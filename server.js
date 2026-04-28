@@ -44,7 +44,6 @@ app.post('/preview', async (req, res) => {
         aspect_ratio: '1:1',
         resolution: '1K',
         num_images: 1,
-        elements: [{ frontal_image_url: image_url }],
       },
     });
     res.json({ url: result.data.images[0].url });
@@ -64,7 +63,6 @@ app.post('/generate', async (req, res) => {
         aspect_ratio: '1:1',
         resolution: '2K',
         num_images: 1,
-        elements: [{ frontal_image_url: image_url }],
       },
     });
     res.json({ url: result.data.images[0].url });
