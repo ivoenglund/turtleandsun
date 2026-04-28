@@ -41,8 +41,7 @@ app.post('/preview', async (req, res) => {
       input: {
         image_url,
         prompt: ROYAL_PORTRAIT_PROMPT,
-        resolution: '1k',
-        num_images: 1,
+        aspect_ratio: '1:1',
       },
     });
     res.json({ url: result.data.images[0].url });
@@ -59,8 +58,7 @@ app.post('/generate', async (req, res) => {
       input: {
         image_url,
         prompt: ROYAL_PORTRAIT_PROMPT,
-        resolution: '2k',
-        num_images: 1,
+        aspect_ratio: '1:1',
       },
     });
     res.json({ url: result.data.images[0].url });
