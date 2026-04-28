@@ -28,29 +28,62 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
+const ROYAL_PORTRAIT_PROMPT =
+  'A regal royal portrait painting of the same person, wearing an ornate crown and royal robes, ' +
+  'set in a grand palace with dramatic lighting. Preserve the exact face, facial features, skin tone, ' +
+  'age, and likeness of the person. Oil painting style, highly detailed, museum quality.';
+
 app.post('/preview', async (req, res) => {
   const { image_url } = req.body;
-  if (!image_url) {
-    return res.status(400).json({ error: 'image_url is required' });
-  }
+  if (!image_url) return res.status(400).json({ error: 'image_url is required' });
   try {
-    const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
+    const result = await fal.subscribe('fal-ai/kling-image/v3/image-to-image', {
       input: {
         image_url,
-        prompt:
-          'A regal royal portrait painting of the same person, wearing an ornate crown and royal robes, ' +
-          'set in a grand palace with dramatic lighting. Preserve the exact face, facial features, skin tone, ' +
-          'age, and likeness of the person. Oil painting style, highly detailed, museum quality.',
-        strength: 0.65,
-        num_inference_steps: 28,
-        guidance_scale: 3.5,
-        image_size: { width: 1024, height: 1024 },
+        prompt: ROYAL_PORTRAIT_PROMPT,
+        resolution: '1k',
         num_images: 1,
       },
     });
     res.json({ url: result.data.images[0].url });
   } catch (err) {
     res.status(500).json({ error: 'Preview generation failed', details: err.message });
+  }
+});
+
+app.post('/generate', async (req, res) => {
+  const { image_url } = req.body;
+  if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+  try {
+    const result = await fal.subscribe('fal-ai/kling-image/v3/image-to-image', {
+      input: {
+        image_url,
+        prompt: ROYAL_PORTRAIT_PROMPT,
+        resolution: '2k',
+        num_images: 1,
+      },
+    });
+    res.json({ url: result.data.images[0].url });
+  } catch (err) {
+    res.status(500).json({ error: 'Image generation failed', details: err.message });
+  }
+});
+
+app.post('/video', async (req, res) => {
+  const { image_url } = req.body;
+  if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+  try {
+    const result = await fal.subscribe('fal-ai/kling-video/v3/pro/image-to-video', {
+      input: {
+        image_url,
+        prompt: ROYAL_PORTRAIT_PROMPT,
+        duration: '10',
+        enable_audio: true,
+      },
+    });
+    res.json({ url: result.data.video.url });
+  } catch (err) {
+    res.status(500).json({ error: 'Video generation failed', details: err.message });
   }
 });
 
