@@ -10,13 +10,16 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email VARCHAR(255) UNIQUE NOT NULL,
-      name VARCHAR(255),
+      preview_count INTEGER DEFAULT 0,
+      has_purchased BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS orders (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id),
+      email VARCHAR(255) NOT NULL,
+      style_id VARCHAR(255),
+      product VARCHAR(255),
       status VARCHAR(50) DEFAULT 'pending',
       amount NUMERIC(10, 2),
       created_at TIMESTAMPTZ DEFAULT NOW()
@@ -24,8 +27,9 @@ async function initDb() {
 
     CREATE TABLE IF NOT EXISTS prompts (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id),
-      content TEXT NOT NULL,
+      style_id VARCHAR(255),
+      prompt_text TEXT NOT NULL,
+      fal_model VARCHAR(255),
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
