@@ -4,15 +4,28 @@ const path = require('path');
 const multer = require('multer');
 const { fal } = require('@fal-ai/client');
 const Stripe = require('stripe');
-const { initDb, pool } = require('./db');
+const { Resend } = require('resend');
+const { initDb, pool, seedGallery } = require('./db');
 const { uploadStream } = require('./cloudinary');
 
 fal.config({ credentials: process.env.FAL_API_KEY });
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
+
+const PRODUCTS = {
+  image:  { name: 'Royal Portrait — Image',  amount: 1900 },
+  video:  { name: 'Royal Portrait — Video',  amount: 2900 },
+  bundle: { name: 'Royal Portrait — Bundle', amount: 3900 },
+};
+
+const ROYAL_PORTRAIT_PROMPT =
+  'A regal royal portrait painting of the same person, wearing an ornate crown and royal robes, ' +
+  'set in a grand palace with dramatic lighting. Preserve the exact face, facial features, skin tone, ' +
+  'age, and likeness of the person. Oil painting style, highly detailed, museum quality.';
 
 // Webhook must use raw body before express.json()
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -25,23 +38,43 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const { email, image_url, product } = session.metadata;
+  if (event.type === 'payment_intent.succeeded') {
+    const pi = event.data.object;
+    const { email, image_url, product } = pi.metadata || {};
+
+    if (!image_url || !product) {
+      return res.json({ received: true });
+    }
 
     // Record order
+    let orderId;
     try {
-      await pool.query(
-        'INSERT INTO orders (email, style_id, product, status, amount) VALUES ($1, $2, $3, $4, $5)',
-        [email, null, product, 'paid', session.amount_total / 100]
+      const orderRes = await pool.query(
+        'INSERT INTO orders (email, style_id, product, status, amount) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [email || '', null, product, 'paid', pi.amount / 100]
       );
+      orderId = orderRes.rows[0].id;
     } catch (err) {
       console.error('Order insert error:', err.message);
     }
 
-    // Trigger generation in background
-    generateForOrder(image_url, product).catch(err =>
-      console.error('Generation error for order:', session.id, err.message)
+    // Mark user as purchased and reset preview counter
+    if (email) {
+      try {
+        await pool.query(
+          `INSERT INTO users (email, has_purchased, preview_count)
+           VALUES ($1, TRUE, 0)
+           ON CONFLICT (email) DO UPDATE SET has_purchased = TRUE, preview_count = 0`,
+          [email]
+        );
+      } catch (err) {
+        console.error('User update error:', err.message);
+      }
+    }
+
+    // Trigger full-quality generation in background
+    generateForOrder(image_url, product, email || '', orderId).catch(err =>
+      console.error('Generation error for payment_intent:', pi.id, err.message)
     );
   }
 
@@ -50,17 +83,6 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
-
-const PRODUCTS = {
-  image:  { name: 'Royal Portrait — Image',  amount: 1900 },
-  video:  { name: 'Royal Portrait — Video',  amount: 2900 },
-  bundle: { name: 'Royal Portrait — Bundle', amount: 3900 },
-};
-
-const ROYAL_PORTRAIT_PROMPT =
-  'A regal royal portrait painting of the same person, wearing an ornate crown and royal robes, ' +
-  'set in a grand palace with dramatic lighting. Preserve the exact face, facial features, skin tone, ' +
-  'age, and likeness of the person. Oil painting style, highly detailed, museum quality.';
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'turtleandsun-landing.html'));
@@ -96,6 +118,9 @@ app.post('/create-checkout-session', async (req, res) => {
       mode: 'payment',
       customer_email: email || undefined,
       metadata: { product, image_url, email: email || '' },
+      payment_intent_data: {
+        metadata: { product, image_url, email: email || '' },
+      },
       success_url: `${origin}/?order=success`,
       cancel_url: `${origin}/?order=cancelled`,
     });
@@ -106,8 +131,31 @@ app.post('/create-checkout-session', async (req, res) => {
 });
 
 app.post('/preview', async (req, res) => {
-  const { image_url } = req.body;
+  const { image_url, email } = req.body;
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+  if (!email) return res.status(400).json({ error: 'email is required' });
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO users (email, preview_count)
+       VALUES ($1, 1)
+       ON CONFLICT (email) DO UPDATE
+         SET preview_count = CASE
+           WHEN users.has_purchased = TRUE THEN users.preview_count
+           ELSE users.preview_count + 1
+         END
+       RETURNING preview_count, has_purchased`,
+      [email]
+    );
+    const { preview_count, has_purchased } = result.rows[0];
+
+    if (!has_purchased && preview_count > 3) {
+      return res.status(403).json({ error: 'Preview limit reached. Purchase to continue.' });
+    }
+  } catch (err) {
+    console.error('Preview user upsert error:', err.message);
+  }
+
   try {
     const result = await fal.subscribe('fal-ai/kling-image/v3/image-to-image', {
       input: {
@@ -147,6 +195,24 @@ app.post('/video', async (req, res) => {
   }
 });
 
+app.get('/gallery', async (req, res) => {
+  const { category } = req.query;
+  try {
+    let query, params;
+    if (category && category !== 'all') {
+      query = 'SELECT style_id, style_name, description, example_image_url, category FROM prompts WHERE LOWER(category) = LOWER($1) ORDER BY id';
+      params = [category];
+    } else {
+      query = 'SELECT style_id, style_name, description, example_image_url, category FROM prompts ORDER BY id';
+      params = [];
+    }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch gallery', details: err.message });
+  }
+});
+
 async function generateImage(image_url) {
   const result = await fal.subscribe('fal-ai/kling-image/v3/image-to-image', {
     input: {
@@ -172,18 +238,67 @@ async function generateVideo(image_url) {
   return result.data.video.url;
 }
 
-async function generateForOrder(image_url, product) {
+async function generateForOrder(image_url, product, email, orderId) {
+  let imageUrl = null;
+  let videoUrl = null;
+
   if (product === 'image' || product === 'bundle') {
-    const url = await generateImage(image_url);
-    console.log('Generated image:', url);
+    imageUrl = await generateImage(image_url);
+    console.log('Generated image:', imageUrl);
+    if (orderId) {
+      await pool.query('UPDATE orders SET result_url = $1 WHERE id = $2', [imageUrl, orderId]);
+    }
   }
+
   if (product === 'video' || product === 'bundle') {
-    const url = await generateVideo(image_url);
-    console.log('Generated video:', url);
+    videoUrl = await generateVideo(image_url);
+    console.log('Generated video:', videoUrl);
+    if (orderId) {
+      await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
+    }
+  }
+
+  if (email) {
+    await sendResultEmail(email, product, imageUrl, videoUrl);
+  }
+}
+
+async function sendResultEmail(email, product, imageUrl, videoUrl) {
+  const links = [];
+  if (imageUrl) {
+    links.push(`<p style="margin:16px 0;"><a href="${imageUrl}" style="display:inline-block;padding:12px 24px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download Your Royal Portrait</a></p>`);
+  }
+  if (videoUrl) {
+    links.push(`<p style="margin:16px 0;"><a href="${videoUrl}" style="display:inline-block;padding:12px 24px;background:#1C2A14;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download Your Royal Portrait Video</a></p>`);
+  }
+
+  const productLabel = product === 'bundle' ? 'Royal Portrait Bundle' : product === 'video' ? 'Royal Portrait Video' : 'Royal Portrait Image';
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#FFF9E6;padding:40px 32px;border-radius:12px;">
+      <h1 style="font-size:26px;color:#1C0A00;margin-bottom:8px;">Your Royal Portrait is Ready! &#128081;</h1>
+      <p style="font-size:16px;color:#3C2000;margin-bottom:24px;">Thank you for your order. Your <strong>${productLabel}</strong> has been created and is ready to download.</p>
+      ${links.join('')}
+      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.1);margin:32px 0 16px;" />
+      <p style="font-size:13px;color:#888;margin:0;">Links expire after 24 hours. Reply to this email if you need any help.</p>
+      <p style="font-size:13px;color:#888;margin-top:8px;">&#8212; Turtle and Sun</p>
+    </div>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: 'Turtle and Sun <noreply@turtleandsun.com>',
+      to: email,
+      subject: 'Your Royal Portrait is Ready! 👑',
+      html,
+    });
+    console.log('Email sent to', email);
+  } catch (err) {
+    console.error('Email send failed:', err.message);
   }
 }
 
 initDb()
+  .then(() => seedGallery())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
