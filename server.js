@@ -8,7 +8,7 @@ const { uploadStream } = require('./cloudinary');
 fal.config({ credentials: process.env.FAL_API_KEY });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(express.json());
