@@ -40,11 +40,10 @@ app.post('/preview', async (req, res) => {
     const result = await fal.subscribe('fal-ai/kling-image/v3/image-to-image', {
       input: {
         image_url,
-        prompt: ROYAL_PORTRAIT_PROMPT + ' @Element1',
+        prompt: ROYAL_PORTRAIT_PROMPT,
         aspect_ratio: '1:1',
         resolution: '1K',
         num_images: 1,
-        elements: [{ frontal_image_url: image_url }],
       },
     });
     res.json({ url: result.data.images[0].url });
