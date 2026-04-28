@@ -49,7 +49,8 @@ app.post('/preview', async (req, res) => {
     });
     res.json({ url: result.data.images[0].url });
   } catch (err) {
-    res.status(500).json({ error: 'Preview generation failed', details: err.message });
+    console.error('Preview error:', JSON.stringify(err, null, 2));
+    res.status(500).json({ error: 'Preview generation failed', details: err.message, body: err.body ?? null });
   }
 });
 
