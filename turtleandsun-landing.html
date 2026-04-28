@@ -53,6 +53,17 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .g-card canvas{display:block;width:100%;height:100%;}
 .trust{display:flex;justify-content:space-between;padding:14px 0;flex-wrap:wrap;gap:8px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;}
 .ti{font-size:12px;color:rgba(60,20,0,0.55);display:flex;align-items:center;gap:5px;}
+.step-upload{cursor:pointer;transition:border-color 0.15s,background 0.15s;}
+.step-upload:hover{border-color:rgba(0,0,0,0.35);background:rgba(255,220,60,0.7);}
+#uploadThumb{width:56px;height:56px;border-radius:8px;object-fit:cover;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.18);}
+#uploadIcon{transition:opacity 0.2s;}
+.btn-preview{width:100%;padding:9px;background:#3A6B20;color:white;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background 0.18s;display:none;margin-top:2px;}
+.btn-preview:hover:not(:disabled){background:#1C0A00;}
+.btn-preview:disabled{opacity:0.5;cursor:not-allowed;}
+#previewResult{width:100%;border-radius:8px;overflow:hidden;display:none;margin-top:4px;}
+#previewResult img{width:100%;display:block;border-radius:8px;}
+.spinner{width:20px;height:20px;border:2.5px solid rgba(0,0,0,0.15);border-top-color:#3A6B20;border-radius:50%;animation:spin 0.7s linear infinite;display:none;margin:2px auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
 @media(max-width:700px){.wrap{padding:0 16px;}.hero-imgs{grid-template-columns:1fr 1fr;}.steps{grid-template-columns:1fr 1fr;}.g-grid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
@@ -95,18 +106,23 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
   </div>
 
   <div class="steps">
-    <div class="step">
+    <div class="step step-upload" id="step1" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display:none">
       <div class="snum">1</div>
       <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="1.5" style="margin-top:4px;"><path d="M12 16V8m0 0l-3 3m3-3l3 3M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1"/></svg>
-      <div class="stitle">Drop image here or<br>click to upload</div>
-      <div class="ssub">JPG, PNG, WEBP</div>
+      <svg id="uploadIcon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="1.5" style="margin-top:4px;"><path d="M12 16V8m0 0l-3 3m3-3l3 3M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1"/></svg>
+      <img id="uploadThumb" src="" alt="Uploaded photo">
+      <div class="stitle" id="uploadLabel">Drop image here or<br>click to upload</div>
+      <div class="ssub" id="uploadSub">JPG, PNG, WEBP</div>
     </div>
-    <div class="step">
+    <div class="step" id="step2">
       <div class="snum">2</div>
       <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="sgrid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
+      <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
       <div class="stitle">Choose style &amp; generate<br>a preview</div>
+      <button class="btn-preview" id="btnPreview" onclick="generatePreview()">Generate preview</button>
+      <div class="spinner" id="previewSpinner"></div>
+      <div id="previewResult"><img id="previewImg" src="" alt="Preview"></div>
     </div>
     <div class="step">
       <div class="snum">3</div>
@@ -197,6 +213,73 @@ window.showDesc = function(cat) {
 };
 
 window.setF=function(cat,btn){document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');window.showDesc(cat);};
+
+let cloudinaryUrl = null;
+
+document.getElementById('fileInput').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Show local thumbnail immediately
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('uploadThumb').src = ev.target.result;
+    document.getElementById('uploadThumb').style.display = 'block';
+    document.getElementById('uploadIcon').style.display = 'none';
+    document.getElementById('uploadLabel').textContent = file.name.length > 20 ? file.name.slice(0,18)+'…' : file.name;
+    document.getElementById('uploadSub').textContent = 'Uploading…';
+  };
+  reader.readAsDataURL(file);
+
+  // Upload to Cloudinary via /upload
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.url) {
+      cloudinaryUrl = data.url;
+      document.getElementById('uploadSub').textContent = 'Uploaded ✓';
+      document.getElementById('btnPreview').style.display = 'block';
+    } else {
+      document.getElementById('uploadSub').textContent = 'Upload failed';
+    }
+  } catch (err) {
+    document.getElementById('uploadSub').textContent = 'Upload failed';
+  }
+});
+
+window.generatePreview = async function() {
+  if (!cloudinaryUrl) return;
+  const btn = document.getElementById('btnPreview');
+  const spinner = document.getElementById('previewSpinner');
+  const result = document.getElementById('previewResult');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  spinner.style.display = 'block';
+  result.style.display = 'none';
+  try {
+    const res = await fetch('/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: cloudinaryUrl }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      document.getElementById('previewImg').src = data.url;
+      result.style.display = 'block';
+      document.getElementById('step2Grid').style.display = 'none';
+      btn.textContent = 'Regenerate';
+    } else {
+      btn.textContent = 'Try again';
+    }
+  } catch (err) {
+    btn.textContent = 'Try again';
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+};
 </script>
 </body>
 </html>
