@@ -160,9 +160,7 @@ app.post('/preview', async (req, res) => {
     const result = await fal.subscribe('fal-ai/kling-image/o1', {
       input: {
         prompt: 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.',
-        images: [{ url: image_url, name: 'Image1' }],
-        aspect_ratio: '1:1',
-        num_images: 1,
+        image_urls: [image_url],
       },
     });
     res.json({ url: result.data.images[0].url });
