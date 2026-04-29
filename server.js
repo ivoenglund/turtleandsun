@@ -273,20 +273,46 @@ async function generateVideo(image_url) {
   return result.data.video.url;
 }
 
+// Bundle 4K: kling-image/o1 at 2K resolution
+async function generateBundleImage(image_url) {
+  const result = await fal.subscribe('fal-ai/kling-image/o1', {
+    input: {
+      prompt: 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.',
+      image_urls: [image_url],
+      resolution: '2K',
+    },
+  });
+  return result.data.images[0].url;
+}
+
+// Bundle 4K: full 10s video (kling max) vs 5s for individual
+async function generateBundleVideo(image_url) {
+  const result = await fal.subscribe('fal-ai/kling-video/v3/pro/image-to-video', {
+    input: {
+      image_url,
+      prompt: ROYAL_VIDEO_PROMPT,
+      duration: '10',
+      enable_audio: true,
+    },
+  });
+  return result.data.video.url;
+}
+
 async function generateForOrder(image_url, product, email, orderId) {
+  const isBundle = product === 'bundle';
   let imageUrl = null;
   let videoUrl = null;
 
-  if (product === 'image' || product === 'bundle') {
-    imageUrl = await generateImage(image_url);
+  if (product === 'image' || isBundle) {
+    imageUrl = await (isBundle ? generateBundleImage(image_url) : generateImage(image_url));
     console.log('Generated image:', imageUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_url = $1 WHERE id = $2', [imageUrl, orderId]);
     }
   }
 
-  if (product === 'video' || product === 'bundle') {
-    videoUrl = await generateVideo(image_url);
+  if (product === 'video' || isBundle) {
+    videoUrl = await (isBundle ? generateBundleVideo(image_url) : generateVideo(image_url));
     console.log('Generated video:', videoUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
