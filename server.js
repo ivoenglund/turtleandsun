@@ -88,19 +88,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'turtleandsun-landing.html'));
 });
 
-app.get('/test-email', async (req, res) => {
-  try {
-    const result = await resend.emails.send({
-      from: 'Turtle and Sun <noreply@turtleandsun.com>',
-      to: 'ivo.englund@gmail.com',
-      subject: 'Test Loveogram',
-      html: '<p>Your Loveogram is ready!</p>',
-    });
-    res.json({ ok: true, id: result.data?.id });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
 
 app.post('/upload', upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -290,7 +277,7 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
   await resend.emails.send({
     from: 'Turtle and Sun <noreply@turtleandsun.com>',
     to: email,
-    subject: 'Your Loveogram is ready!',
+    subject: 'Your Loveogram is ready! 🎨',
     html,
   });
   console.log('Email sent to', email);
