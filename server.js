@@ -17,15 +17,10 @@ const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PRODUCTS = {
-  image:  { name: 'Royal Portrait — Image HD',    amount: 1499 },
-  video:  { name: 'Royal Portrait — Video HD',    amount: 1999 },
-  bundle: { name: 'Royal Portrait — Bundle 4K',   amount: 2999 },
+  image:  { name: 'Royal Portrait — Image',   amount: 1499 },
+  video:  { name: 'Royal Portrait — Video',   amount: 1999 },
+  bundle: { name: 'Royal Portrait — Bundle',  amount: 2999 },
 };
-
-const ROYAL_PORTRAIT_PROMPT =
-  'A regal royal portrait painting of the same person, wearing an ornate crown and royal robes, ' +
-  'set in a grand palace with dramatic lighting. Preserve the exact face, facial features, skin tone, ' +
-  'age, and likeness of the person. Oil painting style, highly detailed, museum quality.';
 
 const ROYAL_VIDEO_PROMPT =
   'The royal portrait painting slowly comes to life — subtle movement in the regal robes and hair, ' +
@@ -48,12 +43,12 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const { email, image_url, product } = session.metadata || {};
+    const { email, image_url, portrait_url, product } = session.metadata || {};
 
-    console.log('checkout.session.completed — email:', email, 'product:', product, 'image_url:', image_url);
+    console.log('checkout.session.completed — email:', email, 'product:', product, 'portrait_url:', portrait_url);
 
-    if (!image_url || !product) {
-      console.warn('Webhook missing image_url or product in metadata, skipping generation');
+    if (!product) {
+      console.warn('Webhook missing product in metadata, skipping generation');
       return res.json({ received: true });
     }
 
@@ -84,10 +79,10 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
       }
     }
 
-    // Trigger full-quality generation in background
-    console.log('Starting generation for order:', orderId);
-    generateForOrder(image_url, product, email || '', orderId).catch(err =>
-      console.error('Generation error for session:', session.id, err.message)
+    // Deliver portrait — no re-generation needed
+    console.log('Delivering for order:', orderId);
+    generateForOrder(portrait_url || image_url, product, email || '', orderId).catch(err =>
+      console.error('Delivery error for session:', session.id, err.message)
     );
   }
 
@@ -113,12 +108,13 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 });
 
 app.post('/create-checkout-session', async (req, res) => {
-  const { product, image_url, email } = req.body;
+  const { product, image_url, portrait_url, email } = req.body;
   if (!PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product' });
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
 
   const origin = `${req.protocol}://${req.get('host')}`;
   try {
+    const meta = { product, image_url, portrait_url: portrait_url || '', email: email || '' };
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
@@ -131,10 +127,8 @@ app.post('/create-checkout-session', async (req, res) => {
       }],
       mode: 'payment',
       customer_email: email || undefined,
-      metadata: { product, image_url, email: email || '' },
-      payment_intent_data: {
-        metadata: { product, image_url, email: email || '' },
-      },
+      metadata: meta,
+      payment_intent_data: { metadata: meta },
       success_url: `${origin}/?order=success`,
       cancel_url: `${origin}/?order=cancelled`,
     });
@@ -184,27 +178,6 @@ app.post('/preview', async (req, res) => {
   }
 });
 
-app.post('/generate', async (req, res) => {
-  const { image_url } = req.body;
-  if (!image_url) return res.status(400).json({ error: 'image_url is required' });
-  try {
-    const result = await generateImage(image_url);
-    res.json({ url: result });
-  } catch (err) {
-    res.status(500).json({ error: 'Image generation failed', details: err.message });
-  }
-});
-
-app.post('/video', async (req, res) => {
-  const { image_url } = req.body;
-  if (!image_url) return res.status(400).json({ error: 'image_url is required' });
-  try {
-    const result = await generateVideo(image_url);
-    res.json({ url: result });
-  } catch (err) {
-    res.status(500).json({ error: 'Video generation failed', details: err.message });
-  }
-});
 
 app.post('/generate-video', async (req, res) => {
   const { image_url, email, order_id } = req.body;
@@ -248,23 +221,10 @@ app.get('/gallery', async (req, res) => {
   }
 });
 
-async function generateImage(image_url) {
-  const result = await fal.subscribe('fal-ai/kling-image/v3/image-to-image', {
-    input: {
-      image_url,
-      prompt: ROYAL_PORTRAIT_PROMPT,
-      aspect_ratio: '1:1',
-      resolution: '2K',
-      num_images: 1,
-    },
-  });
-  return result.data.images[0].url;
-}
-
-async function generateVideo(image_url) {
+async function generateVideo(portrait_url) {
   const result = await fal.subscribe('fal-ai/kling-video/v3/pro/image-to-video', {
     input: {
-      image_url,
+      image_url: portrait_url,
       prompt: ROYAL_VIDEO_PROMPT,
       duration: '5',
       enable_audio: true,
@@ -273,46 +233,21 @@ async function generateVideo(image_url) {
   return result.data.video.url;
 }
 
-// Bundle 4K: kling-image/o1 at 2K resolution
-async function generateBundleImage(image_url) {
-  const result = await fal.subscribe('fal-ai/kling-image/o1', {
-    input: {
-      prompt: 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.',
-      image_urls: [image_url],
-      resolution: '2K',
-    },
-  });
-  return result.data.images[0].url;
-}
-
-// Bundle 4K: full 10s video (kling max) vs 5s for individual
-async function generateBundleVideo(image_url) {
-  const result = await fal.subscribe('fal-ai/kling-video/v3/pro/image-to-video', {
-    input: {
-      image_url,
-      prompt: ROYAL_VIDEO_PROMPT,
-      duration: '10',
-      enable_audio: true,
-    },
-  });
-  return result.data.video.url;
-}
-
-async function generateForOrder(image_url, product, email, orderId) {
-  const isBundle = product === 'bundle';
+// portrait_url is the already-generated preview image — no re-generation needed for image product
+async function generateForOrder(portrait_url, product, email, orderId) {
   let imageUrl = null;
   let videoUrl = null;
 
-  if (product === 'image' || isBundle) {
-    imageUrl = await (isBundle ? generateBundleImage(image_url) : generateImage(image_url));
-    console.log('Generated image:', imageUrl);
+  if (product === 'image' || product === 'bundle') {
+    imageUrl = portrait_url;
+    console.log('Using preview portrait as final image:', imageUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_url = $1 WHERE id = $2', [imageUrl, orderId]);
     }
   }
 
-  if (product === 'video' || isBundle) {
-    videoUrl = await (isBundle ? generateBundleVideo(image_url) : generateVideo(image_url));
+  if (product === 'video' || product === 'bundle') {
+    videoUrl = await generateVideo(portrait_url);
     console.log('Generated video:', videoUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
