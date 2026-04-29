@@ -17,9 +17,9 @@ const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PRODUCTS = {
-  image:  { name: 'Royal Portrait — Image',  amount: 1900 },
-  video:  { name: 'Royal Portrait — Video',  amount: 2900 },
-  bundle: { name: 'Royal Portrait — Bundle', amount: 3900 },
+  image:  { name: 'Royal Portrait — Image HD',    amount: 1499 },
+  video:  { name: 'Royal Portrait — Video HD',    amount: 1999 },
+  bundle: { name: 'Royal Portrait — Bundle 4K',   amount: 2999 },
 };
 
 const ROYAL_PORTRAIT_PROMPT =
