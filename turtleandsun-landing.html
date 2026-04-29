@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
       <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
       <div class="stitle">Choose style &amp; generate<br>a preview</div>
       <input type="email" id="previewEmail" placeholder="Your email" style="width:100%;padding:7px 10px;border:1.5px solid rgba(0,0,0,0.18);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;margin-bottom:6px;outline:none;background:rgba(255,255,255,0.7);" />
-      <button class="btn-preview" id="btnPreview" onclick="generatePreview()">Generate preview</button>
+      <button class="btn-preview" id="btnPreview">Generate preview</button>
       <div class="spinner" id="previewSpinner"></div>
       <div id="previewResult"><img id="previewImg" src="" alt="Preview"></div>
     </div>
@@ -248,10 +248,16 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   }
 });
 
-window.generatePreview = async function() {
-  if (!cloudinaryUrl) return;
+document.getElementById('btnPreview').addEventListener('click', async function() {
+  if (!cloudinaryUrl) {
+    alert('Please upload a photo first.');
+    return;
+  }
   const email = document.getElementById('previewEmail').value.trim();
-  if (!email) { alert('Please enter your email to generate a preview.'); return; }
+  if (!email) {
+    alert('Please enter your email to generate a preview.');
+    return;
+  }
   const btn = document.getElementById('btnPreview');
   const spinner = document.getElementById('previewSpinner');
   const result = document.getElementById('previewResult');
@@ -266,8 +272,8 @@ window.generatePreview = async function() {
       body: JSON.stringify({ image_url: cloudinaryUrl, email }),
     });
     if (res.status === 403) {
-      btn.textContent = 'Limit reached';
       alert('You have used your 3 free previews. Purchase to continue.');
+      btn.textContent = 'Generate preview';
       return;
     }
     const data = await res.json();
@@ -281,12 +287,13 @@ window.generatePreview = async function() {
       btn.textContent = 'Try again';
     }
   } catch (err) {
+    console.error('Preview error:', err);
     btn.textContent = 'Try again';
   } finally {
     btn.disabled = false;
     spinner.style.display = 'none';
   }
-};
+});
 
 let selectedProduct = null;
 
