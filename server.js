@@ -238,6 +238,10 @@ app.get('/account', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'account.html'));
 });
 
+app.get('/account/contacts', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'contacts.html'));
+});
+
 app.get('/api/account/data', requireAuth, async (req, res) => {
   try {
     const orders = await pool.query(

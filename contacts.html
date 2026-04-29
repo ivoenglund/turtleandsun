@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sync Contacts — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#FFF9E6;color:#1C0A00;min-height:100vh;}
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(0,0,0,0.07);}
+.wrap{max-width:1100px;margin:0 auto;padding:0 40px;}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0 21px;}
+.nav a img{height:90px;width:auto;margin-top:-56px;display:block;}
+.nav-links{display:flex;gap:36px;align-items:center;}
+.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.72;}
+.nav-links a:hover{opacity:1;}
+.nav-account-wrap{position:relative;}
+#accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
+#accountDropdown.open{display:block;}
+#accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
+#accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
+#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;}
+#accountDropdown input:focus{border-color:#3A6B20;}
+#accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
+#accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
+#accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
+#accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
+#accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
+#ddUser{display:none;}
+.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
+.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
+.dd-user-link:hover{opacity:0.72;}
+.dd-user-logout{color:#c0392b !important;}
+.main{max-width:760px;margin:0 auto;padding:36px 40px 80px;}
+.page-header{margin-bottom:32px;}
+.page-header h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px;}
+.page-header p{font-size:14px;color:rgba(60,20,0,0.6);line-height:1.5;}
+.card{background:#fff;border-radius:12px;padding:24px 28px;box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:20px;}
+.card h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;margin-bottom:6px;}
+.card p{font-size:14px;color:rgba(60,20,0,0.65);line-height:1.6;margin-bottom:16px;}
+.btn-google{display:inline-flex;align-items:center;gap:10px;padding:11px 20px;background:#fff;color:#1C0A00;border:1.5px solid rgba(0,0,0,0.18);border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:border-color 0.18s,box-shadow 0.18s;}
+.btn-google:hover{border-color:#3A6B20;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.btn-google svg{flex-shrink:0;}
+.divider{display:flex;align-items:center;gap:12px;margin:20px 0;}
+.divider hr{flex:1;border:none;border-top:1px solid #f0ede6;}
+.divider span{font-size:12px;color:rgba(60,20,0,0.4);white-space:nowrap;}
+.upload-instructions{background:#f9f7f0;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:rgba(60,20,0,0.75);line-height:1.7;}
+.upload-instructions ol{padding-left:16px;}
+.upload-instructions li{margin-bottom:4px;}
+.upload-instructions a{color:#3A6B20;font-weight:500;}
+.file-row{display:flex;gap:10px;align-items:center;}
+.file-input-label{display:inline-block;padding:9px 16px;background:#f0ede6;border:1.5px solid rgba(0,0,0,0.12);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;color:#1C0A00;transition:background 0.15s;}
+.file-input-label:hover{background:#e5e0d4;}
+#csvFile{display:none;}
+#csvName{font-size:13px;color:rgba(60,20,0,0.55);}
+.btn-upload{padding:9px 20px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.18s;}
+.btn-upload:hover:not(:disabled){background:#1C0A00;}
+.btn-upload:disabled{opacity:0.45;cursor:not-allowed;}
+.upload-msg{font-size:13px;margin-top:10px;min-height:18px;}
+.upload-msg.ok{color:#3A6B20;} .upload-msg.err{color:#c0392b;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:9px 12px;color:rgba(60,20,0,0.5);font-weight:600;border-bottom:1.5px solid #f0ede6;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;}
+td{padding:10px 12px;border-bottom:1px solid #f5f2ea;vertical-align:middle;}
+.empty-row td{text-align:center;color:rgba(60,20,0,0.35);padding:32px;font-size:14px;}
+@media(max-width:700px){.wrap,.main{padding:0 16px;}.main{padding-top:24px;}.file-row{flex-wrap:wrap;}}
+</style>
+</head>
+<body>
+<div class="nav-bar">
+  <div class="wrap">
+    <div class="nav">
+      <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
+      <div class="nav-links">
+        <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
+        <span class="nav-account-wrap">
+          <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
+          <div id="accountDropdown">
+            <div id="ddGuest">
+              <h4>Log in</h4>
+              <p>Enter your email and we'll send you a magic link.</p>
+              <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
+              <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
+              <div class="dd-msg" id="ddMsg"></div>
+            </div>
+            <div id="ddUser">
+              <div class="dd-user-email" id="ddUserEmail"></div>
+              <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
+              <a class="dd-user-link" href="/account/contacts">Sync Contacts</a>
+              <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
+            </div>
+          </div>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="main">
+  <div class="page-header">
+    <h1>Sync Contacts</h1>
+    <p>Import your contacts to quickly send Loveograms to people you care about.</p>
+  </div>
+
+  <div class="card">
+    <h2>Connect Google Contacts</h2>
+    <p>Sign in with Google to automatically sync your contacts. We only request read access to your contacts list.</p>
+    <a href="#" class="btn-google" onclick="handleGoogleConnect(event)">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+        <path d="M3.964 10.706A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Connect Google Contacts
+    </a>
+  </div>
+
+  <div class="card">
+    <h2>Upload from CSV</h2>
+    <p>Export your contacts from Google Contacts as a CSV file and upload here.</p>
+    <div class="upload-instructions">
+      <ol>
+        <li>Go to <a href="https://contacts.google.com" target="_blank" rel="noopener">contacts.google.com</a></li>
+        <li>Click <strong>Export</strong> in the left sidebar</li>
+        <li>Choose <strong>Google CSV</strong> format and click Export</li>
+        <li>Upload the downloaded file below</li>
+      </ol>
+    </div>
+    <div class="file-row">
+      <label class="file-input-label" for="csvFile">Choose CSV file</label>
+      <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(this)">
+      <span id="csvName">No file selected</span>
+      <button class="btn-upload" id="btnUpload" disabled onclick="handleCsvUpload()">Upload</button>
+    </div>
+    <div class="upload-msg" id="uploadMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Contacts</h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Phone</th><th>Source</th></tr>
+      </thead>
+      <tbody id="contactsBody">
+        <tr class="empty-row"><td colspan="4">No contacts synced yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function handleGoogleConnect(e) {
+  e.preventDefault();
+  alert('Google Contacts OAuth coming soon.');
+}
+
+function handleFileSelect(input) {
+  const name = input.files[0]?.name || 'No file selected';
+  document.getElementById('csvName').textContent = name;
+  document.getElementById('btnUpload').disabled = !input.files[0];
+}
+
+function handleCsvUpload() {
+  document.getElementById('uploadMsg').className = 'upload-msg ok';
+  document.getElementById('uploadMsg').textContent = 'CSV import coming soon.';
+}
+
+// ── Shared nav ────────────────────────────────────────────────────────────────
+let _authStatus = null;
+async function initAuthNav() {
+  try {
+    const res = await fetch('/api/auth/status');
+    _authStatus = res.ok ? await res.json() : false;
+  } catch { _authStatus = false; }
+  if (!_authStatus || !_authStatus.loggedIn) { window.location.href = '/login'; return; }
+  document.getElementById('ddGuest').style.display = 'none';
+  document.getElementById('ddUser').style.display = 'block';
+  document.getElementById('ddUserEmail').textContent = _authStatus.email;
+  document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
+}
+function handleAccountClick(e) {
+  e.preventDefault();
+  if (_authStatus === null) return;
+  const dd = document.getElementById('accountDropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open') && (!_authStatus || !_authStatus.loggedIn)) document.getElementById('ddEmail').focus();
+}
+async function sendNavMagicLink() {
+  const email = document.getElementById('ddEmail').value.trim();
+  const btn = document.getElementById('ddBtn');
+  const msg = document.getElementById('ddMsg');
+  if (!email || !email.includes('@')) { msg.className = 'dd-msg err'; msg.textContent = 'Enter a valid email.'; return; }
+  btn.disabled = true; btn.textContent = 'Sending…'; msg.className = 'dd-msg'; msg.textContent = '';
+  try {
+    const res = await fetch('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('ddEmail').style.display = 'none'; btn.style.display = 'none'; msg.className = 'dd-msg ok'; msg.textContent = 'Check your inbox for the login link.'; }
+    else { msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+  } catch { msg.className = 'dd-msg err'; msg.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+}
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('accountDropdown');
+  const wrap = document.querySelector('.nav-account-wrap');
+  if (dd && wrap && dd.classList.contains('open') && !wrap.contains(e.target)) dd.classList.remove('open');
+});
+initAuthNav();
+</script>
+</body>
+</html>
