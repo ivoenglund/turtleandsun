@@ -303,7 +303,7 @@ document.getElementById('btnPreview').addEventListener('click', async function()
     alert('Please upload a photo first.');
     return;
   }
-  const email = document.getElementById('previewEmail').value.trim();
+  const email = window._previewEmail || document.getElementById('previewEmail').value.trim();
   if (!email) {
     alert('Please enter your email to generate a preview.');
     return;
@@ -464,6 +464,10 @@ async function initAuthNav() {
     document.getElementById('ddUser').style.display = 'block';
     document.getElementById('ddUserEmail').textContent = _authStatus.email;
     document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
+    // Skip email input in step 2 for logged-in users
+    const emailInput = document.getElementById('previewEmail');
+    if (emailInput) emailInput.style.display = 'none';
+    window._previewEmail = _authStatus.email;
   }
 }
 
