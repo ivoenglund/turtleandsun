@@ -5,14 +5,31 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin — Turtle and Sun</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:Arial,sans-serif;background:#f5f5f2;color:#1C0A00;min-height:100vh;}
-header{background:#1C0A00;color:#FFF9E6;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;}
-header h1{font-size:17px;font-weight:700;}
-header .meta{font-size:13px;opacity:0.65;}
-.logout{background:rgba(255,255,255,0.12);border:none;color:#FFF9E6;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:13px;}
-.logout:hover{background:rgba(255,255,255,0.22);}
-.main{max-width:1200px;margin:0 auto;padding:32px 24px;}
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(0,0,0,0.07);}
+.wrap{max-width:1100px;margin:0 auto;padding:0 40px;}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0 21px;}
+.nav a img{height:90px;width:auto;margin-top:-56px;display:block;}
+.nav-links{display:flex;gap:36px;align-items:center;}
+.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.72;}
+.nav-links a:hover{opacity:1;}
+.nav-account-wrap{position:relative;}
+#accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
+#accountDropdown.open{display:block;}
+#accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
+#accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
+#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;}
+#accountDropdown input:focus{border-color:#3A6B20;}
+#accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
+#accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
+#accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
+#accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
+#accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
+#navLogout{display:none;}
+.main{max-width:1100px;margin:0 auto;padding:32px 40px;}
+.page-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:24px;}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px;}
 .stat{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
 .stat-val{font-size:28px;font-weight:800;color:#3A6B20;}
@@ -45,19 +62,33 @@ tr:hover td{background:#fffdf5;}
 .form-msg{font-size:13px;margin-top:10px;min-height:18px;}
 .form-msg.ok{color:#3A6B20;} .form-msg.err{color:#c0392b;}
 .loading{text-align:center;padding:40px;color:rgba(60,20,0,0.4);font-size:14px;}
+@media(max-width:700px){.wrap,.main{padding:0 16px;}.main{padding-top:24px;}}
 </style>
 </head>
 <body>
-<header>
-  <h1>Admin Dashboard</h1>
-  <div style="display:flex;align-items:center;gap:16px;">
-    <span class="meta" id="adminEmail"></span>
-    <form action="/auth/logout" method="post" style="margin:0;">
-      <button class="logout" type="submit">Log out</button>
-    </form>
+<div class="nav-bar">
+  <div class="wrap">
+    <div class="nav">
+      <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
+      <div class="nav-links">
+        <a href="/">Home</a><a href="/">Pricing</a><a href="/">FAQ</a>
+        <span class="nav-account-wrap">
+          <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
+          <div id="accountDropdown">
+            <h4>Log in</h4>
+            <p>Enter your email and we'll send you a magic link.</p>
+            <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
+            <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
+            <div class="dd-msg" id="ddMsg"></div>
+          </div>
+        </span>
+        <a href="#" id="navLogout" onclick="handleLogout(event)">Logout</a>
+      </div>
+    </div>
   </div>
-</header>
+</div>
 <div class="main">
+  <p class="page-title">Admin Dashboard</p>
   <div id="loading" class="loading">Loading…</div>
   <div id="content" style="display:none;">
     <div class="stats" id="statsRow"></div>
@@ -111,7 +142,6 @@ async function load() {
     if (res.status === 403) { document.getElementById('loading').textContent = 'Access denied.'; return; }
     const { orders, users } = await res.json();
 
-    // Stats
     const revenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + parseFloat(o.amount || 0), 0);
     document.getElementById('statsRow').innerHTML = `
       <div class="stat"><div class="stat-val">${orders.length}</div><div class="stat-lbl">Total orders</div></div>
@@ -120,24 +150,17 @@ async function load() {
       <div class="stat"><div class="stat-val">${users.filter(u => u.has_purchased).length}</div><div class="stat-lbl">Customers</div></div>
     `;
 
-    // Orders
     document.getElementById('ordersBody').innerHTML = orders.length
       ? orders.map(o => `<tr>
-          <td>${o.id}</td>
-          <td>${esc(o.email)}</td>
-          <td>${esc(o.product || '—')}</td>
+          <td>${o.id}</td><td>${esc(o.email)}</td><td>${esc(o.product || '—')}</td>
           <td><span class="badge badge-${o.status}">${o.status}</span></td>
-          <td>$${parseFloat(o.amount || 0).toFixed(2)}</td>
-          <td>${fmtDate(o.created_at)}</td>
+          <td>$${parseFloat(o.amount || 0).toFixed(2)}</td><td>${fmtDate(o.created_at)}</td>
         </tr>`).join('')
       : '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px;">No orders yet</td></tr>';
 
-    // Users
     document.getElementById('usersBody').innerHTML = users.length
       ? users.map(u => `<tr>
-          <td>${u.id}</td>
-          <td>${esc(u.email)}</td>
-          <td>${u.preview_count}</td>
+          <td>${u.id}</td><td>${esc(u.email)}</td><td>${u.preview_count}</td>
           <td>${u.has_purchased ? '✓' : '—'}</td>
           <td>${(u.roles || []).map(r => `<span class="badge badge-${r}">${r}</span>`).join(' ') || '—'}</td>
           <td>${fmtDate(u.created_at)}</td>
@@ -158,27 +181,64 @@ async function manageRole(action) {
   if (!email) { msg.className = 'form-msg err'; msg.textContent = 'Email required.'; return; }
   const endpoint = action === 'grant' ? '/api/admin/grant-role' : '/api/admin/revoke-role';
   try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, role }),
-    });
+    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, role }) });
     const data = await res.json();
-    if (data.ok) {
-      msg.className = 'form-msg ok';
-      msg.textContent = `Role ${action === 'grant' ? 'granted' : 'revoked'} successfully.`;
-      load();
-    } else {
-      msg.className = 'form-msg err';
-      msg.textContent = data.error || 'Failed.';
-    }
+    if (data.ok) { msg.className = 'form-msg ok'; msg.textContent = `Role ${action === 'grant' ? 'granted' : 'revoked'}.`; load(); }
+    else { msg.className = 'form-msg err'; msg.textContent = data.error || 'Failed.'; }
   } catch { msg.className = 'form-msg err'; msg.textContent = 'Network error.'; }
 }
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'; }
 
+// ── Shared nav ────────────────────────────────────────────────────────────────
+let _authStatus = null;
+
+async function initAuthNav() {
+  try {
+    const res = await fetch('/api/auth/status');
+    _authStatus = res.ok ? await res.json() : false;
+  } catch { _authStatus = false; }
+  if (_authStatus && _authStatus.loggedIn) document.getElementById('navLogout').style.display = '';
+}
+
+function handleAccountClick(e) {
+  e.preventDefault();
+  if (_authStatus === null) return;
+  if (_authStatus && _authStatus.loggedIn) { window.location.href = _authStatus.isAdmin ? '/admin' : '/account'; return; }
+  const dd = document.getElementById('accountDropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) document.getElementById('ddEmail').focus();
+}
+
+async function sendNavMagicLink() {
+  const email = document.getElementById('ddEmail').value.trim();
+  const btn = document.getElementById('ddBtn');
+  const msg = document.getElementById('ddMsg');
+  if (!email || !email.includes('@')) { msg.className = 'dd-msg err'; msg.textContent = 'Enter a valid email.'; return; }
+  btn.disabled = true; btn.textContent = 'Sending…'; msg.className = 'dd-msg'; msg.textContent = '';
+  try {
+    const res = await fetch('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('ddEmail').style.display = 'none'; btn.style.display = 'none'; msg.className = 'dd-msg ok'; msg.textContent = 'Check your inbox for the login link.'; }
+    else { msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+  } catch { msg.className = 'dd-msg err'; msg.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+}
+
+async function handleLogout(e) {
+  e.preventDefault();
+  await fetch('/auth/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('accountDropdown');
+  const wrap = document.querySelector('.nav-account-wrap');
+  if (dd && wrap && dd.classList.contains('open') && !wrap.contains(e.target)) dd.classList.remove('open');
+});
+
 load();
+initAuthNav();
 </script>
 </body>
 </html>
