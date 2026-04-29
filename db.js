@@ -50,12 +50,9 @@ async function initDb() {
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS category VARCHAR(50);
   `);
 
-  // Add unique constraint on prompts.style_id for ON CONFLICT support
+  // Unique index on prompts.style_id for ON CONFLICT support
   await pool.query(`
-    DO $$ BEGIN
-      ALTER TABLE prompts ADD CONSTRAINT prompts_style_id_unique UNIQUE (style_id);
-    EXCEPTION WHEN duplicate_object THEN NULL;
-    END $$;
+    CREATE UNIQUE INDEX IF NOT EXISTS prompts_style_id_unique ON prompts (style_id);
   `);
 
   console.log('Database tables ready');
