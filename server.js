@@ -159,6 +159,12 @@ app.get('/auth/verify', async (req, res) => {
   }
 });
 
+app.get('/api/auth/status', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.json({ loggedIn: false });
+  res.json({ loggedIn: true, email: user.email, isAdmin: user.roles.includes('admin') });
+});
+
 app.post('/auth/logout', (req, res) => {
   res.clearCookie('ts_session', { path: '/' });
   res.redirect('/login');
