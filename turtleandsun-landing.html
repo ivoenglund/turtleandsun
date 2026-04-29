@@ -219,18 +219,21 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   const file = e.target.files[0];
   if (!file) return;
 
-  // Show local thumbnail immediately
+  // Reset state for new upload
+  cloudinaryUrl = null;
+  document.getElementById('uploadLabel').textContent = file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name;
+  document.getElementById('uploadSub').textContent = 'Uploading…';
+
+  // Show local thumbnail
   const reader = new FileReader();
   reader.onload = function(ev) {
     document.getElementById('uploadThumb').src = ev.target.result;
     document.getElementById('uploadThumb').style.display = 'block';
     document.getElementById('uploadIcon').style.display = 'none';
-    document.getElementById('uploadLabel').textContent = file.name.length > 20 ? file.name.slice(0,18)+'…' : file.name;
-    document.getElementById('uploadSub').textContent = 'Uploading…';
   };
   reader.readAsDataURL(file);
 
-  // Upload to Cloudinary via /upload
+  // POST to /upload and store Cloudinary URL
   const formData = new FormData();
   formData.append('image', file);
   try {
@@ -239,12 +242,13 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     if (data.url) {
       cloudinaryUrl = data.url;
       document.getElementById('uploadSub').textContent = 'Uploaded ✓';
-      document.getElementById('btnPreview').style.display = 'block';
     } else {
       document.getElementById('uploadSub').textContent = 'Upload failed';
+      console.error('Upload response missing URL:', data);
     }
   } catch (err) {
     document.getElementById('uploadSub').textContent = 'Upload failed';
+    console.error('Upload error:', err);
   }
 });
 
