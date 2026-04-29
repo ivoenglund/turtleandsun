@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Turtle and Sun</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#f5f5f2;color:#1C0A00;min-height:100vh;}
+header{background:#1C0A00;color:#FFF9E6;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;}
+header h1{font-size:17px;font-weight:700;}
+header .meta{font-size:13px;opacity:0.65;}
+.logout{background:rgba(255,255,255,0.12);border:none;color:#FFF9E6;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:13px;}
+.logout:hover{background:rgba(255,255,255,0.22);}
+.main{max-width:1200px;margin:0 auto;padding:32px 24px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px;}
+.stat{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.stat-val{font-size:28px;font-weight:800;color:#3A6B20;}
+.stat-lbl{font-size:13px;color:rgba(60,20,0,0.55);margin-top:4px;}
+section{margin-bottom:40px;}
+h2{font-size:16px;font-weight:700;margin-bottom:14px;color:#1C0A00;}
+.table-wrap{overflow-x:auto;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+th{background:#1C0A00;color:#FFF9E6;text-align:left;padding:10px 14px;font-weight:600;white-space:nowrap;}
+td{padding:9px 14px;border-bottom:1px solid #f0ede6;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fffdf5;}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}
+.badge-admin{background:#c8e6c9;color:#1b5e20;}
+.badge-moderator{background:#fff3cd;color:#856404;}
+.badge-viewer{background:#e3f2fd;color:#0d47a1;}
+.badge-paid{background:#c8e6c9;color:#1b5e20;}
+.badge-pending{background:#fff3cd;color:#856404;}
+.role-form{background:#fff;border-radius:10px;padding:22px 24px;box-shadow:0 1px 4px rgba(0,0,0,0.07);max-width:480px;}
+.role-form h2{margin-bottom:16px;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:12px;font-weight:700;margin-bottom:5px;}
+.field input,.field select{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;}
+.field input:focus,.field select:focus{border-color:#3A6B20;}
+.btn-row{display:flex;gap:10px;margin-top:14px;}
+.btn{padding:9px 20px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-grant{background:#3A6B20;color:#fff;}
+.btn-revoke{background:#c0392b;color:#fff;}
+.btn:hover{opacity:0.87;}
+.form-msg{font-size:13px;margin-top:10px;min-height:18px;}
+.form-msg.ok{color:#3A6B20;} .form-msg.err{color:#c0392b;}
+.loading{text-align:center;padding:40px;color:rgba(60,20,0,0.4);font-size:14px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Admin Dashboard</h1>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <span class="meta" id="adminEmail"></span>
+    <form action="/auth/logout" method="post" style="margin:0;">
+      <button class="logout" type="submit">Log out</button>
+    </form>
+  </div>
+</header>
+<div class="main">
+  <div id="loading" class="loading">Loading…</div>
+  <div id="content" style="display:none;">
+    <div class="stats" id="statsRow"></div>
+
+    <section>
+      <h2>Orders</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Email</th><th>Product</th><th>Status</th><th>Amount</th><th>Date</th></tr></thead>
+          <tbody id="ordersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Users</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Email</th><th>Previews</th><th>Purchased</th><th>Roles</th><th>Joined</th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="role-form">
+        <h2>Manage roles</h2>
+        <div class="field"><label>Email</label><input type="email" id="roleEmail" placeholder="user@example.com"></div>
+        <div class="field">
+          <label>Role</label>
+          <select id="roleSelect">
+            <option value="admin">admin</option>
+            <option value="moderator">moderator</option>
+            <option value="viewer">viewer</option>
+          </select>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-grant" onclick="manageRole('grant')">Grant</button>
+          <button class="btn btn-revoke" onclick="manageRole('revoke')">Revoke</button>
+        </div>
+        <div class="form-msg" id="roleMsg"></div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+async function load() {
+  try {
+    const res = await fetch('/api/admin/data');
+    if (res.status === 401) { location.href = '/login'; return; }
+    if (res.status === 403) { document.getElementById('loading').textContent = 'Access denied.'; return; }
+    const { orders, users } = await res.json();
+
+    // Stats
+    const revenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + parseFloat(o.amount || 0), 0);
+    document.getElementById('statsRow').innerHTML = `
+      <div class="stat"><div class="stat-val">${orders.length}</div><div class="stat-lbl">Total orders</div></div>
+      <div class="stat"><div class="stat-val">$${revenue.toFixed(2)}</div><div class="stat-lbl">Revenue</div></div>
+      <div class="stat"><div class="stat-val">${users.length}</div><div class="stat-lbl">Users</div></div>
+      <div class="stat"><div class="stat-val">${users.filter(u => u.has_purchased).length}</div><div class="stat-lbl">Customers</div></div>
+    `;
+
+    // Orders
+    document.getElementById('ordersBody').innerHTML = orders.length
+      ? orders.map(o => `<tr>
+          <td>${o.id}</td>
+          <td>${esc(o.email)}</td>
+          <td>${esc(o.product || '—')}</td>
+          <td><span class="badge badge-${o.status}">${o.status}</span></td>
+          <td>$${parseFloat(o.amount || 0).toFixed(2)}</td>
+          <td>${fmtDate(o.created_at)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px;">No orders yet</td></tr>';
+
+    // Users
+    document.getElementById('usersBody').innerHTML = users.length
+      ? users.map(u => `<tr>
+          <td>${u.id}</td>
+          <td>${esc(u.email)}</td>
+          <td>${u.preview_count}</td>
+          <td>${u.has_purchased ? '✓' : '—'}</td>
+          <td>${(u.roles || []).map(r => `<span class="badge badge-${r}">${r}</span>`).join(' ') || '—'}</td>
+          <td>${fmtDate(u.created_at)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px;">No users yet</td></tr>';
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  } catch (err) {
+    document.getElementById('loading').textContent = 'Failed to load data.';
+  }
+}
+
+async function manageRole(action) {
+  const email = document.getElementById('roleEmail').value.trim();
+  const role = document.getElementById('roleSelect').value;
+  const msg = document.getElementById('roleMsg');
+  if (!email) { msg.className = 'form-msg err'; msg.textContent = 'Email required.'; return; }
+  const endpoint = action === 'grant' ? '/api/admin/grant-role' : '/api/admin/revoke-role';
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, role }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msg.className = 'form-msg ok';
+      msg.textContent = `Role ${action === 'grant' ? 'granted' : 'revoked'} successfully.`;
+      load();
+    } else {
+      msg.className = 'form-msg err';
+      msg.textContent = data.error || 'Failed.';
+    }
+  } catch { msg.className = 'form-msg err'; msg.textContent = 'Network error.'; }
+}
+
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'; }
+
+load();
+</script>
+</body>
+</html>

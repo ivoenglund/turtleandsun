@@ -40,6 +40,34 @@ async function initDb() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_roles (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'moderator', 'viewer')),
+      granted_by VARCHAR(255),
+      granted_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (user_id, role)
+    );
+
+    CREATE TABLE IF NOT EXISTS magic_links (
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(255) NOT NULL,
+      token VARCHAR(64) NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token VARCHAR(64) NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+  `);
+
   // Migrate existing tables to add new columns
   await pool.query(`
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS result_url TEXT;

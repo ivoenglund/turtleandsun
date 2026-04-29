@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log in — Turtle and Sun</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Arial',sans-serif;background:#FFF9E6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{background:#fff;border-radius:16px;padding:40px 36px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.1);}
+h1{font-size:22px;font-weight:800;color:#1C0A00;margin-bottom:8px;}
+.sub{font-size:14px;color:rgba(60,20,0,0.65);margin-bottom:28px;line-height:1.5;}
+label{display:block;font-size:13px;font-weight:700;color:#1C0A00;margin-bottom:6px;}
+input[type=email]{width:100%;padding:11px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:15px;outline:none;transition:border 0.18s;}
+input[type=email]:focus{border-color:#3A6B20;}
+.btn{display:block;width:100%;padding:12px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px;transition:background 0.18s;}
+.btn:hover:not(:disabled){background:#1C0A00;}
+.btn:disabled{opacity:0.55;cursor:not-allowed;}
+.msg{margin-top:18px;font-size:14px;text-align:center;min-height:20px;}
+.msg.ok{color:#3A6B20;}
+.msg.err{color:#c0392b;}
+.error-banner{background:#fdecea;border:1px solid #f5c6c6;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;color:#c0392b;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Log in</h1>
+  <p class="sub">Enter your email address and we'll send you a magic link to log in instantly — no password needed.</p>
+  <div class="error-banner" id="errorBanner"></div>
+  <form id="loginForm">
+    <label for="email">Email address</label>
+    <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+    <button class="btn" type="submit" id="submitBtn">Send login link</button>
+  </form>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get('error')) {
+    const banner = document.getElementById('errorBanner');
+    const msgs = { invalid: 'That link has expired or already been used. Please request a new one.', missing: 'Invalid link.', server: 'Something went wrong. Please try again.' };
+    banner.textContent = msgs[params.get('error')] || 'Something went wrong.';
+    banner.style.display = 'block';
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const btn = document.getElementById('submitBtn');
+    const msg = document.getElementById('msg');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    msg.className = 'msg';
+    msg.textContent = '';
+    try {
+      const res = await fetch('/auth/request-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('loginForm').style.display = 'none';
+        msg.className = 'msg ok';
+        msg.textContent = 'Check your inbox — your login link is on the way.';
+      } else {
+        msg.className = 'msg err';
+        msg.textContent = data.error || 'Failed to send link. Try again.';
+        btn.disabled = false;
+        btn.textContent = 'Send login link';
+      }
+    } catch {
+      msg.className = 'msg err';
+      msg.textContent = 'Network error. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Send login link';
+    }
+  });
+</script>
+</body>
+</html>

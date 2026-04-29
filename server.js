@@ -2,11 +2,17 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
+const cookieParser = require('cookie-parser');
 const { fal } = require('@fal-ai/client');
 const Stripe = require('stripe');
 const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
 const { uploadStream } = require('./cloudinary');
+const {
+  createMagicLink, verifyMagicLink, findOrCreateUser,
+  createSession, setSessionCookie, getSessionUser,
+  requireAuth, requireRole,
+} = require('./auth');
 
 fal.config({ credentials: process.env.FAL_API_KEY });
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -89,11 +95,148 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
   res.json({ received: true });
 });
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'turtleandsun-landing.html'));
+});
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+app.post('/auth/request-link', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email required' });
+  }
+  const normalised = email.toLowerCase().trim();
+  try {
+    const token = await createMagicLink(normalised);
+    const origin = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const link = `${origin}/auth/verify?token=${token}`;
+    await resend.emails.send({
+      from: 'Turtle and Sun <noreply@turtleandsun.com>',
+      to: normalised,
+      subject: 'Your login link for Turtle and Sun',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:40px 32px;">
+          <h2 style="color:#1C0A00;margin-bottom:16px;">Log in to Turtle and Sun</h2>
+          <p style="color:#3C2000;margin-bottom:24px;">Click the button below to log in. This link expires in 15 minutes and can only be used once.</p>
+          <a href="${link}" style="display:inline-block;padding:12px 28px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Log in</a>
+          <p style="margin-top:24px;font-size:13px;color:#888;">If you didn't request this, you can ignore this email.</p>
+        </div>
+      `,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Magic link error:', err.message);
+    res.status(500).json({ error: 'Failed to send login link' });
+  }
+});
+
+app.get('/auth/verify', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.redirect('/login?error=missing');
+  try {
+    const email = await verifyMagicLink(token);
+    if (!email) return res.redirect('/login?error=invalid');
+    const userId = await findOrCreateUser(email);
+    const { token: sessionToken, expiresAt } = await createSession(userId);
+    setSessionCookie(res, sessionToken, expiresAt);
+    const adminCheck = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'",
+      [userId]
+    );
+    res.redirect(adminCheck.rows.length ? '/admin' : '/account');
+  } catch (err) {
+    console.error('Verify error:', err.message);
+    res.redirect('/login?error=server');
+  }
+});
+
+app.post('/auth/logout', (req, res) => {
+  res.clearCookie('ts_session', { path: '/' });
+  res.redirect('/login');
+});
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+app.get('/admin', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/api/admin/data', requireRole('admin'), async (req, res) => {
+  try {
+    const [orders, users] = await Promise.all([
+      pool.query(
+        'SELECT id, email, product, status, amount, created_at FROM orders ORDER BY created_at DESC LIMIT 200'
+      ),
+      pool.query(
+        `SELECT u.id, u.email, u.preview_count, u.has_purchased, u.created_at,
+                COALESCE(array_agg(r.role) FILTER (WHERE r.role IS NOT NULL), '{}') AS roles
+         FROM users u
+         LEFT JOIN user_roles r ON r.user_id = u.id
+         GROUP BY u.id ORDER BY u.created_at DESC LIMIT 200`
+      ),
+    ]);
+    res.json({ orders: orders.rows, users: users.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/grant-role', requireRole('admin'), async (req, res) => {
+  const { email, role } = req.body;
+  if (!['admin', 'moderator', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  try {
+    const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (!userRes.rows.length) return res.status(404).json({ error: 'User not found' });
+    await pool.query(
+      'INSERT INTO user_roles (user_id, role, granted_by) VALUES ($1, $2, $3) ON CONFLICT (user_id, role) DO NOTHING',
+      [userRes.rows[0].id, role, req.user.email]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/revoke-role', requireRole('admin'), async (req, res) => {
+  const { email, role } = req.body;
+  try {
+    await pool.query(
+      'DELETE FROM user_roles WHERE user_id = (SELECT id FROM users WHERE email = $1) AND role = $2',
+      [email, role]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Account ───────────────────────────────────────────────────────────────────
+
+app.get('/account', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'account.html'));
+});
+
+app.get('/api/account/data', requireAuth, async (req, res) => {
+  try {
+    const orders = await pool.query(
+      'SELECT id, product, status, amount, result_url, result_video_url, created_at FROM orders WHERE email = $1 ORDER BY created_at DESC',
+      [req.user.email]
+    );
+    res.json({ user: { email: req.user.email, roles: req.user.roles }, orders: orders.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 
