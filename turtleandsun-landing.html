@@ -57,7 +57,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .step-upload:hover{border-color:rgba(0,0,0,0.35);background:rgba(255,220,60,0.7);}
 #uploadThumb{width:100%;max-height:160px;border-radius:8px;object-fit:contain;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.18);}
 #uploadIcon{transition:opacity 0.2s;}
-.btn-preview{width:100%;padding:9px;background:#3A6B20;color:white;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background 0.18s;display:none;margin-top:2px;}
+.btn-preview{width:100%;padding:9px;background:#3A6B20;color:white;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background 0.18s;margin-top:2px;}
 .btn-preview:hover:not(:disabled){background:#1C0A00;}
 .btn-preview:disabled{opacity:0.5;cursor:not-allowed;}
 #previewResult{width:100%;border-radius:8px;overflow:hidden;display:none;margin-top:4px;}
@@ -335,27 +335,31 @@ async function loadGallery(category) {
   try {
     const res = await fetch(url);
     const styles = await res.json();
-    const grids = [document.getElementById('g1'), document.getElementById('g2'), document.getElementById('g3')];
-    grids.forEach(function(g) { if (g) g.innerHTML = ''; });
-    styles.forEach(function(style, i) {
-      const card = document.createElement('div');
-      card.className = 'g-card';
-      card.style.position = 'relative';
-      const img = document.createElement('img');
-      img.src = style.example_image_url;
-      img.alt = style.style_name;
-      img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
-      const label = document.createElement('div');
-      label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;';
-      label.textContent = style.style_name;
-      card.appendChild(img);
-      card.appendChild(label);
-      const target = grids[Math.min(Math.floor(i / 4), 2)];
-      if (target) target.appendChild(card);
-    });
-  } catch (e) {
-    console.error('Gallery load failed', e);
-  }
+    if (styles && styles.length > 0) {
+      const grids = [document.getElementById('g1'), document.getElementById('g2'), document.getElementById('g3')];
+      grids.forEach(function(g) { if (g) g.innerHTML = ''; });
+      styles.forEach(function(style, i) {
+        const card = document.createElement('div');
+        card.className = 'g-card';
+        card.style.position = 'relative';
+        const img = document.createElement('img');
+        img.src = style.example_image_url;
+        img.alt = style.style_name;
+        img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
+        const label = document.createElement('div');
+        label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;';
+        label.textContent = style.style_name;
+        card.appendChild(img);
+        card.appendChild(label);
+        const target = grids[Math.min(Math.floor(i / 4), 2)];
+        if (target) target.appendChild(card);
+      });
+      return;
+    }
+  } catch (e) {}
+  fill('g1', pals.slice(0, 4));
+  fill('g2', pals.slice(4, 8));
+  fill('g3', pals.slice(8, 12));
 }
 loadGallery('all');
 </script>
