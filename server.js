@@ -38,11 +38,16 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === 'payment_intent.succeeded') {
-    const pi = event.data.object;
-    const { email, image_url, product } = pi.metadata || {};
+  console.log('Webhook received:', event.type, event.id);
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const { email, image_url, product } = session.metadata || {};
+
+    console.log('checkout.session.completed — email:', email, 'product:', product, 'image_url:', image_url);
 
     if (!image_url || !product) {
+      console.warn('Webhook missing image_url or product in metadata, skipping generation');
       return res.json({ received: true });
     }
 
@@ -51,9 +56,10 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     try {
       const orderRes = await pool.query(
         'INSERT INTO orders (email, style_id, product, status, amount) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [email || '', null, product, 'paid', pi.amount / 100]
+        [email || '', null, product, 'paid', session.amount_total / 100]
       );
       orderId = orderRes.rows[0].id;
+      console.log('Order recorded, id:', orderId);
     } catch (err) {
       console.error('Order insert error:', err.message);
     }
@@ -73,8 +79,9 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     }
 
     // Trigger full-quality generation in background
+    console.log('Starting generation for order:', orderId);
     generateForOrder(image_url, product, email || '', orderId).catch(err =>
-      console.error('Generation error for payment_intent:', pi.id, err.message)
+      console.error('Generation error for session:', session.id, err.message)
     );
   }
 
