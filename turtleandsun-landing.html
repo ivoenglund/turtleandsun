@@ -88,7 +88,11 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 #accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
 #accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
 #accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
-#navLogout{display:none;}
+#ddUser{display:none;}
+.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
+.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
+.dd-user-link:hover{opacity:0.72;}
+.dd-user-logout{color:#c0392b !important;}
 </style>
 </head>
 <body>
@@ -101,14 +105,20 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
       <span class="nav-account-wrap">
         <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
         <div id="accountDropdown">
-          <h4>Log in</h4>
-          <p>Enter your email and we'll send you a magic link.</p>
-          <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
-          <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
-          <div class="dd-msg" id="ddMsg"></div>
+          <div id="ddGuest">
+            <h4>Log in</h4>
+            <p>Enter your email and we'll send you a magic link.</p>
+            <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
+            <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
+            <div class="dd-msg" id="ddMsg"></div>
+          </div>
+          <div id="ddUser">
+            <div class="dd-user-email" id="ddUserEmail"></div>
+            <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
+            <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
+          </div>
         </div>
       </span>
-      <a href="#" id="navLogout" onclick="handleLogout(event)">Logout</a>
     </div>
   </div>
 
@@ -450,21 +460,19 @@ async function initAuthNav() {
     _authStatus = false;
   }
   if (_authStatus && _authStatus.loggedIn) {
-    document.getElementById('navAccount').textContent = 'Account';
-    document.getElementById('navLogout').style.display = '';
+    document.getElementById('ddGuest').style.display = 'none';
+    document.getElementById('ddUser').style.display = 'block';
+    document.getElementById('ddUserEmail').textContent = _authStatus.email;
+    document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
   }
 }
 
 function handleAccountClick(e) {
   e.preventDefault();
-  if (_authStatus === null) return; // still loading
-  if (_authStatus && _authStatus.loggedIn) {
-    window.location.href = _authStatus.isAdmin ? '/admin' : '/account';
-    return;
-  }
+  if (_authStatus === null) return;
   const dd = document.getElementById('accountDropdown');
   dd.classList.toggle('open');
-  if (dd.classList.contains('open')) {
+  if (dd.classList.contains('open') && (!_authStatus || !_authStatus.loggedIn)) {
     document.getElementById('ddEmail').focus();
   }
 }
@@ -498,14 +506,6 @@ async function sendNavMagicLink() {
     msg.className = 'dd-msg err'; msg.textContent = 'Network error.';
     btn.disabled = false; btn.textContent = 'Send login link';
   }
-}
-
-async function handleLogout(e) {
-  e.preventDefault();
-  await fetch('/auth/logout', { method: 'POST' });
-  _authStatus = false;
-  document.getElementById('navLogout').style.display = 'none';
-  document.getElementById('navAccount').textContent = 'Account';
 }
 
 // Close dropdown when clicking outside

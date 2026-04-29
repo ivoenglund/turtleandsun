@@ -27,7 +27,11 @@ body{font-family:Arial,sans-serif;background:#FFF9E6;color:#1C0A00;min-height:10
 #accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
 #accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
 #accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
-#navLogout{display:none;}
+#ddUser{display:none;}
+.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
+.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
+.dd-user-link:hover{opacity:0.72;}
+.dd-user-logout{color:#c0392b !important;}
 .main{max-width:760px;margin:0 auto;padding:36px 40px;}
 .welcome{margin-bottom:28px;}
 .welcome h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;margin-bottom:6px;}
@@ -58,14 +62,20 @@ tr:last-child td{border-bottom:none;}
         <span class="nav-account-wrap">
           <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
           <div id="accountDropdown">
-            <h4>Log in</h4>
-            <p>Enter your email and we'll send you a magic link.</p>
-            <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
-            <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
-            <div class="dd-msg" id="ddMsg"></div>
+            <div id="ddGuest">
+              <h4>Log in</h4>
+              <p>Enter your email and we'll send you a magic link.</p>
+              <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
+              <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
+              <div class="dd-msg" id="ddMsg"></div>
+            </div>
+            <div id="ddUser">
+              <div class="dd-user-email" id="ddUserEmail"></div>
+              <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
+              <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
+            </div>
           </div>
         </span>
-        <a href="#" id="navLogout" onclick="handleLogout(event)">Logout</a>
       </div>
     </div>
   </div>
@@ -130,16 +140,22 @@ async function initAuthNav() {
     const res = await fetch('/api/auth/status');
     _authStatus = res.ok ? await res.json() : false;
   } catch { _authStatus = false; }
-  if (_authStatus && _authStatus.loggedIn) document.getElementById('navLogout').style.display = '';
+  if (_authStatus && _authStatus.loggedIn) {
+    document.getElementById('ddGuest').style.display = 'none';
+    document.getElementById('ddUser').style.display = 'block';
+    document.getElementById('ddUserEmail').textContent = _authStatus.email;
+    document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
+  }
 }
 
 function handleAccountClick(e) {
   e.preventDefault();
   if (_authStatus === null) return;
-  if (_authStatus && _authStatus.loggedIn) { window.location.href = _authStatus.isAdmin ? '/admin' : '/account'; return; }
   const dd = document.getElementById('accountDropdown');
   dd.classList.toggle('open');
-  if (dd.classList.contains('open')) document.getElementById('ddEmail').focus();
+  if (dd.classList.contains('open') && (!_authStatus || !_authStatus.loggedIn)) {
+    document.getElementById('ddEmail').focus();
+  }
 }
 
 async function sendNavMagicLink() {
@@ -154,12 +170,6 @@ async function sendNavMagicLink() {
     if (data.ok) { document.getElementById('ddEmail').style.display = 'none'; btn.style.display = 'none'; msg.className = 'dd-msg ok'; msg.textContent = 'Check your inbox for the login link.'; }
     else { msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Send login link'; }
   } catch { msg.className = 'dd-msg err'; msg.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Send login link'; }
-}
-
-async function handleLogout(e) {
-  e.preventDefault();
-  await fetch('/auth/logout', { method: 'POST' });
-  window.location.href = '/';
 }
 
 document.addEventListener('click', function(e) {

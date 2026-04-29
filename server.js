@@ -165,9 +165,14 @@ app.get('/api/auth/status', async (req, res) => {
   res.json({ loggedIn: true, email: user.email, isAdmin: user.roles.includes('admin') });
 });
 
+app.get('/auth/logout', (req, res) => {
+  res.clearCookie('ts_session', { path: '/' });
+  res.redirect('/');
+});
+
 app.post('/auth/logout', (req, res) => {
   res.clearCookie('ts_session', { path: '/' });
-  res.redirect('/login');
+  res.redirect('/');
 });
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
