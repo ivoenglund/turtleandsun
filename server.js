@@ -99,9 +99,9 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'turtleandsun-landing.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'turtleandsun-landing.html')));
+app.get('/faq', (req, res) => res.sendFile(path.join(__dirname, 'faq.html')));
+app.get('/pricing', (req, res) => res.sendFile(path.join(__dirname, 'pricing.html')));
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
