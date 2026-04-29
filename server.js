@@ -261,37 +261,25 @@ async function generateForOrder(image_url, product, email, orderId) {
 }
 
 async function sendResultEmail(email, product, imageUrl, videoUrl) {
-  const links = [];
-  if (imageUrl) {
-    links.push(`<p style="margin:16px 0;"><a href="${imageUrl}" style="display:inline-block;padding:12px 24px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download Your Royal Portrait</a></p>`);
-  }
-  if (videoUrl) {
-    links.push(`<p style="margin:16px 0;"><a href="${videoUrl}" style="display:inline-block;padding:12px 24px;background:#1C2A14;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download Your Royal Portrait Video</a></p>`);
-  }
-
-  const productLabel = product === 'bundle' ? 'Royal Portrait Bundle' : product === 'video' ? 'Royal Portrait Video' : 'Royal Portrait Image';
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#FFF9E6;padding:40px 32px;border-radius:12px;">
-      <h1 style="font-size:26px;color:#1C0A00;margin-bottom:8px;">Your Royal Portrait is Ready! &#128081;</h1>
-      <p style="font-size:16px;color:#3C2000;margin-bottom:24px;">Thank you for your order. Your <strong>${productLabel}</strong> has been created and is ready to download.</p>
-      ${links.join('')}
+      <h1 style="font-size:26px;color:#1C0A00;margin-bottom:8px;">Your Loveogram is ready! &#128081;</h1>
+      <p style="font-size:16px;color:#3C2000;margin-bottom:24px;">Thank you for your order. Your portrait has been created and is ready to download.</p>
+      ${imageUrl ? `<p style="margin:16px 0;"><a href="${imageUrl}" style="display:inline-block;padding:12px 24px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download your Loveogram</a></p>` : ''}
+      ${videoUrl ? `<p style="margin:16px 0;"><a href="${videoUrl}" style="display:inline-block;padding:12px 24px;background:#1C2A14;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download your Loveogram Video</a></p>` : ''}
       <hr style="border:none;border-top:1px solid rgba(0,0,0,0.1);margin:32px 0 16px;" />
-      <p style="font-size:13px;color:#888;margin:0;">Links expire after 24 hours. Reply to this email if you need any help.</p>
+      <p style="font-size:13px;color:#888;margin:0;">Reply to this email if you need any help.</p>
       <p style="font-size:13px;color:#888;margin-top:8px;">&#8212; Turtle and Sun</p>
     </div>
   `;
 
-  try {
-    await resend.emails.send({
-      from: 'Turtle and Sun <noreply@turtleandsun.com>',
-      to: email,
-      subject: 'Your Royal Portrait is Ready! 👑',
-      html,
-    });
-    console.log('Email sent to', email);
-  } catch (err) {
-    console.error('Email send failed:', err.message);
-  }
+  await resend.emails.send({
+    from: 'Turtle and Sun <noreply@turtleandsun.com>',
+    to: email,
+    subject: 'Your Loveogram is ready!',
+    html,
+  });
+  console.log('Email sent to', email);
 }
 
 initDb()
