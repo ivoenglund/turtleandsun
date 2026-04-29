@@ -27,6 +27,12 @@ const ROYAL_PORTRAIT_PROMPT =
   'set in a grand palace with dramatic lighting. Preserve the exact face, facial features, skin tone, ' +
   'age, and likeness of the person. Oil painting style, highly detailed, museum quality.';
 
+const ROYAL_VIDEO_PROMPT =
+  'The royal portrait painting slowly comes to life — subtle movement in the regal robes and hair, ' +
+  'dramatic candlelight flickering across the face, eyes gently alive with regal presence. ' +
+  'Cinematic depth of field, atmospheric palace setting with soft volumetric light. ' +
+  'Painterly and majestic, museum-quality motion. Preserve the exact face and identity of the subject.';
+
 // Webhook must use raw body before express.json()
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -200,6 +206,30 @@ app.post('/video', async (req, res) => {
   }
 });
 
+app.post('/generate-video', async (req, res) => {
+  const { image_url, email, order_id } = req.body;
+  if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+
+  try {
+    console.log('Generating video for image:', image_url);
+    const videoUrl = await generateVideo(image_url);
+    console.log('Video generated:', videoUrl);
+
+    if (order_id) {
+      await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, order_id]);
+    }
+
+    if (email) {
+      await sendResultEmail(email, 'video', null, videoUrl);
+    }
+
+    res.json({ url: videoUrl });
+  } catch (err) {
+    console.error('Video generation error:', err.message);
+    res.status(500).json({ error: 'Video generation failed', details: err.message });
+  }
+});
+
 app.get('/gallery', async (req, res) => {
   const { category } = req.query;
   try {
@@ -235,8 +265,8 @@ async function generateVideo(image_url) {
   const result = await fal.subscribe('fal-ai/kling-video/v3/pro/image-to-video', {
     input: {
       image_url,
-      prompt: ROYAL_PORTRAIT_PROMPT,
-      duration: '10',
+      prompt: ROYAL_VIDEO_PROMPT,
+      duration: '5',
       enable_audio: true,
     },
   });
