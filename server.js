@@ -230,16 +230,21 @@ app.get('/auth/google/callback', async (req, res) => {
       const name  = c.names?.[0]?.displayName    || null;
       const email = c.emailAddresses?.[0]?.value  || null;
       const phone = c.phoneNumbers?.[0]?.value    || null;
-      const address = c.addresses?.[0]?.formattedValue || null;
+      const addr = c.addresses?.[0] || null;
+      const street = addr?.streetAddress || null;
+      const city = addr?.city || null;
+      const country = addr?.country || null;
+      const postal_code = addr?.postalCode || null;
       const bd = c.birthdays?.[0]?.date;
       const birthday = bd ? `${bd.year || ''}-${String(bd.month).padStart(2,'0')}-${String(bd.day).padStart(2,'0')}` : null;
       await pool.query(
-        `INSERT INTO contacts (user_id, google_id, name, email, phone, address, birthday)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO contacts (user_id, google_id, name, email, phone, street, city, country, postal_code, birthday)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (user_id, google_id) DO UPDATE
            SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
-               address = EXCLUDED.address, birthday = EXCLUDED.birthday`,
-        [user.id, googleId, name, email, phone, address, birthday]
+               street = EXCLUDED.street, city = EXCLUDED.city, country = EXCLUDED.country,
+               postal_code = EXCLUDED.postal_code, birthday = EXCLUDED.birthday`,
+        [user.id, googleId, name, email, phone, street, city, country, postal_code, birthday]
       );
       saved++;
     }
