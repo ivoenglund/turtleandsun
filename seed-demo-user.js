@@ -1,10 +1,4 @@
-require('dotenv').config();
-const { Pool } = require('pg');
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+const { pool } = require('./db');
 
 const DEMO_EMAIL = 'demo@turtleandsun.com';
 
@@ -221,7 +215,11 @@ async function seed() {
 
   console.log('Relationships seeded');
   console.log(`Done! Log in as ${DEMO_EMAIL} to view the network.`);
-  await pool.end();
 }
 
-seed().catch(err => { console.error(err); process.exit(1); });
+module.exports = seed;
+
+if (require.main === module) {
+  require('dotenv').config();
+  seed().catch(err => { console.error(err); process.exit(1); });
+}
