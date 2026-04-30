@@ -193,6 +193,7 @@ app.get('/auth/google/contacts', requireAuth, (req, res) => {
     access_type: 'online',
     scope: ['https://www.googleapis.com/auth/contacts.readonly'],
     prompt: 'consent',
+    redirect_uri: 'https://turtleandsun.com/auth/google/callback',
   });
   res.redirect(url);
 });
@@ -206,7 +207,7 @@ app.get('/auth/google/callback', async (req, res) => {
 
   try {
     const client = googleOAuthClient();
-    const { tokens } = await client.getToken(code);
+    const { tokens } = await client.getToken({ code, redirect_uri: 'https://turtleandsun.com/auth/google/callback' });
     client.setCredentials(tokens);
 
     const people = google.people({ version: 'v1', auth: client });
