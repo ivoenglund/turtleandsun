@@ -193,7 +193,6 @@ app.get('/auth/google/contacts', requireAuth, (req, res) => {
     access_type: 'online',
     scope: ['https://www.googleapis.com/auth/contacts.readonly'],
     prompt: 'consent',
-    redirect_uri: 'https://turtleandsun.com/auth/google/callback',
   });
   res.redirect(url);
 });
