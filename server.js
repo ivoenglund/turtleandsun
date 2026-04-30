@@ -323,6 +323,130 @@ app.get('/account/contacts', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'contacts.html'));
 });
 
+// ── Contacts management API ───────────────────────────────────────────────────
+
+app.get('/api/contacts', requireAuth, async (req, res) => {
+  try {
+    const contacts = await pool.query(
+      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder
+       FROM contacts WHERE user_id = $1 ORDER BY name ASC NULLS LAST`,
+      [req.user.id]
+    );
+    res.json(contacts.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
+  const { name } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO contacts (user_id, name, is_placeholder) VALUES ($1, $2, TRUE) RETURNING id`,
+      [req.user.id, name]
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/contacts/:id', requireAuth, async (req, res) => {
+  try {
+    const contact = await pool.query(
+      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder
+       FROM contacts WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!contact.rows.length) return res.status(404).json({ error: 'Not found' });
+
+    const relationships = await pool.query(
+      `SELECT cr.id, cr.contact_b_id, c.name AS related_name, rt.name AS relationship_name
+       FROM contact_relationships cr
+       JOIN contacts c ON c.id = cr.contact_b_id
+       JOIN relationship_types rt ON rt.id = cr.relationship_type_id
+       WHERE cr.contact_a_id = $1 AND cr.user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+
+    const orders = await pool.query(
+      `SELECT id, product, status, amount, created_at FROM orders WHERE email = $1 ORDER BY created_at DESC`,
+      [contact.rows[0].email || '']
+    );
+
+    res.json({ ...contact.rows[0], relationships: relationships.rows, loveograms: orders.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/contacts/:id', requireAuth, async (req, res) => {
+  const { name, email, phone, street, city, country, postal_code, birthday } = req.body;
+  try {
+    await pool.query(
+      `UPDATE contacts SET name=$1, email=$2, phone=$3, street=$4, city=$5, country=$6, postal_code=$7, birthday=$8
+       WHERE id=$9 AND user_id=$10`,
+      [name, email, phone, street, city, country, postal_code, birthday, req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/relationship-types', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT rt.id, rt.name, rt.mirror_id, g.name AS group_name
+       FROM relationship_types rt
+       JOIN groups g ON g.id = rt.group_id
+       WHERE g.user_id = $1
+       ORDER BY g.name, rt.name`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/contact-relationships', requireAuth, async (req, res) => {
+  const { contact_a_id, contact_b_id, relationship_type_id } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
+       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+      [req.user.id, contact_a_id, contact_b_id, relationship_type_id]
+    );
+    const mirror = await pool.query(
+      `SELECT mirror_id FROM relationship_types WHERE id = $1`,
+      [relationship_type_id]
+    );
+    if (mirror.rows[0]?.mirror_id) {
+      await pool.query(
+        `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
+         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+        [req.user.id, contact_b_id, contact_a_id, mirror.rows[0].mirror_id]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/contact-relationships/:id', requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `DELETE FROM contact_relationships WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/account/contacts', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(

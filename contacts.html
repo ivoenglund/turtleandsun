@@ -3,24 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sync Contacts — Turtle and Sun</title>
+<title>Contacts — Turtle and Sun</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Arial,sans-serif;background:#FFF9E6;color:#1C0A00;min-height:100vh;}
-.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(0,0,0,0.07);}
-.wrap{max-width:1100px;margin:0 auto;padding:0 40px;}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0 21px;}
-.nav a img{height:90px;width:auto;margin-top:-56px;display:block;}
-.nav-links{display:flex;gap:36px;align-items:center;}
-.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.72;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:flex;flex-direction:column;}
+
+/* ── Nav ──────────────────────────────────────────────────────────────────── */
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
+.nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
+.nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
+.nav-links{display:flex;gap:28px;align-items:center;}
+.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
 .nav-links a:hover{opacity:1;}
 .nav-account-wrap{position:relative;}
 #accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
 #accountDropdown.open{display:block;}
 #accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
 #accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
-#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;}
+#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;box-sizing:border-box;}
 #accountDropdown input:focus{border-color:#3A6B20;}
 #accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
 #accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
@@ -32,52 +35,117 @@ body{font-family:Arial,sans-serif;background:#FFF9E6;color:#1C0A00;min-height:10
 .dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
 .dd-user-link:hover{opacity:0.72;}
 .dd-user-logout{color:#c0392b !important;}
-.main{max-width:760px;margin:0 auto;padding:36px 40px 80px;}
-.page-header{margin-bottom:28px;}
-.page-header h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px;}
-.page-header p{font-size:14px;color:rgba(60,20,0,0.6);line-height:1.5;}
-.banner{border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;}
-.banner.ok{background:#dcf0dc;color:#1b5e20;}
-.banner.err{background:#fdecea;color:#c0392b;}
-.card{background:#fff;border-radius:12px;padding:24px 28px;box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:20px;}
-.card h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;margin-bottom:6px;}
-.card p{font-size:14px;color:rgba(60,20,0,0.65);line-height:1.6;margin-bottom:16px;}
-.btn-google{display:inline-flex;align-items:center;gap:10px;padding:11px 20px;background:#fff;color:#1C0A00;border:1.5px solid rgba(0,0,0,0.18);border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:border-color 0.18s,box-shadow 0.18s;}
-.btn-google:hover{border-color:#3A6B20;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
-.btn-google svg{flex-shrink:0;}
-.divider{display:flex;align-items:center;gap:12px;margin:20px 0;}
-.divider hr{flex:1;border:none;border-top:1px solid #f0ede6;}
-.divider span{font-size:12px;color:rgba(60,20,0,0.4);white-space:nowrap;}
-.upload-instructions{background:#f9f7f0;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:rgba(60,20,0,0.75);line-height:1.7;}
-.upload-instructions ol{padding-left:16px;}
-.upload-instructions li{margin-bottom:4px;}
-.upload-instructions a{color:#3A6B20;font-weight:500;}
-.file-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.file-input-label{display:inline-block;padding:9px 16px;background:#f0ede6;border:1.5px solid rgba(0,0,0,0.12);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;color:#1C0A00;transition:background 0.15s;}
-.file-input-label:hover{background:#e5e0d4;}
-#csvFile{display:none;}
-#csvName{font-size:13px;color:rgba(60,20,0,0.55);}
-.btn-upload{padding:9px 20px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.18s;}
-.btn-upload:hover:not(:disabled){background:#1C0A00;}
-.btn-upload:disabled{opacity:0.45;cursor:not-allowed;}
-.upload-msg{font-size:13px;margin-top:10px;min-height:18px;}
-.upload-msg.ok{color:#3A6B20;} .upload-msg.err{color:#c0392b;}
-.contacts-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.contacts-header h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;}
-.contacts-count{font-size:13px;color:rgba(60,20,0,0.5);}
+
+/* ── Sync banner + strip ──────────────────────────────────────────────────── */
+#syncBanner{display:none;padding:10px 32px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;flex-shrink:0;}
+#syncBanner.ok{background:#e8f0e0;color:#2d5a16;}
+#syncBanner.err{background:#fdecea;color:#c0392b;}
+.sync-strip{background:#fff;border-bottom:1px solid rgba(28,10,0,0.07);padding:8px 32px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:rgba(28,10,0,0.5);flex-shrink:0;}
+.sync-strip a{color:#3A6B20;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;text-decoration:none;padding:5px 12px;border:1.5px solid #3A6B20;border-radius:6px;}
+.sync-strip a:hover{background:#3A6B20;color:#fff;}
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+.app-shell{flex:1;min-height:0;display:flex;overflow:hidden;}
+
+/* ── List panel ───────────────────────────────────────────────────────────── */
+.list-panel{width:300px;flex-shrink:0;border-right:1px solid rgba(28,10,0,0.08);display:flex;flex-direction:column;background:#fff;overflow:hidden;}
+.list-toolbar{padding:12px 14px;border-bottom:1px solid rgba(28,10,0,0.07);display:flex;flex-direction:column;gap:8px;flex-shrink:0;}
+.search-input{width:100%;padding:8px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#f9f7f2;outline:none;}
+.search-input:focus{border-color:#3A6B20;background:#fff;}
+.btn-add-ph{width:100%;padding:8px 12px;background:transparent;border:1.5px dashed rgba(28,10,0,0.18);border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:rgba(28,10,0,0.45);cursor:pointer;text-align:left;}
+.btn-add-ph:hover{border-color:#3A6B20;color:#3A6B20;}
+.contact-list{flex:1;overflow-y:auto;}
+.contact-item{padding:11px 14px;cursor:pointer;border-bottom:1px solid rgba(28,10,0,0.05);transition:background 0.1s;}
+.contact-item:hover{background:#f9f7f2;}
+.contact-item.active{background:#e8f0e0;}
+.ci-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ci-email{font-size:12px;color:rgba(28,10,0,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.ci-bday{font-size:11px;color:rgba(28,10,0,0.32);margin-top:2px;}
+.ci-ph{display:inline-block;font-size:10px;background:#f0ede6;color:rgba(28,10,0,0.4);padding:1px 5px;border-radius:6px;font-weight:700;margin-left:4px;vertical-align:middle;}
+.list-empty{padding:32px 16px;text-align:center;font-size:13px;color:rgba(28,10,0,0.3);line-height:1.7;}
+
+/* ── Detail panel ─────────────────────────────────────────────────────────── */
+.detail-panel{flex:1;overflow-y:auto;}
+.detail-empty{display:flex;align-items:center;justify-content:center;height:100%;font-size:15px;color:rgba(28,10,0,0.22);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;}
+.detail-inner{max-width:680px;margin:0 auto;padding:32px 36px 80px;}
+.detail-header{margin-bottom:24px;}
+.detail-name-display{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;line-height:1.2;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.ph-badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
+
+/* ── Cards ────────────────────────────────────────────────────────────────── */
+.section-card{background:#fff;border-radius:12px;padding:24px 26px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06);}
+.section-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.32);margin-bottom:16px;}
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:11px;font-weight:600;color:rgba(28,10,0,0.42);text-transform:uppercase;letter-spacing:0.04em;}
+.field input{padding:8px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;transition:border-color 0.15s;}
+.field input:focus{border-color:#3A6B20;}
+.field-full{grid-column:1/-1;}
+.save-row{margin-top:16px;display:flex;align-items:center;gap:12px;}
+.btn-save{padding:9px 22px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s;}
+.btn-save:hover{background:#1C0A00;}
+.btn-save:disabled{opacity:0.5;cursor:not-allowed;}
+.save-msg{font-size:12px;}
+.save-msg.ok{color:#3A6B20;} .save-msg.err{color:#c0392b;}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
 .table-wrap{overflow-x:auto;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
-th{text-align:left;padding:9px 12px;color:rgba(60,20,0,0.5);font-weight:600;border-bottom:1.5px solid #f0ede6;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;}
-td{padding:10px 12px;border-bottom:1px solid #f5f2ea;vertical-align:middle;}
+th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(28,10,0,0.32);border-bottom:1.5px solid #f0ede6;}
+td{padding:9px 10px;border-bottom:1px solid #f5f2ea;vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
-.empty-row td{text-align:center;color:rgba(60,20,0,0.35);padding:32px;font-size:14px;}
-.source-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#e3f2fd;color:#0d47a1;}
-@media(max-width:700px){.wrap,.main{padding:0 16px;}.main{padding-top:24px;}}
+.empty-row td{text-align:center;color:rgba(28,10,0,0.28);padding:20px 10px;font-size:13px;}
+.btn-del{padding:3px 9px;background:none;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.42);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;}
+.btn-del:hover{border-color:#c0392b;color:#c0392b;}
+
+/* ── Add relationship form ────────────────────────────────────────────────── */
+.add-rel-form{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+.add-rel-form select{flex:1;min-width:130px;padding:8px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:13px;color:#1C0A00;background:#fff;outline:none;font-family:'DM Sans',sans-serif;}
+.add-rel-form select:focus{border-color:#3A6B20;}
+.btn-add-rel{padding:8px 16px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-add-rel:hover{background:#1C0A00;}
+.rel-msg{font-size:12px;margin-top:8px;min-height:16px;}
+.rel-msg.err{color:#c0392b;}
+
+/* ── Loveogram status ─────────────────────────────────────────────────────── */
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+.dot.done{background:#3A6B20;} .dot.pending{background:#f0a500;} .dot.failed{background:#c0392b;}
+
+/* ── Placeholder modal ────────────────────────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.32);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:#fff;border-radius:14px;padding:28px 32px;width:340px;box-shadow:0 12px 48px rgba(0,0,0,0.18);}
+.modal-box h3{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;margin-bottom:8px;}
+.modal-box p{font-size:13px;color:rgba(28,10,0,0.6);margin-bottom:16px;line-height:1.5;}
+.modal-box input{width:100%;padding:9px 12px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:14px;font-family:'DM Sans';outline:none;margin-bottom:14px;}
+.modal-box input:focus{border-color:#3A6B20;}
+.modal-btns{display:flex;gap:8px;}
+.modal-btns button{flex:1;padding:9px;border:none;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-modal-cancel{background:#f0ede6;color:#1C0A00;}
+.btn-modal-confirm{background:#3A6B20;color:#fff;}
+.btn-modal-cancel:hover{background:#e0dcd4;}
+.btn-modal-confirm:hover{background:#1C0A00;}
+
+/* ── Mobile ───────────────────────────────────────────────────────────────── */
+@media(max-width:700px){
+  .nav-wrap,.sync-strip{padding:0 16px;}
+  #syncBanner{padding:10px 16px;}
+  .app-shell{overflow:visible;flex-direction:column;min-height:0;}
+  .list-panel{width:100%;border-right:none;overflow:visible;flex:none;}
+  .contact-list{overflow:visible;max-height:none;}
+  .detail-panel{flex:none;min-height:calc(100vh - 120px);}
+  .list-panel.mobile-hidden,.detail-panel.mobile-hidden{display:none;}
+  .detail-inner{padding:0 16px 60px;}
+  .fields-grid{grid-template-columns:1fr;}
+  .mobile-back-btn{display:flex;align-items:center;gap:8px;padding:14px 16px;background:#fff;border:none;border-bottom:1px solid rgba(28,10,0,0.07);width:100%;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;color:#3A6B20;cursor:pointer;flex-shrink:0;}
+}
+@media(min-width:701px){.mobile-back-btn{display:none;}}
 </style>
 </head>
 <body>
+
 <div class="nav-bar">
-  <div class="wrap">
+  <div class="nav-wrap">
     <div class="nav">
       <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
       <div class="nav-links">
@@ -95,7 +163,7 @@ tr:last-child td{border-bottom:none;}
             <div id="ddUser">
               <div class="dd-user-email" id="ddUserEmail"></div>
               <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
-              <a class="dd-user-link" href="/account/contacts">Sync Contacts</a>
+              <a class="dd-user-link" href="/account/contacts">Contacts</a>
               <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
             </div>
           </div>
@@ -104,126 +172,335 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 </div>
-<div class="main">
-  <div class="page-header">
-    <h1>Sync Contacts</h1>
-    <p>Import your contacts to quickly send Loveograms to people you care about.</p>
+
+<div id="syncBanner"></div>
+
+<div class="sync-strip">
+  <span>Keep contacts up to date</span>
+  <a href="/auth/google/contacts">↻ Sync Google Contacts</a>
+</div>
+
+<div class="app-shell">
+
+  <div class="list-panel" id="listPanel">
+    <div class="list-toolbar">
+      <input class="search-input" id="searchInput" type="text" placeholder="Search contacts…" oninput="filterContacts(this.value)">
+      <button class="btn-add-ph" onclick="openPlaceholderModal()">+ Add person manually</button>
+    </div>
+    <div class="contact-list" id="contactList">
+      <div class="list-empty">Loading…</div>
+    </div>
   </div>
 
-  <div id="statusBanner" style="display:none;"></div>
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-empty" id="detailEmpty">← Select a contact</div>
+    <div id="detailContent" style="display:none;">
+      <button class="mobile-back-btn" onclick="mobileBack()">← Back</button>
+      <div class="detail-inner">
 
-  <div class="card">
-    <h2>Connect Google Contacts</h2>
-    <p>Sign in with Google to automatically sync your contacts. We only request read-only access to your contacts list.</p>
-    <a href="/auth/google/contacts" class="btn-google">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-        <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
-        <path d="M3.964 10.706A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
-        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-      </svg>
-      Connect Google Contacts
-    </a>
+        <div class="detail-header">
+          <div class="detail-name-display">
+            <span id="detailNameDisplay"></span>
+            <span class="ph-badge" id="phBadge" style="display:none;">Manual</span>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-title">Contact details</div>
+          <div class="fields-grid">
+            <div class="field field-full"><label>Name</label><input type="text" id="fName"></div>
+            <div class="field"><label>Email</label><input type="email" id="fEmail"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="fPhone"></div>
+            <div class="field"><label>Birthday</label><input type="text" id="fBirthday" placeholder="YYYY-MM-DD"></div>
+            <div class="field"><label>Street</label><input type="text" id="fStreet"></div>
+            <div class="field"><label>City</label><input type="text" id="fCity"></div>
+            <div class="field"><label>Country</label><input type="text" id="fCountry"></div>
+            <div class="field"><label>Postal code</label><input type="text" id="fPostal"></div>
+          </div>
+          <div class="save-row">
+            <button class="btn-save" id="btnSave" onclick="saveContact()">Save</button>
+            <span class="save-msg" id="saveMsg"></span>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-title">Relationships</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Person</th><th>Relationship</th><th></th></tr></thead>
+              <tbody id="relBody"></tbody>
+            </table>
+          </div>
+          <div class="add-rel-form">
+            <select id="relContact"><option value="">— Select person —</option></select>
+            <select id="relType"><option value="">— Relationship type —</option></select>
+            <button class="btn-add-rel" onclick="addRelationship()">Add</button>
+          </div>
+          <div class="rel-msg" id="relMsg"></div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-title">Loveogram history</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Product</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody id="lovBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Upload from CSV</h2>
-    <p>Export your contacts from Google Contacts as a CSV file and upload here.</p>
-    <div class="upload-instructions">
-      <ol>
-        <li>Go to <a href="https://contacts.google.com" target="_blank" rel="noopener">contacts.google.com</a></li>
-        <li>Click <strong>Export</strong> in the left sidebar</li>
-        <li>Choose <strong>Google CSV</strong> format and click Export</li>
-        <li>Upload the downloaded file below</li>
-      </ol>
-    </div>
-    <div class="file-row">
-      <label class="file-input-label" for="csvFile">Choose CSV file</label>
-      <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(this)">
-      <span id="csvName">No file selected</span>
-      <button class="btn-upload" id="btnUpload" disabled onclick="handleCsvUpload()">Upload</button>
-    </div>
-    <div class="upload-msg" id="uploadMsg"></div>
-  </div>
+</div>
 
-  <div class="card">
-    <div class="contacts-header">
-      <h2>Contacts</h2>
-      <span class="contacts-count" id="contactsCount"></span>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Source</th></tr>
-        </thead>
-        <tbody id="contactsBody">
-          <tr class="empty-row"><td colspan="4">Loading…</td></tr>
-        </tbody>
-      </table>
+<div class="modal-overlay" id="phModal" onclick="modalOverlayClick(event)">
+  <div class="modal-box">
+    <h3>Add person manually</h3>
+    <p>Add someone who isn't in your Google contacts yet.</p>
+    <input type="text" id="phName" placeholder="Full name" onkeydown="if(event.key==='Enter')confirmPlaceholder()">
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closePlaceholderModal()">Cancel</button>
+      <button class="btn-modal-confirm" onclick="confirmPlaceholder()">Add</button>
     </div>
   </div>
 </div>
+
 <script>
-// ── Status banner from URL params ─────────────────────────────────────────────
+let _contacts = [];
+let _currentId = null;
+let _relTypes = [];
+
+// ── Sync banner ───────────────────────────────────────────────────────────────
 (function() {
   const p = new URLSearchParams(location.search);
-  const banner = document.getElementById('statusBanner');
+  const banner = document.getElementById('syncBanner');
   if (p.get('synced') !== null) {
     const n = parseInt(p.get('synced'), 10);
-    banner.className = 'banner ok';
-    banner.textContent = `Successfully synced ${n} contact${n !== 1 ? 's' : ''} from Google.`;
+    banner.className = 'ok';
+    banner.textContent = `✓ Synced ${n} contact${n !== 1 ? 's' : ''} from Google.`;
     banner.style.display = 'block';
   } else if (p.get('error')) {
-    banner.className = 'banner err';
-    banner.textContent = p.get('error') === 'cancelled'
-      ? 'Google sign-in was cancelled.'
-      : 'Failed to sync contacts. Please try again.';
+    banner.className = 'err';
+    banner.textContent = p.get('error') === 'cancelled' ? 'Google sign-in was cancelled.' : 'Failed to sync contacts. Please try again.';
     banner.style.display = 'block';
   }
-  // Clean URL without reloading
-  if (p.get('synced') !== null || p.get('error')) {
-    history.replaceState(null, '', '/account/contacts');
-  }
+  if (p.get('synced') !== null || p.get('error')) history.replaceState(null, '', '/account/contacts');
 })();
 
-// ── Contacts table ────────────────────────────────────────────────────────────
+// ── Contacts list ─────────────────────────────────────────────────────────────
 async function loadContacts() {
+  const res = await fetch('/api/contacts');
+  if (res.status === 401) { window.location.href = '/login'; return; }
+  _contacts = await res.json();
+  renderList(_contacts);
+}
+
+function renderList(contacts) {
+  const el = document.getElementById('contactList');
+  if (!contacts.length) {
+    el.innerHTML = '<div class="list-empty">No contacts yet.<br>Sync Google Contacts or add a person manually.</div>';
+    return;
+  }
+  el.innerHTML = contacts.map(c => `
+    <div class="contact-item${_currentId === c.id ? ' active' : ''}" onclick="selectContact(${c.id})" data-id="${c.id}">
+      <div class="ci-name">${esc(c.name || 'Unnamed')}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}</div>
+      ${c.email ? `<div class="ci-email">${esc(c.email)}</div>` : ''}
+      ${c.birthday ? `<div class="ci-bday">${esc(c.birthday)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function filterContacts(q) {
+  const lq = q.toLowerCase();
+  renderList(_contacts.filter(c =>
+    (c.name || '').toLowerCase().includes(lq) ||
+    (c.email || '').toLowerCase().includes(lq)
+  ));
+}
+
+// ── Select contact ────────────────────────────────────────────────────────────
+async function selectContact(id) {
+  _currentId = id;
+  document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
+  if (window.innerWidth <= 700) {
+    document.getElementById('listPanel').classList.add('mobile-hidden');
+    document.getElementById('detailPanel').classList.remove('mobile-hidden');
+  }
+  document.getElementById('detailEmpty').style.display = 'none';
+  document.getElementById('detailContent').style.display = 'block';
+  document.getElementById('saveMsg').textContent = '';
+
+  const res = await fetch(`/api/contacts/${id}`);
+  if (!res.ok) return;
+  const c = await res.json();
+
+  document.getElementById('detailNameDisplay').textContent = c.name || 'Unnamed';
+  document.getElementById('phBadge').style.display = c.is_placeholder ? 'inline-block' : 'none';
+  document.getElementById('fName').value = c.name || '';
+  document.getElementById('fEmail').value = c.email || '';
+  document.getElementById('fPhone').value = c.phone || '';
+  document.getElementById('fBirthday').value = c.birthday || '';
+  document.getElementById('fStreet').value = c.street || '';
+  document.getElementById('fCity').value = c.city || '';
+  document.getElementById('fCountry').value = c.country || '';
+  document.getElementById('fPostal').value = c.postal_code || '';
+
+  renderRelationships(c.relationships || []);
+  renderLoveograms(c.loveograms || []);
+  populateRelSelects(id);
+}
+
+// ── Save contact ──────────────────────────────────────────────────────────────
+async function saveContact() {
+  const btn = document.getElementById('btnSave');
+  const msg = document.getElementById('saveMsg');
+  btn.disabled = true;
+  const body = {
+    name: document.getElementById('fName').value,
+    email: document.getElementById('fEmail').value,
+    phone: document.getElementById('fPhone').value,
+    street: document.getElementById('fStreet').value,
+    city: document.getElementById('fCity').value,
+    country: document.getElementById('fCountry').value,
+    postal_code: document.getElementById('fPostal').value,
+    birthday: document.getElementById('fBirthday').value,
+  };
   try {
-    const res = await fetch('/api/account/contacts');
-    if (res.status === 401) { window.location.href = '/login'; return; }
-    const contacts = await res.json();
-    const tbody = document.getElementById('contactsBody');
-    const count = document.getElementById('contactsCount');
-    if (!contacts.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No contacts synced yet</td></tr>';
-      count.textContent = '';
+    const res = await fetch(`/api/contacts/${_currentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      msg.className = 'save-msg ok'; msg.textContent = 'Saved.';
+      const c = _contacts.find(x => x.id === _currentId);
+      if (c) { c.name = body.name; c.email = body.email; c.birthday = body.birthday; }
+      document.getElementById('detailNameDisplay').textContent = body.name || 'Unnamed';
+      renderList(_contacts);
+      document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === _currentId));
+      setTimeout(() => { msg.textContent = ''; }, 2500);
     } else {
-      count.textContent = `${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`;
-      tbody.innerHTML = contacts.map(c => `
-        <tr>
-          <td>${esc(c.name || '—')}</td>
-          <td>${esc(c.email || '—')}</td>
-          <td>${esc(c.phone || '—')}</td>
-          <td><span class="source-badge">Google</span></td>
-        </tr>
-      `).join('');
+      const d = await res.json();
+      msg.className = 'save-msg err'; msg.textContent = d.error || 'Failed to save.';
     }
-  } catch (err) {
-    document.getElementById('contactsBody').innerHTML =
-      '<tr class="empty-row"><td colspan="4">Failed to load contacts.</td></tr>';
+  } catch { msg.className = 'save-msg err'; msg.textContent = 'Network error.'; }
+  btn.disabled = false;
+}
+
+// ── Relationships ─────────────────────────────────────────────────────────────
+function renderRelationships(rels) {
+  const tbody = document.getElementById('relBody');
+  if (!rels.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No relationships added yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rels.map(r => `
+    <tr>
+      <td>${esc(r.related_name || 'Unknown')}</td>
+      <td>${esc(r.relationship_name)}</td>
+      <td><button class="btn-del" onclick="deleteRelationship(${r.id})">Remove</button></td>
+    </tr>
+  `).join('');
+}
+
+async function deleteRelationship(id) {
+  await fetch(`/api/contact-relationships/${id}`, { method: 'DELETE' });
+  selectContact(_currentId);
+}
+
+async function addRelationship() {
+  const contactId = document.getElementById('relContact').value;
+  const typeId = document.getElementById('relType').value;
+  const msg = document.getElementById('relMsg');
+  if (!contactId || !typeId) {
+    msg.className = 'rel-msg err'; msg.textContent = 'Select both a person and a relationship type.'; return;
+  }
+  msg.textContent = '';
+  const res = await fetch('/api/contact-relationships', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contact_a_id: _currentId, contact_b_id: +contactId, relationship_type_id: +typeId }),
+  });
+  if (res.ok) {
+    document.getElementById('relContact').value = '';
+    document.getElementById('relType').value = '';
+    selectContact(_currentId);
+  } else {
+    const d = await res.json();
+    msg.className = 'rel-msg err'; msg.textContent = d.error || 'Failed.';
   }
 }
 
-function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function populateRelSelects(currentId) {
+  const sel = document.getElementById('relContact');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Select person —</option>' +
+    _contacts.filter(c => c.id !== currentId).map(c =>
+      `<option value="${c.id}">${esc(c.name || 'Unnamed')}</option>`
+    ).join('');
+  if (prev) sel.value = prev;
 
-function handleFileSelect(input) {
-  document.getElementById('csvName').textContent = input.files[0]?.name || 'No file selected';
-  document.getElementById('btnUpload').disabled = !input.files[0];
+  if (!_relTypes.length) {
+    const r = await fetch('/api/relationship-types');
+    if (r.ok) _relTypes = await r.json();
+  }
+  const tsel = document.getElementById('relType');
+  tsel.innerHTML = _relTypes.length
+    ? '<option value="">— Relationship type —</option>' + _relTypes.map(t =>
+        `<option value="${t.id}">${esc(t.group_name)}: ${esc(t.name)}</option>`
+      ).join('')
+    : '<option value="">— No types configured —</option>';
 }
 
-function handleCsvUpload() {
-  document.getElementById('uploadMsg').className = 'upload-msg ok';
-  document.getElementById('uploadMsg').textContent = 'CSV import coming soon.';
+// ── Loveograms ────────────────────────────────────────────────────────────────
+function renderLoveograms(lovs) {
+  const tbody = document.getElementById('lovBody');
+  if (!lovs.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No Loveograms sent yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lovs.map(o => {
+    const dotCls = (o.status === 'paid' || o.status === 'delivered') ? 'done' : o.status === 'failed' ? 'failed' : 'pending';
+    const date = new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `<tr>
+      <td>${date}</td>
+      <td>${esc(o.product)}</td>
+      <td>$${parseFloat(o.amount).toFixed(2)}</td>
+      <td><span class="dot ${dotCls}"></span>${esc(o.status)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Placeholder modal ─────────────────────────────────────────────────────────
+function openPlaceholderModal() {
+  document.getElementById('phName').value = '';
+  document.getElementById('phModal').classList.add('open');
+  setTimeout(() => document.getElementById('phName').focus(), 50);
+}
+function closePlaceholderModal() { document.getElementById('phModal').classList.remove('open'); }
+function modalOverlayClick(e) { if (e.target === e.currentTarget) closePlaceholderModal(); }
+async function confirmPlaceholder() {
+  const name = document.getElementById('phName').value.trim();
+  if (!name) return;
+  closePlaceholderModal();
+  const res = await fetch('/api/contacts/placeholder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (res.ok) {
+    const { id } = await res.json();
+    await loadContacts();
+    selectContact(id);
+  }
+}
+
+// ── Mobile back ───────────────────────────────────────────────────────────────
+function mobileBack() {
+  document.getElementById('listPanel').classList.remove('mobile-hidden');
+  document.getElementById('detailPanel').classList.add('mobile-hidden');
 }
 
 // ── Shared nav ────────────────────────────────────────────────────────────────
@@ -265,6 +542,11 @@ document.addEventListener('click', function(e) {
   const wrap = document.querySelector('.nav-account-wrap');
   if (dd && wrap && dd.classList.contains('open') && !wrap.contains(e.target)) dd.classList.remove('open');
 });
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 initAuthNav();
 </script>
 </body>

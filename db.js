@@ -60,6 +60,7 @@ async function initDb() {
     );
 
     CREATE TABLE IF NOT EXISTS contacts (
+      id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id),
       google_id TEXT,
       name TEXT,
@@ -70,8 +71,31 @@ async function initDb() {
       country TEXT,
       postal_code TEXT,
       birthday TEXT,
+      is_placeholder BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (user_id, google_id)
+      UNIQUE (user_id, google_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS groups (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      name TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS relationship_types (
+      id SERIAL PRIMARY KEY,
+      group_id INTEGER REFERENCES groups(id),
+      name TEXT NOT NULL,
+      mirror_id INTEGER REFERENCES relationship_types(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS contact_relationships (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      contact_a_id INTEGER NOT NULL,
+      contact_b_id INTEGER NOT NULL,
+      relationship_type_id INTEGER REFERENCES relationship_types(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -91,6 +115,13 @@ async function initDb() {
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS description TEXT;
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS example_image_url TEXT;
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS category VARCHAR(50);
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS id SERIAL;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_placeholder BOOLEAN DEFAULT FALSE;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS street TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS city TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS country TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS postal_code TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS birthday TEXT;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support
