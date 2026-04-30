@@ -29,6 +29,13 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const app = express();
+app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect(301, `https://${req.get('host')}${req.url}`);
+  }
+  next();
+});
 const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
 
