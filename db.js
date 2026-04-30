@@ -65,6 +65,8 @@ async function initDb() {
       name TEXT,
       email TEXT,
       phone TEXT,
+      address TEXT,
+      birthday TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (user_id, google_id)
     );

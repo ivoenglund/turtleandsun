@@ -216,7 +216,7 @@ app.get('/auth/google/callback', async (req, res) => {
       const resp = await people.people.connections.list({
         resourceName: 'people/me',
         pageSize: 1000,
-        personFields: 'names,emailAddresses,phoneNumbers',
+        personFields: 'names,emailAddresses,phoneNumbers,addresses,birthdays',
         ...(pageToken && { pageToken }),
       });
       connections = connections.concat(resp.data.connections || []);
@@ -230,12 +230,16 @@ app.get('/auth/google/callback', async (req, res) => {
       const name  = c.names?.[0]?.displayName    || null;
       const email = c.emailAddresses?.[0]?.value  || null;
       const phone = c.phoneNumbers?.[0]?.value    || null;
+      const address = c.addresses?.[0]?.formattedValue || null;
+      const bd = c.birthdays?.[0]?.date;
+      const birthday = bd ? `${bd.year || ''}-${String(bd.month).padStart(2,'0')}-${String(bd.day).padStart(2,'0')}` : null;
       await pool.query(
-        `INSERT INTO contacts (user_id, google_id, name, email, phone)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO contacts (user_id, google_id, name, email, phone, address, birthday)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (user_id, google_id) DO UPDATE
-           SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone`,
-        [user.id, googleId, name, email, phone]
+           SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
+               address = EXCLUDED.address, birthday = EXCLUDED.birthday`,
+        [user.id, googleId, name, email, phone, address, birthday]
       );
       saved++;
     }
