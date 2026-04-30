@@ -330,6 +330,30 @@ app.get('/account/contacts', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'contacts.html'));
 });
 
+app.get('/account/network', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'network.html'));
+});
+
+app.get('/api/network', requireAuth, async (req, res) => {
+  try {
+    const contacts = await pool.query(
+      `SELECT id, name, email, birthday, city FROM contacts WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const relationships = await pool.query(
+      `SELECT cr.contact_a_id, cr.contact_b_id, rt.name AS relationship, g.name AS group_name
+       FROM contact_relationships cr
+       JOIN relationship_types rt ON rt.id = cr.relationship_type_id
+       JOIN groups g ON g.id = rt.group_id
+       WHERE cr.user_id = $1`,
+      [req.user.id]
+    );
+    res.json({ contacts: contacts.rows, relationships: relationships.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Contacts management API ───────────────────────────────────────────────────
 
 app.get('/api/contacts', requireAuth, async (req, res) => {

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Network — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:#1C0A00;color:#FFF9E6;display:flex;flex-direction:column;}
+
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
+.nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
+.nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
+.nav-links{display:flex;gap:28px;align-items:center;}
+.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
+.nav-links a:hover{opacity:1;}
+
+.top-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.1);padding:10px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;}
+.top-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;}
+.top-bar select{padding:7px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;cursor:pointer;}
+.top-bar select:focus{border-color:#3A6B20;}
+.btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.btn-back:hover{background:#1C0A00;}
+
+#graph-container{flex:1;position:relative;overflow:hidden;}
+#graph-svg{width:100%;height:100%;display:block;}
+
+/* Tooltip */
+.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.15s;z-index:100;max-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.4);}
+.tooltip.visible{opacity:1;}
+
+/* Side panel */
+.side-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:#FFF9E6;box-shadow:-4px 0 24px rgba(0,0,0,0.18);transition:right 0.25s cubic-bezier(0.4,0,0.2,1);z-index:200;display:flex;flex-direction:column;padding:0;}
+.side-panel.open{right:0;}
+.sp-header{padding:20px 20px 16px;border-bottom:1px solid rgba(28,10,0,0.08);display:flex;align-items:flex-start;justify-content:space-between;}
+.sp-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1C0A00;line-height:1.2;}
+.sp-close{background:none;border:none;font-size:20px;cursor:pointer;color:rgba(28,10,0,0.4);padding:0;line-height:1;}
+.sp-close:hover{color:#1C0A00;}
+.sp-body{padding:16px 20px;flex:1;overflow-y:auto;}
+.sp-field{margin-bottom:12px;}
+.sp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:3px;}
+.sp-value{font-size:13px;color:#1C0A00;}
+.sp-rels{margin-top:16px;}
+.sp-rels-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:8px;}
+.sp-rel-item{font-size:12px;color:#1C0A00;padding:5px 0;border-bottom:1px solid rgba(28,10,0,0.06);}
+.sp-rel-item:last-child{border-bottom:none;}
+.sp-rel-name{font-weight:600;}
+.sp-rel-type{color:rgba(28,10,0,0.5);margin-left:4px;}
+.sp-footer{padding:16px 20px;border-top:1px solid rgba(28,10,0,0.08);}
+.btn-view-full{display:block;width:100%;padding:10px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;}
+.btn-view-full:hover{background:#1C0A00;}
+
+/* Loading overlay */
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#1C0A00;z-index:50;}
+#loading p{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(255,249,230,0.6);}
+
+/* Legend */
+.legend{position:absolute;bottom:20px;left:20px;background:rgba(255,249,230,0.12);backdrop-filter:blur(6px);border-radius:10px;padding:12px 16px;z-index:10;}
+.legend-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(255,249,230,0.5);margin-bottom:8px;}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,249,230,0.8);margin-bottom:4px;}
+.legend-item:last-child{margin-bottom:0;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.legend-line{width:18px;height:3px;border-radius:2px;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<div class="nav-bar">
+  <div class="nav-wrap">
+    <div class="nav">
+      <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
+      <div class="nav-links">
+        <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
+        <a href="/account/contacts">Contacts</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="top-bar">
+  <h1>My Network</h1>
+  <select id="groupFilter" onchange="applyFilter()">
+    <option value="all">All groups</option>
+    <option value="Family">Family</option>
+    <option value="Work">Work</option>
+    <option value="School">School</option>
+    <option value="Friends">Friends</option>
+  </select>
+  <a href="/account/contacts" class="btn-back">← Contacts</a>
+</div>
+
+<div id="graph-container">
+  <div id="loading"><p>Loading network…</p></div>
+  <svg id="graph-svg"></svg>
+  <div class="legend">
+    <div class="legend-title">Groups</div>
+    <div class="legend-item"><div class="legend-line" style="background:#e74c8b;"></div> Family</div>
+    <div class="legend-item"><div class="legend-line" style="background:#3A6B20;"></div> Work</div>
+    <div class="legend-item"><div class="legend-line" style="background:#2980b9;"></div> School</div>
+    <div class="legend-item"><div class="legend-line" style="background:#e67e22;"></div> Friends</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<div class="side-panel" id="sidePanel">
+  <div class="sp-header">
+    <div class="sp-name" id="spName"></div>
+    <button class="sp-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="sp-body">
+    <div class="sp-field" id="spBirthdayWrap">
+      <div class="sp-label">Birthday</div>
+      <div class="sp-value" id="spBirthday"></div>
+    </div>
+    <div class="sp-field" id="spCityWrap">
+      <div class="sp-label">City</div>
+      <div class="sp-value" id="spCity"></div>
+    </div>
+    <div class="sp-rels">
+      <div class="sp-rels-title">Relationships</div>
+      <div id="spRels"></div>
+    </div>
+  </div>
+  <div class="sp-footer">
+    <a href="#" class="btn-view-full" id="spViewFull">View full record</a>
+  </div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const GROUP_COLORS = {
+  'Family':  '#e74c8b',
+  'Work':    '#3A6B20',
+  'School':  '#2980b9',
+  'Friends': '#e67e22',
+};
+const DEFAULT_LINK_COLOR = 'rgba(255,249,230,0.15)';
+
+let _allNodes = [], _allLinks = [], _contactMap = {};
+let _simulation, _svg, _g, _linkSel, _nodeSel, _labelSel;
+let _activeFilter = 'all';
+let _width, _height;
+
+async function init() {
+  const res = await fetch('/api/network');
+  if (res.status === 401) { window.location.href = '/login'; return; }
+  const data = await res.json();
+
+  // Build contact map
+  data.contacts.forEach(c => { _contactMap[c.id] = c; });
+
+  // Nodes: user center + contacts
+  _allNodes = [
+    { id: '__me__', name: 'You', isMe: true },
+    ...data.contacts.map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c }))
+  ];
+
+  // Deduplicate links (keep one per pair)
+  const seen = new Set();
+  _allLinks = [];
+  data.relationships.forEach(r => {
+    const key = [Math.min(r.contact_a_id, r.contact_b_id), Math.max(r.contact_a_id, r.contact_b_id)].join('-');
+    if (!seen.has(key)) {
+      seen.add(key);
+      _allLinks.push({ source: r.contact_a_id, target: r.contact_b_id, group: r.group_name, rel: r.relationship });
+    }
+  });
+
+  document.getElementById('loading').style.display = 'none';
+  buildGraph();
+}
+
+function buildGraph() {
+  const container = document.getElementById('graph-container');
+  _width = container.clientWidth;
+  _height = container.clientHeight;
+
+  _svg = d3.select('#graph-svg')
+    .attr('width', _width)
+    .attr('height', _height);
+
+  _svg.selectAll('*').remove();
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.05, 4])
+    .on('zoom', e => _g.attr('transform', e.transform));
+
+  _svg.call(zoom);
+  _g = _svg.append('g');
+
+  // Defs: arrow marker (unused but ready)
+  _svg.append('defs');
+
+  drawGraph(_allNodes, _allLinks);
+}
+
+function getVisibleNodesLinks(filter) {
+  if (filter === 'all') return { nodes: _allNodes, links: _allLinks };
+
+  // Contacts that have at least one relationship in this group
+  const relatedIds = new Set();
+  _allLinks.forEach(l => {
+    if (l.group === filter) {
+      relatedIds.add(typeof l.source === 'object' ? l.source.id : l.source);
+      relatedIds.add(typeof l.target === 'object' ? l.target.id : l.target);
+    }
+  });
+
+  const nodes = _allNodes.filter(n => n.isMe || relatedIds.has(n.id));
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const links = _allLinks.filter(l => {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    return l.group === filter && nodeIds.has(s) && nodeIds.has(t);
+  });
+  return { nodes, links };
+}
+
+function drawGraph(nodes, links) {
+  if (_simulation) _simulation.stop();
+  _g.selectAll('*').remove();
+
+  // Clone nodes/links so D3 mutation doesn't contaminate originals
+  const nodesCopy = nodes.map(n => ({ ...n }));
+  const idToNode = {};
+  nodesCopy.forEach(n => { idToNode[n.id] = n; });
+  const linksCopy = links.map(l => ({
+    ...l,
+    source: idToNode[typeof l.source === 'object' ? l.source.id : l.source],
+    target: idToNode[typeof l.target === 'object' ? l.target.id : l.target],
+  })).filter(l => l.source && l.target);
+
+  _simulation = d3.forceSimulation(nodesCopy)
+    .force('link', d3.forceLink(linksCopy).id(d => d.id).distance(80).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-200))
+    .force('center', d3.forceCenter(_width / 2, _height / 2))
+    .force('collision', d3.forceCollide().radius(d => d.isMe ? 28 : 18));
+
+  // Links
+  _linkSel = _g.append('g').attr('class', 'links')
+    .selectAll('line')
+    .data(linksCopy)
+    .join('line')
+    .attr('stroke', d => GROUP_COLORS[d.group] || DEFAULT_LINK_COLOR)
+    .attr('stroke-opacity', 0.45)
+    .attr('stroke-width', 1.5);
+
+  // Node groups
+  const nodeG = _g.append('g').attr('class', 'nodes')
+    .selectAll('g')
+    .data(nodesCopy)
+    .join('g')
+    .attr('class', 'node-g')
+    .style('cursor', d => d.isMe ? 'default' : 'pointer')
+    .call(d3.drag()
+      .on('start', dragStart)
+      .on('drag', dragged)
+      .on('end', dragEnd))
+    .on('mouseenter', showTooltip)
+    .on('mousemove', moveTooltip)
+    .on('mouseleave', hideTooltip)
+    .on('click', nodeClick);
+
+  // Circles
+  nodeG.append('circle')
+    .attr('r', d => d.isMe ? 24 : 14)
+    .attr('fill', d => d.isMe ? '#3A6B20' : '#FFF9E6')
+    .attr('stroke', d => d.isMe ? '#FFF9E6' : 'rgba(255,249,230,0.25)')
+    .attr('stroke-width', d => d.isMe ? 3 : 1.5);
+
+  // Labels inside circles
+  nodeG.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+    .attr('font-size', d => d.isMe ? 11 : 10)
+    .attr('font-weight', 700)
+    .attr('fill', d => d.isMe ? '#FFF9E6' : '#1C0A00')
+    .text(d => d.isMe ? 'You' : (d.name || '?').charAt(0).toUpperCase());
+
+  _simulation.on('tick', () => {
+    _linkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  // Store refs for highlight
+  _nodeSel = nodeG;
+  _linkSel2 = _linkSel;
+}
+
+function applyFilter() {
+  _activeFilter = document.getElementById('groupFilter').value;
+  const { nodes, links } = getVisibleNodesLinks(_activeFilter);
+  drawGraph(nodes, links);
+  closePanel();
+}
+
+// ── Drag ──────────────────────────────────────────────────────────────────────
+function dragStart(event, d) {
+  if (!event.active) _simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+function dragEnd(event, d) {
+  if (!event.active) _simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTooltip(event, d) {
+  if (d.isMe) return;
+  tooltip.textContent = d.name || 'Unnamed';
+  tooltip.classList.add('visible');
+  moveTooltip(event);
+}
+function moveTooltip(event) {
+  tooltip.style.left = (event.clientX + 14) + 'px';
+  tooltip.style.top = (event.clientY - 10) + 'px';
+}
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+// ── Node click → side panel ───────────────────────────────────────────────────
+function nodeClick(event, d) {
+  if (d.isMe) return;
+  event.stopPropagation();
+  openPanel(d);
+}
+
+function openPanel(d) {
+  document.getElementById('spName').textContent = d.name || 'Unnamed';
+
+  const bday = d.birthday;
+  document.getElementById('spBirthdayWrap').style.display = bday ? '' : 'none';
+  document.getElementById('spBirthday').textContent = bday || '';
+
+  const city = d.city;
+  document.getElementById('spCityWrap').style.display = city ? '' : 'none';
+  document.getElementById('spCity').textContent = city || '';
+
+  // Relationships for this node
+  const nodeId = d.id;
+  const rels = _allLinks.filter(l => {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    return s === nodeId || t === nodeId;
+  });
+
+  const relsEl = document.getElementById('spRels');
+  if (!rels.length) {
+    relsEl.innerHTML = '<div style="font-size:12px;color:rgba(28,10,0,0.35);">No relationships recorded.</div>';
+  } else {
+    relsEl.innerHTML = rels.map(l => {
+      const otherId = (typeof l.source === 'object' ? l.source.id : l.source) === nodeId
+        ? (typeof l.target === 'object' ? l.target.id : l.target)
+        : (typeof l.source === 'object' ? l.source.id : l.source);
+      const other = _contactMap[otherId];
+      return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(l.rel)}</span></div>`;
+    }).join('');
+  }
+
+  document.getElementById('spViewFull').href = `/account/contacts#${nodeId}`;
+  document.getElementById('sidePanel').classList.add('open');
+
+  // Highlight connected nodes
+  highlightNode(nodeId);
+}
+
+function closePanel() {
+  document.getElementById('sidePanel').classList.remove('open');
+  clearHighlight();
+}
+
+function highlightNode(nodeId) {
+  if (!_nodeSel) return;
+  const connectedIds = new Set([nodeId]);
+  _allLinks.forEach(l => {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    if (s === nodeId) connectedIds.add(t);
+    if (t === nodeId) connectedIds.add(s);
+  });
+
+  _nodeSel.selectAll('circle')
+    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.15);
+  _nodeSel.selectAll('text')
+    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.15);
+  if (_linkSel2) {
+    _linkSel2.attr('stroke-opacity', l => {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const t = typeof l.target === 'object' ? l.target.id : l.target;
+      return (s === nodeId || t === nodeId) ? 0.85 : 0.05;
+    });
+  }
+}
+
+function clearHighlight() {
+  if (!_nodeSel) return;
+  _nodeSel.selectAll('circle').attr('opacity', 1);
+  _nodeSel.selectAll('text').attr('opacity', 1);
+  if (_linkSel2) _linkSel2.attr('stroke-opacity', 0.45);
+}
+
+// Close panel on svg click
+document.getElementById('graph-svg').addEventListener('click', () => closePanel());
+
+// Resize
+window.addEventListener('resize', () => {
+  const container = document.getElementById('graph-container');
+  _width = container.clientWidth;
+  _height = container.clientHeight;
+  _svg.attr('width', _width).attr('height', _height);
+  if (_simulation) _simulation.force('center', d3.forceCenter(_width / 2, _height / 2)).alpha(0.3).restart();
+});
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _linkSel2;
+init();
+</script>
+</body>
+</html>
