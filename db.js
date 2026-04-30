@@ -60,14 +60,13 @@ async function initDb() {
     );
 
     CREATE TABLE IF NOT EXISTS contacts (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      google_id VARCHAR(255) NOT NULL,
-      name VARCHAR(255),
-      email VARCHAR(255),
-      phone VARCHAR(50),
+      user_id INTEGER REFERENCES users(id),
+      google_id TEXT,
+      name TEXT,
+      email TEXT,
+      phone TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE (user_id, google_id)
+      PRIMARY KEY (user_id, google_id)
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
