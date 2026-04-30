@@ -8,11 +8,21 @@ const Stripe = require('stripe');
 const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
 const { uploadStream } = require('./cloudinary');
+const { google } = require('googleapis');
 const {
   createMagicLink, verifyMagicLink, findOrCreateUser,
   createSession, setSessionCookie, getSessionUser,
   requireAuth, requireRole,
 } = require('./auth');
+
+function googleOAuthClient() {
+  const base = process.env.APP_URL || 'http://localhost:8080';
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${base}/auth/google/callback`
+  );
+}
 
 fal.config({ credentials: process.env.FAL_API_KEY });
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -175,6 +185,68 @@ app.post('/auth/logout', (req, res) => {
   res.redirect('/');
 });
 
+// ── Google OAuth (contacts) ───────────────────────────────────────────────────
+
+app.get('/auth/google/contacts', requireAuth, (req, res) => {
+  const client = googleOAuthClient();
+  const url = client.generateAuthUrl({
+    access_type: 'online',
+    scope: ['https://www.googleapis.com/auth/contacts.readonly'],
+    prompt: 'consent',
+  });
+  res.redirect(url);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) return res.redirect('/account/contacts?error=cancelled');
+
+  const user = await getSessionUser(req);
+  if (!user) return res.redirect('/login');
+
+  try {
+    const client = googleOAuthClient();
+    const { tokens } = await client.getToken(code);
+    client.setCredentials(tokens);
+
+    const people = google.people({ version: 'v1', auth: client });
+    let connections = [];
+    let pageToken;
+    do {
+      const resp = await people.people.connections.list({
+        resourceName: 'people/me',
+        pageSize: 1000,
+        personFields: 'names,emailAddresses,phoneNumbers',
+        ...(pageToken && { pageToken }),
+      });
+      connections = connections.concat(resp.data.connections || []);
+      pageToken = resp.data.nextPageToken;
+    } while (pageToken);
+
+    let saved = 0;
+    for (const c of connections) {
+      const googleId = c.resourceName;
+      if (!googleId) continue;
+      const name  = c.names?.[0]?.displayName    || null;
+      const email = c.emailAddresses?.[0]?.value  || null;
+      const phone = c.phoneNumbers?.[0]?.value    || null;
+      await pool.query(
+        `INSERT INTO contacts (user_id, google_id, name, email, phone)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (user_id, google_id) DO UPDATE
+           SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone`,
+        [user.id, googleId, name, email, phone]
+      );
+      saved++;
+    }
+    console.log(`Synced ${saved} contacts for user ${user.id}`);
+    res.redirect(`/account/contacts?synced=${saved}`);
+  } catch (err) {
+    console.error('Google contacts sync error:', err.message);
+    res.redirect('/account/contacts?error=failed');
+  }
+});
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 app.get('/admin', requireRole('admin'), (req, res) => {
@@ -240,6 +312,18 @@ app.get('/account', requireAuth, (req, res) => {
 
 app.get('/account/contacts', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'contacts.html'));
+});
+
+app.get('/api/account/contacts', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, google_id, name, email, phone, created_at FROM contacts WHERE user_id = $1 ORDER BY name ASC NULLS LAST',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/account/data', requireAuth, async (req, res) => {
