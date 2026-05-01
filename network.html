@@ -595,36 +595,22 @@ function closePanel() {
   clearHighlight();
 }
 
+function nodeStroke(d) {
+  return d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#333';
+}
+
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
-  const connectedIds = new Set([nodeId]);
-  _relLinks.forEach(l => {
-    const s = typeof l.source === 'object' ? l.source.id : l.source;
-    const t = typeof l.target === 'object' ? l.target.id : l.target;
-    if (s === nodeId) connectedIds.add(t);
-    if (t === nodeId) connectedIds.add(s);
-  });
-  _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.08);
-  _groupNodeSel.attr('opacity', 0.08);
-  // Dim non-connected visible rel links (display:none edges are unaffected)
-  _relLinkSel.attr('stroke-opacity', l => {
-    const s = typeof l.source === 'object' ? l.source.id : l.source;
-    const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return (s === nodeId || t === nodeId) ? 0.9 : 0.04;
-  });
-  // Dim membership links
-  _memberLinkSel.attr('stroke-opacity', l => {
-    const tId = typeof l.target === 'object' ? l.target.id : l.target;
-    return connectedIds.has(tId) ? 0.5 : 0.04;
-  });
+  _nodeSel.select('rect')
+    .attr('stroke', d => d.id === nodeId ? '#3A6B20' : nodeStroke(d))
+    .attr('stroke-width', d => d.id === nodeId ? 4 : 3);
 }
 
 function clearHighlight() {
   if (!_nodeSel) return;
-  _nodeSel.attr('opacity', 1);
-  _groupNodeSel.attr('opacity', 1);
-  _relLinkSel.attr('stroke-opacity', 0.75);
-  _memberLinkSel.attr('stroke-opacity', 0.45);
+  _nodeSel.select('rect')
+    .attr('stroke', d => nodeStroke(d))
+    .attr('stroke-width', 3);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());
