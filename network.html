@@ -130,8 +130,9 @@ const PALETTE = ['#c0195a','#2a6b50','#1a5f8a','#b85e10','#6b2d9a','#1a8a6b','#8
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const NW = 130, NH = 46, NRX = 10;
-const GNW = 120, GNH = 34, GNRX = 17;
+const GNW = 164, GNH = 60, GNRX = 14;
 const ME_R = 26;
+const FAMILY_COLOR = '#9e3a3a';
 
 let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {};
 let _nodeGroups = {};
@@ -288,6 +289,7 @@ async function init() {
   // Assign colors
   GROUP_COLORS = {};
   _allGroupNames.forEach((g, i) => { GROUP_COLORS[g] = PALETTE[i % PALETTE.length]; });
+  GROUP_COLORS['Family'] = FAMILY_COLOR;
 
   // Build dynamic checkboxes
   const cbGroup = document.getElementById('cbGroup');
@@ -373,7 +375,7 @@ function buildGraph() {
     .force('x', d3.forceX(_width / 2).strength(0.025))
     .force('y', d3.forceY(_height / 2).strength(0.025))
     .force('collision', d3.forceCollide().radius(d => {
-      if (d.isMe)    return ME_R + 8;
+      if (d.isMe)    return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 6;
       if (d.isGroup) return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 4;
       const h = _nodeHeights[d.id] || NH;
       return Math.sqrt((NW / 2) ** 2 + (h / 2) ** 2) + 6;
@@ -418,18 +420,21 @@ function buildGraph() {
     .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
     .attr('fill', d => {
       const c = GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20';
-      return c + '18';
+      return c + '1a';
     })
     .attr('stroke', d => GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20')
-    .attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '5,3');
+    .attr('stroke-width', 4)
+    .attr('stroke-dasharray', '6,4');
 
   groupG.append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 10).attr('font-weight', 700)
+    .attr('font-size', 13).attr('font-weight', 800)
     .attr('fill', d => GROUP_COLORS[_groupNodeName[d.id]] || '#2a5016')
-    .text(d => truncate(d.name, 15));
+    .text(d => {
+      const name = _groupNodeName[d.id] || d.name;
+      return truncate((name === 'Family' ? '♥ ' : '') + name, 17);
+    });
 
   _groupNodeSel = groupG;
 
@@ -443,14 +448,17 @@ function buildGraph() {
     .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
     .on('click', nodeClick);
 
-  // Me circle
+  // Me node — same shape and size as group hubs, brand green
   const meG = nodeG.filter(d => d.isMe);
-  meG.append('circle').attr('r', ME_R)
-    .attr('fill', '#3A6B20').attr('stroke', '#fff').attr('stroke-width', 3);
+  meG.append('rect')
+    .attr('x', -GNW / 2).attr('y', -GNH / 2)
+    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
+    .attr('fill', '#3A6B2022').attr('stroke', '#3A6B20').attr('stroke-width', 4)
+    .attr('stroke-dasharray', '6,4');
   meG.append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 11).attr('font-weight', 800).attr('fill', '#fff').text('You');
+    .attr('font-size', 13).attr('font-weight', 800).attr('fill', '#3A6B20').text('You');
 
   // Contact pills — dynamic per-node layout based on content
   const cG = nodeG.filter(d => !d.isMe);
@@ -684,15 +692,15 @@ function nodeStroke(d) {
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
   _nodeSel.select('rect')
-    .attr('stroke', d => d.id === nodeId ? '#3A6B20' : nodeStroke(d))
-    .attr('stroke-width', d => d.id === nodeId ? 4 : 3);
+    .attr('stroke', d => d.isMe ? '#3A6B20' : d.id === nodeId ? '#3A6B20' : nodeStroke(d))
+    .attr('stroke-width', d => (d.isMe || d.id === nodeId) ? 4 : 3);
 }
 
 function clearHighlight() {
   if (!_nodeSel) return;
   _nodeSel.select('rect')
-    .attr('stroke', d => nodeStroke(d))
-    .attr('stroke-width', 3);
+    .attr('stroke', d => d.isMe ? '#3A6B20' : nodeStroke(d))
+    .attr('stroke-width', d => d.isMe ? 4 : 3);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());
