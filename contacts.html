@@ -246,6 +246,7 @@ let _allGroups = [];
 let _relTypes = [];
 let _contactGroupMap = {};
 let _allGroupsById = {};
+let _relatedContactIds = null;
 
 // ── Sync banner ───────────────────────────────────────────────────────────────
 (function() {
@@ -368,6 +369,10 @@ function renderFilterPanel() {
     <div class="fp-item"><label>
       <input type="checkbox" id="cb-living-contacts" onchange="applyContactFilter()">
       Only living
+    </label></div>
+    <div class="fp-item"><label>
+      <input type="checkbox" id="cb-show-unrelated" checked onchange="applyContactFilter()">
+      Show unrelated
     </label></div>`;
   document.getElementById('leftFilterContent').innerHTML = html;
 }
@@ -388,8 +393,10 @@ function applyContactFilter() {
   const allCbs = [...document.querySelectorAll('#leftFilterContent input[data-group-id]')];
   const allChecked = !allCbs.length || allCbs.every(cb => cb.checked);
   const activeIds = allChecked ? null : new Set(allCbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.groupId)));
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
   renderList(_contacts.filter(c => {
     if (c.is_me) return true;
+    if (!showUnrelated && _relatedContactIds && !_relatedContactIds.has(c.id)) return false;
     if (q && !(c.name || '').toLowerCase().includes(q) && !(c.email || '').toLowerCase().includes(q)) return false;
     if (showLiving && c.died_on) return false;
     if (activeIds) {
@@ -559,7 +566,14 @@ async function initAuthNav() {
     if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
     document.getElementById('ddUserEmail').textContent = status.email;
     await Promise.all([loadContacts(), loadGroups(), loadRelTypes()]);
-    await loadGroupMemberships();
+    const [, relIdsRes] = await Promise.all([
+      loadGroupMemberships(),
+      fetch('/api/contacts/related-ids'),
+    ]);
+    if (relIdsRes.ok) {
+      const ids = await relIdsRes.json();
+      _relatedContactIds = new Set(ids);
+    }
 
     CP.init('cpContainer');
     CP.contacts = _contacts;

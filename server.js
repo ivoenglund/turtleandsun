@@ -590,6 +590,19 @@ app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT contact_a_id AS id FROM contact_relationships WHERE user_id = $1
+      UNION
+      SELECT DISTINCT contact_b_id AS id FROM contact_relationships WHERE user_id = $1
+      UNION
+      SELECT DISTINCT contact_id AS id FROM contact_group_memberships WHERE user_id = $1
+    `, [req.user.id]);
+    res.json(result.rows.map(r => r.id));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(

@@ -177,6 +177,9 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
         <div class="fp-item">
           <label><input type="checkbox" id="cb-living" onchange="applyVisibility()"> Only living</label>
         </div>
+        <div class="fp-item" id="cb-unrelated-wrap" style="display:none;">
+          <label><input type="checkbox" id="cb-show-unrelated" checked onchange="applyVisibility()"> Show unrelated</label>
+        </div>
       </div>
     </div>
     <div class="panel-resize-handle" id="leftResizeHandle"></div>
@@ -247,6 +250,7 @@ function lightenHex(hex, t) {
 
 let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {};
 let _meNodeId = '__me__';
+let _unrelatedIds = new Set();
 let _nodeGroups = {};
 let _groupNodeName = {};
 let _contactGroupNames = {};
@@ -532,6 +536,22 @@ async function init() {
     });
   });
 
+  // Compute unrelated contacts and add virtual Unrelated hub
+  _unrelatedIds = new Set(
+    Object.values(_contactMap)
+      .filter(c => !c.is_me && !_nodeGroups[c.id] && !_contactGroupNames[c.id])
+      .map(c => c.id)
+  );
+  if (_unrelatedIds.size > 0) {
+    GROUP_COLORS['Unrelated'] = '#9aa5b4';
+    _groupNodeName['g_unrelated'] = 'Unrelated';
+    _allNodes.push({ id: 'g_unrelated', name: 'Unrelated', isGroup: true, isUnrelated: true });
+    for (const cid of _unrelatedIds) {
+      _memberLinks.push({ source: 'g_unrelated', target: cid, isMembership: true, groupName: 'Unrelated', isUnrelated: true });
+    }
+    document.getElementById('cb-unrelated-wrap').style.display = '';
+  }
+
   document.getElementById('loading').style.display = 'none';
   buildGraph();
 }
@@ -578,6 +598,8 @@ function buildGraph() {
       const gNode = idToNode[`g_${g.id}`];
       if (gNode) meLinksCopy.push({ source: meNode, target: gNode, isMeLink: true });
     });
+    const unrelatedHub = idToNode['g_unrelated'];
+    if (unrelatedHub) meLinksCopy.push({ source: meNode, target: unrelatedHub, isMeLink: true, isUnrelated: true });
   }
 
   _simulation = d3.forceSimulation(nodesCopy)
@@ -738,10 +760,15 @@ function isGroupNameActive(groupName, active) {
 }
 
 function computeVisibleNodeIds(active, showOnlyLiving) {
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
   const visible = new Set();
   _nodeSel.each(d => {
     if (d.isMe) { visible.add(d.id); return; }
     if (showOnlyLiving && d.died_on) return;
+    if (_unrelatedIds.has(d.id)) {
+      if (showUnrelated) visible.add(d.id);
+      return;
+    }
     const relGroups = _nodeGroups[d.id];
     if (relGroups) { for (const g of relGroups) { if (isGroupNameActive(g, active)) { visible.add(d.id); return; } } }
     const memGroups = _contactGroupNames[d.id];
@@ -751,8 +778,13 @@ function computeVisibleNodeIds(active, showOnlyLiving) {
 }
 
 function computeVisibleGroupIds(active) {
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
   const visible = new Set();
   _groupNodeSel.each(d => {
+    if (d.id === 'g_unrelated') {
+      if (showUnrelated && _unrelatedIds.size > 0) visible.add(d.id);
+      return;
+    }
     if (isGroupNameActive(_groupNodeName[d.id], active)) visible.add(d.id);
   });
   return visible;
@@ -783,10 +815,11 @@ function applyVisibility() {
   _memberLinkSel.attr('display', l => {
     const srcId = typeof l.source === 'object' ? l.source.id : l.source;
     const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
-    const gname = _groupNodeName[srcId] || l.groupName;
-    if (!isGroupNameActive(gname, active)) return 'none';
     if (!visibleGroupIds.has(srcId)) return 'none';
     if (!visibleNodeIds.has(tgtId)) return 'none';
+    if (srcId === 'g_unrelated') return null;
+    const gname = _groupNodeName[srcId] || l.groupName;
+    if (!isGroupNameActive(gname, active)) return 'none';
     return null;
   });
 
@@ -952,11 +985,13 @@ function calToday() {
 
 function getOccasionsForMonth(year, month) {
   const showOnlyLiving = document.getElementById('cb-living') && document.getElementById('cb-living').checked;
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
   const byDay = {};
   const add = (day, chip) => { if (!byDay[day]) byDay[day] = []; byDay[day].push(chip); };
 
   for (const c of Object.values(_contactMap)) {
     if (showOnlyLiving && c.died_on) continue;
+    if (!showUnrelated && _unrelatedIds.has(c.id)) continue;
     if (c.birthday) {
       const b = new Date(c.birthday);
       if (!isNaN(b.getTime()) && b.getMonth() === month) {
@@ -987,10 +1022,12 @@ function getOccasionsForMonth(year, month) {
 
 function getOccasionsForDate(date) {
   const showOnlyLiving = document.getElementById('cb-living') && document.getElementById('cb-living').checked;
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
   const result = [];
   const month = date.getMonth(), day = date.getDate(), year = date.getFullYear();
   for (const c of Object.values(_contactMap)) {
     if (showOnlyLiving && c.died_on) continue;
+    if (!showUnrelated && _unrelatedIds.has(c.id)) continue;
     if (c.birthday) {
       const b = new Date(c.birthday);
       if (!isNaN(b.getTime()) && b.getMonth() === month && b.getDate() === day)
@@ -1119,6 +1156,27 @@ function renderOutline() {
     }
     inner.appendChild(el);
   });
+
+  // Unrelated section at bottom
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
+  if (showUnrelated && _unrelatedIds.size > 0) {
+    const unrelatedContacts = [..._unrelatedIds]
+      .map(id => _contactMap[id]).filter(c => c && (!showOnlyLiving || !c.died_on))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (unrelatedContacts.length > 0) {
+      const el = document.createElement('div');
+      el.className = 'ol-group';
+      el.innerHTML = `<div class="ol-group-hdr" onclick="toggleOlGroup(this)">
+        <span class="ol-tri">▼</span>
+        <span class="ol-dot" style="background:#9aa5b4"></span>
+        <span class="ol-group-name">Unrelated</span>
+        <span class="ol-count">${unrelatedContacts.length}</span>
+      </div><div class="ol-group-body"></div>`;
+      const body = el.querySelector('.ol-group-body');
+      unrelatedContacts.forEach(c => body.appendChild(makeOlRow(c, 0, false)));
+      inner.appendChild(el);
+    }
+  }
 }
 
 function renderOlFamilySection(body, members) {
