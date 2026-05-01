@@ -84,6 +84,7 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .ci-bday{font-size:11px;color:rgba(28,10,0,0.32);margin-top:2px;}
 .ci-ph{display:inline-block;font-size:10px;background:#f0ede6;color:rgba(28,10,0,0.4);padding:1px 5px;border-radius:6px;font-weight:700;margin-left:4px;vertical-align:middle;}
 .ci-deceased{display:inline-block;font-size:10px;background:#f0ede6;color:rgba(28,10,0,0.4);padding:1px 5px;border-radius:6px;font-weight:700;margin-left:4px;vertical-align:middle;}
+.ci-me{display:inline-block;font-size:10px;background:#e8f0e0;color:#3A6B20;padding:1px 5px;border-radius:6px;font-weight:700;margin-left:4px;vertical-align:middle;}
 .list-empty{padding:32px 16px;text-align:center;font-size:13px;color:rgba(28,10,0,0.3);line-height:1.7;}
 
 /* Modals */
@@ -388,6 +389,7 @@ function applyContactFilter() {
   const allChecked = !allCbs.length || allCbs.every(cb => cb.checked);
   const activeIds = allChecked ? null : new Set(allCbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.groupId)));
   renderList(_contacts.filter(c => {
+    if (c.is_me) return true;
     if (q && !(c.name || '').toLowerCase().includes(q) && !(c.email || '').toLowerCase().includes(q)) return false;
     if (showLiving && c.died_on) return false;
     if (activeIds) {
@@ -424,7 +426,7 @@ function renderList(contacts) {
   }
   el.innerHTML = contacts.map(c => `
     <div class="contact-item${_currentId === c.id ? ' active' : ''}" onclick="selectContact(${c.id})" data-id="${c.id}">
-      <div class="ci-name">${c.is_pet ? '🐾 ' : ''}${esc(c.name || 'Unnamed')}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}${c.died_on ? '<span class="ci-deceased">†</span>' : ''}</div>
+      <div class="ci-name">${c.is_pet ? '🐾 ' : ''}${esc(c.name || 'Unnamed')}${c.is_me ? '<span class="ci-me">Me</span>' : ''}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}${c.died_on ? '<span class="ci-deceased">†</span>' : ''}</div>
       ${c.email ? `<div class="ci-email">${esc(c.email)}</div>` : ''}
       ${c.birthday ? `<div class="ci-bday">${esc(c.birthday)}</div>` : ''}
     </div>

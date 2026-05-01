@@ -156,6 +156,18 @@ app.post('/auth/request-link', async (req, res) => {
   }
 });
 
+async function ensureIsMe(userId, email) {
+  const existing = await pool.query(
+    `SELECT id FROM contacts WHERE user_id = $1 AND is_me = TRUE`, [userId]
+  );
+  if (!existing.rows.length) {
+    await pool.query(
+      `INSERT INTO contacts (user_id, name, email, is_me) VALUES ($1, 'Me', $2, TRUE)`,
+      [userId, email]
+    );
+  }
+}
+
 async function ensureFamilyGroup(userId) {
   const existing = await pool.query(
     `SELECT id FROM groups WHERE user_id = $1 AND name = 'Family'`, [userId]
@@ -199,6 +211,7 @@ app.get('/auth/verify', async (req, res) => {
     if (!email) return res.redirect('/login?error=invalid');
     const userId = await findOrCreateUser(email);
     await ensureFamilyGroup(userId);
+    await ensureIsMe(userId, email);
     const { token: sessionToken, expiresAt } = await createSession(userId);
     setSessionCookie(res, sessionToken, expiresAt);
     const adminCheck = await pool.query(
@@ -517,7 +530,7 @@ app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
 app.get('/api/network', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, name, email, birthday, city, died_on, is_pet FROM contacts WHERE user_id = $1`,
+      `SELECT id, name, email, birthday, city, died_on, is_pet, is_me FROM contacts WHERE user_id = $1`,
       [req.user.id]
     );
     const relationships = await pool.query(
@@ -554,8 +567,8 @@ app.get('/api/network', requireAuth, async (req, res) => {
 app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet
-       FROM contacts WHERE user_id = $1 ORDER BY name ASC NULLS LAST`,
+      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
+       FROM contacts WHERE user_id = $1 ORDER BY is_me DESC NULLS LAST, name ASC NULLS LAST`,
       [req.user.id]
     );
     res.json(contacts.rows);
@@ -580,7 +593,7 @@ app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
 app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(
-      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet
+      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
        FROM contacts WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]
     );

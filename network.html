@@ -246,6 +246,7 @@ function lightenHex(hex, t) {
 }
 
 let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {};
+let _meNodeId = '__me__';
 let _nodeGroups = {};
 let _groupNodeName = {};
 let _contactGroupNames = {};
@@ -484,9 +485,13 @@ async function init() {
     groupName: m.group_name,
   }));
 
+  const meContact = (data.contacts || []).find(c => c.is_me);
+  _meNodeId = meContact ? meContact.id : '__me__';
   _allNodes = [
-    { id: '__me__', name: 'You', isMe: true },
-    ...data.contacts.map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c })),
+    meContact
+      ? { ...meContact, id: meContact.id, name: meContact.name || 'Me', isMe: true }
+      : { id: '__me__', name: 'Me', isMe: true },
+    ...data.contacts.filter(c => !c.is_me).map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c })),
     ...groupNodes,
   ];
 
@@ -566,7 +571,7 @@ function buildGraph() {
   });
 
   const childGroupIds = new Set(_rawGroups.filter(g => g.parent_group_id).map(g => g.parent_group_id));
-  const meNode = idToNode['__me__'];
+  const meNode = idToNode[_meNodeId];
   const meLinksCopy = [];
   if (meNode) {
     _rawGroups.filter(g => !childGroupIds.has(g.id)).forEach(g => {
@@ -651,7 +656,7 @@ function buildGraph() {
   const nodeG = _g.append('g').attr('class', 'contact-nodes')
     .selectAll('g').data(contactsCopy).join('g')
     .attr('class', 'contact-node-g')
-    .style('cursor', d => d.isMe ? 'default' : 'pointer')
+    .style('cursor', d => (d.isMe && !Number.isInteger(d.id)) ? 'default' : 'pointer')
     .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd))
     .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
     .on('click', nodeClick);
@@ -668,7 +673,7 @@ function buildGraph() {
   meG.append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 13).attr('font-weight', 800).attr('fill', '#3A6B20').text('You');
+    .attr('font-size', 13).attr('font-weight', 800).attr('fill', '#3A6B20').text(d => d.name || 'Me');
 
   const cG = nodeG.filter(d => !d.isMe);
   cG.each(function(d) {
@@ -810,7 +815,7 @@ function dragEnd(event, d) { if (!event.active) _simulation.alphaTarget(0); d.fx
 const tooltip = document.getElementById('tooltip');
 
 function showTooltip(event, d) {
-  if (d.isMe) return;
+  if (d.isMe && !Number.isInteger(d.id)) return;
   tooltip.textContent = d.name || 'Unnamed';
   tooltip.classList.add('visible');
   moveTooltip(event);
@@ -840,7 +845,7 @@ function moveTooltip(event) {
 function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whiteSpace = 'normal'; }
 
 // ── Detail panel ──────────────────────────────────────────────────────────────
-function nodeClick(event, d) { if (d.isMe) return; event.stopPropagation(); openDetailPanel(d.id); }
+function nodeClick(event, d) { if (d.isMe && !Number.isInteger(d.id)) return; event.stopPropagation(); openDetailPanel(d.id); }
 
 function openDetailPanel(id) {
   const pr = document.getElementById('panelRight');
