@@ -32,52 +32,70 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 #syncBanner.ok{background:#e8f0e0;color:#2d5a16;}
 #syncBanner.err{background:#fdecea;color:#c0392b;}
 
-/* ── Three-column layout ──────────────────────────────────────────── */
-.three-col{flex:1;min-height:0;display:flex;overflow:hidden;position:relative;}
+/* ── Main canvas (full width) ───────────────────────────────────── */
+.main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 
-.panel-left{display:flex;flex-direction:column;width:280px;flex-shrink:0;overflow:hidden;transition:width 0.22s ease;border-right:1px solid rgba(0,0,0,0.06);background:#fff;}
-.panel-left.collapsed{width:0;border-right:none;}
-.pl-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;flex-shrink:0;border-bottom:1px solid rgba(28,10,0,0.05);}
-.pl-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.35);}
-.pl-close-btn{width:22px;height:22px;border:none;background:none;cursor:pointer;color:rgba(28,10,0,0.28);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:background 0.12s,color 0.12s;padding:0;flex-shrink:0;}
-.pl-close-btn:hover{background:rgba(28,10,0,0.07);color:#1C0A00;}
-.pl-scroll{flex:1;overflow-y:auto;padding:8px 14px 20px;}
+/* ── Floating overlays ──────────────────────────────────────────── */
+.fo-filters,.fo-detail{position:fixed;z-index:50;}
 
-.panel-center{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+.fo-filters{top:62px;left:14px;width:210px;max-height:calc(100vh - 82px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
+.fo-filters::-webkit-scrollbar{display:none;}
 
-.panel-right{display:flex;flex-direction:column;width:380px;flex-shrink:0;overflow:hidden;transition:width 0.22s ease;border-left:1px solid rgba(0,0,0,0.06);background:#FFF9E6;}
-.panel-right.collapsed{width:0;border-left:none;}
-.pr-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;flex-shrink:0;border-bottom:1px solid rgba(28,10,0,0.05);}
-.pr-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.35);}
-.pr-close-btn{width:22px;height:22px;border:none;background:none;cursor:pointer;color:rgba(28,10,0,0.28);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:background 0.12s,color 0.12s;padding:0;flex-shrink:0;}
-.pr-close-btn:hover{background:rgba(28,10,0,0.07);color:#1C0A00;}
+.fo-detail{top:62px;right:14px;width:320px;max-height:calc(100vh - 82px);overflow:hidden;display:none;flex-direction:column;}
+.fo-detail.fo-open{display:flex;}
 
-.btn-show-filters{display:none;position:absolute;top:10px;left:10px;z-index:5;align-items:center;gap:5px;padding:5px 10px;background:#fff;border:1px solid rgba(28,10,0,0.11);border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:rgba(28,10,0,0.5);cursor:pointer;transition:background 0.12s;}
-.btn-show-filters:hover{background:#f9f7f2;color:#1C0A00;}
-.btn-show-details{display:none;padding:5px 10px;background:rgba(58,107,32,0.09);border:none;border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:#3A6B20;cursor:pointer;white-space:nowrap;}
-.btn-show-details:hover{background:rgba(58,107,32,0.16);}
+.fo-filters.fo-hidden{display:none;}
 
-@media(max-width:1000px){
-  .panel-left{position:fixed;left:0;top:0;bottom:0;z-index:200;width:280px!important;transform:translateX(-100%);transition:transform 0.22s ease;border-right:none;box-shadow:4px 0 24px rgba(0,0,0,0.13);}
-  .panel-left.mobile-open{transform:translateX(0);}
-  .panel-left.collapsed{width:280px!important;transform:translateX(-100%);}
-  .panel-right{position:fixed;right:0;top:0;bottom:0;z-index:200;width:320px!important;transform:translateX(100%);transition:transform 0.22s ease;border-left:none;box-shadow:-4px 0 24px rgba(0,0,0,0.13);}
-  .panel-right.mobile-open{transform:translateX(0);}
-  .panel-right.collapsed{width:320px!important;transform:translateX(100%);}
-  .btn-show-filters{display:flex!important;}
-  .mobile-backdrop{display:block!important;}
-}
-.mobile-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:199;}
+.fo-hdr{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.fo-close-btn{width:18px;height:18px;border:none;background:none;cursor:pointer;font-size:16px;color:rgba(28,10,0,0.35);line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-shadow:0 0 8px rgba(255,249,230,1);}
+.fo-close-btn:hover{color:#1C0A00;}
+.fo-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.3);text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
+.fo-detail-hdr{display:flex;justify-content:flex-end;padding-bottom:4px;}
 
-/* Filter panel items */
-.fp-item{display:flex;align-items:center;gap:5px;padding:4px 0;cursor:pointer;user-select:none;}
-.fp-item label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;display:flex;align-items:center;gap:5px;}
+.fo-show-btn{position:fixed;top:64px;left:14px;z-index:50;border:none;background:none;cursor:pointer;font-size:22px;line-height:1;color:rgba(28,10,0,0.35);font-weight:700;display:none;padding:0;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
+.fo-show-btn:hover{color:#1C0A00;}
+
+/* Filter items – text-shadow for legibility over any bg */
+.fp-item{display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer;user-select:none;}
+.fp-item label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;display:flex;align-items:center;gap:5px;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fp-item input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
 .fp-sub label{padding-left:10px;font-size:11px;opacity:0.85;}
 .fp-sub2 label{padding-left:20px;font-size:11px;opacity:0.7;}
-.fp-sep{height:1px;background:rgba(28,10,0,0.07);margin:8px 0;}
+.fp-sep{height:1px;background:rgba(28,10,0,0.12);margin:6px 0;}
 
-/* List (center panel) */
+/* Mobile */
+.fo-backdrop{display:none;position:fixed;inset:0;bottom:56px;background:rgba(0,0,0,0.35);z-index:190;}
+.mob-toolbar{display:none;}
+
+@media(max-width:1000px){
+  .fo-filters,.fo-detail{
+    position:fixed;top:0;left:0;right:0;bottom:56px;
+    width:auto!important;max-height:none!important;
+    background:rgba(255,249,230,0.97);backdrop-filter:blur(8px);
+    z-index:200;overflow-y:auto;padding:20px 16px;
+    display:none!important;flex-direction:column;
+  }
+  .fo-filters.fo-hidden{display:none!important;}
+  .fo-filters.mob-open,.fo-detail.mob-open{display:flex!important;}
+  .fo-backdrop.mob-open{display:block;}
+  .fo-show-btn{display:none!important;}
+  .mob-toolbar{
+    display:flex;position:fixed;bottom:0;left:0;right:0;height:56px;
+    background:rgba(255,249,230,0.97);backdrop-filter:blur(8px);
+    border-top:1px solid rgba(28,10,0,0.1);
+    align-items:center;justify-content:center;gap:10px;z-index:150;padding:0 16px;
+  }
+  .mob-btn{
+    flex:1;max-width:180px;padding:9px;border:1.5px solid rgba(28,10,0,0.14);border-radius:8px;
+    font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;
+    cursor:pointer;background:transparent;color:#1C0A00;transition:background 0.12s;
+  }
+  .mob-btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .mob-btn.active{background:#3A6B20;color:#fff;border-color:#3A6B20;}
+  .main-canvas{padding-bottom:56px;}
+}
+
+/* List */
 .list-toolbar{padding:12px 14px;border-bottom:1px solid rgba(28,10,0,0.07);display:flex;flex-direction:column;gap:8px;flex-shrink:0;background:#fff;}
 .search-input{width:100%;padding:8px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#f9f7f2;outline:none;}
 .search-input:focus{border-color:#3A6B20;background:#fff;}
@@ -128,7 +146,6 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .btn-add-sub:hover{border-color:#3A6B20;color:#3A6B20;}
 .btn-del{padding:3px 9px;background:none;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.42);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;}
 .btn-del:hover{border-color:#c0392b;color:#c0392b;}
-
 </style>
 </head>
 <body>
@@ -166,44 +183,43 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 
 <div id="syncBanner"></div>
 
-<div class="three-col">
-
-  <button class="btn-show-filters" id="btnShowFilters" onclick="togglePanel('left')">≡ Filters</button>
-
-  <!-- LEFT: Filters -->
-  <div class="panel-left" id="panelLeft">
-    <div class="pl-header">
-      <span class="pl-title">Filters</span>
-      <button class="pl-close-btn" onclick="togglePanel('left')" aria-label="Hide filters">×</button>
-    </div>
-    <div class="pl-scroll" id="leftFilterContent"></div>
-  </div>
-
-  <!-- CENTER: Contact list -->
-  <div class="panel-center">
-    <div class="list-toolbar">
-      <input class="search-input" id="searchInput" type="text" placeholder="Search contacts…" oninput="applyContactFilter()">
-      <div class="list-actions">
-        <button class="btn-add-ph" onclick="openPlaceholderModal()">+ Add person</button>
-        <button class="btn-manage-groups" onclick="openGroupsModal()">⚙ Groups</button>
-        <button class="btn-show-details" id="btnShowDetails" onclick="forceSelectContact(_currentId)">Details →</button>
-      </div>
-    </div>
-    <div class="contact-list" id="contactList">
-      <div class="list-empty">Loading…</div>
+<!-- Full-width contact list -->
+<div class="main-canvas">
+  <div class="list-toolbar">
+    <input class="search-input" id="searchInput" type="text" placeholder="Search contacts…" oninput="applyContactFilter()">
+    <div class="list-actions">
+      <button class="btn-add-ph" onclick="openPlaceholderModal()">+ Add person</button>
+      <button class="btn-manage-groups" onclick="openGroupsModal()">⚙ Groups</button>
     </div>
   </div>
-
-  <!-- RIGHT: Detail (shared CP component) -->
-  <div class="panel-right" id="panelRight">
-    <div class="pr-header">
-      <span class="pr-title">Details</span>
-      <button class="pr-close-btn" onclick="togglePanel('right')" aria-label="Close">×</button>
-    </div>
-    <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
+  <div class="contact-list" id="contactList">
+    <div class="list-empty">Loading…</div>
   </div>
+</div>
 
-  <div class="mobile-backdrop" id="mobileBackdrop" onclick="closeMobileOverlays()"></div>
+<!-- Floating filter overlay (left) -->
+<div class="fo-filters" id="foFilters">
+  <div class="fo-hdr">
+    <button class="fo-close-btn" onclick="hideFilters()" aria-label="Hide filters">×</button>
+    <span class="fo-title">Filters</span>
+  </div>
+  <div id="leftFilterContent"></div>
+</div>
+<button class="fo-show-btn" id="foShowFilters" onclick="showFilters()" title="Show filters">+</button>
+
+<!-- Floating contact detail overlay (right) -->
+<div class="fo-detail" id="foDetail">
+  <div class="fo-detail-hdr">
+    <button class="fo-close-btn" onclick="hideDetail()" aria-label="Close">×</button>
+  </div>
+  <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;"></div>
+</div>
+
+<!-- Mobile -->
+<div class="fo-backdrop" id="foBackdrop" onclick="closeMobileOverlays()"></div>
+<div class="mob-toolbar">
+  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">≡ Filters</button>
+  <button class="mob-btn" id="mobDetailBtn" disabled onclick="toggleMobileDetail()">Selected contact</button>
 </div>
 
 <!-- Add person modal -->
@@ -262,50 +278,71 @@ let _relatedContactIds = null;
   if (p.get('synced') !== null || p.get('error')) history.replaceState(null, '', '/account/contacts');
 })();
 
-// ── Panel collapse/expand ─────────────────────────────────────────────────────
-const LS_LEFT = 'ts_panel_left', LS_RIGHT = 'ts_panel_right';
-
-function initPanels() {
-  if (localStorage.getItem(LS_LEFT) === 'collapsed') _setPanelCollapsed('left', true);
-  if (localStorage.getItem(LS_RIGHT) === 'collapsed') _setPanelCollapsed('right', true);
+// ── Floating overlay helpers ──────────────────────────────────────────────────
+function showFilters() {
+  document.getElementById('foFilters').classList.remove('fo-hidden');
+  document.getElementById('foShowFilters').style.display = 'none';
+  localStorage.setItem('ts_filters_v', 'visible');
+}
+function hideFilters() {
+  document.getElementById('foFilters').classList.add('fo-hidden');
+  document.getElementById('foShowFilters').style.display = 'flex';
+  localStorage.setItem('ts_filters_v', 'hidden');
+}
+function initOverlays() {
+  if (localStorage.getItem('ts_filters_v') === 'hidden') hideFilters();
 }
 
-function _setPanelCollapsed(side, collapsed) {
-  const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
-  el.classList.toggle('collapsed', collapsed);
-  localStorage.setItem(side === 'left' ? LS_LEFT : LS_RIGHT, collapsed ? 'collapsed' : 'expanded');
-  if (side === 'left') {
-    const btn = document.getElementById('btnShowFilters');
-    if (btn) btn.style.display = collapsed ? 'flex' : 'none';
+function openDetail(id) {
+  _currentId = id;
+  document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
+  document.getElementById('foDetail').classList.add('fo-open');
+  CP.open(id);
+  _updateMobileDetailBtn();
+}
+function hideDetail() {
+  document.getElementById('foDetail').classList.remove('fo-open');
+  document.getElementById('foDetail').classList.remove('mob-open');
+  document.getElementById('foBackdrop').classList.remove('mob-open');
+  document.querySelectorAll('.mob-btn').forEach(b => b.classList.remove('active'));
+  CP.close();
+  _updateMobileDetailBtn();
+}
+function _updateMobileDetailBtn() {
+  const btn = document.getElementById('mobDetailBtn');
+  if (btn) btn.disabled = !_currentId;
+}
+
+function toggleMobileFilters() {
+  const fo = document.getElementById('foFilters');
+  const bd = document.getElementById('foBackdrop');
+  const btn = document.getElementById('mobFiltersBtn');
+  const isOpen = fo.classList.contains('mob-open');
+  closeMobileOverlays();
+  if (!isOpen) { fo.classList.add('mob-open'); bd.classList.add('mob-open'); btn.classList.add('active'); }
+}
+function toggleMobileDetail() {
+  if (!_currentId) return;
+  const fo = document.getElementById('foDetail');
+  const bd = document.getElementById('foBackdrop');
+  const btn = document.getElementById('mobDetailBtn');
+  const isOpen = fo.classList.contains('mob-open');
+  closeMobileOverlays();
+  if (!isOpen) {
+    fo.classList.add('mob-open');
+    bd.classList.add('mob-open');
+    btn.classList.add('active');
+    CP.open(_currentId);
   }
-  if (side === 'right') _updateShowDetailsBtn();
 }
-
-function togglePanel(side) {
-  const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
-  if (window.innerWidth <= 1000) {
-    const open = el.classList.contains('mobile-open');
-    el.classList.toggle('mobile-open', !open);
-    document.getElementById('mobileBackdrop').classList.toggle('open', !open);
-  } else {
-    _setPanelCollapsed(side, !el.classList.contains('collapsed'));
-  }
-}
-
 function closeMobileOverlays() {
-  document.getElementById('panelLeft').classList.remove('mobile-open');
-  document.getElementById('panelRight').classList.remove('mobile-open');
-  document.getElementById('mobileBackdrop').classList.remove('open');
+  document.getElementById('foFilters').classList.remove('mob-open');
+  document.getElementById('foDetail').classList.remove('mob-open');
+  document.getElementById('foBackdrop').classList.remove('mob-open');
+  document.querySelectorAll('.mob-btn').forEach(b => b.classList.remove('active'));
 }
 
-function _updateShowDetailsBtn() {
-  const pr = document.getElementById('panelRight');
-  const btn = document.getElementById('btnShowDetails');
-  if (!btn) return;
-  btn.style.display = (_currentId && pr.classList.contains('collapsed')) ? 'flex' : 'none';
-}
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileOverlays(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileOverlays(); hideDetail(); } });
 
 // ── Filter panel ──────────────────────────────────────────────────────────────
 async function loadGroupMemberships() {
@@ -421,24 +458,13 @@ function renderList(contacts) {
 function selectContact(id) {
   _currentId = id;
   document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
-  const pr = document.getElementById('panelRight');
-  const panelOpen = window.innerWidth <= 1000 ? pr.classList.contains('mobile-open') : !pr.classList.contains('collapsed');
-  if (panelOpen) CP.open(id);
-  _updateShowDetailsBtn();
+  const fo = document.getElementById('foDetail');
+  if (fo.classList.contains('fo-open') || fo.classList.contains('mob-open')) CP.open(id);
+  _updateMobileDetailBtn();
 }
 
 function forceSelectContact(id) {
-  _currentId = id;
-  document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
-  const pr = document.getElementById('panelRight');
-  if (window.innerWidth <= 1000) {
-    pr.classList.add('mobile-open');
-    document.getElementById('mobileBackdrop').classList.add('open');
-  } else if (pr.classList.contains('collapsed')) {
-    _setPanelCollapsed('right', false);
-  }
-  CP.open(id);
-  _updateShowDetailsBtn();
+  openDetail(id);
 }
 
 // ── Manage groups modal ───────────────────────────────────────────────────────
@@ -573,7 +599,7 @@ async function initAuthNav() {
     };
 
     renderFilterPanel();
-    initPanels();
+    initOverlays();
 
     const urlId = new URLSearchParams(location.search).get('id');
     if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }

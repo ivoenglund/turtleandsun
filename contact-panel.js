@@ -91,13 +91,28 @@ const CP = (() => {
 .cp-form-msg{font-size:11px;padding:0 16px 4px;min-height:14px;color:#c0392b;}
 
 @media(max-width:1000px){.cp-lbl{width:86px;font-size:10px;}}
+
+/* Overlay mode: transparent bg, text-shadow for legibility */
+.fo-detail .cp-name-bar{text-shadow:0 0 8px rgba(255,249,230,0.95);}
+.fo-detail .cp-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
+.fo-detail .cp-section-hdr{text-shadow:0 0 8px rgba(255,249,230,1);}
+.fo-detail .cp-inp{background:transparent!important;}
+.fo-detail .cp-inp:focus{background:rgba(255,249,230,0.75)!important;}
+.fo-detail .cp-list-primary{text-shadow:0 0 6px rgba(255,249,230,0.8);}
+.fo-detail .cp-list-secondary{text-shadow:0 0 6px rgba(255,249,230,0.8);}
+.fo-detail .cp-badge{background:rgba(240,237,230,0.75);}
+.fo-detail .cp-badge-dec{background:rgba(245,234,234,0.75);}
+.fo-detail .cp-toast.ok{background:rgba(232,240,224,0.88);}
+.fo-detail .cp-toast.err{background:rgba(253,236,234,0.88);}
+.fo-detail .cp-pill{background:rgba(250,248,245,0.75);}
+.fo-detail .cp-pill.active{background:rgba(232,240,224,0.88);}
     `;
     document.head.appendChild(s);
   }
 
   const _HTML = `
 <div class="cp-empty" id="cpEmpty">Select a contact to see details.</div>
-<div id="cpContent" style="display:none;overflow-y:auto;flex:1;">
+<div id="cpContent" style="display:none;overflow-y:auto;flex:1;min-height:0;">
 
   <div class="cp-name-bar">
     <span id="cpNameDisplay"></span>
