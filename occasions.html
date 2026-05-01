@@ -29,46 +29,38 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .dd-nav-sep{height:1px;background:rgba(28,10,0,0.07);margin:6px 0;}
 
 /* ── Three-column layout ──────────────────────────────────────────── */
-.three-col{flex:1;min-height:0;display:flex;overflow:hidden;}
+.three-col{flex:1;min-height:0;display:flex;overflow:hidden;position:relative;}
 
-.panel-left{display:flex;flex-direction:row;width:200px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-right:1px solid rgba(28,10,0,0.08);background:#fff;}
-.panel-left.collapsed{width:28px;}
-.pl-body{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative;}
-.pl-header{padding:14px 0 6px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);flex-shrink:0;}
-.pl-scroll{flex:1;overflow-y:auto;padding:4px 8px 16px 14px;}
-.pl-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-left:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);user-select:none;font-size:14px;transition:color 0.1s,background 0.1s;}
-.pl-toggle:hover{color:#3A6B20;background:#f9f7f2;}
-.panel-left.collapsed .pl-toggle{border-left:none;}
+.panel-left{display:flex;flex-direction:column;width:280px;flex-shrink:0;overflow:hidden;transition:width 0.22s ease;border-right:1px solid rgba(0,0,0,0.06);background:#fff;}
+.panel-left.collapsed{width:0;border-right:none;}
+.pl-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;flex-shrink:0;border-bottom:1px solid rgba(28,10,0,0.05);}
+.pl-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.35);}
+.pl-close-btn{width:22px;height:22px;border:none;background:none;cursor:pointer;color:rgba(28,10,0,0.28);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:background 0.12s,color 0.12s;padding:0;flex-shrink:0;}
+.pl-close-btn:hover{background:rgba(28,10,0,0.07);color:#1C0A00;}
+.pl-scroll{flex:1;overflow-y:auto;padding:8px 14px 20px;}
 
 .panel-center{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
 
-.panel-right{display:flex;flex-direction:row-reverse;width:380px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-left:1px solid rgba(28,10,0,0.08);background:#FFF9E6;}
-.panel-right.collapsed{width:28px;}
-.pr-body{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;position:relative;}
-.pr-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-right:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);user-select:none;font-size:14px;transition:color 0.1s,background 0.1s;}
-.pr-toggle:hover{color:#3A6B20;background:#f9f7f2;}
-.panel-right.collapsed .pr-toggle{border-right:none;}
+.panel-right{display:flex;flex-direction:column;width:380px;flex-shrink:0;overflow:hidden;transition:width 0.22s ease;border-left:1px solid rgba(0,0,0,0.06);background:#FFF9E6;}
+.panel-right.collapsed{width:0;border-left:none;}
+.pr-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;flex-shrink:0;border-bottom:1px solid rgba(28,10,0,0.05);}
+.pr-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.35);}
+.pr-close-btn{width:22px;height:22px;border:none;background:none;cursor:pointer;color:rgba(28,10,0,0.28);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:background 0.12s,color 0.12s;padding:0;flex-shrink:0;}
+.pr-close-btn:hover{background:rgba(28,10,0,0.07);color:#1C0A00;}
 
-/* Resize handles */
-.panel-resize-handle{width:4px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background 0.15s;}
-.panel-resize-handle:hover,.panel-resize-handle.dragging{background:rgba(58,107,32,0.22);}
-.panel-left.collapsed .panel-resize-handle,.panel-right.collapsed .panel-resize-handle{display:none;}
-
-/* Close button (mobile overlay) */
-.panel-close-btn{display:none;position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;border-radius:50%;background:rgba(28,10,0,0.08);color:#1C0A00;font-size:16px;cursor:pointer;line-height:1;z-index:10;}
-.panel-close-btn:hover{background:rgba(28,10,0,0.15);}
+.btn-show-filters{display:none;position:absolute;top:10px;left:10px;z-index:5;align-items:center;gap:5px;padding:5px 10px;background:#fff;border:1px solid rgba(28,10,0,0.11);border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:rgba(28,10,0,0.5);cursor:pointer;transition:background 0.12s;}
+.btn-show-filters:hover{background:#f9f7f2;color:#1C0A00;}
+.btn-show-details{display:none;padding:5px 10px;background:rgba(58,107,32,0.09);border:none;border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:#3A6B20;cursor:pointer;white-space:nowrap;}
+.btn-show-details:hover{background:rgba(58,107,32,0.16);}
 
 @media(max-width:1000px){
-  .panel-left{position:fixed;left:0;top:0;bottom:0;z-index:200;width:260px!important;transform:translateX(-100%);transition:transform 0.2s ease;border-right:none;box-shadow:4px 0 24px rgba(0,0,0,0.15);}
+  .panel-left{position:fixed;left:0;top:0;bottom:0;z-index:200;width:280px!important;transform:translateX(-100%);transition:transform 0.22s ease;border-right:none;box-shadow:4px 0 24px rgba(0,0,0,0.13);}
   .panel-left.mobile-open{transform:translateX(0);}
-  .panel-left.collapsed{width:260px!important;transform:translateX(-100%);}
-  .panel-left .panel-resize-handle{display:none!important;}
-  .panel-right{position:fixed;right:0;top:0;bottom:0;z-index:200;width:320px!important;transform:translateX(100%);transition:transform 0.2s ease;border-left:none;box-shadow:-4px 0 24px rgba(0,0,0,0.15);}
+  .panel-left.collapsed{width:280px!important;transform:translateX(-100%);}
+  .panel-right{position:fixed;right:0;top:0;bottom:0;z-index:200;width:320px!important;transform:translateX(100%);transition:transform 0.22s ease;border-left:none;box-shadow:-4px 0 24px rgba(0,0,0,0.13);}
   .panel-right.mobile-open{transform:translateX(0);}
   .panel-right.collapsed{width:320px!important;transform:translateX(100%);}
-  .panel-right .panel-resize-handle{display:none!important;}
-  .panel-left .pl-toggle,.panel-right .pr-toggle{display:none;}
-  .panel-close-btn{display:flex;align-items:center;justify-content:center;}
+  .btn-show-filters{display:flex!important;}
   .mobile-backdrop{display:block!important;}
 }
 .mobile-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:199;}
@@ -174,38 +166,36 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 
 <div class="three-col">
 
+  <button class="btn-show-filters" id="btnShowFilters" onclick="togglePanel('left')">≡ Filters</button>
+
   <!-- LEFT: Filters -->
   <div class="panel-left" id="panelLeft">
-    <div class="pl-body">
-      <button class="panel-close-btn" onclick="closeMobileOverlays()" aria-label="Close">×</button>
-      <div class="pl-header">Filters</div>
-      <div class="pl-scroll">
-        <div class="fp-label">Type</div>
-        <div class="fp-check">
-          <input type="checkbox" id="cbBirthdays" checked onchange="render()">
-          <label for="cbBirthdays">🎂 Birthdays</label>
-        </div>
-        <div class="fp-check">
-          <input type="checkbox" id="cbOccasions" checked onchange="render()">
-          <label for="cbOccasions">✨ Occasions</label>
-        </div>
-        <div class="fp-check">
-          <input type="checkbox" id="cbRemembrance" onchange="render()">
-          <label for="cbRemembrance">🕯 Remembrance</label>
-        </div>
-        <div class="fp-sep"></div>
-        <div class="fp-label">Window</div>
-        <select class="fp-select" id="windowSel" onchange="render()">
-          <option value="30">Next 30 days</option>
-          <option value="90">Next 3 months</option>
-          <option value="180">Next 6 months</option>
-          <option value="365" selected>Next 12 months</option>
-        </select>
-      </div>
+    <div class="pl-header">
+      <span class="pl-title">Filters</span>
+      <button class="pl-close-btn" onclick="togglePanel('left')" aria-label="Hide filters">×</button>
     </div>
-    <div class="panel-resize-handle" id="leftResizeHandle"></div>
-    <div class="pl-toggle" onclick="togglePanel('left')" title="Toggle filters">
-      <span id="plArrow">‹</span>
+    <div class="pl-scroll">
+      <div class="fp-label">Type</div>
+      <div class="fp-check">
+        <input type="checkbox" id="cbBirthdays" checked onchange="render()">
+        <label for="cbBirthdays">🎂 Birthdays</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="cbOccasions" checked onchange="render()">
+        <label for="cbOccasions">✨ Occasions</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="cbRemembrance" onchange="render()">
+        <label for="cbRemembrance">🕯 Remembrance</label>
+      </div>
+      <div class="fp-sep"></div>
+      <div class="fp-label">Window</div>
+      <select class="fp-select" id="windowSel" onchange="render()">
+        <option value="30">Next 30 days</option>
+        <option value="90">Next 3 months</option>
+        <option value="180">Next 6 months</option>
+        <option value="365" selected>Next 12 months</option>
+      </select>
     </div>
   </div>
 
@@ -216,7 +206,10 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
         <h2>Upcoming Occasions</h2>
         <p>Birthdays, anniversaries, and milestones for the people you care about.</p>
       </div>
-      <button class="btn-print-occ" onclick="window.print()">Print list</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-show-details" id="btnShowDetails" onclick="forceOpenContact(_activeContactId)">Details →</button>
+        <button class="btn-print-occ" onclick="window.print()">Print list</button>
+      </div>
     </div>
     <div class="occ-scroll">
       <div id="listContainer"><div class="empty-state">Loading…</div></div>
@@ -225,14 +218,11 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 
   <!-- RIGHT: Contact detail (shared CP component) -->
   <div class="panel-right" id="panelRight">
-    <div class="pr-toggle" onclick="togglePanel('right')" title="Toggle detail">
-      <span id="prArrow">›</span>
+    <div class="pr-header">
+      <span class="pr-title">Details</span>
+      <button class="pr-close-btn" onclick="togglePanel('right')" aria-label="Close">×</button>
     </div>
-    <div class="panel-resize-handle" id="rightResizeHandle"></div>
-    <div class="pr-body">
-      <button class="panel-close-btn" onclick="closeMobileOverlays()" aria-label="Close">×</button>
-      <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
-    </div>
+    <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
   </div>
 
   <div class="mobile-backdrop" id="mobileBackdrop" onclick="closeMobileOverlays()"></div>
@@ -436,6 +426,7 @@ function openContact(id) {
   const pr = document.getElementById('panelRight');
   const panelOpen = window.innerWidth <= 1000 ? pr.classList.contains('mobile-open') : !pr.classList.contains('collapsed');
   if (panelOpen) CP.open(id);
+  _updateShowDetailsBtn();
 }
 
 function forceOpenContact(id) {
@@ -451,6 +442,7 @@ function forceOpenContact(id) {
     _setPanelCollapsed('right', false);
   }
   CP.open(id);
+  _updateShowDetailsBtn();
 }
 
 // ── Panel collapse/expand ─────────────────────────────────────────────────────
@@ -463,11 +455,13 @@ function initPanels() {
 
 function _setPanelCollapsed(side, collapsed) {
   const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
-  const arrow = document.getElementById(side === 'left' ? 'plArrow' : 'prArrow');
   el.classList.toggle('collapsed', collapsed);
-  if (side === 'left') arrow.textContent = collapsed ? '›' : '‹';
-  else arrow.textContent = collapsed ? '‹' : '›';
   localStorage.setItem(side === 'left' ? LS_LEFT : LS_RIGHT, collapsed ? 'collapsed' : 'expanded');
+  if (side === 'left') {
+    const btn = document.getElementById('btnShowFilters');
+    if (btn) btn.style.display = collapsed ? 'flex' : 'none';
+  }
+  if (side === 'right') _updateShowDetailsBtn();
 }
 
 function togglePanel(side) {
@@ -487,35 +481,11 @@ function closeMobileOverlays() {
   document.getElementById('mobileBackdrop').classList.remove('open');
 }
 
-// ── Resize handles ────────────────────────────────────────────────────────────
-function initResizeHandle(handleId, panelId, storageKey, isRight) {
-  const handle = document.getElementById(handleId);
-  const panel = document.getElementById(panelId);
-  if (!handle || !panel) return;
-  const saved = localStorage.getItem(storageKey);
-  if (saved) panel.style.width = saved + 'px';
-  let startX, startW;
-  handle.addEventListener('mousedown', e => {
-    startX = e.clientX;
-    startW = panel.offsetWidth;
-    panel.style.transition = 'none';
-    handle.classList.add('dragging');
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    e.preventDefault();
-  });
-  function onMove(e) {
-    const delta = isRight ? startX - e.clientX : e.clientX - startX;
-    panel.style.width = Math.min(600, Math.max(200, startW + delta)) + 'px';
-  }
-  function onUp(e) {
-    const delta = isRight ? startX - e.clientX : e.clientX - startX;
-    localStorage.setItem(storageKey, Math.min(600, Math.max(200, startW + delta)));
-    panel.style.transition = '';
-    handle.classList.remove('dragging');
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-  }
+function _updateShowDetailsBtn() {
+  const pr = document.getElementById('panelRight');
+  const btn = document.getElementById('btnShowDetails');
+  if (!btn) return;
+  btn.style.display = (_activeContactId && pr.classList.contains('collapsed')) ? 'flex' : 'none';
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileOverlays(); });
@@ -546,8 +516,6 @@ async function initAuthNav() {
     };
 
     initPanels();
-    initResizeHandle('leftResizeHandle', 'panelLeft', 'ts_left_w', false);
-    initResizeHandle('rightResizeHandle', 'panelRight', 'ts_right_w', true);
   } catch { window.location.href = '/login'; }
 }
 
