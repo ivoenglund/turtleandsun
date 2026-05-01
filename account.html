@@ -72,7 +72,10 @@ tr:last-child td{border-bottom:none;}
             <div id="ddUser">
               <div class="dd-user-email" id="ddUserEmail"></div>
               <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
-              <a class="dd-user-link" href="/account/contacts">Sync Contacts</a>
+              <a class="dd-user-link" href="/account/contacts">Contacts</a>
+              <a class="dd-user-link" href="/account/occasions">Occasions</a>
+              <a class="dd-user-link" href="/print/labels">Print address labels</a>
+              <a class="dd-user-link" href="/account/occasions">Print occasion list</a>
               <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
             </div>
           </div>
@@ -92,7 +95,7 @@ tr:last-child td{border-bottom:none;}
       <h3>Your orders</h3>
       <table>
         <thead>
-          <tr><th>Product</th><th>Amount</th><th>Status</th><th>Date</th><th>Download</th></tr>
+          <tr><th>Product</th><th>Amount</th><th>Status</th><th>Date</th><th>Download</th><th>Print</th></tr>
         </thead>
         <tbody id="ordersBody"></tbody>
       </table>
@@ -119,6 +122,9 @@ async function load() {
             ${o.result_url ? `<a class="dl-link" href="${esc(o.result_url)}" target="_blank">Image ↓</a>` : ''}
             ${o.result_video_url ? `<a class="dl-link" href="${esc(o.result_video_url)}" target="_blank" style="margin-left:8px;">Video ↓</a>` : ''}
             ${!o.result_url && !o.result_video_url ? '<span style="color:#aaa;font-size:12px;">Processing…</span>' : ''}
+          </td>
+          <td>
+            ${o.result_url ? `<a class="dl-link" href="/print/loveogram?url=${encodeURIComponent(o.result_url)}" target="_blank">Print card</a>` : '—'}
           </td>
         </tr>`).join('')
       : `<tr><td colspan="5" class="empty">No orders yet. <a href="/" style="color:#3A6B20;font-weight:700;">Create your portrait →</a></td></tr>`;

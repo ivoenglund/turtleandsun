@@ -64,9 +64,33 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .fp-select:focus{border-color:#3A6B20;}
 
 /* Center panel */
-.occ-toolbar{padding:14px 18px 10px;border-bottom:1px solid rgba(28,10,0,0.07);flex-shrink:0;background:#fff;}
-.occ-toolbar h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:17px;font-weight:800;color:#1C0A00;}
-.occ-toolbar p{font-size:12px;color:rgba(28,10,0,0.45);margin-top:2px;}
+.occ-toolbar{padding:14px 18px 10px;border-bottom:1px solid rgba(28,10,0,0.07);flex-shrink:0;background:#fff;display:flex;align-items:flex-start;justify-content:space-between;}
+.occ-toolbar-text h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:17px;font-weight:800;color:#1C0A00;}
+.occ-toolbar-text p{font-size:12px;color:rgba(28,10,0,0.45);margin-top:2px;}
+.btn-print-occ{padding:7px 14px;background:#f0ede6;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;color:rgba(28,10,0,0.6);cursor:pointer;flex-shrink:0;margin-left:12px;}
+.btn-print-occ:hover{background:#3A6B20;color:#fff;}
+
+/* ── Print ─────────────────────────────────────────────────────────────────── */
+@media print {
+  html,body{height:auto;overflow:visible;}
+  .nav-bar,.panel-left,.panel-right,.btn-print-occ{display:none!important;}
+  .three-col{display:block;}
+  .panel-center{overflow:visible;}
+  .occ-scroll{overflow:visible;padding:0;}
+  .occ-toolbar{border:none;padding:0 0 12px;}
+  .occ-toolbar-text h2{font-size:18pt;margin-bottom:4pt;}
+  .occ-toolbar-text p{font-size:10pt;}
+  .section-label{font-size:9pt;margin:14pt 0 6pt;color:#555;}
+  .occasion-card{box-shadow:none;border:1px solid #ddd;padding:8pt 12pt;margin-bottom:6pt;border-radius:0;page-break-inside:avoid;}
+  .oc-icon{display:none;}
+  .oc-action{display:none;}
+  .oc-occasion{font-size:11pt;font-weight:700;}
+  .oc-contact{font-size:10pt;}
+  .oc-years{font-size:9pt;}
+  .oc-date{font-size:11pt;}
+  .oc-days{font-size:9pt;}
+  @page{size:A4 portrait;margin:15mm 15mm 20mm;}
+}
 .occ-scroll{flex:1;overflow-y:auto;padding:12px 18px 40px;}
 
 /* Occasion cards */
@@ -128,6 +152,9 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
             <a class="dd-nav-link" href="/account/network?view=calendar">Calendar</a>
             <a class="dd-nav-link" href="/account/occasions">Occasions</a>
             <div class="dd-nav-sep"></div>
+            <a class="dd-nav-link" href="/print/labels">Print address labels</a>
+            <a class="dd-nav-link" href="/account/occasions">Print occasion list</a>
+            <div class="dd-nav-sep"></div>
             <a class="dd-nav-link" href="/auth/google/contacts">↻ Sync Google contacts</a>
             <a class="dd-nav-link" href="/account">Account settings</a>
             <a class="dd-nav-link dd-nav-logout" href="/auth/logout">Log out</a>
@@ -177,8 +204,11 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
   <!-- CENTER: Occasions list -->
   <div class="panel-center">
     <div class="occ-toolbar">
-      <h2>Upcoming Occasions</h2>
-      <p>Birthdays, anniversaries, and milestones for the people you care about.</p>
+      <div class="occ-toolbar-text">
+        <h2>Upcoming Occasions</h2>
+        <p>Birthdays, anniversaries, and milestones for the people you care about.</p>
+      </div>
+      <button class="btn-print-occ" onclick="window.print()">Print list</button>
     </div>
     <div class="occ-scroll">
       <div id="listContainer"><div class="empty-state">Loading…</div></div>

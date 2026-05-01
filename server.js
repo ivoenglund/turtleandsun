@@ -387,6 +387,14 @@ app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
 
+app.get('/print/loveogram', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'print-loveogram.html'));
+});
+
+app.get('/print/labels', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'print-labels.html'));
+});
+
 // ── Groups ────────────────────────────────────────────────────────────────────
 
 app.get('/api/groups', requireAuth, async (req, res) => {

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Print Address Labels — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:flex;flex-direction:column;}
+
+/* ── Nav ───────────────────────────────────────────────────────────────────── */
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);padding:14px 32px;display:flex;align-items:center;gap:20px;flex-shrink:0;}
+.nav-bar a{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:rgba(28,10,0,0.6);text-decoration:none;}
+.nav-bar a:hover{color:#1C0A00;}
+.nav-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;}
+.btn-print-main{padding:10px 24px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+.btn-print-main:hover{background:#1C0A00;}
+
+/* ── Three-column layout ──────────────────────────────────────────────────── */
+.three-col{flex:1;min-height:0;display:flex;overflow:hidden;}
+
+/* Left panel: filters */
+.panel-left{width:220px;flex-shrink:0;overflow-y:auto;border-right:1px solid rgba(28,10,0,0.08);background:#fff;padding:16px 14px;}
+.pl-header{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:12px;}
+.fp-section{margin-bottom:16px;}
+.fp-section-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:rgba(28,10,0,0.5);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
+.fp-check{display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;}
+.fp-check input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;}
+.fp-check label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;}
+.fp-sep{height:1px;background:rgba(28,10,0,0.07);margin:10px 0;}
+.fp-select{width:100%;padding:6px 8px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:12px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;margin-top:4px;}
+.fp-select:focus{border-color:#3A6B20;}
+.count-line{font-size:11px;color:rgba(28,10,0,0.4);margin-top:8px;}
+.btn-sel-all,.btn-sel-none{padding:5px 10px;font-size:11px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;border:1.5px solid #e0dcd4;border-radius:6px;cursor:pointer;background:#fff;color:rgba(28,10,0,0.7);margin-right:4px;}
+.btn-sel-all:hover,.btn-sel-none:hover{border-color:#3A6B20;color:#3A6B20;}
+.contact-select-list{max-height:260px;overflow-y:auto;border:1.5px solid #e0dcd4;border-radius:8px;margin-top:8px;background:#fff;}
+.csl-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid rgba(28,10,0,0.04);cursor:pointer;}
+.csl-item:last-child{border-bottom:none;}
+.csl-item:hover{background:#f9f7f2;}
+.csl-item input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
+.csl-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.csl-addr{font-size:10px;color:rgba(28,10,0,0.4);}
+
+/* Center panel: label preview */
+.panel-center{flex:1;overflow-y:auto;padding:24px;background:#e8e4de;}
+
+.label-settings{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:18px;display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;}
+.ls-group{display:flex;flex-direction:column;gap:4px;}
+.ls-group label{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.4);}
+.ls-group select{padding:7px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:12px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;}
+.ls-group select:focus{border-color:#3A6B20;}
+.ls-count{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:rgba(28,10,0,0.5);}
+
+/* Label sheet */
+.label-sheet{background:#fff;box-shadow:0 2px 20px rgba(0,0,0,0.15);border-radius:4px;margin:0 auto;position:relative;}
+
+/* Grid templates (screen approximation — print CSS takes over for real dimensions) */
+.sheet-5160{width:612px;padding:36px 13.7px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;}
+.sheet-5161{width:612px;padding:36px 13.7px 0;display:grid;grid-template-columns:repeat(2,1fr);gap:0;}
+.sheet-5163{width:612px;padding:36px 13.7px 0;display:grid;grid-template-columns:repeat(2,1fr);gap:0;}
+.sheet-dymo{width:252px;padding:8px;display:grid;grid-template-columns:1fr;gap:8px;}
+.sheet-brother{width:252px;padding:8px;display:grid;grid-template-columns:1fr;gap:8px;}
+
+.label{overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:5px 8px;border:1px dashed rgba(0,0,0,0.1);}
+.label.empty-slot{opacity:0.25;}
+.sheet-5160 .label{height:72px;}
+.sheet-5161 .label{height:72px;}
+.sheet-5163 .label{height:144px;}
+.sheet-dymo .label,.sheet-brother .label{height:81px;border-radius:4px;}
+
+.lbl-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:#1C0A00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lbl-street{font-size:9.5px;color:#1C0A00;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lbl-city{font-size:9.5px;color:#1C0A00;}
+.lbl-country{font-size:9px;color:rgba(28,10,0,0.55);}
+
+.empty-state{text-align:center;padding:60px;color:rgba(28,10,0,0.3);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
+
+/* ── Print stylesheet ─────────────────────────────────────────────────────── */
+@media print {
+  body { background: #fff; }
+  .nav-bar, .panel-left, .label-settings { display: none !important; }
+  .three-col { display: block; }
+  .panel-center { padding: 0; overflow: visible; background: #fff; }
+  .label-sheet { box-shadow: none; border-radius: 0; width: auto !important; max-width: none !important; }
+  .label { border-color: transparent; }
+
+  /* Avery 5160: Letter, 3×10, 2-5/8" × 1" */
+  .sheet-5160 { padding: 0.5in 0.19in; display: grid; grid-template-columns: repeat(3, 2.625in); gap: 0; width: 8.5in; }
+  .sheet-5160 .label { height: 1in; padding: 0.08in 0.1in; }
+
+  /* Avery 5161: Letter, 2×10, 4" × 1" */
+  .sheet-5161 { padding: 0.5in 0.16in; display: grid; grid-template-columns: repeat(2, 4in); gap: 0; width: 8.5in; }
+  .sheet-5161 .label { height: 1in; padding: 0.08in 0.1in; }
+
+  /* Avery 5163: Letter, 2×5, 4" × 2" */
+  .sheet-5163 { padding: 0.5in 0.16in; display: grid; grid-template-columns: repeat(2, 4in); gap: 0; width: 8.5in; }
+  .sheet-5163 .label { height: 2in; padding: 0.15in 0.1in; }
+
+  /* Dymo 30252 */
+  .sheet-dymo { padding: 0; display: grid; grid-template-columns: 1fr; gap: 0; width: 3.5in; }
+  .sheet-dymo .label { height: 1.125in; padding: 0.08in 0.12in; border-radius: 0; }
+
+  /* Brother DK-1201 */
+  .sheet-brother { padding: 0; display: grid; grid-template-columns: 1fr; gap: 0; width: 3.5in; }
+  .sheet-brother .label { height: 1.14in; padding: 0.08in 0.12in; border-radius: 0; }
+
+  .label .lbl-name { font-size: 10pt; }
+  .label .lbl-street, .label .lbl-city { font-size: 9pt; }
+  .label .lbl-country { font-size: 8pt; }
+
+  /* Page size per template */
+  body.tpl-5160 { @page { size: Letter portrait; margin: 0; } }
+  body.tpl-5161 { @page { size: Letter portrait; margin: 0; } }
+  body.tpl-5163 { @page { size: Letter portrait; margin: 0; } }
+  body.tpl-dymo { @page { size: 3.5in 1.125in; margin: 0; } }
+  body.tpl-brother { @page { size: 3.5in 1.14in; margin: 0; } }
+
+  .empty-slot { display: none !important; }
+}
+
+@page { size: Letter portrait; margin: 0; }
+</style>
+</head>
+<body class="tpl-5160">
+
+<div class="nav-bar">
+  <a href="/account/contacts">← Back to contacts</a>
+  <h1>Print Address Labels</h1>
+  <button class="btn-print-main" onclick="window.print()">Print</button>
+</div>
+
+<div class="three-col">
+  <!-- LEFT: Filters & contact selection -->
+  <div class="panel-left">
+    <div class="pl-header">Filters</div>
+
+    <div class="fp-section">
+      <div class="fp-section-label">Type</div>
+      <div class="fp-check">
+        <input type="checkbox" id="cbLiving" onchange="applyFilter()">
+        <label for="cbLiving">Only living</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="cbHasAddress" checked onchange="applyFilter()">
+        <label for="cbHasAddress">Has address only</label>
+      </div>
+    </div>
+
+    <div class="fp-section" id="groupFilters">
+      <div class="fp-section-label">Groups</div>
+      <div id="groupCbs"></div>
+    </div>
+
+    <div class="fp-sep"></div>
+
+    <div class="fp-section">
+      <div class="fp-section-label">Selection</div>
+      <div style="display:flex;gap:4px;margin-bottom:8px;">
+        <button class="btn-sel-all" onclick="selectAll()">All</button>
+        <button class="btn-sel-none" onclick="selectNone()">None</button>
+      </div>
+      <div class="count-line" id="countLine">0 selected</div>
+    </div>
+
+    <div class="contact-select-list" id="contactSelectList">
+      <div style="padding:12px;text-align:center;font-size:12px;color:rgba(28,10,0,0.35);">Loading…</div>
+    </div>
+  </div>
+
+  <!-- CENTER: Label preview -->
+  <div class="panel-center">
+    <div class="label-settings">
+      <div class="ls-group">
+        <label>Label template</label>
+        <select id="templateSel" onchange="applyTemplate()">
+          <option value="5160">Avery 5160 — 30 labels (3×10), 2⅝" × 1", Letter</option>
+          <option value="5161">Avery 5161 — 20 labels (2×10), 4" × 1", Letter</option>
+          <option value="5163">Avery 5163 — 10 labels (2×5), 4" × 2", Letter</option>
+          <option value="dymo">Dymo 30252 — single labels, 3½" × 1⅛"</option>
+          <option value="brother">Brother DK-1201 — single labels, 3½" × 1⅛"</option>
+        </select>
+      </div>
+      <div class="ls-count" id="sheetCount"></div>
+    </div>
+    <div id="labelOutput">
+      <div class="empty-state">Select contacts on the left to preview labels.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _contacts = [];
+let _groups = [];
+let _selected = new Set();
+let _filteredContacts = [];
+
+const TEMPLATES = {
+  '5160': { cols: 3, perPage: 30, sheetClass: 'sheet-5160' },
+  '5161': { cols: 2, perPage: 20, sheetClass: 'sheet-5161' },
+  '5163': { cols: 2, perPage: 10, sheetClass: 'sheet-5163' },
+  'dymo': { cols: 1, perPage: 1,  sheetClass: 'sheet-dymo' },
+  'brother': { cols: 1, perPage: 1, sheetClass: 'sheet-brother' },
+};
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+function applyFilter() {
+  const onlyLiving = document.getElementById('cbLiving').checked;
+  const hasAddress = document.getElementById('cbHasAddress').checked;
+  const activeGroups = new Set(
+    [...document.querySelectorAll('#groupCbs input:checked')].map(cb => parseInt(cb.dataset.gid))
+  );
+  const hasGroupFilter = document.querySelectorAll('#groupCbs input').length > 0;
+
+  _filteredContacts = _contacts.filter(c => {
+    if (c.is_me) return false;
+    if (onlyLiving && c.died_on) return false;
+    if (hasAddress && !c.street && !c.city) return false;
+    if (hasGroupFilter && activeGroups.size > 0) {
+      const inGroup = c._groupIds && [...activeGroups].some(gid => c._groupIds.has(gid));
+      if (!inGroup) return false;
+    }
+    return true;
+  });
+
+  renderContactList();
+  renderLabels();
+}
+
+function renderContactList() {
+  const el = document.getElementById('contactSelectList');
+  if (!_filteredContacts.length) {
+    el.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:rgba(28,10,0,0.35);">No contacts match filters.</div>';
+    document.getElementById('countLine').textContent = '0 selected';
+    return;
+  }
+  el.innerHTML = _filteredContacts.map(c => `
+    <div class="csl-item" onclick="toggleContact(${c.id}, event)">
+      <input type="checkbox" ${_selected.has(c.id) ? 'checked' : ''} data-cid="${c.id}" onclick="event.stopPropagation();toggleContact(${c.id})">
+      <div style="flex:1;min-width:0;">
+        <div class="csl-name">${esc(c.name || 'Unnamed')}</div>
+        <div class="csl-addr">${[c.street, c.city].filter(Boolean).join(', ') || 'No address'}</div>
+      </div>
+    </div>
+  `).join('');
+  updateCount();
+}
+
+function toggleContact(id, e) {
+  if (_selected.has(id)) _selected.delete(id);
+  else _selected.add(id);
+  // sync checkbox
+  const cb = document.querySelector(`#contactSelectList input[data-cid="${id}"]`);
+  if (cb) cb.checked = _selected.has(id);
+  updateCount();
+  renderLabels();
+}
+
+function updateCount() {
+  document.getElementById('countLine').textContent = `${_selected.size} selected`;
+}
+
+function selectAll() {
+  _filteredContacts.forEach(c => _selected.add(c.id));
+  renderContactList();
+  renderLabels();
+}
+function selectNone() {
+  _filteredContacts.forEach(c => _selected.delete(c.id));
+  renderContactList();
+  renderLabels();
+}
+
+// ── Labels ───────────────────────────────────────────────────────────────────
+function applyTemplate() {
+  const tpl = document.getElementById('templateSel').value;
+  document.body.className = 'tpl-' + tpl;
+  renderLabels();
+}
+
+function renderLabels() {
+  const tpl = document.getElementById('templateSel').value;
+  const { cols, perPage, sheetClass } = TEMPLATES[tpl] || TEMPLATES['5160'];
+  const selected = _contacts.filter(c => _selected.has(c.id));
+  const output = document.getElementById('labelOutput');
+
+  if (!selected.length) {
+    output.innerHTML = '<div class="empty-state">Select contacts on the left to preview labels.</div>';
+    document.getElementById('sheetCount').textContent = '';
+    return;
+  }
+
+  const sheets = Math.ceil(selected.length / perPage);
+  document.getElementById('sheetCount').textContent =
+    `${selected.length} label${selected.length !== 1 ? 's' : ''} · ${sheets} sheet${sheets !== 1 ? 's' : ''}`;
+
+  let html = '';
+  for (let s = 0; s < sheets; s++) {
+    html += `<div class="label-sheet ${sheetClass}" style="margin-bottom:24px;">`;
+    for (let i = 0; i < perPage; i++) {
+      const c = selected[s * perPage + i];
+      if (c) {
+        const cityLine = [c.city, c.postal_code].filter(Boolean).join(' ');
+        html += `<div class="label">
+          <div class="lbl-name">${esc(c.name || 'Unnamed')}</div>
+          ${c.street ? `<div class="lbl-street">${esc(c.street)}</div>` : ''}
+          ${cityLine ? `<div class="lbl-city">${esc(cityLine)}</div>` : ''}
+          ${c.country ? `<div class="lbl-country">${esc(c.country)}</div>` : ''}
+        </div>`;
+      } else {
+        html += `<div class="label empty-slot"></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  output.innerHTML = html;
+}
+
+// ── Groups ───────────────────────────────────────────────────────────────────
+function renderGroupFilters(groups, memberships) {
+  const membersByContact = {};
+  memberships.forEach(m => {
+    if (!membersByContact[m.contact_id]) membersByContact[m.contact_id] = new Set();
+    membersByContact[m.contact_id].add(m.group_id);
+  });
+  _contacts.forEach(c => { c._groupIds = membersByContact[c.id] || new Set(); });
+
+  const flat = [];
+  function flatten(g, depth) {
+    flat.push({ ...g, depth });
+    (g.subgroups || []).forEach(s => flatten(s, depth + 1));
+  }
+  groups.forEach(g => flatten(g, 0));
+
+  if (!flat.length) {
+    document.getElementById('groupFilters').style.display = 'none';
+    return;
+  }
+  document.getElementById('groupCbs').innerHTML = flat.map(g => `
+    <div class="fp-check" style="padding-left:${g.depth * 14}px;">
+      <input type="checkbox" data-gid="${g.id}" checked onchange="applyFilter()">
+      <label style="font-size:${12 - g.depth}px;opacity:${1 - g.depth * 0.2}">${esc(g.name)}</label>
+    </div>
+  `).join('');
+}
+
+// ── Load data ────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const res = await fetch('/api/auth/status');
+    const status = res.ok ? await res.json() : false;
+    if (!status || !status.loggedIn) { location.href = '/login'; return; }
+
+    const [contactsRes, groupsRes, membershipsRes] = await Promise.all([
+      fetch('/api/contacts'),
+      fetch('/api/groups'),
+      fetch('/api/group-memberships'),
+    ]);
+    _contacts = contactsRes.ok ? await contactsRes.json() : [];
+    _groups = groupsRes.ok ? await groupsRes.json() : [];
+    const memberships = membershipsRes.ok ? await membershipsRes.json() : [];
+
+    renderGroupFilters(_groups, memberships);
+    applyFilter();
+  } catch (err) {
+    console.error('Load error:', err);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

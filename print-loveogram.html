@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Print Loveogram — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;min-height:100vh;}
+
+/* ── Screen UI ─────────────────────────────────────────────────────────────── */
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);padding:14px 32px;display:flex;align-items:center;gap:20px;}
+.nav-bar a{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:rgba(28,10,0,0.6);text-decoration:none;}
+.nav-bar a:hover{color:#1C0A00;}
+.nav-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;}
+.btn-print-main{padding:10px 24px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+.btn-print-main:hover{background:#1C0A00;}
+
+.controls{max-width:900px;margin:24px auto;padding:0 32px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;}
+.ctrl-group{display:flex;flex-direction:column;gap:6px;}
+.ctrl-group label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.45);}
+.ctrl-group select,.ctrl-group input[type=text],.ctrl-group textarea{padding:8px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;}
+.ctrl-group select:focus,.ctrl-group input[type=text]:focus,.ctrl-group textarea:focus{border-color:#3A6B20;}
+.ctrl-group textarea{width:300px;height:72px;resize:vertical;}
+.ctrl-group input[type=text]{width:220px;}
+.fold-lines-row{display:flex;align-items:center;gap:8px;}
+.fold-lines-row input[type=checkbox]{width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;}
+.fold-lines-row label{font-size:13px;cursor:pointer;}
+
+.preview-wrap{max-width:900px;margin:0 auto 48px;padding:0 32px;}
+.preview-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.35);margin-bottom:10px;}
+
+/* ── Print canvas (screen preview) ───────────────────────────────────────── */
+.print-preview{background:#fff;box-shadow:0 4px 32px rgba(0,0,0,0.18);border-radius:4px;overflow:hidden;position:relative;}
+
+/* Single-page A4 portrait preview (210:297 ratio) */
+.preview-single{width:100%;max-width:520px;aspect-ratio:210/297;margin:0 auto;display:flex;align-items:center;justify-content:center;padding:16px;}
+.preview-single img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}
+
+/* Fold card preview (A4 landscape: 297:210 ratio) */
+.preview-fold{width:100%;max-width:760px;aspect-ratio:297/210;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;position:relative;}
+.fold-panel{overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center;}
+.fold-panel.rotated{transform:rotate(180deg);}
+.fold-panel.front img{max-width:90%;max-height:90%;object-fit:contain;}
+.fold-panel.back{background:#f9f7f2;align-items:flex-end;justify-content:center;padding:12px;}
+.fold-panel.back .back-logo{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:rgba(28,10,0,0.35);text-align:center;}
+.fold-panel.inside-left{background:#fff;border-top:1px dashed #ccc;border-right:1px dashed #ccc;}
+.fold-panel.inside-right{background:#fff;border-top:1px dashed #ccc;padding:24px;align-items:flex-start;justify-content:flex-start;}
+.fold-panel.inside-right .msg-text{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;line-height:1.7;color:#1C0A00;white-space:pre-wrap;}
+.fold-h-line{position:absolute;left:0;right:0;top:50%;border-top:1px dashed #bbb;z-index:2;pointer-events:none;}
+.fold-v-line{position:absolute;top:0;bottom:0;left:50%;border-left:1px dashed #bbb;z-index:2;pointer-events:none;}
+.crop-mark{position:absolute;width:8px;height:8px;border-color:#999;border-style:solid;border-width:0;}
+.cm-tl{top:4px;left:4px;border-top-width:1px;border-left-width:1px;}
+.cm-tr{top:4px;right:4px;border-top-width:1px;border-right-width:1px;}
+.cm-bl{bottom:4px;left:4px;border-bottom-width:1px;border-left-width:1px;}
+.cm-br{bottom:4px;right:4px;border-bottom-width:1px;border-right-width:1px;}
+
+.no-portrait{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0ede6;border-radius:4px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:rgba(28,10,0,0.4);}
+
+/* ── Print stylesheet ─────────────────────────────────────────────────────── */
+@media print {
+  body { background: #fff; }
+  .nav-bar, .controls, .preview-label { display: none !important; }
+  .preview-wrap { max-width: none; margin: 0; padding: 0; }
+  .print-preview { box-shadow: none; border-radius: 0; }
+
+  /* Single-page mode */
+  body.mode-single .preview-fold { display: none; }
+  body.mode-single .preview-single {
+    max-width: none;
+    width: 100%;
+    height: 100vh;
+    padding: 10mm;
+  }
+
+  /* Fold-card mode: A4 landscape */
+  body.mode-fold .preview-single { display: none; }
+  body.mode-fold .preview-fold {
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    aspect-ratio: unset;
+  }
+  body.mode-fold .fold-panel.inside-left,
+  body.mode-fold .fold-panel.inside-right { border-color: transparent; }
+  body.hide-foldlines .fold-h-line,
+  body.hide-foldlines .fold-v-line { display: none; }
+  body.hide-cropmarks .crop-mark { display: none; }
+
+  /* Letter size override */
+  body.paper-letter { }
+  @page { size: A4 portrait; margin: 0; }
+  body.mode-fold @page { size: A4 landscape; margin: 0; }
+  body.paper-letter @page { size: Letter portrait; margin: 0; }
+  body.paper-letter.mode-fold @page { size: Letter landscape; margin: 0; }
+}
+</style>
+</head>
+<body class="mode-single paper-a4">
+
+<div class="nav-bar">
+  <a href="/account">← Back to account</a>
+  <h1>Print Loveogram Card</h1>
+  <button class="btn-print-main" onclick="window.print()">Print</button>
+</div>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <label>Layout</label>
+    <select id="layoutSel" onchange="applyLayout()">
+      <option value="single">A4 Portrait — single page</option>
+      <option value="fold">A4 Fold Card — 4 panels</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Paper size</label>
+    <select id="paperSel" onchange="applyPaper()">
+      <option value="a4">A4</option>
+      <option value="letter">US Letter</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Recipient name</label>
+    <input type="text" id="recipientName" placeholder="e.g. Dear Mum," oninput="updateMessage()">
+  </div>
+  <div class="ctrl-group">
+    <label>Inside message</label>
+    <textarea id="insideMsg" placeholder="Write your message here…" oninput="updateMessage()"></textarea>
+  </div>
+  <div class="ctrl-group">
+    <label>Options</label>
+    <div class="fold-lines-row">
+      <input type="checkbox" id="showFoldLines" checked onchange="applyOptions()">
+      <label for="showFoldLines">Fold guides</label>
+    </div>
+    <div class="fold-lines-row" style="margin-top:4px;">
+      <input type="checkbox" id="showCropMarks" checked onchange="applyOptions()">
+      <label for="showCropMarks">Crop marks</label>
+    </div>
+  </div>
+</div>
+
+<div class="preview-wrap">
+  <div class="preview-label">Preview</div>
+  <div class="print-preview">
+
+    <!-- Single-page layout -->
+    <div class="preview-single" id="singleLayout">
+      <img id="portraitImgSingle" src="" alt="Portrait">
+      <div class="no-portrait" id="noPortraitSingle" style="display:none;">No portrait — add ?url=... to the address bar</div>
+    </div>
+
+    <!-- Fold-card layout (A4 landscape, 4 panels) -->
+    <div class="preview-fold" id="foldLayout" style="display:none;">
+      <!-- Top row: outside panels (rotated 180° so they read correctly when folded) -->
+      <div class="fold-panel back rotated">
+        <div class="back-logo">Turtle and Sun<br>turtleandsun.com</div>
+      </div>
+      <div class="fold-panel front rotated">
+        <img id="portraitImgFold" src="" alt="Portrait">
+        <div class="no-portrait" id="noPortraitFold" style="display:none;">No portrait</div>
+      </div>
+      <!-- Bottom row: inside panels -->
+      <div class="fold-panel inside-left">
+        <!-- decorative blank or add a small motif here -->
+      </div>
+      <div class="fold-panel inside-right">
+        <div class="msg-text" id="msgDisplay"></div>
+      </div>
+      <!-- fold guides -->
+      <div class="fold-h-line" id="foldHLine"></div>
+      <div class="fold-v-line" id="foldVLine"></div>
+      <!-- crop marks -->
+      <div class="crop-mark cm-tl"></div>
+      <div class="crop-mark cm-tr"></div>
+      <div class="crop-mark cm-bl"></div>
+      <div class="crop-mark cm-br"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const portraitUrl = params.get('url') || '';
+const recipientParam = params.get('name') || '';
+
+// Set portrait images
+function setPortrait(url) {
+  const imgs = [document.getElementById('portraitImgSingle'), document.getElementById('portraitImgFold')];
+  const noPs = [document.getElementById('noPortraitSingle'), document.getElementById('noPortraitFold')];
+  imgs.forEach((img, i) => {
+    if (url) {
+      img.src = url;
+      img.style.display = '';
+      noPs[i].style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      noPs[i].style.display = '';
+    }
+  });
+}
+
+function updateMessage() {
+  const name = document.getElementById('recipientName').value.trim();
+  const msg = document.getElementById('insideMsg').value.trim();
+  let full = '';
+  if (name) full += name + '\n\n';
+  if (msg) full += msg;
+  document.getElementById('msgDisplay').textContent = full;
+}
+
+function applyLayout() {
+  const mode = document.getElementById('layoutSel').value;
+  document.body.className = document.body.className.replace(/mode-\S+/, '').trim() + ' mode-' + mode;
+  document.getElementById('singleLayout').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('foldLayout').style.display = mode === 'fold' ? '' : 'none';
+  // toggle fold options visibility
+  document.getElementById('showFoldLines').closest('.fold-lines-row').style.display = mode === 'fold' ? '' : 'none';
+  document.getElementById('showCropMarks').closest('.fold-lines-row').style.display = mode === 'fold' ? '' : 'none';
+}
+
+function applyPaper() {
+  const paper = document.getElementById('paperSel').value;
+  document.body.className = document.body.className.replace(/paper-\S+/, '').trim() + ' paper-' + paper;
+}
+
+function applyOptions() {
+  const showFold = document.getElementById('showFoldLines').checked;
+  const showCrop = document.getElementById('showCropMarks').checked;
+  document.body.classList.toggle('hide-foldlines', !showFold);
+  document.body.classList.toggle('hide-cropmarks', !showCrop);
+  document.getElementById('foldHLine').style.display = showFold ? '' : 'none';
+  document.getElementById('foldVLine').style.display = showFold ? '' : 'none';
+  document.querySelectorAll('.crop-mark').forEach(el => { el.style.display = showCrop ? '' : 'none'; });
+}
+
+// Init
+setPortrait(portraitUrl);
+if (recipientParam) {
+  document.getElementById('recipientName').value = recipientParam;
+  updateMessage();
+}
+// Hide fold-only options initially (single is default)
+document.getElementById('showFoldLines').closest('.fold-lines-row').style.display = 'none';
+document.getElementById('showCropMarks').closest('.fold-lines-row').style.display = 'none';
+
+// Auth check
+fetch('/api/auth/status').then(r => r.json()).then(s => {
+  if (!s.loggedIn) location.href = '/login';
+}).catch(() => location.href = '/login');
+</script>
+</body>
+</html>
