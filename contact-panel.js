@@ -29,10 +29,12 @@ const CP = (() => {
 .cp-empty{display:flex;align-items:center;justify-content:center;height:160px;font-size:13px;color:rgba(28,10,0,0.25);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;text-align:center;padding:24px;}
 
 /* Name bar */
-.cp-name-bar{padding:10px 16px 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cp-name-bar{padding:10px 16px 8px;display:flex;align-items:center;gap:7px;flex-wrap:nowrap;border-bottom:1px solid rgba(28,10,0,0.06);}
 .cp-name-inp{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#1C0A00;background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:0;transition:border-color 0.12s;cursor:text;}
 .cp-name-inp:focus{border-bottom-color:#3A6B20;}
 .cp-name-inp::placeholder{color:rgba(28,10,0,0.28);}
+.cp-close-btn{margin-left:auto;border:none;background:none;cursor:pointer;font-size:16px;color:rgba(28,10,0,0.35);line-height:1;padding:0;flex-shrink:0;display:flex;align-items:center;}
+.cp-close-btn:hover{color:#1C0A00;}
 .cp-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
 .cp-badge-dec{background:#f5eaea;color:rgba(120,20,20,0.55);}
 
@@ -97,6 +99,7 @@ const CP = (() => {
 
 /* Overlay mode: transparent bg, text-shadow for legibility */
 .fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
+.fo-detail .cp-close-btn{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-section-hdr{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-inp{background:transparent!important;border-left-color:transparent;border-left-width:1px;}
@@ -122,12 +125,12 @@ const CP = (() => {
     <span id="cpPetIcon" style="display:none;">🐾</span>
     <span class="cp-badge" id="cpPhBadge" style="display:none;">Manual</span>
     <span class="cp-badge cp-badge-dec" id="cpDeceasedBadge" style="display:none;">† Deceased</span>
+    <button class="cp-close-btn" onclick="window.hideDetail&&hideDetail()" aria-label="Close">×</button>
   </div>
 
   <div class="cp-toast" id="cpSaveMsg"></div>
 
   <div class="cp-section">
-    <div class="cp-section-hdr">Personal</div>
     <div class="cp-tbl">
       <div class="cp-row"><span class="cp-lbl">Email</span><input class="cp-inp" type="email" id="cpFEmail" data-field="email" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
@@ -138,22 +141,19 @@ const CP = (() => {
   </div>
 
   <div class="cp-section">
-    <div class="cp-section-hdr">Address</div>
     <div class="cp-tbl">
       <div class="cp-row"><span class="cp-lbl">Street</span><input class="cp-inp" type="text" id="cpFStreet" data-field="street" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">City</span><input class="cp-inp" type="text" id="cpFCity" data-field="city" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Country</span><input class="cp-inp" type="text" id="cpFCountry" data-field="country" onblur="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Postal code</span><input class="cp-inp" type="text" id="cpFPostal" data-field="postal_code" onblur="CP._scheduleSave()"></div>
+      <div class="cp-row"><span class="cp-lbl">Po code</span><input class="cp-inp" type="text" id="cpFPostal" data-field="postal_code" onblur="CP._scheduleSave()"></div>
     </div>
   </div>
 
   <div class="cp-section">
-    <div class="cp-section-hdr">Groups</div>
     <div id="cpGroupsCheckboxes"></div>
   </div>
 
   <div class="cp-section" id="cpFamilyCard" style="display:none;">
-    <div class="cp-section-hdr">Family relationships</div>
     <div id="cpRelBody"></div>
     <div class="cp-add-row">
       <select class="cp-add-sel" id="cpRelContact"><option value="">— person —</option></select>
@@ -164,7 +164,6 @@ const CP = (() => {
   </div>
 
   <div class="cp-section">
-    <div class="cp-section-hdr">Occasions</div>
     <div id="cpOccBody"></div>
     <div class="cp-add-row">
       <input class="cp-add-inp" type="text" id="cpOccName" placeholder="Occasion name">
@@ -180,7 +179,6 @@ const CP = (() => {
   </div>
 
   <div class="cp-section">
-    <div class="cp-section-hdr">Loveogram history</div>
     <div id="cpLovBody"></div>
   </div>
 

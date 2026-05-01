@@ -33,10 +33,10 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 /* ── Floating overlays ──────────────────────────────────────────── */
 .fo-filters,.fo-detail{position:fixed;z-index:50;}
 
-.fo-filters{top:62px;left:14px;width:210px;max-height:calc(100vh - 82px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
+.fo-filters{top:76px;left:14px;width:210px;max-height:calc(100vh - 96px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
-.fo-detail{top:62px;right:14px;width:320px;max-height:calc(100vh - 82px);overflow:hidden;display:none;flex-direction:column;}
+.fo-detail{top:76px;right:14px;width:250px;max-height:calc(100vh - 96px);overflow:hidden;display:none;flex-direction:column;}
 .fo-detail.fo-open{display:flex;}
 
 .fo-filters.fo-hidden{display:none;}
@@ -47,7 +47,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .fo-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.35);text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fo-detail-hdr{display:flex;justify-content:flex-end;padding-bottom:4px;}
 
-.fo-show-btn{position:fixed;top:64px;left:14px;z-index:50;border:none;background:none;cursor:pointer;font-size:22px;line-height:1;color:rgba(28,10,0,0.4);font-weight:700;display:none;padding:0;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
+.fo-show-btn{position:fixed;top:78px;left:14px;z-index:50;border:none;background:none;cursor:pointer;font-size:22px;line-height:1;color:rgba(28,10,0,0.4);font-weight:700;display:none;padding:0;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fo-show-btn:hover{color:#1C0A00;}
 
 /* Filter items – text-shadow for legibility over canvas */
@@ -246,9 +246,6 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <!-- Floating contact detail overlay (right) -->
 <div class="fo-detail" id="foDetail">
-  <div class="fo-detail-hdr">
-    <button class="fo-close-btn" onclick="hideDetail()" aria-label="Close">×</button>
-  </div>
   <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;"></div>
 </div>
 
