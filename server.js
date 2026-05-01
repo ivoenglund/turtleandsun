@@ -381,18 +381,28 @@ app.get('/api/groups', requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
     );
-    const topLevel = result.rows.filter(g => !g.parent_group_id);
     const byParent = {};
-    result.rows.filter(g => g.parent_group_id).forEach(g => {
-      if (!byParent[g.parent_group_id]) byParent[g.parent_group_id] = [];
-      byParent[g.parent_group_id].push({ id: g.id, name: g.name });
+    result.rows.forEach(g => {
+      const pid = g.parent_group_id || 0;
+      if (!byParent[pid]) byParent[pid] = [];
+      byParent[pid].push(g);
     });
-    const nested = topLevel.map(g => ({
-      id: g.id, name: g.name,
-      subgroups: (byParent[g.id] || []).sort((a, b) => a.name.localeCompare(b.name)),
-    }));
+    function buildTree(g) {
+      const children = (byParent[g.id] || []).sort((a, b) => a.name.localeCompare(b.name));
+      return { id: g.id, name: g.name, parent_group_id: g.parent_group_id || null, subgroups: children.map(buildTree) };
+    }
+    const nested = (byParent[0] || []).map(buildTree);
     nested.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
     res.json(nested);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/group-memberships', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT contact_id, group_id FROM contact_group_memberships WHERE user_id = $1`, [req.user.id]
+    );
+    res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

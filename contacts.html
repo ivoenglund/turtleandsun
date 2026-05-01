@@ -18,35 +18,51 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
 .nav-links a:hover{opacity:1;}
 .nav-account-wrap{position:relative;}
-#accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
-#accountDropdown.open{display:block;}
-#accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
-#accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
-#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;box-sizing:border-box;}
-#accountDropdown input:focus{border-color:#3A6B20;}
-#accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
-#accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
-#accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
-#accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
-#accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
-#ddUser{display:none;}
-.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
-.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
-.dd-user-link:hover{opacity:0.72;}
-.dd-user-logout{color:#c0392b !important;}
+.nav-account-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;cursor:pointer;background:none;border:none;padding:0;}
+.nav-account-btn:hover{opacity:1;}
+#accountDropdown{visibility:hidden;opacity:0;transform:translateY(-6px);transition:opacity 0.15s,transform 0.15s,visibility 0s 0.15s;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:14px 18px;width:220px;z-index:300;}
+#accountDropdown.open{visibility:visible;opacity:1;transform:translateY(0);transition:opacity 0.15s,transform 0.15s,visibility 0s 0s;}
+.dd-user-email{font-size:11px;color:rgba(60,20,0,0.5);padding-bottom:8px;border-bottom:1px solid #f0ede6;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dd-nav-link{display:block;padding:6px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.75;}
+.dd-nav-link:hover{opacity:1;color:#3A6B20;}
+.dd-nav-logout{color:#c0392b !important;opacity:1 !important;}
+.dd-nav-sep{height:1px;background:rgba(28,10,0,0.07);margin:6px 0;}
 
 #syncBanner{display:none;padding:10px 32px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;flex-shrink:0;}
 #syncBanner.ok{background:#e8f0e0;color:#2d5a16;}
 #syncBanner.err{background:#fdecea;color:#c0392b;}
-.sync-strip{background:#fff;border-bottom:1px solid rgba(28,10,0,0.07);padding:8px 32px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:rgba(28,10,0,0.5);flex-shrink:0;}
-.sync-strip a{color:#3A6B20;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;text-decoration:none;padding:5px 12px;border:1.5px solid #3A6B20;border-radius:6px;}
-.sync-strip a:hover{background:#3A6B20;color:#fff;}
-.sync-strip-links{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 
-.app-shell{flex:1;min-height:0;display:flex;overflow:hidden;}
+/* ── Three-column layout ──────────────────────────────────────────── */
+.three-col{flex:1;min-height:0;display:flex;overflow:hidden;}
 
-.list-panel{width:300px;flex-shrink:0;border-right:1px solid rgba(28,10,0,0.08);display:flex;flex-direction:column;background:#fff;overflow:hidden;}
-.list-toolbar{padding:12px 14px;border-bottom:1px solid rgba(28,10,0,0.07);display:flex;flex-direction:column;gap:8px;flex-shrink:0;}
+.panel-left{display:flex;flex-direction:row;width:220px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-right:1px solid rgba(28,10,0,0.08);background:#fff;}
+.panel-left.collapsed{width:28px;}
+.pl-body{flex:1;display:flex;flex-direction:column;min-width:192px;overflow:hidden;}
+.pl-header{padding:14px 0 6px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);flex-shrink:0;}
+.pl-scroll{flex:1;overflow-y:auto;padding:4px 8px 16px 14px;}
+.pl-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-left:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);user-select:none;font-size:14px;transition:color 0.1s,background 0.1s;}
+.pl-toggle:hover{color:#3A6B20;background:#f9f7f2;}
+.panel-left.collapsed .pl-toggle{border-left:none;}
+
+.panel-center{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+
+.panel-right{display:flex;flex-direction:row-reverse;width:380px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-left:1px solid rgba(28,10,0,0.08);background:#FFF9E6;}
+.panel-right.collapsed{width:28px;}
+.pr-body{flex:1;min-width:352px;overflow-y:auto;}
+.pr-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-right:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);user-select:none;font-size:14px;transition:color 0.1s,background 0.1s;}
+.pr-toggle:hover{color:#3A6B20;background:#f9f7f2;}
+.panel-right.collapsed .pr-toggle{border-right:none;}
+
+/* Filter panel items */
+.fp-item{display:flex;align-items:center;gap:5px;padding:4px 0;cursor:pointer;user-select:none;}
+.fp-item label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;display:flex;align-items:center;gap:5px;}
+.fp-item input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
+.fp-sub label{padding-left:10px;font-size:11px;opacity:0.85;}
+.fp-sub2 label{padding-left:20px;font-size:11px;opacity:0.7;}
+.fp-sep{height:1px;background:rgba(28,10,0,0.07);margin:8px 0;}
+
+/* List (center panel) */
+.list-toolbar{padding:12px 14px;border-bottom:1px solid rgba(28,10,0,0.07);display:flex;flex-direction:column;gap:8px;flex-shrink:0;background:#fff;}
 .search-input{width:100%;padding:8px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#f9f7f2;outline:none;}
 .search-input:focus{border-color:#3A6B20;background:#fff;}
 .list-actions{display:flex;gap:6px;}
@@ -65,17 +81,15 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .ci-deceased{display:inline-block;font-size:10px;background:#f0ede6;color:rgba(28,10,0,0.4);padding:1px 5px;border-radius:6px;font-weight:700;margin-left:4px;vertical-align:middle;}
 .list-empty{padding:32px 16px;text-align:center;font-size:13px;color:rgba(28,10,0,0.3);line-height:1.7;}
 
-.detail-panel{flex:1;overflow-y:auto;}
-.detail-empty{display:flex;align-items:center;justify-content:center;height:100%;font-size:15px;color:rgba(28,10,0,0.22);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;}
-.detail-inner{max-width:680px;margin:0 auto;padding:32px 36px 80px;}
-
-.detail-header{margin-bottom:24px;}
-.detail-name-display{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;line-height:1.2;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+/* Detail (right panel body) */
+.detail-empty{display:flex;align-items:center;justify-content:center;height:160px;font-size:14px;color:rgba(28,10,0,0.25);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;text-align:center;padding:24px;}
+.detail-inner{max-width:680px;margin:0 auto;padding:24px 28px 80px;}
+.detail-header{margin-bottom:20px;}
+.detail-name-display{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;line-height:1.2;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .ph-badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
 .deceased-badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.55);}
-
-.section-card{background:#fff;border-radius:12px;padding:24px 26px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06);}
-.section-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.32);margin-bottom:16px;}
+.section-card{background:#fff;border-radius:12px;padding:20px 22px;margin-bottom:14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);}
+.section-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.32);margin-bottom:14px;}
 .fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .field{display:flex;flex-direction:column;gap:5px;}
 .field label{font-size:11px;font-weight:600;color:rgba(28,10,0,0.42);text-transform:uppercase;letter-spacing:0.04em;}
@@ -85,13 +99,12 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .field-check{flex-direction:row;align-items:center;gap:8px;padding-top:18px;}
 .field-check label{font-size:13px;font-weight:500;color:#1C0A00;text-transform:none;letter-spacing:0;cursor:pointer;display:flex;align-items:center;gap:6px;}
 .field-check input[type=checkbox]{width:16px;height:16px;accent-color:#3A6B20;cursor:pointer;}
-.save-row{margin-top:16px;display:flex;align-items:center;gap:12px;}
+.save-row{margin-top:14px;display:flex;align-items:center;gap:12px;}
 .btn-save{padding:9px 22px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s;}
 .btn-save:hover{background:#1C0A00;}
 .btn-save:disabled{opacity:0.5;cursor:not-allowed;}
 .save-msg{font-size:12px;}
 .save-msg.ok{color:#3A6B20;} .save-msg.err{color:#c0392b;}
-
 .groups-list{display:flex;flex-direction:column;gap:5px;}
 .group-tree-row{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#f9f7f2;border:1.5px solid #e0dcd4;border-radius:8px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;user-select:none;transition:border-color 0.15s,background 0.15s;}
 .group-tree-row:hover{border-color:#3A6B20;}
@@ -99,9 +112,6 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .group-tree-row.checked{background:#e8f0e0;border-color:#3A6B20;}
 .group-tree-children{padding-left:20px;display:flex;flex-direction:column;gap:3px;margin-top:2px;}
 .group-tree-row.group-tree-sub{font-size:12px;padding:5px 10px;border-radius:6px;}
-.group-cb-label{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#f9f7f2;border:1.5px solid #e0dcd4;border-radius:8px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;user-select:none;transition:border-color 0.15s,background 0.15s;}
-.group-cb-label input[type=checkbox]{width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;}
-
 .table-wrap{overflow-x:auto;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(28,10,0,0.32);border-bottom:1.5px solid #f0ede6;}
@@ -110,7 +120,6 @@ tr:last-child td{border-bottom:none;}
 .empty-row td{text-align:center;color:rgba(28,10,0,0.28);padding:20px 10px;font-size:13px;}
 .btn-del{padding:3px 9px;background:none;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.42);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;}
 .btn-del:hover{border-color:#c0392b;color:#c0392b;}
-
 .add-rel-form{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
 .add-rel-form select,.add-occasion-form select,.add-occasion-form input{flex:1;min-width:110px;padding:8px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:13px;color:#1C0A00;background:#fff;outline:none;font-family:'DM Sans',sans-serif;}
 .add-rel-form select:focus,.add-occasion-form select:focus,.add-occasion-form input:focus{border-color:#3A6B20;}
@@ -119,10 +128,8 @@ tr:last-child td{border-bottom:none;}
 .rel-msg,.occ-msg{font-size:12px;margin-top:8px;min-height:16px;}
 .rel-msg.err,.occ-msg.err{color:#c0392b;}
 .add-occasion-form{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
-
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;}
 .dot.done{background:#3A6B20;} .dot.pending{background:#f0a500;} .dot.failed{background:#c0392b;}
-
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.32);z-index:500;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
 .modal-box{background:#fff;border-radius:14px;padding:28px 32px;width:380px;max-width:95vw;box-shadow:0 12px 48px rgba(0,0,0,0.18);max-height:80vh;display:flex;flex-direction:column;}
@@ -136,7 +143,6 @@ tr:last-child td{border-bottom:none;}
 .btn-modal-confirm{background:#3A6B20;color:#fff;}
 .btn-modal-cancel:hover{background:#e0dcd4;}
 .btn-modal-confirm:hover{background:#1C0A00;}
-
 .groups-mgr-list{flex:1;overflow-y:auto;margin-bottom:14px;}
 .groups-mgr-item{display:flex;align-items:center;justify-content:space-between;padding:9px 4px;border-bottom:1px solid #f0ede6;}
 .groups-mgr-item:last-child{border-bottom:none;}
@@ -152,19 +158,23 @@ tr:last-child td{border-bottom:none;}
 .btn-add-sub{padding:3px 8px;background:#f0ede6;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.6);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;white-space:nowrap;}
 .btn-add-sub:hover{border-color:#3A6B20;color:#3A6B20;}
 
-@media(max-width:700px){
-  .nav-wrap,.sync-strip{padding:0 16px;}
-  #syncBanner{padding:10px 16px;}
-  .app-shell{overflow:visible;flex-direction:column;min-height:0;}
-  .list-panel{width:100%;border-right:none;overflow:visible;flex:none;}
-  .contact-list{overflow:visible;max-height:none;}
-  .detail-panel{flex:none;min-height:calc(100vh - 120px);}
-  .list-panel.mobile-hidden,.detail-panel.mobile-hidden{display:none;}
-  .detail-inner{padding:0 16px 60px;}
+/* Mobile */
+.mobile-backdrop{display:none;}
+@media(max-width:1000px){
+  .three-col{position:relative;}
+  .panel-left{position:absolute;top:0;bottom:0;left:0;z-index:50;width:28px !important;box-shadow:none;transition:width 0.22s ease,box-shadow 0.22s;}
+  .panel-left.mobile-open{width:260px !important;box-shadow:4px 0 20px rgba(0,0,0,0.13);}
+  .panel-right{position:absolute;top:0;bottom:0;right:0;z-index:50;width:28px !important;transition:width 0.22s ease,box-shadow 0.22s;}
+  .panel-right.mobile-open{width:340px !important;box-shadow:-4px 0 20px rgba(0,0,0,0.13);}
+  .panel-center{padding:0 28px;}
+  .mobile-backdrop{display:block;position:absolute;inset:0;background:rgba(0,0,0,0.25);z-index:49;pointer-events:none;opacity:0;transition:opacity 0.2s;}
+  .mobile-backdrop.open{pointer-events:auto;opacity:1;}
+  .detail-inner{padding:20px 16px 60px;}
   .fields-grid{grid-template-columns:1fr;}
-  .mobile-back-btn{display:flex;align-items:center;gap:8px;padding:14px 16px;background:#fff;border:none;border-bottom:1px solid rgba(28,10,0,0.07);width:100%;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;color:#3A6B20;cursor:pointer;flex-shrink:0;}
 }
-@media(min-width:701px){.mobile-back-btn{display:none;}}
+@media(min-width:1001px){
+  .panel-left.collapsed,.panel-right.collapsed{transition:width 0.2s ease;}
+}
 </style>
 </head>
 <body>
@@ -176,22 +186,19 @@ tr:last-child td{border-bottom:none;}
       <div class="nav-links">
         <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
         <span class="nav-account-wrap">
-          <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
+          <button class="nav-account-btn" onclick="handleAccountClick(event)">Account</button>
           <div id="accountDropdown">
-            <div id="ddGuest">
-              <h4>Log in</h4>
-              <p>Enter your email and we'll send you a magic link.</p>
-              <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
-              <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
-              <div class="dd-msg" id="ddMsg"></div>
-            </div>
-            <div id="ddUser">
-              <div class="dd-user-email" id="ddUserEmail"></div>
-              <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
-              <a class="dd-user-link" href="/account/contacts">Contacts</a>
-              <a class="dd-user-link" href="/account/occasions">Occasions</a>
-              <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
-            </div>
+            <div class="dd-user-email" id="ddUserEmail"></div>
+            <a class="dd-nav-link" href="/account/contacts">Contacts</a>
+            <div class="dd-nav-sep"></div>
+            <a class="dd-nav-link" href="/account/network?view=network">Network</a>
+            <a class="dd-nav-link" href="/account/network?view=outline">Outline</a>
+            <a class="dd-nav-link" href="/account/network?view=calendar">Calendar</a>
+            <a class="dd-nav-link" href="/account/occasions">Occasions</a>
+            <div class="dd-nav-sep"></div>
+            <a class="dd-nav-link" href="/auth/google/contacts">↻ Sync Google contacts</a>
+            <a class="dd-nav-link" href="/account">Account settings</a>
+            <a class="dd-nav-link dd-nav-logout" href="/auth/logout">Log out</a>
           </div>
         </span>
       </div>
@@ -201,20 +208,23 @@ tr:last-child td{border-bottom:none;}
 
 <div id="syncBanner"></div>
 
-<div class="sync-strip">
-  <span>Keep contacts up to date</span>
-  <div class="sync-strip-links">
-    <a href="/account/occasions">📅 Occasions</a>
-    <a href="/account/network" style="background:#1C0A00;color:#FFF9E6;border-color:#1C0A00;">⬡ Network</a>
-    <a href="/auth/google/contacts">↻ Sync Google</a>
+<div class="three-col">
+
+  <!-- LEFT: Filters -->
+  <div class="panel-left" id="panelLeft">
+    <div class="pl-body">
+      <div class="pl-header">Filters</div>
+      <div class="pl-scroll" id="leftFilterContent"></div>
+    </div>
+    <div class="pl-toggle" onclick="togglePanel('left')" title="Toggle filters">
+      <span id="plArrow">‹</span>
+    </div>
   </div>
-</div>
 
-<div class="app-shell">
-
-  <div class="list-panel" id="listPanel">
+  <!-- CENTER: Contact list -->
+  <div class="panel-center">
     <div class="list-toolbar">
-      <input class="search-input" id="searchInput" type="text" placeholder="Search contacts…" oninput="filterContacts(this.value)">
+      <input class="search-input" id="searchInput" type="text" placeholder="Search contacts…" oninput="applyContactFilter()">
       <div class="list-actions">
         <button class="btn-add-ph" onclick="openPlaceholderModal()">+ Add person</button>
         <button class="btn-manage-groups" onclick="openGroupsModal()">⚙ Groups</button>
@@ -225,106 +235,107 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 
-  <div class="detail-panel" id="detailPanel">
-    <div class="detail-empty" id="detailEmpty">← Select a contact</div>
-    <div id="detailContent" style="display:none;">
-      <button class="mobile-back-btn" onclick="mobileBack()">← Back</button>
-      <div class="detail-inner">
+  <!-- RIGHT: Detail -->
+  <div class="panel-right" id="panelRight">
+    <div class="pr-toggle" onclick="togglePanel('right')" title="Toggle detail">
+      <span id="prArrow">›</span>
+    </div>
+    <div class="pr-body">
+      <div class="detail-empty" id="detailEmpty">Select a contact to see details.</div>
+      <div id="detailContent" style="display:none;">
+        <div class="detail-inner">
 
-        <div class="detail-header">
-          <div class="detail-name-display">
-            <span id="detailNameDisplay"></span>
-            <span id="petIcon" style="display:none;">🐾</span>
-            <span class="ph-badge" id="phBadge" style="display:none;">Manual</span>
-            <span class="deceased-badge" id="deceasedBadge" style="display:none;">Deceased</span>
-          </div>
-        </div>
-
-        <!-- Contact details -->
-        <div class="section-card">
-          <div class="section-title">Contact details</div>
-          <div class="fields-grid">
-            <div class="field field-full"><label>Name</label><input type="text" id="fName"></div>
-            <div class="field"><label>Email</label><input type="email" id="fEmail"></div>
-            <div class="field"><label>Phone</label><input type="tel" id="fPhone"></div>
-            <div class="field"><label>Birthday</label><input type="date" id="fBirthday"></div>
-            <div class="field"><label>Died on</label><input type="date" id="fDiedOn"></div>
-            <div class="field"><label>Street</label><input type="text" id="fStreet"></div>
-            <div class="field"><label>City</label><input type="text" id="fCity"></div>
-            <div class="field"><label>Country</label><input type="text" id="fCountry"></div>
-            <div class="field"><label>Postal code</label><input type="text" id="fPostal"></div>
-            <div class="field field-check">
-              <label><input type="checkbox" id="fIsPet"> 🐾 This is a pet</label>
+          <div class="detail-header">
+            <div class="detail-name-display">
+              <span id="detailNameDisplay"></span>
+              <span id="petIcon" style="display:none;">🐾</span>
+              <span class="ph-badge" id="phBadge" style="display:none;">Manual</span>
+              <span class="deceased-badge" id="deceasedBadge" style="display:none;">Deceased</span>
             </div>
           </div>
-          <div class="save-row">
-            <button class="btn-save" id="btnSave" onclick="saveContact()">Save</button>
-            <span class="save-msg" id="saveMsg"></span>
-          </div>
-        </div>
 
-        <!-- Groups -->
-        <div class="section-card">
-          <div class="section-title">Groups</div>
-          <div class="groups-list" id="groupsCheckboxes">
-            <span style="font-size:13px;color:rgba(28,10,0,0.35);">Loading…</span>
+          <div class="section-card">
+            <div class="section-title">Contact details</div>
+            <div class="fields-grid">
+              <div class="field field-full"><label>Name</label><input type="text" id="fName"></div>
+              <div class="field"><label>Email</label><input type="email" id="fEmail"></div>
+              <div class="field"><label>Phone</label><input type="tel" id="fPhone"></div>
+              <div class="field"><label>Birthday</label><input type="date" id="fBirthday"></div>
+              <div class="field"><label>Died on</label><input type="date" id="fDiedOn"></div>
+              <div class="field"><label>Street</label><input type="text" id="fStreet"></div>
+              <div class="field"><label>City</label><input type="text" id="fCity"></div>
+              <div class="field"><label>Country</label><input type="text" id="fCountry"></div>
+              <div class="field"><label>Postal code</label><input type="text" id="fPostal"></div>
+              <div class="field field-check">
+                <label><input type="checkbox" id="fIsPet"> 🐾 This is a pet</label>
+              </div>
+            </div>
+            <div class="save-row">
+              <button class="btn-save" id="btnSave" onclick="saveContact()">Save</button>
+              <span class="save-msg" id="saveMsg"></span>
+            </div>
           </div>
-        </div>
 
-        <!-- Family relationships (only when in Family group) -->
-        <div class="section-card" id="familyCard" style="display:none;">
-          <div class="section-title">Family relationships</div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Person</th><th>Relationship</th><th></th></tr></thead>
-              <tbody id="relBody"></tbody>
-            </table>
+          <div class="section-card">
+            <div class="section-title">Groups</div>
+            <div class="groups-list" id="groupsCheckboxes">
+              <span style="font-size:13px;color:rgba(28,10,0,0.35);">Loading…</span>
+            </div>
           </div>
-          <div class="add-rel-form">
-            <select id="relContact"><option value="">— Select person —</option></select>
-            <select id="relType"><option value="">— Relationship —</option></select>
-            <button class="btn-add-rel" onclick="addRelationship()">Add</button>
-          </div>
-          <div class="rel-msg" id="relMsg"></div>
-        </div>
 
-        <!-- Occasions -->
-        <div class="section-card">
-          <div class="section-title">Occasions</div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Name</th><th>Date</th><th>Frequency</th><th></th></tr></thead>
-              <tbody id="occBody"></tbody>
-            </table>
+          <div class="section-card" id="familyCard" style="display:none;">
+            <div class="section-title">Family relationships</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Person</th><th>Relationship</th><th></th></tr></thead>
+                <tbody id="relBody"></tbody>
+              </table>
+            </div>
+            <div class="add-rel-form">
+              <select id="relContact"><option value="">— Select person —</option></select>
+              <select id="relType"><option value="">— Relationship —</option></select>
+              <button class="btn-add-rel" onclick="addRelationship()">Add</button>
+            </div>
+            <div class="rel-msg" id="relMsg"></div>
           </div>
-          <div class="add-occasion-form">
-            <input type="text" id="occName" placeholder="e.g. Wedding anniversary">
-            <input type="date" id="occDate">
-            <select id="occFreq">
-              <option value="yearly">Yearly</option>
-              <option value="milestone">Milestone</option>
-              <option value="one-time">One-time</option>
-            </select>
-            <button class="btn-add-occ" onclick="addOccasion()">Add</button>
-          </div>
-          <div class="occ-msg" id="occMsg"></div>
-        </div>
 
-        <!-- Loveogram history -->
-        <div class="section-card">
-          <div class="section-title">Loveogram history</div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Product</th><th>Amount</th><th>Status</th></tr></thead>
-              <tbody id="lovBody"></tbody>
-            </table>
+          <div class="section-card">
+            <div class="section-title">Occasions</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Date</th><th>Frequency</th><th></th></tr></thead>
+                <tbody id="occBody"></tbody>
+              </table>
+            </div>
+            <div class="add-occasion-form">
+              <input type="text" id="occName" placeholder="e.g. Wedding anniversary">
+              <input type="date" id="occDate">
+              <select id="occFreq">
+                <option value="yearly">Yearly</option>
+                <option value="milestone">Milestone</option>
+                <option value="one-time">One-time</option>
+              </select>
+              <button class="btn-add-occ" onclick="addOccasion()">Add</button>
+            </div>
+            <div class="occ-msg" id="occMsg"></div>
           </div>
-        </div>
 
+          <div class="section-card">
+            <div class="section-title">Loveogram history</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Product</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody id="lovBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   </div>
 
+  <div class="mobile-backdrop" id="mobileBackdrop" onclick="closeMobileOverlays()"></div>
 </div>
 
 <!-- Add person modal -->
@@ -363,6 +374,8 @@ let _allGroups = [];
 let _relTypes = [];
 let _contactGroupIds = new Set();
 let _inFamilyGroup = false;
+let _contactGroupMap = {};  // contactId → Set<groupId> with ancestors
+let _allGroupsById = {};    // groupId → {id, name, parent_group_id}
 
 // ── Sync banner ───────────────────────────────────────────────────────────────
 (function() {
@@ -380,6 +393,112 @@ let _inFamilyGroup = false;
   }
   if (p.get('synced') !== null || p.get('error')) history.replaceState(null, '', '/account/contacts');
 })();
+
+// ── Panel collapse/expand ─────────────────────────────────────────────────────
+const LS_LEFT = 'ts_panel_left', LS_RIGHT = 'ts_panel_right';
+
+function initPanels() {
+  if (localStorage.getItem(LS_LEFT) === 'collapsed') _setPanelCollapsed('left', true);
+  if (localStorage.getItem(LS_RIGHT) === 'collapsed') _setPanelCollapsed('right', true);
+}
+
+function _setPanelCollapsed(side, collapsed) {
+  const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
+  const arrow = document.getElementById(side === 'left' ? 'plArrow' : 'prArrow');
+  el.classList.toggle('collapsed', collapsed);
+  if (side === 'left') arrow.textContent = collapsed ? '›' : '‹';
+  else arrow.textContent = collapsed ? '‹' : '›';
+  localStorage.setItem(side === 'left' ? LS_LEFT : LS_RIGHT, collapsed ? 'collapsed' : 'expanded');
+}
+
+function togglePanel(side) {
+  const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
+  if (window.innerWidth <= 1000) {
+    const open = el.classList.contains('mobile-open');
+    el.classList.toggle('mobile-open', !open);
+    document.getElementById('mobileBackdrop').classList.toggle('open', !open);
+  } else {
+    _setPanelCollapsed(side, !el.classList.contains('collapsed'));
+  }
+}
+
+function closeMobileOverlays() {
+  document.getElementById('panelLeft').classList.remove('mobile-open');
+  document.getElementById('panelRight').classList.remove('mobile-open');
+  document.getElementById('mobileBackdrop').classList.remove('open');
+}
+
+// ── Filter panel ──────────────────────────────────────────────────────────────
+async function loadGroupMemberships() {
+  const res = await fetch('/api/group-memberships');
+  if (!res.ok) return;
+  const memberships = await res.json();
+  // Flatten all groups with parent_group_id for ancestor computation
+  _allGroupsById = {};
+  function flattenTree(g, parentId) {
+    _allGroupsById[g.id] = { id: g.id, name: g.name, parent_group_id: parentId };
+    (g.subgroups || []).forEach(s => flattenTree(s, g.id));
+  }
+  _allGroups.forEach(g => flattenTree(g, null));
+  // Build contact → group set (with full ancestry)
+  _contactGroupMap = {};
+  memberships.forEach(m => {
+    if (!_contactGroupMap[m.contact_id]) _contactGroupMap[m.contact_id] = new Set();
+    let gid = m.group_id;
+    while (gid) {
+      _contactGroupMap[m.contact_id].add(gid);
+      const g = _allGroupsById[gid];
+      gid = g ? g.parent_group_id : null;
+    }
+  });
+}
+
+function renderFilterPanel() {
+  function renderEntry(g, depth, parentId) {
+    const cls = depth === 0 ? '' : depth === 1 ? ' fp-sub' : ' fp-sub2';
+    const parentAttr = parentId != null ? ` data-parent-id="${parentId}"` : '';
+    let html = `<div class="fp-item${cls}"><label>
+      <input type="checkbox" data-group-id="${g.id}"${parentAttr} checked onchange="filterPanelToggle(this)">
+      ${esc(g.name)}
+    </label></div>`;
+    (g.subgroups || []).forEach(s => { html += renderEntry(s, depth + 1, g.id); });
+    return html;
+  }
+  let html = _allGroups.map(g => renderEntry(g, 0, null)).join('');
+  html += `<div class="fp-sep"></div>
+    <div class="fp-item"><label>
+      <input type="checkbox" id="cb-living-contacts" onchange="applyContactFilter()">
+      Only living
+    </label></div>`;
+  document.getElementById('leftFilterContent').innerHTML = html;
+}
+
+function filterPanelToggle(cb) {
+  const gid = parseInt(cb.dataset.groupId);
+  const cascade = (id, checked) => {
+    document.querySelectorAll(`#leftFilterContent input[data-parent-id="${id}"]`)
+      .forEach(c => { c.checked = checked; cascade(parseInt(c.dataset.groupId), checked); });
+  };
+  cascade(gid, cb.checked);
+  applyContactFilter();
+}
+
+function applyContactFilter() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const showLiving = document.getElementById('cb-living-contacts') && document.getElementById('cb-living-contacts').checked;
+  const allCbs = [...document.querySelectorAll('#leftFilterContent input[data-group-id]')];
+  const allChecked = !allCbs.length || allCbs.every(cb => cb.checked);
+  const activeIds = allChecked ? null : new Set(allCbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.groupId)));
+  renderList(_contacts.filter(c => {
+    if (q && !(c.name || '').toLowerCase().includes(q) && !(c.email || '').toLowerCase().includes(q)) return false;
+    if (showLiving && c.died_on) return false;
+    if (activeIds) {
+      const cg = _contactGroupMap[c.id];
+      if (!cg || ![...activeIds].some(id => cg.has(id))) return false;
+    }
+    return true;
+  }));
+}
 
 // ── Contacts list ─────────────────────────────────────────────────────────────
 async function loadContacts() {
@@ -403,7 +522,7 @@ async function loadRelTypes() {
 function renderList(contacts) {
   const el = document.getElementById('contactList');
   if (!contacts.length) {
-    el.innerHTML = '<div class="list-empty">No contacts yet.<br>Sync Google Contacts or add a person manually.</div>';
+    el.innerHTML = '<div class="list-empty">No contacts match the current filters.</div>';
     return;
   }
   el.innerHTML = contacts.map(c => `
@@ -415,21 +534,18 @@ function renderList(contacts) {
   `).join('');
 }
 
-function filterContacts(q) {
-  const lq = q.toLowerCase();
-  renderList(_contacts.filter(c =>
-    (c.name || '').toLowerCase().includes(lq) ||
-    (c.email || '').toLowerCase().includes(lq)
-  ));
-}
-
 // ── Select contact ────────────────────────────────────────────────────────────
 async function selectContact(id) {
   _currentId = id;
   document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
-  if (window.innerWidth <= 700) {
-    document.getElementById('listPanel').classList.add('mobile-hidden');
-    document.getElementById('detailPanel').classList.remove('mobile-hidden');
+  // On mobile, open right panel
+  if (window.innerWidth <= 1000) {
+    document.getElementById('panelRight').classList.add('mobile-open');
+    document.getElementById('mobileBackdrop').classList.add('open');
+  } else {
+    // On desktop, expand right panel if collapsed
+    const pr = document.getElementById('panelRight');
+    if (pr.classList.contains('collapsed')) _setPanelCollapsed('right', false);
   }
   document.getElementById('detailEmpty').style.display = 'none';
   document.getElementById('detailContent').style.display = 'block';
@@ -448,13 +564,11 @@ async function selectContact(id) {
   _contactGroupIds = new Set(contactGroups.map(g => g.id));
   _inFamilyGroup = contactGroups.some(g => g.name === 'Family');
 
-  // Header
   document.getElementById('detailNameDisplay').textContent = c.name || 'Unnamed';
   document.getElementById('petIcon').style.display = c.is_pet ? 'inline' : 'none';
   document.getElementById('phBadge').style.display = c.is_placeholder ? 'inline-block' : 'none';
   document.getElementById('deceasedBadge').style.display = c.died_on ? 'inline-block' : 'none';
 
-  // Fields
   document.getElementById('fName').value = c.name || '';
   document.getElementById('fEmail').value = c.email || '';
   document.getElementById('fPhone').value = c.phone || '';
@@ -466,21 +580,14 @@ async function selectContact(id) {
   document.getElementById('fPostal').value = c.postal_code || '';
   document.getElementById('fIsPet').checked = !!c.is_pet;
 
-  // Groups checkboxes
   renderGroupCheckboxes();
-
-  // Family relationships
   document.getElementById('familyCard').style.display = _inFamilyGroup ? '' : 'none';
   if (_inFamilyGroup) {
     renderRelationships(c.relationships || []);
     await loadRelTypes();
     populateRelSelects(id);
   }
-
-  // Occasions
   renderOccasions(occasions);
-
-  // Loveograms
   renderLoveograms(c.loveograms || []);
 }
 
@@ -489,7 +596,10 @@ function allGroupsFlat() {
   const flat = [];
   for (const g of _allGroups) {
     flat.push(g);
-    for (const s of (g.subgroups || [])) flat.push(s);
+    for (const s of (g.subgroups || [])) {
+      flat.push(s);
+      for (const s2 of (s.subgroups || [])) flat.push(s2);
+    }
   }
   return flat;
 }
@@ -511,9 +621,9 @@ function renderGroupCheckboxes() {
     if (g.subgroups && g.subgroups.length) {
       html += '<div class="group-tree-children">';
       for (const s of g.subgroups) {
-        const schecked = _contactGroupIds.has(s.id);
-        html += `<label class="group-tree-row group-tree-sub${schecked ? ' checked' : ''}" id="gcbl-${s.id}">
-          <input type="checkbox" ${schecked ? 'checked' : ''} onchange="toggleGroupMembership(${s.id},this)">
+        const sc = _contactGroupIds.has(s.id);
+        html += `<label class="group-tree-row group-tree-sub${sc ? ' checked' : ''}" id="gcbl-${s.id}">
+          <input type="checkbox" ${sc ? 'checked' : ''} onchange="toggleGroupMembership(${s.id},this)">
           ↳ ${esc(s.name)}
         </label>`;
       }
@@ -526,23 +636,16 @@ function renderGroupCheckboxes() {
 
 async function toggleGroupMembership(groupId, cb) {
   const label = document.getElementById(`gcbl-${groupId}`);
-  if (cb.checked) {
-    _contactGroupIds.add(groupId);
-  } else {
-    _contactGroupIds.delete(groupId);
-  }
+  if (cb.checked) _contactGroupIds.add(groupId);
+  else _contactGroupIds.delete(groupId);
   if (label) label.classList.toggle('checked', cb.checked);
 
-  // Check if Family status changed
   const familyGroup = allGroupsFlat().find(g => g.name === 'Family');
   const nowInFamily = familyGroup ? _contactGroupIds.has(familyGroup.id) : false;
   if (nowInFamily !== _inFamilyGroup) {
     _inFamilyGroup = nowInFamily;
     document.getElementById('familyCard').style.display = _inFamilyGroup ? '' : 'none';
-    if (_inFamilyGroup) {
-      await loadRelTypes();
-      populateRelSelects(_currentId);
-    }
+    if (_inFamilyGroup) { await loadRelTypes(); populateRelSelects(_currentId); }
   }
 
   await fetch(`/api/contacts/${_currentId}/groups`, {
@@ -571,9 +674,7 @@ async function saveContact() {
   };
   try {
     const res = await fetch(`/api/contacts/${_currentId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (res.ok) {
       msg.className = 'save-msg ok'; msg.textContent = 'Saved.';
@@ -582,7 +683,7 @@ async function saveContact() {
       document.getElementById('detailNameDisplay').textContent = body.name || 'Unnamed';
       document.getElementById('petIcon').style.display = body.is_pet ? 'inline' : 'none';
       document.getElementById('deceasedBadge').style.display = body.died_on ? 'inline-block' : 'none';
-      renderList(_contacts);
+      applyContactFilter();
       document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === _currentId));
       setTimeout(() => { msg.textContent = ''; }, 2500);
     } else {
@@ -596,17 +697,12 @@ async function saveContact() {
 // ── Relationships ─────────────────────────────────────────────────────────────
 function renderRelationships(rels) {
   const tbody = document.getElementById('relBody');
-  if (!rels.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No family relationships yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = rels.map(r => `
-    <tr>
-      <td>${esc(r.related_name || 'Unknown')}</td>
-      <td>${esc(r.relationship_name)}</td>
-      <td><button class="btn-del" onclick="deleteRelationship(${r.id})">Remove</button></td>
-    </tr>
-  `).join('');
+  if (!rels.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No family relationships yet.</td></tr>'; return; }
+  tbody.innerHTML = rels.map(r => `<tr>
+    <td>${esc(r.related_name || 'Unknown')}</td>
+    <td>${esc(r.relationship_name)}</td>
+    <td><button class="btn-del" onclick="deleteRelationship(${r.id})">Remove</button></td>
+  </tr>`).join('');
 }
 
 async function deleteRelationship(id) {
@@ -618,56 +714,39 @@ async function addRelationship() {
   const contactId = document.getElementById('relContact').value;
   const typeId = document.getElementById('relType').value;
   const msg = document.getElementById('relMsg');
-  if (!contactId || !typeId) {
-    msg.className = 'rel-msg err'; msg.textContent = 'Select both a person and a relationship type.'; return;
-  }
+  if (!contactId || !typeId) { msg.className = 'rel-msg err'; msg.textContent = 'Select both a person and a relationship type.'; return; }
   msg.textContent = '';
   const res = await fetch('/api/contact-relationships', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contact_a_id: _currentId, contact_b_id: +contactId, relationship_type_id: +typeId }),
   });
   if (res.ok) {
     document.getElementById('relContact').value = '';
     document.getElementById('relType').value = '';
     selectContact(_currentId);
-  } else {
-    const d = await res.json();
-    msg.className = 'rel-msg err'; msg.textContent = d.error || 'Failed.';
-  }
+  } else { const d = await res.json(); msg.className = 'rel-msg err'; msg.textContent = d.error || 'Failed.'; }
 }
 
 async function populateRelSelects(currentId) {
   const sel = document.getElementById('relContact');
   sel.innerHTML = '<option value="">— Select person —</option>' +
-    _contacts.filter(c => c.id !== currentId).map(c =>
-      `<option value="${c.id}">${esc(c.name || 'Unnamed')}</option>`
-    ).join('');
-
+    _contacts.filter(c => c.id !== currentId).map(c => `<option value="${c.id}">${esc(c.name || 'Unnamed')}</option>`).join('');
   const familyTypes = _relTypes.filter(t => t.group_name === 'Family');
   const tsel = document.getElementById('relType');
   tsel.innerHTML = familyTypes.length
-    ? '<option value="">— Relationship —</option>' + familyTypes.map(t =>
-        `<option value="${t.id}">${esc(t.name)}</option>`
-      ).join('')
+    ? '<option value="">— Relationship —</option>' + familyTypes.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')
     : '<option value="">— No types —</option>';
 }
 
 // ── Occasions ─────────────────────────────────────────────────────────────────
 function renderOccasions(occs) {
   const tbody = document.getElementById('occBody');
-  if (!occs.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No occasions yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = occs.map(o => `
-    <tr>
-      <td>${esc(o.name)}</td>
-      <td>${esc((o.start_date || '').split('T')[0])}</td>
-      <td>${esc(o.frequency)}</td>
-      <td><button class="btn-del" onclick="deleteOccasion(${o.id})">Remove</button></td>
-    </tr>
-  `).join('');
+  if (!occs.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No occasions yet.</td></tr>'; return; }
+  tbody.innerHTML = occs.map(o => `<tr>
+    <td>${esc(o.name)}</td><td>${esc((o.start_date || '').split('T')[0])}</td>
+    <td>${esc(o.frequency)}</td>
+    <td><button class="btn-del" onclick="deleteOccasion(${o.id})">Remove</button></td>
+  </tr>`).join('');
 }
 
 async function addOccasion() {
@@ -678,8 +757,7 @@ async function addOccasion() {
   if (!name || !date) { msg.className = 'occ-msg err'; msg.textContent = 'Name and date are required.'; return; }
   msg.textContent = '';
   const res = await fetch(`/api/contacts/${_currentId}/occasions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, start_date: date, frequency: freq }),
   });
   if (res.ok) {
@@ -687,10 +765,7 @@ async function addOccasion() {
     document.getElementById('occDate').value = '';
     const newOccs = await (await fetch(`/api/contacts/${_currentId}/occasions`)).json();
     renderOccasions(newOccs);
-  } else {
-    const d = await res.json();
-    msg.className = 'occ-msg err'; msg.textContent = d.error || 'Failed.';
-  }
+  } else { const d = await res.json(); msg.className = 'occ-msg err'; msg.textContent = d.error || 'Failed.'; }
 }
 
 async function deleteOccasion(id) {
@@ -702,19 +777,11 @@ async function deleteOccasion(id) {
 // ── Loveograms ────────────────────────────────────────────────────────────────
 function renderLoveograms(lovs) {
   const tbody = document.getElementById('lovBody');
-  if (!lovs.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No Loveograms sent yet.</td></tr>';
-    return;
-  }
+  if (!lovs.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No Loveograms sent yet.</td></tr>'; return; }
   tbody.innerHTML = lovs.map(o => {
     const dotCls = (o.status === 'paid' || o.status === 'delivered') ? 'done' : o.status === 'failed' ? 'failed' : 'pending';
     const date = new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `<tr>
-      <td>${date}</td>
-      <td>${esc(o.product)}</td>
-      <td>$${parseFloat(o.amount).toFixed(2)}</td>
-      <td><span class="dot ${dotCls}"></span>${esc(o.status)}</td>
-    </tr>`;
+    return `<tr><td>${date}</td><td>${esc(o.product)}</td><td>$${parseFloat(o.amount).toFixed(2)}</td><td><span class="dot ${dotCls}"></span>${esc(o.status)}</td></tr>`;
   }).join('');
 }
 
@@ -736,8 +803,7 @@ function renderGroupsMgr() {
       <div style="display:flex;gap:4px;align-items:center;">
         ${isFamily ? '' : `<button class="btn-add-sub" onclick="openAddSubgroupModal(${g.id},${JSON.stringify(g.name)})">+ Sub</button>`}
         ${isFamily ? '' : `<button class="btn-del" onclick="deleteGroup(${g.id})">Remove</button>`}
-      </div>
-    </div>`;
+      </div></div>`;
     if (g.subgroups && g.subgroups.length) {
       g.subgroups.forEach(s => {
         html += `<div class="groups-mgr-item groups-mgr-sub">
@@ -753,17 +819,14 @@ function renderGroupsMgr() {
 async function addGroup() {
   const name = document.getElementById('newGroupName').value.trim();
   if (!name) return;
-  const res = await fetch('/api/groups', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
+  const res = await fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   if (res.ok) {
     const g = await res.json();
     _allGroups.push({ id: g.id, name: g.name, subgroups: [] });
     _allGroups.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
     document.getElementById('newGroupName').value = '';
     renderGroupsMgr();
+    renderFilterPanel();
     if (_currentId) renderGroupCheckboxes();
   }
 }
@@ -771,39 +834,25 @@ async function addGroup() {
 async function openAddSubgroupModal(parentId, parentName) {
   const name = prompt(`New subgroup under "${parentName}":`);
   if (!name || !name.trim()) return;
-  const res = await fetch('/api/groups', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), parent_group_id: parentId }),
-  });
+  const res = await fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), parent_group_id: parentId }) });
   if (res.ok) {
     const g = await res.json();
     const parent = _allGroups.find(p => p.id === parentId);
-    if (parent) {
-      if (!parent.subgroups) parent.subgroups = [];
-      parent.subgroups.push({ id: g.id, name: g.name });
-      parent.subgroups.sort((a, b) => a.name.localeCompare(b.name));
-    }
+    if (parent) { if (!parent.subgroups) parent.subgroups = []; parent.subgroups.push({ id: g.id, name: g.name, subgroups: [] }); parent.subgroups.sort((a, b) => a.name.localeCompare(b.name)); }
     renderGroupsMgr();
+    renderFilterPanel();
     if (_currentId) renderGroupCheckboxes();
-  } else {
-    const d = await res.json();
-    alert(d.error || 'Failed to create subgroup.');
-  }
+  } else { const d = await res.json(); alert(d.error || 'Failed to create subgroup.'); }
 }
 
 async function deleteGroup(id, isSubgroup = false) {
   const res = await fetch(`/api/groups/${id}`, { method: 'DELETE' });
   if (res.ok) {
-    if (isSubgroup) {
-      for (const g of _allGroups) {
-        if (g.subgroups) g.subgroups = g.subgroups.filter(s => s.id !== id);
-      }
-    } else {
-      _allGroups = _allGroups.filter(g => g.id !== id);
-    }
+    if (isSubgroup) { for (const g of _allGroups) { if (g.subgroups) g.subgroups = g.subgroups.filter(s => s.id !== id); } }
+    else _allGroups = _allGroups.filter(g => g.id !== id);
     _contactGroupIds.delete(id);
     renderGroupsMgr();
+    renderFilterPanel();
     if (_currentId) renderGroupCheckboxes();
   }
 }
@@ -820,62 +869,14 @@ async function confirmPlaceholder() {
   const name = document.getElementById('phName').value.trim();
   if (!name) return;
   closePlaceholderModal();
-  const res = await fetch('/api/contacts/placeholder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (res.ok) {
-    const { id } = await res.json();
-    await loadContacts();
-    selectContact(id);
-  }
+  const res = await fetch('/api/contacts/placeholder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  if (res.ok) { const { id } = await res.json(); await loadContacts(); selectContact(id); }
 }
 
-// ── Mobile back ───────────────────────────────────────────────────────────────
-function mobileBack() {
-  document.getElementById('listPanel').classList.remove('mobile-hidden');
-  document.getElementById('detailPanel').classList.add('mobile-hidden');
-}
-
-// ── Nav auth ──────────────────────────────────────────────────────────────────
-let _authStatus = null;
-async function initAuthNav() {
-  try {
-    const res = await fetch('/api/auth/status');
-    _authStatus = res.ok ? await res.json() : false;
-  } catch { _authStatus = false; }
-  if (!_authStatus || !_authStatus.loggedIn) { window.location.href = '/login'; return; }
-  document.getElementById('ddGuest').style.display = 'none';
-  document.getElementById('ddUser').style.display = 'block';
-  document.getElementById('ddUserEmail').textContent = _authStatus.email;
-  document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
-  await Promise.all([loadContacts(), loadGroups(), loadRelTypes()]);
-  const urlId = new URLSearchParams(location.search).get('id');
-  if (urlId) {
-    history.replaceState(null, '', '/account/contacts');
-    selectContact(+urlId);
-  }
-}
+// ── Nav ───────────────────────────────────────────────────────────────────────
 function handleAccountClick(e) {
   e.preventDefault();
-  if (_authStatus === null) return;
-  const dd = document.getElementById('accountDropdown');
-  dd.classList.toggle('open');
-  if (dd.classList.contains('open') && (!_authStatus || !_authStatus.loggedIn)) document.getElementById('ddEmail').focus();
-}
-async function sendNavMagicLink() {
-  const email = document.getElementById('ddEmail').value.trim();
-  const btn = document.getElementById('ddBtn');
-  const msg = document.getElementById('ddMsg');
-  if (!email || !email.includes('@')) { msg.className = 'dd-msg err'; msg.textContent = 'Enter a valid email.'; return; }
-  btn.disabled = true; btn.textContent = 'Sending…'; msg.className = 'dd-msg'; msg.textContent = '';
-  try {
-    const res = await fetch('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-    const data = await res.json();
-    if (data.ok) { document.getElementById('ddEmail').style.display = 'none'; btn.style.display = 'none'; msg.className = 'dd-msg ok'; msg.textContent = 'Check your inbox for the login link.'; }
-    else { msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Send login link'; }
-  } catch { msg.className = 'dd-msg err'; msg.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+  document.getElementById('accountDropdown').classList.toggle('open');
 }
 document.addEventListener('click', function(e) {
   const dd = document.getElementById('accountDropdown');
@@ -885,6 +886,21 @@ document.addEventListener('click', function(e) {
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function initAuthNav() {
+  try {
+    const res = await fetch('/api/auth/status');
+    const status = res.ok ? await res.json() : false;
+    if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
+    document.getElementById('ddUserEmail').textContent = status.email;
+    await Promise.all([loadContacts(), loadGroups(), loadRelTypes()]);
+    await loadGroupMemberships();
+    renderFilterPanel();
+    initPanels();
+    const urlId = new URLSearchParams(location.search).get('id');
+    if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }
+  } catch { window.location.href = '/login'; }
 }
 
 initAuthNav();

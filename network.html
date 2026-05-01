@@ -10,59 +10,58 @@
 html,body{height:100%;overflow:hidden;}
 body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex;flex-direction:column;}
 
-.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;position:relative;z-index:100;}
 .nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
 .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
 .nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
 .nav-links{display:flex;gap:28px;align-items:center;}
 .nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
 .nav-links a:hover{opacity:1;}
+.nav-account-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;color:#1C0A00;background:none;border:1px solid rgba(28,10,0,0.18);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background 0.15s;}
+.nav-account-btn:hover{background:rgba(28,10,0,0.06);}
+#accountDropdown{position:absolute;top:calc(100% - 4px);right:32px;background:#fff;border:1px solid rgba(28,10,0,0.12);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);min-width:200px;z-index:500;padding:8px 0;opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity 0.18s ease,visibility 0.18s ease,transform 0.18s ease;}
+#accountDropdown.open{opacity:1;visibility:visible;transform:translateY(0);}
+.dd-user-email{padding:10px 16px 8px;font-size:12px;color:rgba(28,10,0,0.45);font-family:'Plus Jakarta Sans',sans-serif;border-bottom:1px solid rgba(28,10,0,0.08);margin-bottom:4px;}
+.dd-nav-link{display:block;padding:8px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:#1C0A00;text-decoration:none;transition:background 0.1s;}
+.dd-nav-link:hover{background:#FFF9E6;}
+.dd-nav-sep{height:1px;background:rgba(28,10,0,0.08);margin:4px 0;}
+.dd-nav-logout{color:#c0195a;}
 
-.top-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.1);padding:10px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;}
-.top-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;}
-.cb-group{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;min-width:0;}
-.cb-label{display:flex;align-items:center;gap:5px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;}
-.cb-label input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
-.cb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.cb-sub-label{padding-left:8px;opacity:0.88;}
-.cb-sub2-label{padding-left:16px;opacity:0.76;}
-.cb-sep{width:1px;height:14px;background:rgba(28,10,0,0.15);flex-shrink:0;}
-.btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
-.btn-back:hover{background:#1C0A00;}
+.three-col{flex:1;display:flex;overflow:hidden;position:relative;}
+.panel-center{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
 
-#graph-container{flex:1;position:relative;overflow:hidden;background:#fff;}
-#graph-svg{width:100%;height:100%;display:block;}
+.panel-left{display:flex;flex-direction:row;width:220px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-right:1px solid rgba(28,10,0,0.08);background:#fff;}
+.panel-left.collapsed{width:28px;}
+.pl-body{flex:1;display:flex;flex-direction:column;min-width:192px;overflow:hidden;}
+.pl-header{padding:12px 16px 6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.35);}
+.pl-content{flex:1;overflow-y:auto;padding:0 0 16px;}
+.pl-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-left:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);font-size:14px;user-select:none;}
+.pl-toggle:hover{color:#1C0A00;background:rgba(28,10,0,0.03);}
 
-.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.12s;z-index:100;max-width:260px;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
+.panel-right{display:flex;flex-direction:row-reverse;width:320px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-left:1px solid rgba(28,10,0,0.08);background:#FFF9E6;}
+.panel-right.collapsed{width:28px;}
+.pr-body{flex:1;display:flex;flex-direction:column;min-width:292px;overflow:hidden;}
+.pr-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-right:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);font-size:14px;user-select:none;}
+.pr-toggle:hover{color:#1C0A00;background:rgba(28,10,0,0.03);}
+
+.fp-item{padding:5px 14px;display:flex;align-items:center;}
+.fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;width:100%;}
+.fp-item input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
+.fp-sub{padding-left:26px;}
+.fp-sub2{padding-left:38px;}
+.fp-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 0;}
+
+.sp-empty{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:rgba(28,10,0,0.3);text-align:center;}
+#spContent{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.12s;z-index:400;max-width:260px;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
 .tooltip.visible{opacity:1;}
-
-.side-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:#FFF9E6;box-shadow:-4px 0 24px rgba(0,0,0,0.12);transition:right 0.25s cubic-bezier(0.4,0,0.2,1);z-index:200;display:flex;flex-direction:column;}
-.side-panel.open{right:0;}
-.sp-header{padding:20px 20px 16px;border-bottom:1px solid rgba(28,10,0,0.08);display:flex;align-items:flex-start;justify-content:space-between;}
-.sp-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1C0A00;line-height:1.2;}
-.sp-close{background:none;border:none;font-size:20px;cursor:pointer;color:rgba(28,10,0,0.4);padding:0;line-height:1;}
-.sp-close:hover{color:#1C0A00;}
-.sp-body{padding:16px 20px;flex:1;overflow-y:auto;}
-.sp-field{margin-bottom:12px;}
-.sp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:3px;}
-.sp-value{font-size:13px;color:#1C0A00;}
-.sp-rels{margin-top:16px;}
-.sp-rels-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:8px;}
-.sp-rel-item{font-size:12px;color:#1C0A00;padding:5px 0;border-bottom:1px solid rgba(28,10,0,0.06);}
-.sp-rel-item:last-child{border-bottom:none;}
-.sp-rel-name{font-weight:600;}
-.sp-rel-type{color:rgba(28,10,0,0.5);margin-left:4px;}
-.sp-footer{padding:16px 20px;border-top:1px solid rgba(28,10,0,0.08);}
-.btn-view-full{display:block;width:100%;padding:10px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;}
-.btn-view-full:hover{background:#1C0A00;}
 
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;z-index:50;}
 #loading p{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(28,10,0,0.4);}
 
-.view-toggle{display:flex;border-radius:8px;overflow:hidden;border:1px solid rgba(28,10,0,0.15);flex-shrink:0;}
-.vtb{padding:6px 18px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;background:#fff;color:rgba(28,10,0,0.45);transition:background 0.15s,color 0.15s;}
-.vtb.active{background:#3A6B20;color:#fff;}
-.vtb:hover:not(.active){background:#f0ede6;color:#1C0A00;}
+#graph-container{flex:1;position:relative;overflow:hidden;background:#fff;}
+#graph-svg{width:100%;height:100%;display:block;}
 
 #outline-container{flex:1;overflow-y:auto;background:#fff;display:none;}
 .outline-inner{max-width:760px;margin:0 auto;padding:24px 24px 100px;}
@@ -93,6 +92,37 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 #ol-bulk-bar.visible{bottom:0;}
 .btn-loveogram{padding:9px 24px;background:#c0195a;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;}
 .btn-loveogram:hover{background:#9e1048;}
+
+#calendar-container{flex:1;background:#fff;display:none;align-items:center;justify-content:center;}
+.cal-placeholder{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(28,10,0,0.3);text-align:center;}
+
+.sp-header{padding:20px 20px 16px;border-bottom:1px solid rgba(28,10,0,0.08);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;}
+.sp-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1C0A00;line-height:1.2;}
+.sp-body{padding:16px 20px;flex:1;overflow-y:auto;}
+.sp-field{margin-bottom:12px;}
+.sp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:3px;}
+.sp-value{font-size:13px;color:#1C0A00;}
+.sp-rels{margin-top:16px;}
+.sp-rels-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:8px;}
+.sp-rel-item{font-size:12px;color:#1C0A00;padding:5px 0;border-bottom:1px solid rgba(28,10,0,0.06);}
+.sp-rel-item:last-child{border-bottom:none;}
+.sp-rel-name{font-weight:600;}
+.sp-rel-type{color:rgba(28,10,0,0.5);margin-left:4px;}
+.sp-footer{padding:16px 20px;border-top:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
+.btn-view-full{display:block;width:100%;padding:10px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;}
+.btn-view-full:hover{background:#1C0A00;}
+
+.mobile-backdrop{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.35);z-index:40;pointer-events:none;opacity:0;transition:opacity 0.2s;}
+@media(max-width:1000px){
+  .three-col{position:relative;}
+  .panel-left{position:absolute;top:0;bottom:0;left:0;z-index:50;width:28px !important;transition:width 0.2s ease,box-shadow 0.2s ease;}
+  .panel-left.mobile-open{width:260px !important;box-shadow:4px 0 20px rgba(0,0,0,0.13);}
+  .panel-right{position:absolute;top:0;bottom:0;right:0;z-index:50;width:28px !important;transition:width 0.2s ease,box-shadow 0.2s ease;}
+  .panel-right.mobile-open{width:300px !important;box-shadow:-4px 0 20px rgba(0,0,0,0.13);}
+  .panel-center{padding:0 28px;}
+  .mobile-backdrop{display:block;}
+  .mobile-backdrop.open{pointer-events:auto;opacity:1;}
+}
 </style>
 </head>
 <body>
@@ -103,40 +133,91 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
       <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
       <div class="nav-links">
         <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
-        <a href="/account/contacts">Contacts</a>
+        <button class="nav-account-btn" onclick="handleAccountClick(event)">Account</button>
       </div>
     </div>
   </div>
-</div>
-
-<div class="top-bar">
-  <h1>My Network</h1>
-  <div class="view-toggle">
-    <button class="vtb active" id="btn-view-network" onclick="switchView('network')">Network</button>
-    <button class="vtb" id="btn-view-outline" onclick="switchView('outline')">Outline</button>
+  <div id="accountDropdown">
+    <div class="dd-user-email" id="ddUserEmail"></div>
+    <a class="dd-nav-link" href="/account/contacts">Contacts</a>
+    <div class="dd-nav-sep"></div>
+    <a class="dd-nav-link" href="/account/network?view=network">Network</a>
+    <a class="dd-nav-link" href="/account/network?view=outline">Outline</a>
+    <a class="dd-nav-link" href="/account/network?view=calendar">Calendar</a>
+    <a class="dd-nav-link" href="/account/occasions">Occasions</a>
+    <div class="dd-nav-sep"></div>
+    <a class="dd-nav-link" href="/auth/google/contacts">↻ Sync Google contacts</a>
+    <a class="dd-nav-link" href="/account">Account settings</a>
+    <a class="dd-nav-link dd-nav-logout" href="/auth/logout">Log out</a>
   </div>
-  <div class="cb-group" id="cbGroup">
-    <label class="cb-label">
-      <input type="checkbox" id="cb-all" checked onchange="toggleAll()">All
-    </label>
-    <div class="cb-sep"></div>
-    <!-- dynamic group checkboxes rendered here -->
-    <div class="cb-sep"></div>
-    <label class="cb-label">
-      <input type="checkbox" id="cb-living" onchange="applyVisibility()">
-      Show only living
-    </label>
+</div>
+
+<div class="three-col">
+  <div class="panel-left" id="panelLeft">
+    <div class="pl-body">
+      <div class="pl-header">Filters</div>
+      <div class="pl-content">
+        <div class="fp-item">
+          <label><input type="checkbox" id="cb-all" checked onchange="toggleAll()"> All groups</label>
+        </div>
+        <div class="fp-sep"></div>
+        <div id="cbGroup"></div>
+        <div class="fp-sep"></div>
+        <div class="fp-item">
+          <label><input type="checkbox" id="cb-living" onchange="applyVisibility()"> Only living</label>
+        </div>
+      </div>
+    </div>
+    <div class="pl-toggle" onclick="togglePanel('left')" id="plArrow">&#8249;</div>
   </div>
-  <a href="/account/contacts" class="btn-back">← Contacts</a>
-</div>
 
-<div id="graph-container">
-  <div id="loading"><p>Loading network…</p></div>
-  <svg id="graph-svg"></svg>
-</div>
+  <div class="panel-center">
+    <div id="graph-container">
+      <div id="loading"><p>Loading network…</p></div>
+      <svg id="graph-svg"></svg>
+    </div>
+    <div id="outline-container">
+      <div class="outline-inner" id="outline-inner"></div>
+    </div>
+    <div id="calendar-container">
+      <div class="cal-placeholder">Calendar view coming soon</div>
+    </div>
+  </div>
 
-<div id="outline-container">
-  <div class="outline-inner" id="outline-inner"></div>
+  <div class="panel-right" id="panelRight">
+    <div class="pr-toggle" onclick="togglePanel('right')" id="prArrow">&#8250;</div>
+    <div class="pr-body">
+      <div class="sp-empty" id="spEmpty">Select a contact to see details</div>
+      <div id="spContent" style="display:none">
+        <div class="sp-header">
+          <div class="sp-name" id="spName"></div>
+        </div>
+        <div class="sp-body">
+          <div class="sp-field" id="spBirthdayWrap">
+            <div class="sp-label">Birthday</div>
+            <div class="sp-value" id="spBirthday"></div>
+          </div>
+          <div class="sp-field" id="spDiedWrap">
+            <div class="sp-label">Died on</div>
+            <div class="sp-value" id="spDied"></div>
+          </div>
+          <div class="sp-field" id="spCityWrap">
+            <div class="sp-label">City</div>
+            <div class="sp-value" id="spCity"></div>
+          </div>
+          <div class="sp-rels">
+            <div class="sp-rels-title">Relationships</div>
+            <div id="spRels"></div>
+          </div>
+        </div>
+        <div class="sp-footer">
+          <a href="#" class="btn-view-full" id="spViewFull">View full record</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-backdrop" id="mobileBackdrop" onclick="closeMobilePanels()"></div>
 </div>
 
 <div id="ol-bulk-bar">
@@ -145,34 +226,6 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <div class="tooltip" id="tooltip"></div>
 
-<div class="side-panel" id="sidePanel">
-  <div class="sp-header">
-    <div class="sp-name" id="spName"></div>
-    <button class="sp-close" onclick="closePanel()">×</button>
-  </div>
-  <div class="sp-body">
-    <div class="sp-field" id="spBirthdayWrap">
-      <div class="sp-label">Birthday</div>
-      <div class="sp-value" id="spBirthday"></div>
-    </div>
-    <div class="sp-field" id="spDiedWrap">
-      <div class="sp-label">Died on</div>
-      <div class="sp-value" id="spDied"></div>
-    </div>
-    <div class="sp-field" id="spCityWrap">
-      <div class="sp-label">City</div>
-      <div class="sp-value" id="spCity"></div>
-    </div>
-    <div class="sp-rels">
-      <div class="sp-rels-title">Relationships</div>
-      <div id="spRels"></div>
-    </div>
-  </div>
-  <div class="sp-footer">
-    <a href="#" class="btn-view-full" id="spViewFull">View full record</a>
-  </div>
-</div>
-
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const PALETTE = ['#1A5C32','#1A3566','#4A2060','#5A3010','#1A4A5A','#3D5A1A','#6B2A14','#1A4A3A'];
@@ -180,8 +233,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 const NW = 130, NH = 46, NRX = 10;
 const GNW = 164, GNH = 60, GNRX = 14;
-const SGW = 134, SGH = 44, SGRX = 11;  // subgroup hub size (smaller than top-level)
-const ME_R = 26;
+const SGW = 134, SGH = 44, SGRX = 11;
 const FAMILY_COLOR = '#7B1D2E';
 
 function lightenHex(hex, t) {
@@ -199,18 +251,18 @@ let GROUP_DEPTH = {};
 let _simulation, _svg, _g;
 let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel, _subgroupLinkSel, _meLinkSel;
 let _width, _height;
-let _subgroupIds = new Set();   // group IDs that are subgroups
-let _subgroupParents = {};      // subgroupId → parentGroupId
+let _subgroupIds = new Set();
+let _subgroupParents = {};
 let _rawGroups = [];
 let _groupMembersMap = {};
 let _groupByName = {};
 let _groupById = {};
 let _contactFamilyRelLabel = {};
-let _currentView = 'network';
+let _currentView = new URLSearchParams(location.search).get('view') || 'network';
 let _selectedContacts = new Set();
 let _groupsWithCheckbox = new Set();
-let _contactOccasions = {};  // contactId → [{ name, date, years }]
-let _nodeHeights = {};        // contactId → computed pill height
+let _contactOccasions = {};
+let _nodeHeights = {};
 const _today = new Date(); _today.setHours(0, 0, 0, 0);
 
 function formatDate(str) {
@@ -226,7 +278,6 @@ function formatBirthdayShort(str) {
   return `${parseInt(p[2], 10)} ${MONTHS[parseInt(p[1], 10) - 1] || p[1]}`;
 }
 function yearOf(str) { return str ? parseInt(str.split('-')[0]) : null; }
-
 function truncate(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 function cleanRel(s) { return (s || '').replace(/ of$/i, ''); }
 
@@ -330,13 +381,11 @@ async function init() {
     fetch('/api/network'),
     fetch('/api/occasions/upcoming'),
   ]);
-  if (netRes.status === 401) { window.location.href = '/login'; return; }
   const data = await netRes.json();
   if (occRes.ok) { const occData = await occRes.json(); processOccasions(occData.occasions || []); }
 
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
-  // Build subgroup hierarchy from data.groups
   _subgroupIds = new Set();
   _subgroupParents = {};
   const groupDefsById = {};
@@ -345,7 +394,6 @@ async function init() {
     if (g.parent_group_id) { _subgroupIds.add(g.id); _subgroupParents[g.id] = g.parent_group_id; }
   });
 
-  // Build group name maps from memberships
   _groupNodeName = {};
   _contactGroupNames = {};
   const groupNodeMap = {};
@@ -359,7 +407,6 @@ async function init() {
     _contactGroupNames[m.contact_id].add(m.group_name);
   });
 
-  // Create nodes for all defined groups (even those with no direct members)
   (data.groups || []).forEach(g => {
     if (!groupNodeMap[g.id]) {
       groupNodeMap[g.id] = { id: `g_${g.id}`, name: g.name, isGroup: true };
@@ -367,7 +414,6 @@ async function init() {
     }
   });
 
-  // Assign colors: top-level groups get palette colors; subgroups inherit parent's color
   const topGroupDefs = (data.groups || []).filter(g => !g.parent_group_id);
   topGroupDefs.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
   GROUP_COLORS = {};
@@ -376,7 +422,6 @@ async function init() {
     GROUP_COLORS[g.name] = g.name === 'Family' ? FAMILY_COLOR : PALETTE[i % PALETTE.length];
     GROUP_DEPTH[g.name] = 0;
   });
-  // BFS so each generation inherits its parent's already-assigned color
   let bfsQueue = topGroupDefs.map(g => g.id);
   const bfsVisited = new Set(bfsQueue);
   while (bfsQueue.length) {
@@ -395,26 +440,23 @@ async function init() {
 
   _allGroupNames = (data.groups || []).map(g => g.name);
 
-  // Build filter checkboxes with full recursive hierarchy
   const cbGroup = document.getElementById('cbGroup');
-  const insertBefore = document.querySelector('#cbGroup .cb-sep:last-of-type');
   const subsByParentId = {};
   (data.groups || []).filter(g => g.parent_group_id).forEach(g => {
     if (!subsByParentId[g.parent_group_id]) subsByParentId[g.parent_group_id] = [];
     subsByParentId[g.parent_group_id].push(g);
   });
   function addCbForGroup(g, depth, color) {
-    const depthClass = depth === 0 ? '' : depth === 1 ? ' cb-sub-label' : ' cb-sub2-label';
-    const label = document.createElement('label');
-    label.className = 'cb-label' + depthClass;
+    const depthClass = depth === 0 ? '' : depth === 1 ? ' fp-sub' : ' fp-sub2';
+    const item = document.createElement('div');
+    item.className = 'fp-item' + depthClass;
     const gAttr = g.name.replace(/"/g, '&quot;');
     const dotSize = depth === 0 ? '8px' : depth === 1 ? '6px' : '5px';
-    const dotExtra = depth === 1 ? ';opacity:0.7' : depth >= 2 ? ';opacity:0.55' : '';
+    const dotOpacity = depth === 1 ? ';opacity:0.7' : depth >= 2 ? ';opacity:0.55' : '';
     const pName = depth > 0 ? ((groupDefsById[g.parent_group_id] || {}).name || '') : '';
     const pAttr = pName ? ` data-parent-group="${pName.replace(/"/g, '&quot;')}"` : '';
-    label.innerHTML = `<input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)">`
-      + `<span class="cb-dot" style="width:${dotSize};height:${dotSize};background:${color}${dotExtra};"></span>${esc(g.name)}`;
-    cbGroup.insertBefore(label, insertBefore);
+    item.innerHTML = `<label><input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)"><span style="display:inline-block;width:${dotSize};height:${dotSize};border-radius:50%;background:${color}${dotOpacity};flex-shrink:0;"></span> ${esc(g.name)}</label>`;
+    cbGroup.appendChild(item);
     (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name))
       .forEach(s => addCbForGroup(s, depth + 1, color));
   }
@@ -448,7 +490,6 @@ async function init() {
   });
   _relLinks = Array.from(pairMap.values());
 
-  // Build outline data structures
   _rawGroups = data.groups || [];
   _groupByName = {};
   _groupById = {};
@@ -502,11 +543,9 @@ function buildGraph() {
     .map(l => ({ ...l, source: idToNode[l.source], target: idToNode[l.target] }))
     .filter(l => l.source && l.target);
 
-  // Pre-compute node heights for collision radii before simulation starts
   _nodeHeights = {};
   _allNodes.forEach(n => { if (!n.isGroup && !n.isMe) _nodeHeights[n.id] = nodeLayout(n).h; });
 
-  // Build subgroup ↔ parent-group links for the simulation
   const subgroupLinksCopy = [];
   Object.entries(_subgroupParents).forEach(([subIdStr, parentId]) => {
     const subNode = idToNode[`g_${subIdStr}`];
@@ -514,7 +553,6 @@ function buildGraph() {
     if (subNode && parentNode) subgroupLinksCopy.push({ source: parentNode, target: subNode, isSubgroupLink: true });
   });
 
-  // Build "You → leaf group" links (most specific groups, no children)
   const childGroupIds = new Set(_rawGroups.filter(g => g.parent_group_id).map(g => g.parent_group_id));
   const meNode = idToNode['__me__'];
   const meLinksCopy = [];
@@ -544,54 +582,35 @@ function buildGraph() {
       return Math.sqrt((NW / 2) ** 2 + (h / 2) ** 2) + 6;
     }));
 
-  // "You → leaf group" lines (rendered first — behind everything)
   _meLinkSel = _g.append('g').attr('class', 'me-links')
     .selectAll('line').data(meLinksCopy).join('line')
-    .attr('stroke', '#3A6B20')
-    .attr('stroke-opacity', 0.3)
-    .attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '3,6');
+    .attr('stroke', '#3A6B20').attr('stroke-opacity', 0.3)
+    .attr('stroke-width', 1.5).attr('stroke-dasharray', '3,6');
 
-  // Subgroup hierarchy lines (rendered next — below member/rel links)
   _subgroupLinkSel = _g.append('g').attr('class', 'subgroup-links')
     .selectAll('line').data(subgroupLinksCopy).join('line')
     .attr('stroke', d => GROUP_COLORS[_groupNodeName[d.target.id]] || '#888')
-    .attr('stroke-opacity', 0.3)
-    .attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '3,4');
+    .attr('stroke-opacity', 0.3).attr('stroke-width', 1.5).attr('stroke-dasharray', '3,4');
 
-  // Membership links
   _memberLinkSel = _g.append('g').attr('class', 'member-links')
     .selectAll('line').data(memberLinksCopy).join('line')
-    .attr('stroke', '#555')
-    .attr('stroke-opacity', 0.45)
-    .attr('stroke-width', 2)
-    .attr('stroke-dasharray', '5,4');
+    .attr('stroke', '#555').attr('stroke-opacity', 0.45)
+    .attr('stroke-width', 2).attr('stroke-dasharray', '5,4');
 
-  // Relationship links
   _relLinkSel = _g.append('g').attr('class', 'rel-links')
     .selectAll('line').data(relLinksCopy).join('line')
     .attr('stroke', d => GROUP_COLORS[d.group] || '#333')
-    .attr('stroke-opacity', 0.75)
-    .attr('stroke-width', 2.5)
-    .style('cursor', 'pointer');
+    .attr('stroke-opacity', 0.75).attr('stroke-width', 2.5).style('cursor', 'pointer');
 
-  // Invisible wider hit-area for edge hover/tooltip
   _hitAreaSel = _g.append('g').attr('class', 'rel-hitareas')
     .selectAll('line').data(relLinksCopy).join('line')
-    .attr('stroke', 'transparent')
-    .attr('stroke-width', 16)
-    .style('cursor', 'pointer')
-    .on('mouseenter', edgeEnter)
-    .on('mousemove', moveTooltip)
-    .on('mouseleave', hideTooltip);
+    .attr('stroke', 'transparent').attr('stroke-width', 16).style('cursor', 'pointer')
+    .on('mouseenter', edgeEnter).on('mousemove', moveTooltip).on('mouseleave', hideTooltip);
 
-  // Group hub nodes
   const groupNodesCopy = nodesCopy.filter(n => n.isGroup);
   const groupG = _g.append('g').attr('class', 'group-nodes')
     .selectAll('g').data(groupNodesCopy).join('g')
-    .attr('class', 'group-node-g')
-    .style('cursor', 'default')
+    .attr('class', 'group-node-g').style('cursor', 'default')
     .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd));
 
   groupG.each(function(d) {
@@ -602,25 +621,20 @@ function buildGraph() {
     const depth = GROUP_DEPTH[_groupNodeName[d.id]] || 0;
     const fillColor = lightenHex(baseColor, depth * 0.18);
     const g = d3.select(this);
-    // White background masks lines passing behind
     g.append('rect').attr('x', -w/2).attr('y', -h/2).attr('width', w).attr('height', h).attr('rx', rx)
       .attr('fill', '#fff').attr('stroke', 'none');
-    // Solid dark fill
     g.append('rect').attr('x', -w/2).attr('y', -h/2).attr('width', w).attr('height', h).attr('rx', rx)
       .attr('fill', fillColor).attr('stroke', 'none');
-    // Label — white text on dark background
     const name = _groupNodeName[d.id] || d.name;
     g.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
       .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-      .attr('font-size', isSub ? 10 : 13).attr('font-weight', 800)
-      .attr('fill', '#FFF9E6')
+      .attr('font-size', isSub ? 10 : 13).attr('font-weight', 800).attr('fill', '#FFF9E6')
       .text(truncate((name === 'Family' ? '♥ ' : '') + name, isSub ? 13 : 17));
   });
 
   _groupNodeSel = groupG;
 
-  // Contact + me nodes
   const contactsCopy = nodesCopy.filter(n => !n.isGroup);
   const nodeG = _g.append('g').attr('class', 'contact-nodes')
     .selectAll('g').data(contactsCopy).join('g')
@@ -630,14 +644,11 @@ function buildGraph() {
     .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
     .on('click', nodeClick);
 
-  // Me node — same shape and size as group hubs, brand green
   const meG = nodeG.filter(d => d.isMe);
-  meG.append('rect')  // white background
-    .attr('x', -GNW / 2).attr('y', -GNH / 2)
+  meG.append('rect').attr('x', -GNW / 2).attr('y', -GNH / 2)
     .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
     .attr('fill', '#fff').attr('stroke', 'none');
-  meG.append('rect')
-    .attr('x', -GNW / 2).attr('y', -GNH / 2)
+  meG.append('rect').attr('x', -GNW / 2).attr('y', -GNH / 2)
     .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
     .attr('class', 'node-outline')
     .attr('fill', '#3A6B2022').attr('stroke', '#3A6B20').attr('stroke-width', 4)
@@ -647,47 +658,31 @@ function buildGraph() {
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
     .attr('font-size', 13).attr('font-weight', 800).attr('fill', '#3A6B20').text('You');
 
-  // Contact pills — dynamic per-node layout based on content
   const cG = nodeG.filter(d => !d.isMe);
   cG.each(function(d) {
     const { h, items } = nodeLayout(d);
     const g = d3.select(this);
-    g.append('rect')
-      .attr('class', 'node-outline')
-      .attr('x', -NW / 2).attr('y', -h / 2)
-      .attr('width', NW).attr('height', h).attr('rx', NRX)
+    g.append('rect').attr('class', 'node-outline')
+      .attr('x', -NW / 2).attr('y', -h / 2).attr('width', NW).attr('height', h).attr('rx', NRX)
       .attr('fill', d.died_on ? '#f0ede6' : d.is_pet ? '#FFF3DC' : '#f7f4ef')
-      .attr('stroke', nodeStroke(d))
-      .attr('stroke-width', 3);
+      .attr('stroke', nodeStroke(d)).attr('stroke-width', 3);
     items.forEach(item => {
       g.append('text')
-        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-        .attr('y', item.y)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', item.y)
         .attr('font-family', "'Plus Jakarta Sans', sans-serif")
         .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
-        .attr('fill', item.fill).attr('font-style', item.fontStyle)
-        .text(item.text);
+        .attr('fill', item.fill).attr('font-style', item.fontStyle).text(item.text);
     });
   });
 
   _nodeSel = nodeG;
 
   _simulation.on('tick', () => {
-    _meLinkSel
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    _subgroupLinkSel
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    _relLinkSel
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    _hitAreaSel
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    _memberLinkSel
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _meLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _subgroupLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _relLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _hitAreaSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _memberLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
     groupG.attr('transform', d => `translate(${d.x},${d.y})`);
   });
@@ -725,7 +720,6 @@ function isGroupNameActive(groupName, active) {
   return parent ? isGroupNameActive(parent.name, active) : false;
 }
 
-// Returns a Set of visible contact-node IDs given current filter state.
 function computeVisibleNodeIds(active, showOnlyLiving) {
   const visible = new Set();
   _nodeSel.each(d => {
@@ -739,7 +733,6 @@ function computeVisibleNodeIds(active, showOnlyLiving) {
   return visible;
 }
 
-// Returns a Set of visible group-hub node IDs.
 function computeVisibleGroupIds(active) {
   const visible = new Set();
   _groupNodeSel.each(d => {
@@ -757,13 +750,9 @@ function applyVisibility() {
   const visibleNodeIds  = computeVisibleNodeIds(active, showOnlyLiving);
   const visibleGroupIds = computeVisibleGroupIds(active);
 
-  // Contact nodes
   _nodeSel.attr('display', d => visibleNodeIds.has(d.id) ? null : 'none');
-
-  // Group hub nodes
   _groupNodeSel.attr('display', d => visibleGroupIds.has(d.id) ? null : 'none');
 
-  // Rel links: group must be active AND both endpoint nodes visible
   const relVisible = l => {
     if (!active.has(l.group)) return false;
     const sId = typeof l.source === 'object' ? l.source.id : l.source;
@@ -773,7 +762,6 @@ function applyVisibility() {
   _relLinkSel.attr('display', l => relVisible(l) ? null : 'none');
   _hitAreaSel.attr('display', l => relVisible(l) ? null : 'none');
 
-  // Membership links: group must be active (or have an active ancestor), hub visible, contact visible
   _memberLinkSel.attr('display', l => {
     const srcId = typeof l.source === 'object' ? l.source.id : l.source;
     const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
@@ -784,7 +772,6 @@ function applyVisibility() {
     return null;
   });
 
-  // Subgroup hierarchy lines: both group hubs must be visible
   if (_subgroupLinkSel) {
     _subgroupLinkSel.attr('display', l => {
       const srcId = typeof l.source === 'object' ? l.source.id : l.source;
@@ -793,7 +780,6 @@ function applyVisibility() {
     });
   }
 
-  // "You → leaf" lines: show only if target group is active
   if (_meLinkSel) {
     _meLinkSel.attr('display', l => {
       const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
@@ -803,15 +789,9 @@ function applyVisibility() {
 }
 
 // ── Drag ──────────────────────────────────────────────────────────────────────
-function dragStart(event, d) {
-  if (!event.active) _simulation.alphaTarget(0.3).restart();
-  d.fx = d.x; d.fy = d.y;
-}
+function dragStart(event, d) { if (!event.active) _simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
 function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
-function dragEnd(event, d) {
-  if (!event.active) _simulation.alphaTarget(0);
-  d.fx = null; d.fy = null;
-}
+function dragEnd(event, d) { if (!event.active) _simulation.alphaTarget(0); d.fx = null; d.fy = null; }
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 const tooltip = document.getElementById('tooltip');
@@ -830,13 +810,9 @@ function edgeEnter(event, d) {
   const tName = tNode ? (tNode.name || 'Unknown') : 'Unknown';
   let text;
   const rA = cleanRel(d.relA), rB = cleanRel(d.relB);
-  if (!rA && !rB) {
-    text = `${sName} ↔ ${tName}`;
-  } else if (!rB || rA === rB) {
-    text = `${sName} & ${tName}: ${rA}`;
-  } else {
-    text = `${truncate(sName,16)}: ${rA}\n${truncate(tName,16)}: ${rB}`;
-  }
+  if (!rA && !rB) text = `${sName} ↔ ${tName}`;
+  else if (!rB || rA === rB) text = `${sName} & ${tName}: ${rA}`;
+  else text = `${truncate(sName,16)}: ${rA}\n${truncate(tName,16)}: ${rB}`;
   tooltip.style.whiteSpace = 'pre';
   tooltip.textContent = text;
   tooltip.classList.add('visible');
@@ -848,17 +824,10 @@ function moveTooltip(event) {
   tooltip.style.top  = (event.clientY - 10) + 'px';
 }
 
-function hideTooltip() {
-  tooltip.classList.remove('visible');
-  tooltip.style.whiteSpace = 'normal';
-}
+function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whiteSpace = 'normal'; }
 
 // ── Side panel ────────────────────────────────────────────────────────────────
-function nodeClick(event, d) {
-  if (d.isMe) return;
-  event.stopPropagation();
-  openPanel(d);
-}
+function nodeClick(event, d) { if (d.isMe) return; event.stopPropagation(); openPanel(d); }
 
 function openPanel(d) {
   document.getElementById('spName').textContent = (d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed');
@@ -889,9 +858,7 @@ function openPanel(d) {
     relsEl.innerHTML = rels.map(l => {
       const s = typeof l.source === 'object' ? l.source.id : l.source;
       const isSource = s === nodeId;
-      const otherId = isSource
-        ? (typeof l.target === 'object' ? l.target.id : l.target)
-        : s;
+      const otherId = isSource ? (typeof l.target === 'object' ? l.target.id : l.target) : s;
       const other = _contactMap[otherId];
       const myRel = cleanRel(isSource ? (l.relA || l.relB) : (l.relB || l.relA));
       return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(myRel || '')}</span></div>`;
@@ -899,18 +866,28 @@ function openPanel(d) {
   }
 
   document.getElementById('spViewFull').href = `/account/contacts?id=${nodeId}`;
-  document.getElementById('sidePanel').classList.add('open');
+  document.getElementById('spEmpty').style.display = 'none';
+  document.getElementById('spContent').style.display = 'flex';
+
+  const pr = document.getElementById('panelRight');
+  if (window.innerWidth > 1000 && pr.classList.contains('collapsed')) {
+    _setPanelCollapsed('right', false);
+    setTimeout(resizeGraph, 220);
+  } else if (window.innerWidth <= 1000 && !pr.classList.contains('mobile-open')) {
+    pr.classList.add('mobile-open');
+    document.getElementById('mobileBackdrop').classList.add('open');
+  }
+
   highlightNode(nodeId);
 }
 
 function closePanel() {
-  document.getElementById('sidePanel').classList.remove('open');
+  document.getElementById('spEmpty').style.display = '';
+  document.getElementById('spContent').style.display = 'none';
   clearHighlight();
 }
 
-function nodeStroke(d) {
-  return d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#333';
-}
+function nodeStroke(d) { return d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#333'; }
 
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
@@ -928,31 +905,31 @@ function clearHighlight() {
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());
 
-window.addEventListener('resize', () => {
+function resizeGraph() {
   const container = document.getElementById('graph-container');
   _width = container.clientWidth;
   _height = container.clientHeight;
-  _svg.attr('width', _width).attr('height', _height);
-  if (_simulation) _simulation.force('center', d3.forceCenter(_width / 2, _height / 2)).alpha(0.3).restart();
-});
+  if (_svg) _svg.attr('width', _width).attr('height', _height);
+  if (_simulation) _simulation.force('center', d3.forceCenter(_width / 2, _height / 2)).alpha(0.1).restart();
+}
+
+window.addEventListener('resize', resizeGraph);
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Outline view ──────────────────────────────────────────────────────────────
+// ── View switching ────────────────────────────────────────────────────────────
 function switchView(view) {
   _currentView = view;
-  document.getElementById('btn-view-network').classList.toggle('active', view === 'network');
-  document.getElementById('btn-view-outline').classList.toggle('active', view === 'outline');
   document.getElementById('graph-container').style.display = view === 'network' ? '' : 'none';
   document.getElementById('outline-container').style.display = view === 'outline' ? 'block' : 'none';
+  document.getElementById('calendar-container').style.display = view === 'calendar' ? 'flex' : 'none';
   if (view === 'network') { applyVisibility(); closePanel(); }
-  else renderOutline();
+  else if (view === 'outline') renderOutline();
 }
 
-// Recursive total count of visible contacts in a group + all its descendants.
-// Counts direct members only if this group is itself active; always recurses into children.
+// ── Outline view ──────────────────────────────────────────────────────────────
 function olGroupTotalCount(groupId, showOnlyLiving, active) {
   const grp = _groupById[groupId];
   const selfActive = !grp || active.has(grp.name);
@@ -1020,7 +997,6 @@ function renderOlFamilySection(body, members) {
   body.appendChild(petsEl);
 }
 
-// Recursively renders children of a group: direct members first (only if group is active), then child subgroups
 function renderOlChildren(body, groupId, showOnlyLiving, active) {
   const grp = _groupById[groupId];
   const selfActive = !grp || active.has(grp.name);
@@ -1031,7 +1007,6 @@ function renderOlChildren(body, groupId, showOnlyLiving, active) {
     .filter(g => g.parent_group_id === groupId && olGroupTotalCount(g.id, showOnlyLiving, active) > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Exclude members that live in child groups (so they only appear once)
   const childMemberIds = new Set();
   const collectDescendantMembers = gid => {
     (_groupMembersMap[gid] || []).forEach(c => childMemberIds.add(c.id));
@@ -1128,7 +1103,65 @@ function updateBulkBar() {
   document.getElementById('btn-loveogram').textContent = `Send Loveogram to ${n} contact${n !== 1 ? 's' : ''}`;
 }
 
-init();
+// ── Nav dropdown ──────────────────────────────────────────────────────────────
+function handleAccountClick(e) {
+  e.stopPropagation();
+  document.getElementById('accountDropdown').classList.toggle('open');
+}
+document.addEventListener('click', () => document.getElementById('accountDropdown').classList.remove('open'));
+
+// ── Panel collapse ────────────────────────────────────────────────────────────
+const LS_LEFT = 'ts_panel_left', LS_RIGHT = 'ts_panel_right';
+
+function _setPanelCollapsed(side, collapsed) {
+  const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
+  const arrow = document.getElementById(side === 'left' ? 'plArrow' : 'prArrow');
+  el.classList.toggle('collapsed', collapsed);
+  if (side === 'left') arrow.textContent = collapsed ? '›' : '‹';
+  else arrow.textContent = collapsed ? '‹' : '›';
+  localStorage.setItem(side === 'left' ? LS_LEFT : LS_RIGHT, collapsed ? 'collapsed' : 'expanded');
+}
+
+function togglePanel(side) {
+  const el = document.getElementById(side === 'left' ? 'panelLeft' : 'panelRight');
+  if (window.innerWidth <= 1000) {
+    const open = el.classList.contains('mobile-open');
+    document.getElementById('panelLeft').classList.remove('mobile-open');
+    document.getElementById('panelRight').classList.remove('mobile-open');
+    if (!open) el.classList.add('mobile-open');
+    document.getElementById('mobileBackdrop').classList.toggle('open', !open);
+  } else {
+    _setPanelCollapsed(side, !el.classList.contains('collapsed'));
+    setTimeout(resizeGraph, 220);
+  }
+}
+
+function closeMobilePanels() {
+  document.getElementById('panelLeft').classList.remove('mobile-open');
+  document.getElementById('panelRight').classList.remove('mobile-open');
+  document.getElementById('mobileBackdrop').classList.remove('open');
+}
+
+function initPanels() {
+  if (localStorage.getItem(LS_LEFT) === 'collapsed') _setPanelCollapsed('left', true);
+  if (localStorage.getItem(LS_RIGHT) === 'collapsed') _setPanelCollapsed('right', true);
+}
+
+// ── Auth & boot ───────────────────────────────────────────────────────────────
+async function initAuthNav() {
+  try {
+    const res = await fetch('/api/auth/status');
+    const status = res.ok ? await res.json() : false;
+    if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
+    document.getElementById('ddUserEmail').textContent = status.email;
+    await init();
+    initPanels();
+    setTimeout(resizeGraph, 250);
+    switchView(_currentView);
+  } catch { window.location.href = '/login'; }
+}
+
+initAuthNav();
 </script>
 </body>
 </html>

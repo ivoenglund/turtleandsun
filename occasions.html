@@ -9,30 +9,22 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;min-height:100vh;}
 
-.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);}
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);position:relative;z-index:100;}
 .nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
 .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
 .nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
 .nav-links{display:flex;gap:28px;align-items:center;}
 .nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
 .nav-links a:hover{opacity:1;}
-.nav-account-wrap{position:relative;}
-#accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
-#accountDropdown.open{display:block;}
-#accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
-#accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
-#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;box-sizing:border-box;}
-#accountDropdown input:focus{border-color:#3A6B20;}
-#accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
-#accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
-#accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
-#accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
-#accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
-#ddUser{display:none;}
-.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
-.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
-.dd-user-link:hover{opacity:0.72;}
-.dd-user-logout{color:#c0392b !important;}
+.nav-account-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;color:#1C0A00;background:none;border:1px solid rgba(28,10,0,0.18);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background 0.15s;}
+.nav-account-btn:hover{background:rgba(28,10,0,0.06);}
+#accountDropdown{position:absolute;top:calc(100% - 4px);right:32px;background:#fff;border:1px solid rgba(28,10,0,0.12);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);min-width:200px;z-index:500;padding:8px 0;opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity 0.18s ease,visibility 0.18s ease,transform 0.18s ease;}
+#accountDropdown.open{opacity:1;visibility:visible;transform:translateY(0);}
+.dd-user-email{padding:10px 16px 8px;font-size:12px;color:rgba(28,10,0,0.45);font-family:'Plus Jakarta Sans',sans-serif;border-bottom:1px solid rgba(28,10,0,0.08);margin-bottom:4px;}
+.dd-nav-link{display:block;padding:8px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:#1C0A00;text-decoration:none;transition:background 0.1s;}
+.dd-nav-link:hover{background:#FFF9E6;}
+.dd-nav-sep{height:1px;background:rgba(28,10,0,0.08);margin:4px 0;}
+.dd-nav-logout{color:#c0195a;}
 
 .page-header{max-width:880px;margin:0 auto;padding:40px 32px 0;}
 .page-header h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:26px;font-weight:800;color:#1C0A00;margin-bottom:6px;}
@@ -85,27 +77,22 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;min-heigh
       <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
       <div class="nav-links">
         <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
-        <span class="nav-account-wrap">
-          <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
-          <div id="accountDropdown">
-            <div id="ddGuest">
-              <h4>Log in</h4>
-              <p>Enter your email and we'll send you a magic link.</p>
-              <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
-              <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
-              <div class="dd-msg" id="ddMsg"></div>
-            </div>
-            <div id="ddUser">
-              <div class="dd-user-email" id="ddUserEmail"></div>
-              <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
-              <a class="dd-user-link" href="/account/contacts">Contacts</a>
-              <a class="dd-user-link" href="/account/occasions">Occasions</a>
-              <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
-            </div>
-          </div>
-        </span>
+        <button class="nav-account-btn" onclick="handleAccountClick(event)">Account</button>
       </div>
     </div>
+  </div>
+  <div id="accountDropdown">
+    <div class="dd-user-email" id="ddUserEmail"></div>
+    <a class="dd-nav-link" href="/account/contacts">Contacts</a>
+    <div class="dd-nav-sep"></div>
+    <a class="dd-nav-link" href="/account/network?view=network">Network</a>
+    <a class="dd-nav-link" href="/account/network?view=outline">Outline</a>
+    <a class="dd-nav-link" href="/account/network?view=calendar">Calendar</a>
+    <a class="dd-nav-link" href="/account/occasions">Occasions</a>
+    <div class="dd-nav-sep"></div>
+    <a class="dd-nav-link" href="/auth/google/contacts">↻ Sync Google contacts</a>
+    <a class="dd-nav-link" href="/account">Account settings</a>
+    <a class="dd-nav-link dd-nav-logout" href="/auth/logout">Log out</a>
   </div>
 </div>
 
@@ -312,49 +299,26 @@ function render() {
 
 async function load() {
   const res = await fetch('/api/occasions/upcoming');
-  if (res.status === 401) { window.location.href = '/login'; return; }
   const data = await res.json();
   _items = computeItems(data.occasions || [], data.contacts || []);
   render();
 }
 
 // ── Nav auth ──────────────────────────────────────────────────────────────────
-let _authStatus = null;
 async function initAuthNav() {
   try {
     const res = await fetch('/api/auth/status');
-    _authStatus = res.ok ? await res.json() : false;
-  } catch { _authStatus = false; }
-  if (!_authStatus || !_authStatus.loggedIn) { window.location.href = '/login'; return; }
-  document.getElementById('ddGuest').style.display = 'none';
-  document.getElementById('ddUser').style.display = 'block';
-  document.getElementById('ddUserEmail').textContent = _authStatus.email;
-  document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
-  load();
+    const status = res.ok ? await res.json() : false;
+    if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
+    document.getElementById('ddUserEmail').textContent = status.email;
+    load();
+  } catch { window.location.href = '/login'; }
 }
 function handleAccountClick(e) {
-  e.preventDefault();
-  if (_authStatus === null) return;
+  e.stopPropagation();
   document.getElementById('accountDropdown').classList.toggle('open');
 }
-async function sendNavMagicLink() {
-  const email = document.getElementById('ddEmail').value.trim();
-  const btn = document.getElementById('ddBtn');
-  const msg = document.getElementById('ddMsg');
-  if (!email || !email.includes('@')) { msg.className = 'dd-msg err'; msg.textContent = 'Enter a valid email.'; return; }
-  btn.disabled = true; btn.textContent = 'Sending…';
-  try {
-    const res = await fetch('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-    const data = await res.json();
-    if (data.ok) { document.getElementById('ddEmail').style.display = 'none'; btn.style.display = 'none'; msg.className = 'dd-msg ok'; msg.textContent = 'Check your inbox.'; }
-    else { msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Send login link'; }
-  } catch { msg.className = 'dd-msg err'; msg.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Send login link'; }
-}
-document.addEventListener('click', function(e) {
-  const dd = document.getElementById('accountDropdown');
-  const wrap = document.querySelector('.nav-account-wrap');
-  if (dd && wrap && dd.classList.contains('open') && !wrap.contains(e.target)) dd.classList.remove('open');
-});
+document.addEventListener('click', () => document.getElementById('accountDropdown').classList.remove('open'));
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
