@@ -415,6 +415,11 @@ function buildGraph() {
     .style('cursor', 'default')
     .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd));
 
+  groupG.append('rect')  // solid white background masks lines that pass behind
+    .attr('x', -GNW / 2).attr('y', -GNH / 2)
+    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
+    .attr('fill', '#fff').attr('stroke', 'none');
+
   groupG.append('rect')
     .attr('x', -GNW / 2).attr('y', -GNH / 2)
     .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
@@ -450,9 +455,14 @@ function buildGraph() {
 
   // Me node — same shape and size as group hubs, brand green
   const meG = nodeG.filter(d => d.isMe);
+  meG.append('rect')  // white background
+    .attr('x', -GNW / 2).attr('y', -GNH / 2)
+    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
+    .attr('fill', '#fff').attr('stroke', 'none');
   meG.append('rect')
     .attr('x', -GNW / 2).attr('y', -GNH / 2)
     .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
+    .attr('class', 'node-outline')
     .attr('fill', '#3A6B2022').attr('stroke', '#3A6B20').attr('stroke-width', 4)
     .attr('stroke-dasharray', '6,4');
   meG.append('text')
@@ -466,6 +476,7 @@ function buildGraph() {
     const { h, items } = nodeLayout(d);
     const g = d3.select(this);
     g.append('rect')
+      .attr('class', 'node-outline')
       .attr('x', -NW / 2).attr('y', -h / 2)
       .attr('width', NW).attr('height', h).attr('rx', NRX)
       .attr('fill', d.died_on ? '#f0ede6' : d.is_pet ? '#FFF3DC' : '#f7f4ef')
@@ -691,14 +702,14 @@ function nodeStroke(d) {
 
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
-  _nodeSel.select('rect')
+  _nodeSel.select('.node-outline')
     .attr('stroke', d => d.isMe ? '#3A6B20' : d.id === nodeId ? '#3A6B20' : nodeStroke(d))
     .attr('stroke-width', d => (d.isMe || d.id === nodeId) ? 4 : 3);
 }
 
 function clearHighlight() {
   if (!_nodeSel) return;
-  _nodeSel.select('rect')
+  _nodeSel.select('.node-outline')
     .attr('stroke', d => d.isMe ? '#3A6B20' : nodeStroke(d))
     .attr('stroke-width', d => d.isMe ? 4 : 3);
 }
