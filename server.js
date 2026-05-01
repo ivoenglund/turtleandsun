@@ -348,7 +348,18 @@ app.get('/api/network', requireAuth, async (req, res) => {
        WHERE cr.user_id = $1`,
       [req.user.id]
     );
-    res.json({ contacts: contacts.rows, relationships: relationships.rows });
+    const groupMemberships = await pool.query(
+      `SELECT cgm.group_id, g.name AS group_name, cgm.contact_id
+       FROM contact_group_memberships cgm
+       JOIN groups g ON g.id = cgm.group_id
+       WHERE cgm.user_id = $1`,
+      [req.user.id]
+    );
+    res.json({
+      contacts: contacts.rows,
+      relationships: relationships.rows,
+      group_memberships: groupMemberships.rows,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

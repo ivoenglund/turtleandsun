@@ -128,9 +128,16 @@ async function seed() {
   }
   console.log('Relationship types seeded');
 
-  // Delete old contacts for this user to avoid duplicates on re-run
+  // Delete old data for this user to avoid duplicates on re-run
+  await pool.query(`DELETE FROM contact_group_memberships WHERE user_id=$1`, [userId]);
   await pool.query(`DELETE FROM contact_relationships WHERE user_id=$1`, [userId]);
   await pool.query(`DELETE FROM contacts WHERE user_id=$1`, [userId]);
+  // Delete subgroups created by previous seed runs (keep the 4 main relationship groups)
+  const mainGroupIdList = Object.values(groupIds);
+  await pool.query(
+    `DELETE FROM groups WHERE user_id=$1 AND id != ALL($2::int[])`,
+    [userId, mainGroupIdList]
+  );
 
   // Generate 200 contacts
   const generated = generateContacts(200);
@@ -214,6 +221,42 @@ async function seed() {
   }
 
   console.log('Relationships seeded');
+
+  // ── Subgroups & group memberships ──────────────────────────────────────────
+  async function createSubgroup(name) {
+    const r = await pool.query(
+      `INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id`,
+      [userId, name]
+    );
+    return r.rows[0].id;
+  }
+  async function addMembership(contactId, sgId) {
+    await pool.query(
+      `INSERT INTO contact_group_memberships (user_id, contact_id, group_id)
+       VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+      [userId, contactId, sgId]
+    );
+  }
+
+  const sgAcme      = await createSubgroup('Acme Corp');
+  const sgBuilder   = await createSubgroup('BuilderLab');
+  const sg1995      = await createSubgroup('Class of 1995');
+  const sgKTH       = await createSubgroup('KTH Engineering');
+  const sgChess     = await createSubgroup('Chess Club');
+  const sgRunning   = await createSubgroup('Running Club');
+  const sgBook      = await createSubgroup('Book Club');
+  const sgHiking    = await createSubgroup('Hiking Group');
+
+  for (const c of workIds.slice(0, 25))   await addMembership(c.id, sgAcme);
+  for (const c of workIds.slice(25))      await addMembership(c.id, sgBuilder);
+  for (const c of schoolIds.slice(0, 30)) await addMembership(c.id, sg1995);
+  for (const c of schoolIds.slice(30))    await addMembership(c.id, sgKTH);
+  for (const c of friendIds.slice(0, 15)) await addMembership(c.id, sgChess);
+  for (const c of friendIds.slice(15,30)) await addMembership(c.id, sgRunning);
+  for (const c of friendIds.slice(30,45)) await addMembership(c.id, sgBook);
+  for (const c of friendIds.slice(45))    await addMembership(c.id, sgHiking);
+
+  console.log('Group memberships seeded');
   console.log(`Done! Log in as ${DEMO_EMAIL} to view the network.`);
 }
 

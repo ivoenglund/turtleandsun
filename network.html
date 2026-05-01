@@ -76,25 +76,24 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
   <h1>My Network</h1>
   <div class="cb-group">
     <label class="cb-label">
-      <input type="checkbox" id="cb-all" checked onchange="toggleAll()">
-      All
+      <input type="checkbox" id="cb-all" checked onchange="toggleAll()">All
     </label>
     <div class="cb-sep"></div>
     <label class="cb-label">
       <input type="checkbox" id="cb-Family" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#e74c8b;"></span>Family
+      <span class="cb-dot" style="background:#c0195a;"></span>Family
     </label>
     <label class="cb-label">
       <input type="checkbox" id="cb-Work" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#3A6B20;"></span>Work
+      <span class="cb-dot" style="background:#2a5016;"></span>Work
     </label>
     <label class="cb-label">
       <input type="checkbox" id="cb-School" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#2980b9;"></span>School
+      <span class="cb-dot" style="background:#1a5f8a;"></span>School
     </label>
     <label class="cb-label">
       <input type="checkbox" id="cb-Friends" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#e67e22;"></span>Friends
+      <span class="cb-dot" style="background:#b85e10;"></span>Friends
     </label>
   </div>
   <a href="/account/contacts" class="btn-back">← Contacts</a>
@@ -142,21 +141,22 @@ const GROUP_COLORS = {
 const GROUPS = ['Family', 'Work', 'School', 'Friends'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// Node pill dimensions
+// Contact node pill dimensions
 const NW = 130, NH = 46, NRX = 10;
+// Group hub node dimensions
+const GNW = 114, GNH = 34, GNRX = 17;
 const ME_R = 26;
 
-let _allNodes = [], _allLinks = [], _contactMap = {};
-let _nodeGroups = {};
-let _simulation, _svg, _g, _nodeSel, _linkSel, _labelSel;
+let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {}, _nodeGroups = {};
+let _simulation, _svg, _g;
+let _nodeSel, _groupNodeSel, _relLinkSel, _memberLinkSel, _labelSelA, _labelSelB;
 let _width, _height;
 
 function formatBirthday(str) {
   if (!str) return '';
   const p = str.split('-');
   if (p.length < 3) return str;
-  const m = MONTHS[parseInt(p[1], 10) - 1] || p[1];
-  return `${parseInt(p[2], 10)} ${m}`;
+  return `${parseInt(p[2], 10)} ${MONTHS[parseInt(p[1], 10) - 1] || p[1]}`;
 }
 
 function truncate(s, n) {
@@ -171,22 +171,43 @@ async function init() {
 
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
-  _allNodes = [
-    { id: '__me__', name: 'You', isMe: true },
-    ...data.contacts.map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c }))
-  ];
-
-  const seen = new Set();
-  _allLinks = [];
-  data.relationships.forEach(r => {
-    const key = [Math.min(r.contact_a_id, r.contact_b_id), Math.max(r.contact_a_id, r.contact_b_id)].join('-');
-    if (!seen.has(key)) {
-      seen.add(key);
-      _allLinks.push({ source: r.contact_a_id, target: r.contact_b_id, group: r.group_name, rel: r.relationship });
+  // Group hub nodes from memberships
+  const groupNodeMap = {};
+  (data.group_memberships || []).forEach(m => {
+    if (!groupNodeMap[m.group_id]) {
+      groupNodeMap[m.group_id] = { id: `g_${m.group_id}`, name: m.group_name, isGroup: true };
     }
   });
+  const groupNodes = Object.values(groupNodeMap);
+  _memberLinks = (data.group_memberships || []).map(m => ({
+    source: `g_${m.group_id}`,
+    target: m.contact_id,
+    isMembership: true,
+  }));
 
-  _allLinks.forEach(l => {
+  _allNodes = [
+    { id: '__me__', name: 'You', isMe: true },
+    ...data.contacts.map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c })),
+    ...groupNodes,
+  ];
+
+  // Bidirectional merge: each pair gets relA (at lo-id end) and relB (at hi-id end)
+  const pairMap = new Map();
+  (data.relationships || []).forEach(r => {
+    const lo = Math.min(r.contact_a_id, r.contact_b_id);
+    const hi = Math.max(r.contact_a_id, r.contact_b_id);
+    const key = `${lo}-${hi}`;
+    if (!pairMap.has(key)) {
+      pairMap.set(key, { source: lo, target: hi, group: r.group_name, relA: null, relB: null });
+    }
+    const link = pairMap.get(key);
+    if (r.contact_a_id === lo) link.relA = r.relationship;
+    else link.relB = r.relationship;
+  });
+  _relLinks = Array.from(pairMap.values());
+
+  // nodeGroups: which relationship categories each contact belongs to
+  _relLinks.forEach(l => {
     [l.source, l.target].forEach(id => {
       if (!_nodeGroups[id]) _nodeGroups[id] = new Set();
       _nodeGroups[id].add(l.group);
@@ -205,150 +226,179 @@ function buildGraph() {
   _svg = d3.select('#graph-svg').attr('width', _width).attr('height', _height);
   _svg.selectAll('*').remove();
 
-  const zoom = d3.zoom()
-    .scaleExtent([0.05, 4])
-    .on('zoom', e => _g.attr('transform', e.transform));
+  const zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', e => _g.attr('transform', e.transform));
   _svg.call(zoom);
   _g = _svg.append('g');
 
+  // Clone all nodes; build id→node map
   const nodesCopy = _allNodes.map(n => ({ ...n }));
   const idToNode = {};
   nodesCopy.forEach(n => { idToNode[n.id] = n; });
-  const linksCopy = _allLinks.map(l => ({
-    ...l,
-    source: idToNode[l.source],
-    target: idToNode[l.target],
-  })).filter(l => l.source && l.target);
+
+  const relLinksCopy = _relLinks
+    .map(l => ({ ...l, source: idToNode[l.source], target: idToNode[l.target] }))
+    .filter(l => l.source && l.target);
+
+  const memberLinksCopy = _memberLinks
+    .map(l => ({ ...l, source: idToNode[l.source], target: idToNode[l.target] }))
+    .filter(l => l.source && l.target);
 
   _simulation = d3.forceSimulation(nodesCopy)
-    .force('link', d3.forceLink(linksCopy).id(d => d.id).distance(160).strength(0.35))
-    .force('charge', d3.forceManyBody().strength(-350))
+    .force('link', d3.forceLink([...relLinksCopy, ...memberLinksCopy]).id(d => d.id)
+      .distance(d => d.isMembership ? 110 : 160)
+      .strength(d => d.isMembership ? 0.15 : 0.35))
+    .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -120 : -350))
     .force('center', d3.forceCenter(_width / 2, _height / 2))
-    .force('collision', d3.forceCollide().radius(d => d.isMe ? ME_R + 8 : Math.sqrt((NW/2)**2 + (NH/2)**2) + 6));
+    .force('collision', d3.forceCollide().radius(d => {
+      if (d.isMe)    return ME_R + 8;
+      if (d.isGroup) return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 4;
+      return Math.sqrt((NW / 2) ** 2 + (NH / 2) ** 2) + 6;
+    }));
 
-  // ── Links ──────────────────────────────────────────────────────────────────
-  _linkSel = _g.append('g').attr('class', 'links')
-    .selectAll('line')
-    .data(linksCopy)
-    .join('line')
+  // ── Layer 1: Membership links (dashed grey) ───────────────────────────────
+  _memberLinkSel = _g.append('g').attr('class', 'member-links')
+    .selectAll('line').data(memberLinksCopy).join('line')
+    .attr('stroke', 'rgba(28,10,0,0.2)')
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '5,4');
+
+  // ── Layer 2: Relationship links ───────────────────────────────────────────
+  _relLinkSel = _g.append('g').attr('class', 'rel-links')
+    .selectAll('line').data(relLinksCopy).join('line')
     .attr('stroke', d => GROUP_COLORS[d.group] || '#555')
     .attr('stroke-opacity', 0.55)
     .attr('stroke-width', 2);
 
-  // ── Edge labels ────────────────────────────────────────────────────────────
-  _labelSel = _g.append('g').attr('class', 'link-labels')
-    .selectAll('text')
-    .data(linksCopy)
-    .join('text')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 9)
-    .attr('font-weight', 700)
-    .attr('fill', d => GROUP_COLORS[d.group] || '#333')
-    .style('paint-order', 'stroke')
-    .style('stroke', '#fff')
-    .style('stroke-width', '4px')
-    .style('stroke-linejoin', 'round')
-    .text(d => d.rel);
-
-  // ── Nodes ──────────────────────────────────────────────────────────────────
-  const nodeG = _g.append('g').attr('class', 'nodes')
-    .selectAll('g')
-    .data(nodesCopy)
-    .join('g')
-    .attr('class', 'node-g')
-    .style('cursor', d => d.isMe ? 'default' : 'pointer')
-    .call(d3.drag()
-      .on('start', dragStart)
-      .on('drag', dragged)
-      .on('end', dragEnd))
-    .on('mouseenter', showTooltip)
-    .on('mousemove', moveTooltip)
-    .on('mouseleave', hideTooltip)
-    .on('click', nodeClick);
-
-  // Me node — circle
-  const meNodes = nodeG.filter(d => d.isMe);
-  meNodes.append('circle')
-    .attr('r', ME_R)
-    .attr('fill', '#3A6B20')
-    .attr('stroke', '#fff')
-    .attr('stroke-width', 3);
-  meNodes.append('text')
+  // ── Layer 3: Two-ended relationship labels ────────────────────────────────
+  const labelBase = sel => sel
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 11).attr('font-weight', 800).attr('fill', '#fff')
-    .text('You');
+    .attr('font-size', 9).attr('font-weight', 700)
+    .attr('fill', d => GROUP_COLORS[d.group] || '#333')
+    .style('paint-order', 'stroke')
+    .style('stroke', '#fff').style('stroke-width', '4px').style('stroke-linejoin', 'round');
 
-  // Contact nodes — pill rect + name + birthday
-  const contactNodes = nodeG.filter(d => !d.isMe);
-  contactNodes.append('rect')
-    .attr('x', -NW / 2).attr('y', -NH / 2)
-    .attr('width', NW).attr('height', NH)
-    .attr('rx', NRX)
-    .attr('fill', '#f7f4ef')
-    .attr('stroke', 'rgba(28,10,0,0.22)')
-    .attr('stroke-width', 2);
+  const labG = _g.append('g').attr('class', 'link-labels');
 
-  // Name text — shift up when birthday present, centred when not
-  contactNodes.append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
+  // Label A: at source end (30%) for asymmetric, midpoint (50%) for symmetric
+  _labelSelA = labG.selectAll('.lbl-a').data(relLinksCopy).join('text')
+    .attr('class', 'lbl-a').call(labelBase)
+    .text(d => d.relA || d.relB || '');
+
+  // Label B: at target end (70%), only shown when asymmetric
+  _labelSelB = labG.selectAll('.lbl-b').data(relLinksCopy).join('text')
+    .attr('class', 'lbl-b').call(labelBase)
+    .text(d => (d.relA && d.relB && d.relA !== d.relB) ? d.relB : '');
+
+  // ── Layer 4: Group hub nodes ──────────────────────────────────────────────
+  const groupNodesCopy = nodesCopy.filter(n => n.isGroup);
+  const groupG = _g.append('g').attr('class', 'group-nodes')
+    .selectAll('g').data(groupNodesCopy).join('g')
+    .attr('class', 'group-node-g')
+    .style('cursor', 'default')
+    .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd));
+
+  groupG.append('rect')
+    .attr('x', -GNW / 2).attr('y', -GNH / 2)
+    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
+    .attr('fill', '#eef6ee')
+    .attr('stroke', '#3A6B20').attr('stroke-width', 1.5).attr('stroke-dasharray', '5,3');
+
+  groupG.append('text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+    .attr('font-size', 10).attr('font-weight', 700).attr('fill', '#2a5016')
+    .text(d => truncate(d.name, 15));
+
+  _groupNodeSel = groupG;
+
+  // ── Layer 5: Contact + me nodes ───────────────────────────────────────────
+  const contactsCopy = nodesCopy.filter(n => !n.isGroup);
+  const nodeG = _g.append('g').attr('class', 'contact-nodes')
+    .selectAll('g').data(contactsCopy).join('g')
+    .attr('class', 'contact-node-g')
+    .style('cursor', d => d.isMe ? 'default' : 'pointer')
+    .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd))
+    .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
+    .on('click', nodeClick);
+
+  // Me circle
+  const meG = nodeG.filter(d => d.isMe);
+  meG.append('circle').attr('r', ME_R)
+    .attr('fill', '#3A6B20').attr('stroke', '#fff').attr('stroke-width', 3);
+  meG.append('text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+    .attr('font-size', 11).attr('font-weight', 800).attr('fill', '#fff').text('You');
+
+  // Contact pills
+  const cG = nodeG.filter(d => !d.isMe);
+  cG.append('rect')
+    .attr('x', -NW / 2).attr('y', -NH / 2).attr('width', NW).attr('height', NH).attr('rx', NRX)
+    .attr('fill', '#f7f4ef').attr('stroke', 'rgba(28,10,0,0.22)').attr('stroke-width', 2);
+  cG.append('text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('y', d => d.birthday ? -8 : 0)
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
     .attr('font-size', 10).attr('font-weight', 700).attr('fill', '#1C0A00')
     .text(d => truncate(d.name, 18));
-
-  // Birthday text
-  contactNodes.filter(d => !!d.birthday)
-    .append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('y', 9)
+  cG.filter(d => !!d.birthday).append('text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
     .attr('font-family', "'DM Sans', sans-serif")
     .attr('font-size', 8.5).attr('fill', 'rgba(28,10,0,0.48)')
     .text(d => formatBirthday(d.birthday));
 
+  _nodeSel = nodeG;
+
   _simulation.on('tick', () => {
-    _linkSel
+    _relLinkSel
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    _labelSel
-      .attr('x', d => (d.source.x + d.target.x) / 2)
-      .attr('y', d => (d.source.y + d.target.y) / 2);
+    _memberLinkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+
+    // Label A: midpoint for symmetric, 30% from source for asymmetric
+    _labelSelA.attr('x', d => {
+      const f = (!d.relA || !d.relB || d.relA === d.relB) ? 0.5 : 0.3;
+      return d.source.x * (1 - f) + d.target.x * f;
+    }).attr('y', d => {
+      const f = (!d.relA || !d.relB || d.relA === d.relB) ? 0.5 : 0.3;
+      return d.source.y * (1 - f) + d.target.y * f;
+    });
+    // Label B: 70% from source (target end)
+    _labelSelB
+      .attr('x', d => d.source.x * 0.3 + d.target.x * 0.7)
+      .attr('y', d => d.source.y * 0.3 + d.target.y * 0.7);
+
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+    groupG.attr('transform', d => `translate(${d.x},${d.y})`);
   });
 
-  _nodeSel = nodeG;
   applyVisibility();
 }
 
-// ── Filter (checkboxes) ───────────────────────────────────────────────────────
+// ── Checkboxes ────────────────────────────────────────────────────────────────
 function getActiveGroups() {
   return new Set(GROUPS.filter(g => document.getElementById(`cb-${g}`).checked));
 }
-
 function toggleAll() {
   const checked = document.getElementById('cb-all').checked;
   GROUPS.forEach(g => { document.getElementById(`cb-${g}`).checked = checked; });
-  applyVisibility();
-  closePanel();
+  applyVisibility(); closePanel();
 }
-
 function applyFilter() {
   const active = getActiveGroups();
   document.getElementById('cb-all').checked = active.size === GROUPS.length;
-  applyVisibility();
-  closePanel();
+  applyVisibility(); closePanel();
 }
-
 function applyVisibility() {
-  if (!_nodeSel || !_linkSel) return;
+  if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
 
-  _linkSel.attr('display', l => active.has(l.group) ? null : 'none');
-  _labelSel.attr('display', l => active.has(l.group) ? null : 'none');
+  _relLinkSel.attr('display', l => active.has(l.group) ? null : 'none');
+  _labelSelA.attr('display', l => active.has(l.group) ? null : 'none');
+  _labelSelB.attr('display', l => active.has(l.group) ? null : 'none');
 
   _nodeSel.attr('display', d => {
     if (d.isMe) return null;
@@ -357,6 +407,7 @@ function applyVisibility() {
     for (const g of groups) { if (active.has(g)) return null; }
     return 'none';
   });
+  // Group hub nodes and membership links always visible
 }
 
 // ── Drag ──────────────────────────────────────────────────────────────────────
@@ -384,7 +435,7 @@ function moveTooltip(event) {
 }
 function hideTooltip() { tooltip.classList.remove('visible'); }
 
-// ── Node click → side panel ───────────────────────────────────────────────────
+// ── Side panel ────────────────────────────────────────────────────────────────
 function nodeClick(event, d) {
   if (d.isMe) return;
   event.stopPropagation();
@@ -403,7 +454,7 @@ function openPanel(d) {
   document.getElementById('spCity').textContent = city || '';
 
   const nodeId = d.id;
-  const rels = _allLinks.filter(l => {
+  const rels = _relLinks.filter(l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
     const t = typeof l.target === 'object' ? l.target.id : l.target;
     return s === nodeId || t === nodeId;
@@ -415,11 +466,14 @@ function openPanel(d) {
   } else {
     relsEl.innerHTML = rels.map(l => {
       const s = typeof l.source === 'object' ? l.source.id : l.source;
-      const otherId = s === nodeId
+      const isSource = s === nodeId;
+      const otherId = isSource
         ? (typeof l.target === 'object' ? l.target.id : l.target)
         : s;
       const other = _contactMap[otherId];
-      return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(l.rel)}</span></div>`;
+      // Show relationship from this node's perspective
+      const myRel = isSource ? (l.relA || l.relB) : (l.relB || l.relA);
+      return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(myRel || '')}</span></div>`;
     }).join('');
   }
 
@@ -436,20 +490,25 @@ function closePanel() {
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
   const connectedIds = new Set([nodeId]);
-  _allLinks.forEach(l => {
+  _relLinks.forEach(l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
     const t = typeof l.target === 'object' ? l.target.id : l.target;
     if (s === nodeId) connectedIds.add(t);
     if (t === nodeId) connectedIds.add(s);
   });
 
-  _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.12);
-  _linkSel.attr('stroke-opacity', l => {
+  _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.1);
+  _relLinkSel.attr('stroke-opacity', l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
     const t = typeof l.target === 'object' ? l.target.id : l.target;
     return (s === nodeId || t === nodeId) ? 0.9 : 0.04;
   });
-  _labelSel.attr('opacity', l => {
+  _labelSelA.attr('opacity', l => {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    return (s === nodeId || t === nodeId) ? 1 : 0.04;
+  });
+  _labelSelB.attr('opacity', l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
     const t = typeof l.target === 'object' ? l.target.id : l.target;
     return (s === nodeId || t === nodeId) ? 1 : 0.04;
@@ -459,8 +518,9 @@ function highlightNode(nodeId) {
 function clearHighlight() {
   if (!_nodeSel) return;
   _nodeSel.attr('opacity', 1);
-  _linkSel.attr('stroke-opacity', 0.55);
-  _labelSel.attr('opacity', 1);
+  _relLinkSel.attr('stroke-opacity', 0.55);
+  _labelSelA.attr('opacity', 1);
+  _labelSelB.attr('opacity', 1);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());

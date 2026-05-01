@@ -98,6 +98,15 @@ async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS contact_group_memberships (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      contact_id INTEGER NOT NULL,
+      group_id INTEGER REFERENCES groups(id),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, contact_id, group_id)
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
