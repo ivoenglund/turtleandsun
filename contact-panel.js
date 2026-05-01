@@ -116,6 +116,8 @@ const CP = (() => {
 .fo-detail .cp-toast.err{background:rgba(253,236,234,0.88);}
 .fo-detail .cp-pill{background:rgba(250,248,245,0.75);}
 .fo-detail .cp-pill.active{background:rgba(232,240,224,0.88);}
+.fo-detail .cp-name-bar,.fo-detail .cp-section,.fo-detail .cp-tbl,.fo-detail .cp-row,.fo-detail .cp-pills,.fo-detail .cp-list,.fo-detail .cp-list-row,.fo-detail .cp-add-row,.fo-detail .cp-form-msg,.fo-detail .cp-toast,.fo-detail .cp-empty{max-width:100%;box-sizing:border-box;}
+.fo-detail .cp-pill{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     `;
     document.head.appendChild(s);
   }
