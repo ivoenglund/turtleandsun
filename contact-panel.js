@@ -29,7 +29,10 @@ const CP = (() => {
 .cp-empty{display:flex;align-items:center;justify-content:center;height:160px;font-size:13px;color:rgba(28,10,0,0.25);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;text-align:center;padding:24px;}
 
 /* Name bar */
-.cp-name-bar{padding:11px 16px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;display:flex;align-items:center;gap:7px;flex-wrap:wrap;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cp-name-bar{padding:10px 16px 8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cp-name-inp{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#1C0A00;background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:0;transition:border-color 0.12s;cursor:text;}
+.cp-name-inp:focus{border-bottom-color:#3A6B20;}
+.cp-name-inp::placeholder{color:rgba(28,10,0,0.28);}
 .cp-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
 .cp-badge-dec{background:#f5eaea;color:rgba(120,20,20,0.55);}
 
@@ -42,8 +45,8 @@ const CP = (() => {
 .cp-tbl{padding-bottom:4px;}
 .cp-row{display:flex;align-items:stretch;border-bottom:1px solid rgba(28,10,0,0.04);}
 .cp-row:last-child{border-bottom:none;}
-.cp-lbl{width:108px;flex-shrink:0;padding:5px 10px 5px 16px;font-size:11px;font-weight:500;color:rgba(28,10,0,0.38);text-align:right;display:flex;align-items:center;justify-content:flex-end;line-height:1.3;}
-.cp-inp{flex:1;padding:5px 9px;border:none;border-left:1px solid rgba(28,10,0,0.06);background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;outline:none;min-width:0;transition:background 0.12s;}
+.cp-lbl{width:108px;flex-shrink:0;padding:5px 4px 5px 14px;font-size:11px;font-weight:500;color:rgba(28,10,0,0.38);text-align:right;display:flex;align-items:center;justify-content:flex-end;line-height:1.3;}
+.cp-inp{flex:1;padding:5px 9px 5px 4px;border:none;border-left:1px solid rgba(28,10,0,0.06);background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;outline:none;min-width:0;transition:background 0.12s;}
 .cp-inp:focus{background:rgba(58,107,32,0.045);border-left-color:#3A6B20;}
 .cp-inp:hover:not(:focus){background:rgba(28,10,0,0.02);}
 .cp-check-cell{flex:1;padding:5px 9px;border-left:1px solid rgba(28,10,0,0.06);display:flex;align-items:center;}
@@ -93,7 +96,7 @@ const CP = (() => {
 @media(max-width:1000px){.cp-lbl{width:86px;font-size:10px;}}
 
 /* Overlay mode: transparent bg, text-shadow for legibility */
-.fo-detail .cp-name-bar{text-shadow:0 0 8px rgba(255,249,230,0.95);}
+.fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
 .fo-detail .cp-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-section-hdr{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-inp{background:transparent!important;border-left-color:transparent;border-left-width:1px;}
@@ -115,7 +118,7 @@ const CP = (() => {
 <div id="cpContent" style="display:none;overflow-y:auto;flex:1;min-height:0;">
 
   <div class="cp-name-bar">
-    <span id="cpNameDisplay"></span>
+    <input class="cp-name-inp" id="cpFName" type="text" data-field="name" onblur="CP._scheduleSave()" placeholder="Name">
     <span id="cpPetIcon" style="display:none;">🐾</span>
     <span class="cp-badge" id="cpPhBadge" style="display:none;">Manual</span>
     <span class="cp-badge cp-badge-dec" id="cpDeceasedBadge" style="display:none;">† Deceased</span>
@@ -126,7 +129,6 @@ const CP = (() => {
   <div class="cp-section">
     <div class="cp-section-hdr">Personal</div>
     <div class="cp-tbl">
-      <div class="cp-row"><span class="cp-lbl">Name</span><input class="cp-inp" type="text" id="cpFName" data-field="name" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Email</span><input class="cp-inp" type="email" id="cpFEmail" data-field="email" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
@@ -211,7 +213,6 @@ const CP = (() => {
     _contactGroupIds = new Set(contactGroups.map(g => g.id));
     _inFamilyGroup = contactGroups.some(g => g.name === 'Family');
 
-    document.getElementById('cpNameDisplay').textContent = c.name || 'Unnamed';
     document.getElementById('cpPetIcon').style.display = c.is_pet ? 'inline' : 'none';
     document.getElementById('cpPhBadge').style.display = c.is_placeholder ? 'inline-block' : 'none';
     document.getElementById('cpDeceasedBadge').style.display = c.died_on ? 'inline-block' : 'none';
@@ -284,7 +285,6 @@ const CP = (() => {
       });
       if (res.ok) {
         _showToast('Saved', true);
-        document.getElementById('cpNameDisplay').textContent = body.name || 'Unnamed';
         document.getElementById('cpPetIcon').style.display = body.is_pet ? 'inline' : 'none';
         document.getElementById('cpDeceasedBadge').style.display = body.died_on ? 'inline-block' : 'none';
         if (typeof CP.onSaved === 'function') CP.onSaved({ id: _currentId, ...body });

@@ -51,7 +51,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .fo-show-btn:hover{color:#1C0A00;}
 
 /* Filter items – text-shadow for legibility over canvas */
-.fp-item{padding:3px 0;display:flex;align-items:center;}
+.fp-item{padding:3px 0;display:flex;align-items:center;gap:6px;}
 .fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fp-item input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
 .fp-sub{padding-left:16px;}
@@ -228,11 +228,8 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <!-- Floating filter overlay (left) -->
 <div class="fo-filters" id="foFilters">
-  <div class="fo-hdr">
-    <button class="fo-close-btn" onclick="hideFilters()" aria-label="Hide filters">×</button>
-    <span class="fo-title">Filters</span>
-  </div>
   <div class="fp-item">
+    <button class="fo-close-btn" onclick="hideFilters()" aria-label="Hide filters">×</button>
     <label><input type="checkbox" id="cb-all" checked onchange="toggleAll()"> All groups</label>
   </div>
   <div class="fp-sep"></div>
