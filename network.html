@@ -32,7 +32,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 .panel-left{display:flex;flex-direction:row;width:220px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-right:1px solid rgba(28,10,0,0.08);background:#fff;}
 .panel-left.collapsed{width:28px;}
-.pl-body{flex:1;display:flex;flex-direction:column;min-width:192px;overflow:hidden;}
+.pl-body{flex:1;display:flex;flex-direction:column;min-width:160px;overflow:hidden;}
 .pl-header{padding:12px 16px 6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.35);}
 .pl-content{flex:1;overflow-y:auto;padding:0 0 16px;}
 .pl-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-left:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);font-size:14px;user-select:none;}
@@ -40,9 +40,14 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 .panel-right{display:flex;flex-direction:row-reverse;width:320px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-left:1px solid rgba(28,10,0,0.08);background:#FFF9E6;}
 .panel-right.collapsed{width:28px;}
-.pr-body{flex:1;display:flex;flex-direction:column;min-width:292px;overflow:hidden;}
+.pr-body{flex:1;display:flex;flex-direction:column;min-width:160px;overflow:hidden;}
 .pr-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-right:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);font-size:14px;user-select:none;}
 .pr-toggle:hover{color:#1C0A00;background:rgba(28,10,0,0.03);}
+
+/* Resize handles */
+.panel-resize-handle{width:4px;flex-shrink:0;cursor:ew-resize;background:transparent;transition:background 0.15s;}
+.panel-resize-handle:hover,.panel-resize-handle.dragging{background:rgba(58,107,32,0.22);}
+.panel-left.collapsed .panel-resize-handle,.panel-right.collapsed .panel-resize-handle{display:none;}
 
 .fp-item{padding:5px 14px;display:flex;align-items:center;}
 .fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;width:100%;}
@@ -50,9 +55,6 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .fp-sub{padding-left:26px;}
 .fp-sub2{padding-left:38px;}
 .fp-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 0;}
-
-.sp-empty{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:rgba(28,10,0,0.3);text-align:center;}
-#spContent{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 
 .tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.12s;z-index:400;max-width:260px;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
 .tooltip.visible{opacity:1;}
@@ -93,24 +95,32 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .btn-loveogram{padding:9px 24px;background:#c0195a;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;}
 .btn-loveogram:hover{background:#9e1048;}
 
-#calendar-container{flex:1;background:#fff;display:none;align-items:center;justify-content:center;}
-.cal-placeholder{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(28,10,0,0.3);text-align:center;}
-
-.sp-header{padding:20px 20px 16px;border-bottom:1px solid rgba(28,10,0,0.08);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;}
-.sp-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1C0A00;line-height:1.2;}
-.sp-body{padding:16px 20px;flex:1;overflow-y:auto;}
-.sp-field{margin-bottom:12px;}
-.sp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:3px;}
-.sp-value{font-size:13px;color:#1C0A00;}
-.sp-rels{margin-top:16px;}
-.sp-rels-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:8px;}
-.sp-rel-item{font-size:12px;color:#1C0A00;padding:5px 0;border-bottom:1px solid rgba(28,10,0,0.06);}
-.sp-rel-item:last-child{border-bottom:none;}
-.sp-rel-name{font-weight:600;}
-.sp-rel-type{color:rgba(28,10,0,0.5);margin-left:4px;}
-.sp-footer{padding:16px 20px;border-top:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
-.btn-view-full{display:block;width:100%;padding:10px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;}
-.btn-view-full:hover{background:#1C0A00;}
+/* Calendar */
+#calendar-container{flex:1;flex-direction:column;overflow:hidden;display:none;background:#fff;}
+.cal-toolbar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;background:#fff;flex-wrap:wrap;}
+.cal-today-btn{padding:5px 12px;background:#3A6B20;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;}
+.cal-today-btn:hover{background:#1C0A00;}
+.cal-nav-btn{padding:5px 10px;background:#f0ede6;border:none;border-radius:6px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.7);}
+.cal-nav-btn:hover{background:#e0dcd4;}
+.cal-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;flex:1;text-align:center;min-width:140px;}
+.cal-zoom-btn{padding:4px 10px;background:#f0ede6;border:none;border-radius:6px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:rgba(28,10,0,0.55);}
+.cal-zoom-btn.active{background:#3A6B20;color:#fff;}
+.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);padding:0 12px;flex-shrink:0;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cal-dow{text-align:center;padding:5px 2px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:rgba(28,10,0,0.35);text-transform:uppercase;letter-spacing:0.04em;}
+.cal-grid-wrap{flex:1;overflow-y:auto;padding:6px 12px 24px;}
+.cal-month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-cell{min-height:80px;border-radius:7px;padding:5px 6px;background:#f9f7f2;}
+.cal-cell.today{background:#e8f0e0;outline:2px solid #3A6B20;}
+.cal-cell.other-month{opacity:0.4;}
+.cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:rgba(28,10,0,0.45);margin-bottom:3px;}
+.cal-cell.today .cal-day-num{color:#3A6B20;}
+.cal-chip{display:block;font-size:10px;font-weight:600;padding:2px 5px;border-radius:4px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.4;}
+.cal-chip:hover{opacity:0.75;}
+.cal-chip.birthday{background:#e8f0e0;color:#2d5a16;}
+.cal-chip.occasion{background:#fef3e2;color:#b85e10;}
+.cal-chip.remembrance{background:#f0ede6;color:rgba(28,10,0,0.55);}
+.cal-chip.milestone{background:#e8e0f0;color:#6b2d9a;}
 
 .mobile-backdrop{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.35);z-index:40;pointer-events:none;opacity:0;transition:opacity 0.2s;}
 @media(max-width:1000px){
@@ -122,6 +132,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
   .panel-center{padding:0 28px;}
   .mobile-backdrop{display:block;}
   .mobile-backdrop.open{pointer-events:auto;opacity:1;}
+  .panel-resize-handle{display:none;}
 }
 </style>
 </head>
@@ -168,6 +179,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
         </div>
       </div>
     </div>
+    <div class="panel-resize-handle" id="leftResizeHandle"></div>
     <div class="pl-toggle" onclick="togglePanel('left')" id="plArrow">&#8249;</div>
   </div>
 
@@ -180,40 +192,30 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
       <div class="outline-inner" id="outline-inner"></div>
     </div>
     <div id="calendar-container">
-      <div class="cal-placeholder">Calendar view coming soon</div>
+      <div class="cal-toolbar">
+        <button class="cal-today-btn" onclick="calToday()">Today</button>
+        <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+        <span class="cal-title" id="calTitle"></span>
+        <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+        <button class="cal-zoom-btn active" data-zoom="month" onclick="setCalZoom('month')">Month</button>
+        <button class="cal-zoom-btn" data-zoom="week" onclick="setCalZoom('week')">Week</button>
+      </div>
+      <div class="cal-dow-row" id="calDowRow">
+        <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div>
+        <div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div>
+        <div class="cal-dow">Sat</div>
+      </div>
+      <div class="cal-grid-wrap">
+        <div id="calGrid" class="cal-month-grid"></div>
+      </div>
     </div>
   </div>
 
   <div class="panel-right" id="panelRight">
     <div class="pr-toggle" onclick="togglePanel('right')" id="prArrow">&#8250;</div>
+    <div class="panel-resize-handle" id="rightResizeHandle"></div>
     <div class="pr-body">
-      <div class="sp-empty" id="spEmpty">Select a contact to see details</div>
-      <div id="spContent" style="display:none">
-        <div class="sp-header">
-          <div class="sp-name" id="spName"></div>
-        </div>
-        <div class="sp-body">
-          <div class="sp-field" id="spBirthdayWrap">
-            <div class="sp-label">Birthday</div>
-            <div class="sp-value" id="spBirthday"></div>
-          </div>
-          <div class="sp-field" id="spDiedWrap">
-            <div class="sp-label">Died on</div>
-            <div class="sp-value" id="spDied"></div>
-          </div>
-          <div class="sp-field" id="spCityWrap">
-            <div class="sp-label">City</div>
-            <div class="sp-value" id="spCity"></div>
-          </div>
-          <div class="sp-rels">
-            <div class="sp-rels-title">Relationships</div>
-            <div id="spRels"></div>
-          </div>
-        </div>
-        <div class="sp-footer">
-          <a href="#" class="btn-view-full" id="spViewFull">View full record</a>
-        </div>
-      </div>
+      <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
     </div>
   </div>
 
@@ -226,10 +228,12 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <div class="tooltip" id="tooltip"></div>
 
+<script src="/contact-panel.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const PALETTE = ['#1A5C32','#1A3566','#4A2060','#5A3010','#1A4A5A','#3D5A1A','#6B2A14','#1A4A3A'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const NW = 130, NH = 46, NRX = 10;
 const GNW = 164, GNH = 60, GNRX = 14;
@@ -263,7 +267,11 @@ let _selectedContacts = new Set();
 let _groupsWithCheckbox = new Set();
 let _contactOccasions = {};
 let _nodeHeights = {};
+let _rawOccasions = [];
 const _today = new Date(); _today.setHours(0, 0, 0, 0);
+
+// Calendar state
+let _calYear = null, _calMonth = null, _calZoom = 'month', _calWeekStart = null;
 
 function formatDate(str) {
   if (!str) return '';
@@ -382,7 +390,11 @@ async function init() {
     fetch('/api/occasions/upcoming'),
   ]);
   const data = await netRes.json();
-  if (occRes.ok) { const occData = await occRes.json(); processOccasions(occData.occasions || []); }
+  if (occRes.ok) {
+    const occData = await occRes.json();
+    _rawOccasions = occData.occasions || [];
+    processOccasions(_rawOccasions);
+  }
 
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
@@ -743,6 +755,7 @@ function computeVisibleGroupIds(active) {
 
 function applyVisibility() {
   if (_currentView === 'outline') { renderOutline(); return; }
+  if (_currentView === 'calendar') { renderCalendar(); return; }
   if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
@@ -826,49 +839,10 @@ function moveTooltip(event) {
 
 function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whiteSpace = 'normal'; }
 
-// ── Side panel ────────────────────────────────────────────────────────────────
-function nodeClick(event, d) { if (d.isMe) return; event.stopPropagation(); openPanel(d); }
+// ── Detail panel ──────────────────────────────────────────────────────────────
+function nodeClick(event, d) { if (d.isMe) return; event.stopPropagation(); openDetailPanel(d.id); }
 
-function openPanel(d) {
-  document.getElementById('spName').textContent = (d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed');
-
-  const bday = d.birthday;
-  document.getElementById('spBirthdayWrap').style.display = bday ? '' : 'none';
-  document.getElementById('spBirthday').textContent = bday ? formatDate(bday) : '';
-
-  const died = d.died_on;
-  document.getElementById('spDiedWrap').style.display = died ? '' : 'none';
-  document.getElementById('spDied').textContent = died ? formatDate(died) : '';
-
-  const city = d.city;
-  document.getElementById('spCityWrap').style.display = city ? '' : 'none';
-  document.getElementById('spCity').textContent = city || '';
-
-  const nodeId = d.id;
-  const rels = _relLinks.filter(l => {
-    const s = typeof l.source === 'object' ? l.source.id : l.source;
-    const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return s === nodeId || t === nodeId;
-  });
-
-  const relsEl = document.getElementById('spRels');
-  if (!rels.length) {
-    relsEl.innerHTML = '<div style="font-size:12px;color:rgba(28,10,0,0.35);">No relationships recorded.</div>';
-  } else {
-    relsEl.innerHTML = rels.map(l => {
-      const s = typeof l.source === 'object' ? l.source.id : l.source;
-      const isSource = s === nodeId;
-      const otherId = isSource ? (typeof l.target === 'object' ? l.target.id : l.target) : s;
-      const other = _contactMap[otherId];
-      const myRel = cleanRel(isSource ? (l.relA || l.relB) : (l.relB || l.relA));
-      return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(myRel || '')}</span></div>`;
-    }).join('');
-  }
-
-  document.getElementById('spViewFull').href = `/account/contacts?id=${nodeId}`;
-  document.getElementById('spEmpty').style.display = 'none';
-  document.getElementById('spContent').style.display = 'flex';
-
+function openDetailPanel(id) {
   const pr = document.getElementById('panelRight');
   if (window.innerWidth > 1000 && pr.classList.contains('collapsed')) {
     _setPanelCollapsed('right', false);
@@ -877,13 +851,12 @@ function openPanel(d) {
     pr.classList.add('mobile-open');
     document.getElementById('mobileBackdrop').classList.add('open');
   }
-
-  highlightNode(nodeId);
+  CP.open(id);
+  if (_currentView === 'network') highlightNode(id);
 }
 
 function closePanel() {
-  document.getElementById('spEmpty').style.display = '';
-  document.getElementById('spContent').style.display = 'none';
+  CP.close();
   clearHighlight();
 }
 
@@ -927,6 +900,172 @@ function switchView(view) {
   document.getElementById('calendar-container').style.display = view === 'calendar' ? 'flex' : 'none';
   if (view === 'network') { applyVisibility(); closePanel(); }
   else if (view === 'outline') renderOutline();
+  else if (view === 'calendar') renderCalendar();
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function initCalendar() {
+  const now = new Date();
+  _calYear = now.getFullYear();
+  _calMonth = now.getMonth();
+  _calWeekStart = new Date(now);
+  _calWeekStart.setDate(now.getDate() - now.getDay());
+  _calWeekStart.setHours(0,0,0,0);
+}
+
+function setCalZoom(zoom) {
+  _calZoom = zoom;
+  document.querySelectorAll('.cal-zoom-btn').forEach(b => b.classList.toggle('active', b.dataset.zoom === zoom));
+  const grid = document.getElementById('calGrid');
+  grid.className = zoom === 'week' ? 'cal-week-grid' : 'cal-month-grid';
+  const dowRow = document.getElementById('calDowRow');
+  dowRow.style.display = zoom === 'week' ? 'none' : '';
+  renderCalendar();
+}
+
+function calNav(delta) {
+  if (_calZoom === 'month') {
+    _calMonth += delta;
+    if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+    if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+  } else {
+    _calWeekStart = new Date(_calWeekStart);
+    _calWeekStart.setDate(_calWeekStart.getDate() + delta * 7);
+  }
+  renderCalendar();
+}
+
+function calToday() {
+  const now = new Date();
+  _calYear = now.getFullYear();
+  _calMonth = now.getMonth();
+  _calWeekStart = new Date(now);
+  _calWeekStart.setDate(now.getDate() - now.getDay());
+  _calWeekStart.setHours(0,0,0,0);
+  renderCalendar();
+}
+
+function getOccasionsForMonth(year, month) {
+  const showOnlyLiving = document.getElementById('cb-living') && document.getElementById('cb-living').checked;
+  const byDay = {};
+  const add = (day, chip) => { if (!byDay[day]) byDay[day] = []; byDay[day].push(chip); };
+
+  for (const c of Object.values(_contactMap)) {
+    if (showOnlyLiving && c.died_on) continue;
+    if (c.birthday) {
+      const b = new Date(c.birthday);
+      if (!isNaN(b.getTime()) && b.getMonth() === month) {
+        add(b.getDate(), { contact_id: c.id, label: `🎂 ${c.name || 'Unnamed'}`, type: 'birthday' });
+      }
+    }
+    if (c.died_on) {
+      const d = new Date(c.died_on);
+      if (!isNaN(d.getTime()) && d.getMonth() === month) {
+        add(d.getDate(), { contact_id: c.id, label: `🕯 ${c.name || 'Unnamed'}`, type: 'remembrance' });
+      }
+    }
+  }
+  for (const o of _rawOccasions) {
+    if (!o.start_date) continue;
+    const s = new Date(o.start_date);
+    if (isNaN(s.getTime())) continue;
+    if (o.frequency === 'yearly' || o.frequency === 'milestone') {
+      if (s.getMonth() === month) {
+        add(s.getDate(), { contact_id: o.contact_id, label: o.name, type: o.frequency === 'milestone' ? 'milestone' : 'occasion' });
+      }
+    } else if (s.getFullYear() === year && s.getMonth() === month) {
+      add(s.getDate(), { contact_id: o.contact_id, label: o.name, type: 'occasion' });
+    }
+  }
+  return byDay;
+}
+
+function getOccasionsForDate(date) {
+  const showOnlyLiving = document.getElementById('cb-living') && document.getElementById('cb-living').checked;
+  const result = [];
+  const month = date.getMonth(), day = date.getDate(), year = date.getFullYear();
+  for (const c of Object.values(_contactMap)) {
+    if (showOnlyLiving && c.died_on) continue;
+    if (c.birthday) {
+      const b = new Date(c.birthday);
+      if (!isNaN(b.getTime()) && b.getMonth() === month && b.getDate() === day)
+        result.push({ contact_id: c.id, label: `🎂 ${c.name || 'Unnamed'}`, type: 'birthday' });
+    }
+    if (c.died_on) {
+      const d = new Date(c.died_on);
+      if (!isNaN(d.getTime()) && d.getMonth() === month && d.getDate() === day)
+        result.push({ contact_id: c.id, label: `🕯 ${c.name || 'Unnamed'}`, type: 'remembrance' });
+    }
+  }
+  for (const o of _rawOccasions) {
+    if (!o.start_date) continue;
+    const s = new Date(o.start_date);
+    if (isNaN(s.getTime())) continue;
+    if ((o.frequency === 'yearly' || o.frequency === 'milestone') && s.getMonth() === month && s.getDate() === day)
+      result.push({ contact_id: o.contact_id, label: o.name, type: o.frequency === 'milestone' ? 'milestone' : 'occasion' });
+    else if (!o.frequency || o.frequency === 'one-time') {
+      if (s.getFullYear() === year && s.getMonth() === month && s.getDate() === day)
+        result.push({ contact_id: o.contact_id, label: o.name, type: 'occasion' });
+    }
+  }
+  return result;
+}
+
+function renderCalendar() {
+  if (_calZoom === 'month') {
+    document.getElementById('calTitle').textContent = `${MONTHS_FULL[_calMonth]} ${_calYear}`;
+    renderCalMonth(_calYear, _calMonth);
+  } else {
+    const end = new Date(_calWeekStart); end.setDate(end.getDate() + 6);
+    document.getElementById('calTitle').textContent =
+      `${MONTHS[_calWeekStart.getMonth()]} ${_calWeekStart.getDate()} – ${MONTHS[end.getMonth()]} ${end.getDate()}, ${end.getFullYear()}`;
+    renderCalWeek(_calWeekStart);
+  }
+}
+
+function renderCalMonth(year, month) {
+  const grid = document.getElementById('calGrid');
+  if (!grid) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const byDay = getOccasionsForMonth(year, month);
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const off = i - firstDow;
+    let day, cur;
+    if (off < 0) { day = daysInPrevMonth + off + 1; cur = false; }
+    else if (off >= daysInMonth) { day = off - daysInMonth + 1; cur = false; }
+    else { day = off + 1; cur = true; }
+    const isToday = cur && year === todayY && month === todayM && day === todayD;
+    const chips = cur ? (byDay[day] || []) : [];
+    html += `<div class="cal-cell${!cur?' other-month':''}${isToday?' today':''}">
+      <div class="cal-day-num">${day}</div>
+      ${chips.slice(0,3).map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
+      ${chips.length>3?`<span style="font-size:9px;color:rgba(28,10,0,0.4);">+${chips.length-3} more</span>`:''}
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function renderCalWeek(weekStart) {
+  const grid = document.getElementById('calGrid');
+  if (!grid) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+    const isToday = d.getTime() === today.getTime();
+    const chips = getOccasionsForDate(d);
+    html += `<div class="cal-cell${isToday?' today':''}" style="min-height:140px;">
+      <div class="cal-day-num">${DOW[i]} ${d.getDate()}</div>
+      ${chips.map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
+    </div>`;
+  }
+  grid.innerHTML = html;
 }
 
 // ── Outline view ──────────────────────────────────────────────────────────────
@@ -954,7 +1093,6 @@ function renderOutline() {
   topGroups.forEach(g => {
     const totalVisible = olGroupTotalCount(g.id, showOnlyLiving, active);
     if (totalVisible === 0) return;
-
     const color = GROUP_COLORS[g.name] || '#3A6B20';
     const isFamily = g.name === 'Family';
     const el = document.createElement('div');
@@ -967,7 +1105,6 @@ function renderOutline() {
       <span class="ol-group-name">${isFamily ? '♥ ' : ''}${esc(g.name)}</span>
       <span class="ol-count">${totalVisible}</span>
     </div><div class="ol-group-body"></div>`;
-
     const body = el.querySelector('.ol-group-body');
     if (isFamily) {
       const members = (_groupMembersMap[g.id] || []).filter(c => !showOnlyLiving || !c.died_on);
@@ -1006,18 +1143,15 @@ function renderOlChildren(body, groupId, showOnlyLiving, active) {
   const childGroups = _rawGroups
     .filter(g => g.parent_group_id === groupId && olGroupTotalCount(g.id, showOnlyLiving, active) > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
-
   const childMemberIds = new Set();
   const collectDescendantMembers = gid => {
     (_groupMembersMap[gid] || []).forEach(c => childMemberIds.add(c.id));
     _rawGroups.filter(g => g.parent_group_id === gid).forEach(g => collectDescendantMembers(g.id));
   };
   childGroups.forEach(g => collectDescendantMembers(g.id));
-
   allMembers.filter(c => !childMemberIds.has(c.id))
     .sort((a, b) => (a.name||'').localeCompare(b.name||''))
     .forEach(c => body.appendChild(makeOlRow(c, 0, false)));
-
   childGroups.forEach(g => {
     const count = olGroupTotalCount(g.id, showOnlyLiving, active);
     if (!count) return;
@@ -1051,7 +1185,7 @@ function makeOlRow(c, depth, showRelLabel) {
   row.innerHTML = `<input type="checkbox" class="ol-row-cb" onclick="event.stopPropagation()" onchange="olRowCbChange(this,${c.id})">
     <span class="ol-row-name">${esc(name)}</span>
     <span class="ol-row-meta">${esc(metaStr)}</span>`;
-  row.addEventListener('click', e => { if (e.target.tagName === 'INPUT') return; openPanel(c); });
+  row.addEventListener('click', e => { if (e.target.tagName === 'INPUT') return; openDetailPanel(c.id); });
   return row;
 }
 
@@ -1147,6 +1281,36 @@ function initPanels() {
   if (localStorage.getItem(LS_RIGHT) === 'collapsed') _setPanelCollapsed('right', true);
 }
 
+// ── Resize handles ────────────────────────────────────────────────────────────
+function initResizeHandle(handleId, panelId, storageKey, isRight) {
+  const handle = document.getElementById(handleId);
+  const panel = document.getElementById(panelId);
+  if (!handle || !panel) return;
+  const saved = localStorage.getItem(storageKey);
+  if (saved) panel.style.width = saved + 'px';
+  let startX, startW;
+  handle.addEventListener('mousedown', e => {
+    startX = e.clientX; startW = panel.offsetWidth;
+    panel.style.transition = 'none';
+    handle.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+  function onMove(e) {
+    const delta = isRight ? startX - e.clientX : e.clientX - startX;
+    panel.style.width = Math.min(550, Math.max(160, startW + delta)) + 'px';
+  }
+  function onUp(e) {
+    const delta = isRight ? startX - e.clientX : e.clientX - startX;
+    localStorage.setItem(storageKey, Math.min(550, Math.max(160, startW + delta)));
+    panel.style.transition = '';
+    handle.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+}
+
 // ── Auth & boot ───────────────────────────────────────────────────────────────
 async function initAuthNav() {
   try {
@@ -1154,8 +1318,27 @@ async function initAuthNav() {
     const status = res.ok ? await res.json() : false;
     if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
     document.getElementById('ddUserEmail').textContent = status.email;
-    await init();
+
+    const [, contactsRes, groupsRes, relTypesRes] = await Promise.all([
+      init(),
+      fetch('/api/contacts'),
+      fetch('/api/groups'),
+      fetch('/api/relationship-types'),
+    ]);
+    const contacts = contactsRes.ok ? await contactsRes.json() : [];
+    const allGroups = groupsRes.ok ? await groupsRes.json() : [];
+    const relTypes = relTypesRes.ok ? await relTypesRes.json() : [];
+
+    CP.init('cpContainer');
+    CP.contacts = contacts;
+    CP.allGroups = allGroups;
+    CP.relTypes = relTypes;
+    CP.onSaved = () => {};
+
     initPanels();
+    initResizeHandle('leftResizeHandle', 'panelLeft', 'ts_left_w', false);
+    initResizeHandle('rightResizeHandle', 'panelRight', 'ts_right_w', true);
+    initCalendar();
     setTimeout(resizeGraph, 250);
     switchView(_currentView);
   } catch { window.location.href = '/login'; }
