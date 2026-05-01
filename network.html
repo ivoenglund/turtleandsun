@@ -196,6 +196,8 @@ let _subgroupIds = new Set();   // group IDs that are subgroups
 let _subgroupParents = {};      // subgroupId → parentGroupId
 let _rawGroups = [];
 let _groupMembersMap = {};
+let _groupByName = {};
+let _groupById = {};
 let _contactFamilyRelLabel = {};
 let _currentView = 'network';
 let _selectedContacts = new Set();
@@ -361,10 +363,21 @@ async function init() {
   topGroupDefs.forEach((g, i) => {
     GROUP_COLORS[g.name] = g.name === 'Family' ? FAMILY_COLOR : PALETTE[i % PALETTE.length];
   });
-  (data.groups || []).filter(g => g.parent_group_id).forEach(g => {
-    const parent = groupDefsById[g.parent_group_id];
-    GROUP_COLORS[g.name] = parent ? GROUP_COLORS[parent.name] : PALETTE[0];
-  });
+  // BFS so each generation inherits its parent's already-assigned color
+  let bfsQueue = topGroupDefs.map(g => g.id);
+  const bfsVisited = new Set(bfsQueue);
+  while (bfsQueue.length) {
+    const nextQueue = [];
+    bfsQueue.forEach(pid => {
+      (data.groups || []).filter(g => g.parent_group_id === pid && !bfsVisited.has(g.id)).forEach(g => {
+        const parent = groupDefsById[g.parent_group_id];
+        GROUP_COLORS[g.name] = parent ? GROUP_COLORS[parent.name] : PALETTE[0];
+        bfsVisited.add(g.id);
+        nextQueue.push(g.id);
+      });
+    });
+    bfsQueue = nextQueue;
+  }
 
   _allGroupNames = (data.groups || []).map(g => g.name);
 
@@ -423,6 +436,9 @@ async function init() {
 
   // Build outline data structures
   _rawGroups = data.groups || [];
+  _groupByName = {};
+  _groupById = {};
+  _rawGroups.forEach(g => { _groupByName[g.name] = g; _groupById[g.id] = g; });
   _groupMembersMap = {};
   (data.group_memberships || []).forEach(m => {
     if (!_groupMembersMap[m.group_id]) _groupMembersMap[m.group_id] = [];
@@ -664,6 +680,15 @@ function applyFilter() {
   applyVisibility(); closePanel();
 }
 
+// A group is active if it has a checkbox and is checked, OR if any ancestor is active.
+function isGroupNameActive(groupName, active) {
+  if (active.has(groupName)) return true;
+  const g = _groupByName[groupName];
+  if (!g || !g.parent_group_id) return false;
+  const parent = _groupById[g.parent_group_id];
+  return parent ? isGroupNameActive(parent.name, active) : false;
+}
+
 // Returns a Set of visible contact-node IDs given current filter state.
 function computeVisibleNodeIds(active, showOnlyLiving) {
   const visible = new Set();
@@ -671,9 +696,9 @@ function computeVisibleNodeIds(active, showOnlyLiving) {
     if (d.isMe) { visible.add(d.id); return; }
     if (showOnlyLiving && d.died_on) return;
     const relGroups = _nodeGroups[d.id];
-    if (relGroups) { for (const g of relGroups) { if (active.has(g)) { visible.add(d.id); return; } } }
+    if (relGroups) { for (const g of relGroups) { if (isGroupNameActive(g, active)) { visible.add(d.id); return; } } }
     const memGroups = _contactGroupNames[d.id];
-    if (memGroups) { for (const g of memGroups) { if (active.has(g)) { visible.add(d.id); return; } } }
+    if (memGroups) { for (const g of memGroups) { if (isGroupNameActive(g, active)) { visible.add(d.id); return; } } }
   });
   return visible;
 }
@@ -681,7 +706,9 @@ function computeVisibleNodeIds(active, showOnlyLiving) {
 // Returns a Set of visible group-hub node IDs.
 function computeVisibleGroupIds(active) {
   const visible = new Set();
-  _groupNodeSel.each(d => { if (active.has(_groupNodeName[d.id])) visible.add(d.id); });
+  _groupNodeSel.each(d => {
+    if (isGroupNameActive(_groupNodeName[d.id], active)) visible.add(d.id);
+  });
   return visible;
 }
 
@@ -710,12 +737,12 @@ function applyVisibility() {
   _relLinkSel.attr('display', l => relVisible(l) ? null : 'none');
   _hitAreaSel.attr('display', l => relVisible(l) ? null : 'none');
 
-  // Membership links: group must be active, group hub visible, contact node visible
+  // Membership links: group must be active (or have an active ancestor), hub visible, contact visible
   _memberLinkSel.attr('display', l => {
     const srcId = typeof l.source === 'object' ? l.source.id : l.source;
     const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
     const gname = _groupNodeName[srcId] || l.groupName;
-    if (!active.has(gname)) return 'none';
+    if (!isGroupNameActive(gname, active)) return 'none';
     if (!visibleGroupIds.has(srcId)) return 'none';
     if (!visibleNodeIds.has(tgtId)) return 'none';
     return null;
@@ -880,6 +907,13 @@ function switchView(view) {
   else renderOutline();
 }
 
+// Recursive total count of visible contacts in a group + all its descendants
+function olGroupTotalCount(groupId, showOnlyLiving, active) {
+  const direct = (_groupMembersMap[groupId] || []).filter(c => !showOnlyLiving || !c.died_on).length;
+  const children = _rawGroups.filter(g => g.parent_group_id === groupId && isGroupNameActive(g.name, active));
+  return direct + children.reduce((sum, g) => sum + olGroupTotalCount(g.id, showOnlyLiving, active), 0);
+}
+
 function renderOutline() {
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
@@ -893,18 +927,11 @@ function renderOutline() {
 
   topGroups.forEach(g => {
     if (!active.has(g.name)) return;
+    const totalVisible = olGroupTotalCount(g.id, showOnlyLiving, active);
+    if (totalVisible === 0) return;
+
     const color = GROUP_COLORS[g.name] || '#3A6B20';
     const isFamily = g.name === 'Family';
-    const subgroups = _rawGroups.filter(s => s.parent_group_id === g.id && active.has(s.name))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const directMembers = (_groupMembersMap[g.id] || []).filter(c => !showOnlyLiving || !c.died_on);
-    const subgroupMemberIds = new Set();
-    subgroups.forEach(s => (_groupMembersMap[s.id] || []).forEach(c => subgroupMemberIds.add(c.id)));
-    const trueDirectMembers = directMembers.filter(c => !subgroupMemberIds.has(c.id));
-    let totalVisible = trueDirectMembers.length;
-    subgroups.forEach(s => totalVisible += (_groupMembersMap[s.id] || []).filter(c => !showOnlyLiving || !c.died_on).length);
-    if (totalVisible === 0 && subgroups.length === 0) return;
-
     const el = document.createElement('div');
     el.className = 'ol-group';
     el.dataset.groupId = g.id;
@@ -917,8 +944,12 @@ function renderOutline() {
     </div><div class="ol-group-body"></div>`;
 
     const body = el.querySelector('.ol-group-body');
-    if (isFamily) renderOlFamilySection(body, directMembers);
-    else renderOlSubSection(body, subgroups, trueDirectMembers, showOnlyLiving);
+    if (isFamily) {
+      const members = (_groupMembersMap[g.id] || []).filter(c => !showOnlyLiving || !c.died_on);
+      renderOlFamilySection(body, members);
+    } else {
+      renderOlChildren(body, g.id, showOnlyLiving, active);
+    }
     inner.appendChild(el);
   });
 }
@@ -941,24 +972,38 @@ function renderOlFamilySection(body, members) {
   body.appendChild(petsEl);
 }
 
-function renderOlSubSection(body, subgroups, directMembers, showOnlyLiving) {
-  directMembers.sort((a, b) => (a.name||'').localeCompare(b.name||''));
-  directMembers.forEach(c => body.appendChild(makeOlRow(c, 0, false)));
-  subgroups.forEach(s => {
-    const sMembers = (_groupMembersMap[s.id] || []).filter(c => !showOnlyLiving || !c.died_on)
-      .sort((a, b) => (a.name||'').localeCompare(b.name||''));
-    if (!sMembers.length) return;
+// Recursively renders children of a group: direct members first, then child subgroups
+function renderOlChildren(body, groupId, showOnlyLiving, active) {
+  const allMembers = (_groupMembersMap[groupId] || []).filter(c => !showOnlyLiving || !c.died_on);
+  const childGroups = _rawGroups.filter(g => g.parent_group_id === groupId && isGroupNameActive(g.name, active))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Exclude members that live in child groups (so they only appear once)
+  const childMemberIds = new Set();
+  const collectDescendantMembers = gid => {
+    (_groupMembersMap[gid] || []).forEach(c => childMemberIds.add(c.id));
+    _rawGroups.filter(g => g.parent_group_id === gid).forEach(g => collectDescendantMembers(g.id));
+  };
+  childGroups.forEach(g => collectDescendantMembers(g.id));
+
+  allMembers.filter(c => !childMemberIds.has(c.id))
+    .sort((a, b) => (a.name||'').localeCompare(b.name||''))
+    .forEach(c => body.appendChild(makeOlRow(c, 0, false)));
+
+  childGroups.forEach(g => {
+    const count = olGroupTotalCount(g.id, showOnlyLiving, active);
+    if (!count) return;
     const subEl = document.createElement('div');
     subEl.className = 'ol-sub';
-    subEl.dataset.subId = s.id;
+    subEl.dataset.subId = g.id;
     subEl.innerHTML = `<div class="ol-sub-hdr" onclick="toggleOlSub(this)">
       <input type="checkbox" class="ol-cb" onchange="olSubCbChange(this)" onclick="event.stopPropagation()">
       <span class="ol-tri">▼</span>
-      <span class="ol-sub-name">${esc(s.name)}</span>
-      <span class="ol-count">${sMembers.length}</span>
+      <span class="ol-sub-name">${esc(g.name)}</span>
+      <span class="ol-count">${count}</span>
     </div><div class="ol-sub-body"></div>`;
     const sb = subEl.querySelector('.ol-sub-body');
-    sMembers.forEach(c => sb.appendChild(makeOlRow(c, 1, false)));
+    renderOlChildren(sb, g.id, showOnlyLiving, active);
     body.appendChild(subEl);
   });
 }

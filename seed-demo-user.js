@@ -40,7 +40,7 @@ function randomDiedOn(birthYear, minAge, maxAge) {
   return dateStr(deathYear, rand(1,12), rand(1,28));
 }
 
-function generateHumans(n) {
+function generateHumans(n, minAge = 22, maxAge = 70) {
   const contacts = [];
   for (let i = 0; i < n; i++) {
     const isMale = Math.random() < 0.5;
@@ -52,7 +52,7 @@ function generateHumans(n) {
       phone: `+467${rand(10000000,99999999)}`,
       city: pick(CITIES),
       country: 'Sweden',
-      birthday: randomBirthday(18, 80),
+      birthday: randomBirthday(minAge, maxAge),
       gender: isMale ? 'M' : 'F',
       is_pet: false,
     });
@@ -68,7 +68,7 @@ async function seed() {
   const userId = userRes.rows[0].id;
   console.log(`Demo user id: ${userId}`);
 
-  // ── Delete in correct dependency order ────────────────────────────────────────
+  // ── Delete in correct dependency order ──────────────────────────────────────
   await pool.query(`DELETE FROM occasions WHERE user_id=$1`, [userId]);
   await pool.query(`DELETE FROM contact_group_memberships WHERE user_id=$1`, [userId]);
   await pool.query(`DELETE FROM contact_relationships WHERE user_id=$1`, [userId]);
@@ -84,7 +84,7 @@ async function seed() {
   await pool.query(`DELETE FROM contacts WHERE user_id=$1`, [userId]);
   console.log('Old data cleared');
 
-  // ── Family group + 6 relationship types ──────────────────────────────────────
+  // ── Family group + relationship types ────────────────────────────────────────
   const famRes = await pool.query(
     `INSERT INTO groups (user_id, name) VALUES ($1, 'Family') RETURNING id`, [userId]
   );
@@ -97,9 +97,13 @@ async function seed() {
     ['Father of', 'Daughter of'],
     ['Spouse',    'Spouse'],
     ['Owner of',  'Pet of'],
+    ['Sister of', 'Brother of'],
+    ['Sister of', 'Sister of'],
+    ['Brother of','Brother of'],
   ];
   const rtIds = {};
   for (const [a, b] of rtPairs) {
+    if (rtIds[a]) continue; // already inserted
     const aRes = await pool.query(
       `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`, [famGid, a]
     );
@@ -108,18 +112,19 @@ async function seed() {
     if (a === b) {
       await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$1`, [aId]);
     } else {
-      const bRes = await pool.query(
-        `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`, [famGid, b]
-      );
-      const bId = bRes.rows[0].id;
-      rtIds[b] = bId;
-      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [bId, aId]);
-      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [aId, bId]);
+      if (!rtIds[b]) {
+        const bRes = await pool.query(
+          `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`, [famGid, b]
+        );
+        rtIds[b] = bRes.rows[0].id;
+      }
+      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [rtIds[b], aId]);
+      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [aId, rtIds[b]]);
     }
   }
   console.log('Family relationship types seeded');
 
-  // ── User-defined groups ───────────────────────────────────────────────────────
+  // ── Group hierarchy ───────────────────────────────────────────────────────────
   async function makeGroup(name) {
     const r = await pool.query(
       `INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id`, [userId, name]
@@ -133,22 +138,28 @@ async function seed() {
     );
     return r.rows[0].id;
   }
-  const gAcme    = await makeGroup('Acme Corp');
-  const g1995    = await makeGroup('Class of 1995');
-  const gChess   = await makeGroup('Chess Club');
-  const gRunning = await makeGroup('Running Club');
-  const gHiking  = await makeGroup('Hiking Group');
-  const gBook    = await makeGroup('Book Club');
 
-  // Subgroups under Acme Corp and Hiking Group
-  const gMyTeam      = await makeSubgroup('My team', gAcme);
-  const gEngineering = await makeSubgroup('Engineering', gAcme);
-  const gLeadership  = await makeSubgroup('Leadership', gAcme);
-  const gWeekend     = await makeSubgroup('Weekend warriors', gHiking);
-  const gMountain    = await makeSubgroup('Mountain group', gHiking);
-  console.log('User groups seeded');
+  // Work → Acme Corp → {My team, Engineering, Leadership}
+  //       → Old colleagues
+  const gWork         = await makeGroup('Work');
+  const gAcme         = await makeSubgroup('Acme Corp',     gWork);
+  const gMyTeam       = await makeSubgroup('My team',       gAcme);
+  const gEngineering  = await makeSubgroup('Engineering',   gAcme);
+  const gLeadership   = await makeSubgroup('Leadership',    gAcme);
+  const gOldCol       = await makeSubgroup('Old colleagues',gWork);
 
-  // ── Insert contacts ───────────────────────────────────────────────────────────
+  // Friends → {Class of 1995, Hiking Group, Running Club, Chess Club, Book Club, Best friends}
+  const gFriends      = await makeGroup('Friends');
+  const g1995         = await makeSubgroup('Class of 1995', gFriends);
+  const gHiking       = await makeSubgroup('Hiking Group',  gFriends);
+  const gRunning      = await makeSubgroup('Running Club',  gFriends);
+  const gChess        = await makeSubgroup('Chess Club',    gFriends);
+  const gBook         = await makeSubgroup('Book Club',     gFriends);
+  const gBest         = await makeSubgroup('Best friends',  gFriends);
+
+  console.log('Group hierarchy seeded');
+
+  // ── Shared helpers ────────────────────────────────────────────────────────────
   async function insertContact(c) {
     const r = await pool.query(
       `INSERT INTO contacts (user_id, name, email, phone, city, country, birthday, died_on, is_placeholder, is_pet)
@@ -161,7 +172,7 @@ async function seed() {
 
   async function addRel(aId, bId, typeName) {
     const rtId = rtIds[typeName];
-    if (!rtId) return;
+    if (!rtId) { console.warn('Unknown rel type:', typeName); return; }
     await pool.query(
       `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
        VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
@@ -184,97 +195,6 @@ async function seed() {
     );
   }
 
-  // ── Family: 25 humans + 5 pets ────────────────────────────────────────────────
-  const familyHumans = generateHumans(25);
-
-  // Make grandparents deceased
-  const grandpa = familyHumans[0];
-  grandpa.birthday = randomBirthday(85, 100);
-  const birthYearGrandpa = parseInt(grandpa.birthday.split('-')[0]);
-  grandpa.died_on = randomDiedOn(birthYearGrandpa, 65, 85);
-
-  const grandma = familyHumans[1];
-  grandma.birthday = randomBirthday(80, 95);
-  const birthYearGrandma = parseInt(grandma.birthday.split('-')[0]);
-  grandma.died_on = randomDiedOn(birthYearGrandma, 70, 88);
-
-  // Make 3 more family members deceased (uncles/aunts)
-  [4, 7, 11].forEach(i => {
-    familyHumans[i].birthday = randomBirthday(65, 85);
-    const by = parseInt(familyHumans[i].birthday.split('-')[0]);
-    familyHumans[i].died_on = randomDiedOn(by, 50, 75);
-  });
-
-  const familyIds = [];
-  for (const c of familyHumans) {
-    const id = await insertContact(c);
-    familyIds.push({ id, gender: c.gender, died_on: c.died_on });
-    await addMembership(id, famGid);
-  }
-
-  // 5 pets
-  const petIds = [];
-  const petSpecies = ['dog','cat','dog','rabbit','cat'];
-  for (let i = 0; i < 5; i++) {
-    const isDeceased = i < 2; // first two pets are deceased
-    const petBirthYear = 2026 - rand(1, isDeceased ? 18 : 6);
-    const bday = dateStr(petBirthYear, rand(1,12), rand(1,28));
-    const id = await insertContact({
-      name: pick(PET_NAMES),
-      birthday: bday,
-      died_on: isDeceased ? dateStr(petBirthYear + rand(8,15), rand(1,12), rand(1,28)) : null,
-      is_pet: true,
-    });
-    petIds.push(id);
-    await addMembership(id, famGid);
-  }
-
-  // Family relationships
-  const dad = familyIds[2];  // parents are index 2,3 (grandparents are 0,1)
-  const mum = familyIds[3];
-  await addRel(familyIds[0].id, familyIds[1].id, 'Spouse');
-  await addRel(dad.id, mum.id, 'Spouse');
-
-  // Dad and Mum are children of grandparents
-  await addRel(familyIds[0].id, dad.id, dad.gender === 'M' ? 'Son of' : 'Daughter of');
-  await addRel(familyIds[1].id, dad.id, dad.gender === 'M' ? 'Son of' : 'Daughter of');
-
-  // 6 children of dad+mum
-  const children = familyIds.slice(4, 10);
-  for (const child of children) {
-    await addRel(dad.id, child.id, child.gender === 'M' ? 'Son of' : 'Daughter of');
-    await addRel(mum.id, child.id, child.gender === 'M' ? 'Son of' : 'Daughter of');
-  }
-
-  // Spouse pairs from remaining family
-  for (let i = 10; i < familyIds.length - 1; i += 2) {
-    await addRel(familyIds[i].id, familyIds[i+1].id, 'Spouse');
-  }
-
-  // Pets owned by dad
-  for (const pid of petIds) {
-    await addRel(dad.id, pid, 'Owner of');
-  }
-
-  console.log('Family relationships seeded');
-
-  // ── Other contacts ────────────────────────────────────────────────────────────
-  const acmeContacts   = generateHumans(25);
-  const classContacts  = generateHumans(20);
-  const chessContacts  = generateHumans(15);
-  const runningContacts= generateHumans(20);
-  const hikingContacts = generateHumans(20);
-  const bookContacts   = generateHumans(20);
-
-  // 3 deceased in work group
-  [2, 9, 18].forEach(i => {
-    if (acmeContacts[i]) {
-      acmeContacts[i].birthday = randomBirthday(60, 80);
-      const by = parseInt(acmeContacts[i].birthday.split('-')[0]);
-      acmeContacts[i].died_on = randomDiedOn(by, 45, 70);
-    }
-  });
-
   async function insertGroup(contacts, groupId) {
     const ids = [];
     for (const c of contacts) {
@@ -285,28 +205,150 @@ async function seed() {
     return ids;
   }
 
-  // Acme Corp: insert contacts into parent group, then assign subgroups
-  const acmeIds = await insertGroup(acmeContacts, gAcme);
-  // My team: first 8, Engineering: next 8, Leadership: last 4 (of 25 total)
-  for (let i = 0; i < 8; i++)  await addMembership(acmeIds[i], gMyTeam);
-  for (let i = 8; i < 16; i++) await addMembership(acmeIds[i], gEngineering);
-  for (let i = 16; i < 20; i++) await addMembership(acmeIds[i], gLeadership);
+  // ── Family: 25 humans + 5 pets ────────────────────────────────────────────────
+  const familyHumans = generateHumans(25, 20, 85);
 
-  await insertGroup(classContacts,   g1995);
-  await insertGroup(chessContacts,   gChess);
-  await insertGroup(runningContacts, gRunning);
+  // Grandparents (0, 1) — deceased
+  familyHumans[0].birthday = randomBirthday(88, 100);
+  const gpBy = parseInt(familyHumans[0].birthday.split('-')[0]);
+  familyHumans[0].died_on = randomDiedOn(gpBy, 68, 84);
 
-  // Hiking: insert into parent group, then assign subgroups
-  const hikingIds = await insertGroup(hikingContacts, gHiking);
-  // Weekend warriors: first 10, Mountain group: last 10
-  for (let i = 0; i < 10; i++)  await addMembership(hikingIds[i], gWeekend);
-  for (let i = 10; i < 20; i++) await addMembership(hikingIds[i], gMountain);
+  familyHumans[1].birthday = randomBirthday(85, 97);
+  const gmBy = parseInt(familyHumans[1].birthday.split('-')[0]);
+  familyHumans[1].died_on = randomDiedOn(gmBy, 72, 88);
 
-  await insertGroup(bookContacts, gBook);
+  // Parents (2, 3) — middle aged, alive
+  familyHumans[2].birthday = randomBirthday(52, 62);
+  familyHumans[3].birthday = randomBirthday(50, 60);
 
-  console.log('Group contacts and memberships seeded');
+  // Two more deceased (aunt/uncle) — indices 7, 14
+  familyHumans[7].birthday  = randomBirthday(65, 80);
+  const a1By = parseInt(familyHumans[7].birthday.split('-')[0]);
+  familyHumans[7].died_on   = randomDiedOn(a1By, 55, 78);
 
-  // ── Occasions ─────────────────────────────────────────────────────────────────
+  familyHumans[14].birthday = randomBirthday(60, 75);
+  const a2By = parseInt(familyHumans[14].birthday.split('-')[0]);
+  familyHumans[14].died_on  = randomDiedOn(a2By, 50, 70);
+
+  const familyIds = [];
+  for (const c of familyHumans) {
+    const id = await insertContact(c);
+    familyIds.push({ id, gender: c.gender, died_on: c.died_on });
+    await addMembership(id, famGid);
+  }
+
+  // 5 pets (first 2 deceased)
+  const petIds = [];
+  for (let i = 0; i < 5; i++) {
+    const isDeceased = i < 2;
+    const petBirthYear = 2026 - rand(1, isDeceased ? 18 : 8);
+    const bday = dateStr(petBirthYear, rand(1,12), rand(1,28));
+    const id = await insertContact({
+      name: pick(PET_NAMES),
+      birthday: bday,
+      died_on: isDeceased ? dateStr(Math.min(petBirthYear + rand(8,16), 2025), rand(1,12), rand(1,28)) : null,
+      is_pet: true,
+    });
+    petIds.push(id);
+    await addMembership(id, famGid);
+  }
+
+  // Family relationships
+  const gp1 = familyIds[0], gp2 = familyIds[1];
+  const dad = familyIds[2], mum = familyIds[3];
+
+  await addRel(gp1.id, gp2.id, 'Spouse');
+  await addRel(dad.id, mum.id, 'Spouse');
+
+  // Dad is child of grandparents
+  await addRel(gp1.id, dad.id, dad.gender === 'M' ? 'Son of' : 'Daughter of');
+  await addRel(gp2.id, dad.id, dad.gender === 'M' ? 'Son of' : 'Daughter of');
+
+  // 6 children of dad+mum (indices 4–9)
+  const children = familyIds.slice(4, 10);
+  for (const child of children) {
+    const rel = child.gender === 'M' ? 'Son of' : 'Daughter of';
+    await addRel(dad.id, child.id, rel);
+    await addRel(mum.id, child.id, rel);
+  }
+
+  // Sibling relationships among children
+  for (let i = 0; i < children.length - 1; i++) {
+    for (let j = i + 1; j < children.length; j++) {
+      const a = children[i], b = children[j];
+      const relType = a.gender === 'M' ? 'Brother of' : 'Sister of';
+      await addRel(a.id, b.id, relType);
+    }
+  }
+
+  // Spouse pairs among remaining family
+  for (let i = 10; i < familyIds.length - 1; i += 2) {
+    await addRel(familyIds[i].id, familyIds[i + 1].id, 'Spouse');
+  }
+
+  // Pets owned by dad
+  for (const pid of petIds) {
+    await addRel(dad.id, pid, 'Owner of');
+  }
+
+  console.log('Family seeded');
+
+  // ── Work: 30 contacts across 4 leaf groups ────────────────────────────────────
+  // My team: 10 (1 deceased), Engineering: 10 (1 deceased), Leadership: 5, Old colleagues: 5
+  const myTeamContacts   = generateHumans(10, 25, 45);
+  const engContacts      = generateHumans(10, 28, 50);
+  const leadContacts     = generateHumans(5,  35, 58);
+  const oldColContacts   = generateHumans(5,  38, 65);
+
+  // 1 deceased in My team (index 3)
+  myTeamContacts[3].birthday = randomBirthday(55, 70);
+  const mt3By = parseInt(myTeamContacts[3].birthday.split('-')[0]);
+  myTeamContacts[3].died_on = randomDiedOn(mt3By, 45, 65);
+
+  // 1 deceased in Engineering (index 6)
+  engContacts[6].birthday = randomBirthday(60, 75);
+  const en6By = parseInt(engContacts[6].birthday.split('-')[0]);
+  engContacts[6].died_on = randomDiedOn(en6By, 48, 70);
+
+  const myTeamIds    = await insertGroup(myTeamContacts,  gMyTeam);
+  const engIds       = await insertGroup(engContacts,     gEngineering);
+  const leadIds      = await insertGroup(leadContacts,    gLeadership);
+  const oldColIds    = await insertGroup(oldColContacts,  gOldCol);
+
+  console.log('Work contacts seeded');
+
+  // ── Friends: 80 contacts across 6 leaf groups ─────────────────────────────────
+  // Class of 1995: 25, Hiking: 15, Running: 12, Chess: 10, Book: 10, Best: 8
+  const classContacts   = generateHumans(25, 42, 50);
+  const hikingContacts  = generateHumans(15, 28, 55);
+  const runningContacts = generateHumans(12, 22, 48);
+  const chessContacts   = generateHumans(10, 30, 65);
+  const bookContacts    = generateHumans(10, 28, 60);
+  const bestContacts    = generateHumans(8,  28, 48);
+
+  // Deceased: index 4 in Class of 1995, index 7 in Hiking, index 2 in Chess
+  classContacts[4].birthday = randomBirthday(55, 68);
+  const cl4By = parseInt(classContacts[4].birthday.split('-')[0]);
+  classContacts[4].died_on  = randomDiedOn(cl4By, 45, 65);
+
+  hikingContacts[7].birthday = randomBirthday(58, 72);
+  const hi7By = parseInt(hikingContacts[7].birthday.split('-')[0]);
+  hikingContacts[7].died_on  = randomDiedOn(hi7By, 50, 70);
+
+  chessContacts[2].birthday = randomBirthday(62, 78);
+  const ch2By = parseInt(chessContacts[2].birthday.split('-')[0]);
+  chessContacts[2].died_on  = randomDiedOn(ch2By, 52, 72);
+
+  const classIds   = await insertGroup(classContacts,   g1995);
+  const hikingIds  = await insertGroup(hikingContacts,  gHiking);
+  const runIds     = await insertGroup(runningContacts, gRunning);
+  const chessIds   = await insertGroup(chessContacts,   gChess);
+  const bookIds    = await insertGroup(bookContacts,    gBook);
+  const bestIds    = await insertGroup(bestContacts,    gBest);
+
+  console.log('Friends contacts seeded');
+
+  // ── Occasions (15+) ───────────────────────────────────────────────────────────
   async function addOccasion(contactId, name, startDate, frequency, notes) {
     await pool.query(
       `INSERT INTO occasions (user_id, contact_id, name, start_date, frequency, notes)
@@ -315,52 +357,58 @@ async function seed() {
     );
   }
 
-  // Wedding anniversary for dad+mum
-  const marriageYear = 2026 - rand(25, 35);
-  await addOccasion(dad.id,  'Wedding anniversary', dateStr(marriageYear, rand(5,9), rand(1,28)), 'yearly', null);
-  await addOccasion(mum.id,  'Wedding anniversary', dateStr(marriageYear, rand(5,9), rand(1,28)), 'yearly', null);
+  // Family — parents' anniversary
+  const marriageYear = 2026 - rand(22, 32);
+  await addOccasion(dad.id, 'Wedding anniversary', dateStr(marriageYear, rand(4,9), rand(1,28)), 'yearly', null);
+  await addOccasion(mum.id, 'Wedding anniversary', dateStr(marriageYear, rand(4,9), rand(1,28)), 'yearly', null);
 
-  // Grandparents' anniversary (milestone — 50th or 60th)
-  const grandWedYear = 2026 - rand(50, 65);
-  await addOccasion(familyIds[0].id, 'Wedding anniversary', dateStr(grandWedYear, rand(6,8), rand(1,28)), 'milestone', 'Golden anniversary');
+  // Grandparents' anniversary (milestone)
+  const gpWedYear = 2026 - rand(52, 68);
+  await addOccasion(gp1.id, 'Wedding anniversary', dateStr(gpWedYear, rand(5,8), rand(1,28)), 'milestone', 'Golden anniversary');
 
   // Children graduations
-  for (let i = 0; i < Math.min(3, children.length); i++) {
-    const gradYear = 2026 - rand(1, 8);
+  for (let i = 0; i < 3; i++) {
+    const gradYear = 2026 - rand(1, 9);
     await addOccasion(children[i].id, 'University graduation', dateStr(gradYear, 6, rand(1,15)), 'milestone', null);
   }
 
-  // Work anniversaries
-  const acmeFirstId = (await pool.query(
-    `SELECT id FROM contacts WHERE user_id=$1 ORDER BY created_at LIMIT 1 OFFSET $2`,
-    [userId, familyIds.length + petIds.length]
-  )).rows[0]?.id;
-  if (acmeFirstId) {
-    const workStartYear = 2026 - rand(3, 12);
-    await addOccasion(acmeFirstId, 'Work anniversary', dateStr(workStartYear, rand(1,12), rand(1,28)), 'yearly', 'Joined Acme Corp');
-  }
+  // Child milestones
+  await addOccasion(children[0].id, 'First job', dateStr(2026 - rand(2,6), rand(1,12), rand(1,28)), 'milestone', null);
+  await addOccasion(children[1].id, 'New home',  dateStr(2025, rand(2,11), rand(1,28)), 'one-time', 'Housewarming party');
 
-  // A few friend occasions
-  const chessOffset = familyIds.length + petIds.length + acmeContacts.length + classContacts.length;
-  const chessFirstId = (await pool.query(
-    `SELECT id FROM contacts WHERE user_id=$1 ORDER BY created_at LIMIT 1 OFFSET $2`,
-    [userId, chessOffset]
-  )).rows[0]?.id;
-  if (chessFirstId) {
-    await addOccasion(chessFirstId, 'Chess tournament', dateStr(2024, 11, 15), 'yearly', 'Annual club championship');
-    await addOccasion(chessFirstId, 'Birthday party', dateStr(2026, 7, 10), 'one-time', '40th birthday celebration');
-  }
+  // Spouse pairs within family (indices 10/11, 12/13)
+  const spouseWed1 = 2026 - rand(12, 22);
+  await addOccasion(familyIds[10].id, 'Wedding anniversary', dateStr(spouseWed1, rand(3,8), rand(1,28)), 'yearly', null);
+  const spouseWed2 = 2026 - rand(4, 14);
+  await addOccasion(familyIds[12].id, 'Wedding anniversary', dateStr(spouseWed2, rand(4,9), rand(1,28)), 'yearly', null);
 
-  // Spouse occasions for family pairs
-  await addOccasion(familyIds[10].id, 'Wedding anniversary', dateStr(2026 - rand(15,25), rand(3,8), rand(1,28)), 'yearly', null);
-  await addOccasion(familyIds[12].id, 'Wedding anniversary', dateStr(2026 - rand(5,15), rand(4,9), rand(1,28)), 'yearly', null);
+  // Work — My team work anniversaries
+  const workStartYear = 2026 - rand(3, 10);
+  await addOccasion(myTeamIds[0], 'Work anniversary', dateStr(workStartYear, rand(1,12), rand(1,28)), 'yearly', 'Joined Acme Corp');
+  await addOccasion(myTeamIds[2], 'Work anniversary', dateStr(2026 - rand(1,5), rand(1,12), rand(1,28)), 'yearly', null);
 
-  // General occasions for children
-  await addOccasion(children[0].id, 'First job', dateStr(2026 - rand(2,5), rand(1,12), rand(1,28)), 'milestone', null);
-  await addOccasion(children[1].id, 'New home', dateStr(2025, rand(1,12), rand(1,28)), 'one-time', 'Housewarming party');
+  // Leadership — a team off-site
+  await addOccasion(leadIds[0], 'Team off-site', dateStr(2026, 9, rand(10,25)), 'yearly', 'Annual leadership retreat');
+
+  // Friends — Chess tournament
+  await addOccasion(chessIds[0], 'Chess tournament', dateStr(2024, 11, 15), 'yearly', 'Annual club championship');
+  await addOccasion(chessIds[1], 'Birthday party',   dateStr(2026, 7, 10), 'one-time', '40th birthday celebration');
+
+  // Friends — Running race
+  await addOccasion(runIds[0], 'Stockholm Marathon', dateStr(2026, 6, rand(1,15)), 'yearly', null);
+
+  // Friends — Hiking annual trip
+  await addOccasion(hikingIds[0], 'Summer hike', dateStr(2026, 7, rand(1,20)), 'yearly', 'Annual mountain trek');
+
+  // Friends — Book club
+  await addOccasion(bookIds[0], 'Book club annual meet', dateStr(2026, 10, rand(1,28)), 'yearly', null);
+
+  // Best friends — birthday
+  await addOccasion(bestIds[0], 'Birthday', dateStr(2026 - rand(28,45), rand(1,12), rand(1,28)), 'yearly', null);
+  await addOccasion(bestIds[1], 'Birthday', dateStr(2026 - rand(28,45), rand(1,12), rand(1,28)), 'yearly', null);
 
   console.log('Occasions seeded');
-  console.log(`Done! Log in as ${DEMO_EMAIL} to view the network.`);
+  console.log(`Done! 140 contacts across Family / Work / Friends. Log in as ${DEMO_EMAIL}.`);
 }
 
 module.exports = seed;

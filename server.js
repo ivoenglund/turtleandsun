@@ -415,18 +415,20 @@ app.post('/api/groups', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+async function deleteGroupCascade(groupId, userId) {
+  const subs = await pool.query(
+    `SELECT id FROM groups WHERE parent_group_id = $1 AND user_id = $2`, [groupId, userId]
+  );
+  for (const sub of subs.rows) await deleteGroupCascade(sub.id, userId);
+  await pool.query(`DELETE FROM contact_group_memberships WHERE group_id = $1 AND user_id = $2`, [groupId, userId]);
+  await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2`, [groupId, userId]);
+}
+
 app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   try {
-    // Delete subgroups first (memberships, then the subgroup rows)
-    const subs = await pool.query(
-      `SELECT id FROM groups WHERE parent_group_id = $1 AND user_id = $2`, [req.params.id, req.user.id]
-    );
-    for (const sub of subs.rows) {
-      await pool.query(`DELETE FROM contact_group_memberships WHERE group_id = $1 AND user_id = $2`, [sub.id, req.user.id]);
-      await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2`, [sub.id, req.user.id]);
-    }
-    await pool.query(`DELETE FROM contact_group_memberships WHERE group_id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
-    await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2 AND name != 'Family'`, [req.params.id, req.user.id]);
+    const check = await pool.query(`SELECT name FROM groups WHERE id=$1 AND user_id=$2`, [req.params.id, req.user.id]);
+    if (!check.rows.length || check.rows[0].name === 'Family') return res.status(400).json({ error: 'Cannot delete this group.' });
+    await deleteGroupCascade(req.params.id, req.user.id);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
