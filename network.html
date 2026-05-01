@@ -32,7 +32,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 .panel-left{display:flex;flex-direction:row;width:220px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-right:1px solid rgba(28,10,0,0.08);background:#fff;}
 .panel-left.collapsed{width:28px;}
-.pl-body{flex:1;display:flex;flex-direction:column;min-width:160px;overflow:hidden;}
+.pl-body{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative;}
 .pl-header{padding:12px 16px 6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.35);}
 .pl-content{flex:1;overflow-y:auto;padding:0 0 16px;}
 .pl-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-left:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);font-size:14px;user-select:none;}
@@ -40,14 +40,33 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 .panel-right{display:flex;flex-direction:row-reverse;width:320px;flex-shrink:0;overflow:hidden;transition:width 0.2s ease;border-left:1px solid rgba(28,10,0,0.08);background:#FFF9E6;}
 .panel-right.collapsed{width:28px;}
-.pr-body{flex:1;display:flex;flex-direction:column;min-width:160px;overflow:hidden;}
+.pr-body{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative;}
 .pr-toggle{width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:12px;cursor:pointer;border-right:1px solid rgba(28,10,0,0.06);color:rgba(28,10,0,0.3);font-size:14px;user-select:none;}
 .pr-toggle:hover{color:#1C0A00;background:rgba(28,10,0,0.03);}
 
 /* Resize handles */
-.panel-resize-handle{width:4px;flex-shrink:0;cursor:ew-resize;background:transparent;transition:background 0.15s;}
+.panel-resize-handle{width:4px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background 0.15s;}
 .panel-resize-handle:hover,.panel-resize-handle.dragging{background:rgba(58,107,32,0.22);}
 .panel-left.collapsed .panel-resize-handle,.panel-right.collapsed .panel-resize-handle{display:none;}
+
+/* Close button (mobile overlay) */
+.panel-close-btn{display:none;position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;border-radius:50%;background:rgba(28,10,0,0.08);color:#1C0A00;font-size:16px;cursor:pointer;line-height:1;z-index:10;}
+.panel-close-btn:hover{background:rgba(28,10,0,0.15);}
+
+@media(max-width:1000px){
+  .panel-left{position:fixed;left:0;top:0;bottom:0;z-index:200;width:260px!important;transform:translateX(-100%);transition:transform 0.2s ease;border-right:none;box-shadow:4px 0 24px rgba(0,0,0,0.15);}
+  .panel-left.mobile-open{transform:translateX(0);}
+  .panel-left.collapsed{width:260px!important;transform:translateX(-100%);}
+  .panel-left .panel-resize-handle{display:none!important;}
+  .panel-right{position:fixed;right:0;top:0;bottom:0;z-index:200;width:320px!important;transform:translateX(100%);transition:transform 0.2s ease;border-left:none;box-shadow:-4px 0 24px rgba(0,0,0,0.15);}
+  .panel-right.mobile-open{transform:translateX(0);}
+  .panel-right.collapsed{width:320px!important;transform:translateX(100%);}
+  .panel-right .panel-resize-handle{display:none!important;}
+  .panel-left .pl-toggle,.panel-right .pr-toggle{display:none;}
+  .panel-close-btn{display:flex;align-items:center;justify-content:center;}
+  .mobile-backdrop{display:block!important;}
+}
+.mobile-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:199;}
 
 .fp-item{padding:5px 14px;display:flex;align-items:center;}
 .fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;width:100%;}
@@ -124,18 +143,6 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .cal-chip.remembrance{background:#f0ede6;color:rgba(28,10,0,0.55);}
 .cal-chip.milestone{background:#e8e0f0;color:#6b2d9a;}
 
-.mobile-backdrop{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.35);z-index:40;pointer-events:none;opacity:0;transition:opacity 0.2s;}
-@media(max-width:1000px){
-  .three-col{position:relative;}
-  .panel-left{position:absolute;top:0;bottom:0;left:0;z-index:50;width:28px !important;transition:width 0.2s ease,box-shadow 0.2s ease;}
-  .panel-left.mobile-open{width:260px !important;box-shadow:4px 0 20px rgba(0,0,0,0.13);}
-  .panel-right{position:absolute;top:0;bottom:0;right:0;z-index:50;width:28px !important;transition:width 0.2s ease,box-shadow 0.2s ease;}
-  .panel-right.mobile-open{width:300px !important;box-shadow:-4px 0 20px rgba(0,0,0,0.13);}
-  .panel-center{padding:0 28px;}
-  .mobile-backdrop{display:block;}
-  .mobile-backdrop.open{pointer-events:auto;opacity:1;}
-  .panel-resize-handle{display:none;}
-}
 </style>
 </head>
 <body>
@@ -172,6 +179,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 <div class="three-col">
   <div class="panel-left" id="panelLeft">
     <div class="pl-body">
+      <button class="panel-close-btn" onclick="closeMobileOverlays()" aria-label="Close">×</button>
       <div class="pl-header">Filters</div>
       <div class="pl-content">
         <div class="fp-item">
@@ -227,11 +235,12 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
     <div class="pr-toggle" onclick="togglePanel('right')" id="prArrow">&#8250;</div>
     <div class="panel-resize-handle" id="rightResizeHandle"></div>
     <div class="pr-body">
+      <button class="panel-close-btn" onclick="closeMobileOverlays()" aria-label="Close">×</button>
       <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
     </div>
   </div>
 
-  <div class="mobile-backdrop" id="mobileBackdrop" onclick="closeMobilePanels()"></div>
+  <div class="mobile-backdrop" id="mobileBackdrop" onclick="closeMobileOverlays()"></div>
 </div>
 
 <div id="ol-bulk-bar">
@@ -573,7 +582,7 @@ function buildGraph() {
   _svg = d3.select('#graph-svg').attr('width', _width).attr('height', _height);
   _svg.selectAll('*').remove();
 
-  const zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', e => _g.attr('transform', e.transform));
+  const zoom = d3.zoom().scaleExtent([0.05, 4]).filter(event => event.type !== 'dblclick').on('zoom', e => _g.attr('transform', e.transform));
   _svg.call(zoom);
   _g = _svg.append('g');
 
@@ -690,7 +699,8 @@ function buildGraph() {
     .style('cursor', d => (d.isMe && !Number.isInteger(d.id)) ? 'default' : 'pointer')
     .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd))
     .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
-    .on('click', nodeClick);
+    .on('click', nodeClick)
+    .on('dblclick', nodeDoubleClick);
 
   const meG = nodeG.filter(d => d.isMe);
   meG.append('rect').attr('x', -GNW / 2).attr('y', -GNH / 2)
@@ -888,8 +898,18 @@ function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whit
 
 // ── Detail panel ──────────────────────────────────────────────────────────────
 function nodeClick(event, d) { if (d.isMe && !Number.isInteger(d.id)) return; event.stopPropagation(); openDetailPanel(d.id); }
+function nodeDoubleClick(event, d) { if (d.isMe && !Number.isInteger(d.id)) return; event.stopPropagation(); forceOpenDetailPanel(d.id); }
 
 function openDetailPanel(id) {
+  const pr = document.getElementById('panelRight');
+  const panelOpen = window.innerWidth <= 1000 ? pr.classList.contains('mobile-open') : !pr.classList.contains('collapsed');
+  if (panelOpen) {
+    CP.open(id);
+    if (_currentView === 'network') highlightNode(id);
+  }
+}
+
+function forceOpenDetailPanel(id) {
   const pr = document.getElementById('panelRight');
   if (window.innerWidth > 1000 && pr.classList.contains('collapsed')) {
     _setPanelCollapsed('right', false);
@@ -1094,7 +1114,7 @@ function renderCalMonth(year, month) {
     const chips = cur ? (byDay[day] || []) : [];
     html += `<div class="cal-cell${!cur?' other-month':''}${isToday?' today':''}">
       <div class="cal-day-num">${day}</div>
-      ${chips.slice(0,3).map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
+      ${chips.slice(0,3).map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" ondblclick="forceOpenDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
       ${chips.length>3?`<span style="font-size:9px;color:rgba(28,10,0,0.4);">+${chips.length-3} more</span>`:''}
     </div>`;
   }
@@ -1124,7 +1144,7 @@ function renderCalWeek(weekStart) {
     const chips = getOccasionsForDate(d);
     html += `<div class="cal-cell${isToday?' today':''}" style="min-height:140px;">
       <div class="cal-day-num">${DOW[i]} ${d.getDate()}</div>
-      ${chips.map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
+      ${chips.map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" ondblclick="forceOpenDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
     </div>`;
   }
   grid.innerHTML = html;
@@ -1269,6 +1289,7 @@ function makeOlRow(c, depth, showRelLabel) {
     <span class="ol-row-name">${esc(name)}</span>
     <span class="ol-row-meta">${esc(metaStr)}</span>`;
   row.addEventListener('click', e => { if (e.target.tagName === 'INPUT') return; openDetailPanel(c.id); });
+  row.addEventListener('dblclick', e => { if (e.target.tagName === 'INPUT') return; forceOpenDetailPanel(c.id); });
   return row;
 }
 
@@ -1353,7 +1374,7 @@ function togglePanel(side) {
   }
 }
 
-function closeMobilePanels() {
+function closeMobileOverlays() {
   document.getElementById('panelLeft').classList.remove('mobile-open');
   document.getElementById('panelRight').classList.remove('mobile-open');
   document.getElementById('mobileBackdrop').classList.remove('open');
@@ -1382,17 +1403,19 @@ function initResizeHandle(handleId, panelId, storageKey, isRight) {
   });
   function onMove(e) {
     const delta = isRight ? startX - e.clientX : e.clientX - startX;
-    panel.style.width = Math.min(550, Math.max(160, startW + delta)) + 'px';
+    panel.style.width = Math.min(600, Math.max(200, startW + delta)) + 'px';
   }
   function onUp(e) {
     const delta = isRight ? startX - e.clientX : e.clientX - startX;
-    localStorage.setItem(storageKey, Math.min(550, Math.max(160, startW + delta)));
+    localStorage.setItem(storageKey, Math.min(600, Math.max(200, startW + delta)));
     panel.style.transition = '';
     handle.classList.remove('dragging');
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   }
 }
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileOverlays(); });
 
 // ── Auth & boot ───────────────────────────────────────────────────────────────
 async function initAuthNav() {
