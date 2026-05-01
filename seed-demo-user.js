@@ -1,6 +1,6 @@
 const { pool } = require('./db');
 
-const DEMO_EMAIL = 'demo@turtleandsun.com';
+const DEMO_EMAIL = 'ivo.englund@3doc.se';
 
 const MALE_NAMES = [
   'Erik','Lars','Johan','Anders','Magnus','Karl','Mikael','Stefan','Peter','Björn',

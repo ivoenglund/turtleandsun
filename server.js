@@ -688,6 +688,17 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
 }
 
 
+app.get('/admin/run-seed-demo', async (req, res) => {
+  try {
+    const seed = require('./seed-demo-user');
+    await seed();
+    res.send('Seed complete. Now remove this route from server.js.');
+  } catch (err) {
+    console.error('Seed error:', err);
+    res.status(500).send('Seed failed: ' + err.message);
+  }
+});
+
 initDb()
   .then(() => seedGallery())
   .then(() => {
