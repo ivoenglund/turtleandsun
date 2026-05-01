@@ -25,6 +25,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .cb-label input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
 .cb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .cb-sub-label{padding-left:8px;opacity:0.88;}
+.cb-sub2-label{padding-left:16px;opacity:0.76;}
 .cb-sep{width:1px;height:14px;background:rgba(28,10,0,0.15);flex-shrink:0;}
 .btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
 .btn-back:hover{background:#1C0A00;}
@@ -201,6 +202,7 @@ let _groupById = {};
 let _contactFamilyRelLabel = {};
 let _currentView = 'network';
 let _selectedContacts = new Set();
+let _groupsWithCheckbox = new Set();
 let _contactOccasions = {};  // contactId → [{ name, date, years }]
 let _nodeHeights = {};        // contactId → computed pill height
 const _today = new Date(); _today.setHours(0, 0, 0, 0);
@@ -308,9 +310,12 @@ function nodeLayout(d) {
   return { h, items };
 }
 
-function toggleParentCb(cb, parentGroupName) {
-  document.querySelectorAll(`#cbGroup input[data-parent-group="${CSS.escape(parentGroupName)}"]`)
-    .forEach(child => { child.checked = cb.checked; });
+function toggleParentCb(cb) {
+  const cascade = (name, checked) => {
+    document.querySelectorAll(`#cbGroup input[data-parent-group="${CSS.escape(name)}"]`)
+      .forEach(child => { child.checked = checked; cascade(child.dataset.group, checked); });
+  };
+  cascade(cb.dataset.group, cb.checked);
   applyFilter();
 }
 
@@ -381,7 +386,7 @@ async function init() {
 
   _allGroupNames = (data.groups || []).map(g => g.name);
 
-  // Build filter checkboxes with parent/subgroup hierarchy
+  // Build filter checkboxes with full recursive hierarchy
   const cbGroup = document.getElementById('cbGroup');
   const insertBefore = document.querySelector('#cbGroup .cb-sep:last-of-type');
   const subsByParentId = {};
@@ -389,24 +394,24 @@ async function init() {
     if (!subsByParentId[g.parent_group_id]) subsByParentId[g.parent_group_id] = [];
     subsByParentId[g.parent_group_id].push(g);
   });
-  topGroupDefs.forEach(g => {
-    const color = GROUP_COLORS[g.name];
+  function addCbForGroup(g, depth, color) {
+    const depthClass = depth === 0 ? '' : depth === 1 ? ' cb-sub-label' : ' cb-sub2-label';
     const label = document.createElement('label');
-    label.className = 'cb-label';
+    label.className = 'cb-label' + depthClass;
     const gAttr = g.name.replace(/"/g, '&quot;');
-    const gJs = g.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    label.innerHTML = `<input type="checkbox" data-group="${gAttr}" checked onchange="toggleParentCb(this,'${gJs}')">`
-      + `<span class="cb-dot" style="background:${color};"></span>${esc(g.name)}`;
+    const dotSize = depth === 0 ? '8px' : depth === 1 ? '6px' : '5px';
+    const dotExtra = depth === 1 ? ';opacity:0.7' : depth >= 2 ? ';opacity:0.55' : '';
+    const pName = depth > 0 ? ((groupDefsById[g.parent_group_id] || {}).name || '') : '';
+    const pAttr = pName ? ` data-parent-group="${pName.replace(/"/g, '&quot;')}"` : '';
+    label.innerHTML = `<input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)">`
+      + `<span class="cb-dot" style="width:${dotSize};height:${dotSize};background:${color}${dotExtra};"></span>${esc(g.name)}`;
     cbGroup.insertBefore(label, insertBefore);
-    (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name)).forEach(s => {
-      const sLabel = document.createElement('label');
-      sLabel.className = 'cb-label cb-sub-label';
-      const sAttr = s.name.replace(/"/g, '&quot;');
-      sLabel.innerHTML = `<input type="checkbox" data-group="${sAttr}" data-parent-group="${gAttr}" checked onchange="applyFilter()">`
-        + `<span class="cb-dot" style="width:6px;height:6px;background:${color};opacity:0.7;"></span>${esc(s.name)}`;
-      cbGroup.insertBefore(sLabel, insertBefore);
-    });
-  });
+    (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(s => addCbForGroup(s, depth + 1, color));
+  }
+  topGroupDefs.forEach(g => addCbForGroup(g, 0, GROUP_COLORS[g.name]));
+  _groupsWithCheckbox.clear();
+  document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => _groupsWithCheckbox.add(cb.dataset.group));
 
   const groupNodes = Object.values(groupNodeMap);
   _memberLinks = (data.group_memberships || []).map(m => ({
@@ -680,8 +685,8 @@ function applyFilter() {
   applyVisibility(); closePanel();
 }
 
-// A group is active if it has a checkbox and is checked, OR if any ancestor is active.
 function isGroupNameActive(groupName, active) {
+  if (_groupsWithCheckbox.has(groupName)) return active.has(groupName);
   if (active.has(groupName)) return true;
   const g = _groupByName[groupName];
   if (!g || !g.parent_group_id) return false;
@@ -902,7 +907,7 @@ function switchView(view) {
   document.getElementById('btn-view-network').classList.toggle('active', view === 'network');
   document.getElementById('btn-view-outline').classList.toggle('active', view === 'outline');
   document.getElementById('graph-container').style.display = view === 'network' ? '' : 'none';
-  document.getElementById('outline-container').style.display = view === 'outline' ? '' : 'none';
+  document.getElementById('outline-container').style.display = view === 'outline' ? 'block' : 'none';
   if (view === 'network') { applyVisibility(); closePanel(); }
   else renderOutline();
 }
