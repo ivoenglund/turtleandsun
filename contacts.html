@@ -518,7 +518,12 @@ async function initAuthNav() {
   document.getElementById('ddUser').style.display = 'block';
   document.getElementById('ddUserEmail').textContent = _authStatus.email;
   document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
-  loadContacts();
+  await loadContacts();
+  const urlId = new URLSearchParams(location.search).get('id');
+  if (urlId) {
+    history.replaceState(null, '', '/account/contacts');
+    selectContact(+urlId);
+  }
 }
 function handleAccountClick(e) {
   e.preventDefault();

@@ -31,7 +31,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 #graph-container{flex:1;position:relative;overflow:hidden;background:#fff;}
 #graph-svg{width:100%;height:100%;display:block;}
 
-.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.15s;z-index:100;max-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
+.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.15s;z-index:100;max-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
 .tooltip.visible{opacity:1;}
 
 .side-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:#FFF9E6;box-shadow:-4px 0 24px rgba(0,0,0,0.12);transition:right 0.25s cubic-bezier(0.4,0,0.2,1);z-index:200;display:flex;flex-direction:column;}
@@ -134,17 +134,35 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const GROUP_COLORS = {
-  'Family':  '#e74c8b',
-  'Work':    '#3A6B20',
-  'School':  '#2980b9',
-  'Friends': '#e67e22',
+  'Family':  '#c0195a',
+  'Work':    '#2a5016',
+  'School':  '#1a5f8a',
+  'Friends': '#b85e10',
 };
 const GROUPS = ['Family', 'Work', 'School', 'Friends'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Node pill dimensions
+const NW = 130, NH = 46, NRX = 10;
+const ME_R = 26;
 
 let _allNodes = [], _allLinks = [], _contactMap = {};
-let _nodeGroups = {}; // nodeId -> Set of group names that have a relationship
-let _simulation, _svg, _g, _nodeSel, _linkSel;
+let _nodeGroups = {};
+let _simulation, _svg, _g, _nodeSel, _linkSel, _labelSel;
 let _width, _height;
+
+function formatBirthday(str) {
+  if (!str) return '';
+  const p = str.split('-');
+  if (p.length < 3) return str;
+  const m = MONTHS[parseInt(p[1], 10) - 1] || p[1];
+  return `${parseInt(p[2], 10)} ${m}`;
+}
+
+function truncate(s, n) {
+  s = s || '';
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
 
 async function init() {
   const res = await fetch('/api/network');
@@ -158,7 +176,6 @@ async function init() {
     ...data.contacts.map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c }))
   ];
 
-  // Deduplicate links (keep one per pair)
   const seen = new Set();
   _allLinks = [];
   data.relationships.forEach(r => {
@@ -169,7 +186,6 @@ async function init() {
     }
   });
 
-  // Build nodeGroups map for visibility decisions
   _allLinks.forEach(l => {
     [l.source, l.target].forEach(id => {
       if (!_nodeGroups[id]) _nodeGroups[id] = new Set();
@@ -192,11 +208,9 @@ function buildGraph() {
   const zoom = d3.zoom()
     .scaleExtent([0.05, 4])
     .on('zoom', e => _g.attr('transform', e.transform));
-
   _svg.call(zoom);
   _g = _svg.append('g');
 
-  // Clone so D3 mutation doesn't contaminate originals
   const nodesCopy = _allNodes.map(n => ({ ...n }));
   const idToNode = {};
   nodesCopy.forEach(n => { idToNode[n.id] = n; });
@@ -207,19 +221,38 @@ function buildGraph() {
   })).filter(l => l.source && l.target);
 
   _simulation = d3.forceSimulation(nodesCopy)
-    .force('link', d3.forceLink(linksCopy).id(d => d.id).distance(80).strength(0.4))
-    .force('charge', d3.forceManyBody().strength(-200))
+    .force('link', d3.forceLink(linksCopy).id(d => d.id).distance(160).strength(0.35))
+    .force('charge', d3.forceManyBody().strength(-350))
     .force('center', d3.forceCenter(_width / 2, _height / 2))
-    .force('collision', d3.forceCollide().radius(d => d.isMe ? 28 : 18));
+    .force('collision', d3.forceCollide().radius(d => d.isMe ? ME_R + 8 : Math.sqrt((NW/2)**2 + (NH/2)**2) + 6));
 
+  // ── Links ──────────────────────────────────────────────────────────────────
   _linkSel = _g.append('g').attr('class', 'links')
     .selectAll('line')
     .data(linksCopy)
     .join('line')
-    .attr('stroke', d => GROUP_COLORS[d.group] || 'rgba(28,10,0,0.12)')
-    .attr('stroke-opacity', 0.4)
-    .attr('stroke-width', 1.5);
+    .attr('stroke', d => GROUP_COLORS[d.group] || '#555')
+    .attr('stroke-opacity', 0.55)
+    .attr('stroke-width', 2);
 
+  // ── Edge labels ────────────────────────────────────────────────────────────
+  _labelSel = _g.append('g').attr('class', 'link-labels')
+    .selectAll('text')
+    .data(linksCopy)
+    .join('text')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+    .attr('font-size', 9)
+    .attr('font-weight', 700)
+    .attr('fill', d => GROUP_COLORS[d.group] || '#333')
+    .style('paint-order', 'stroke')
+    .style('stroke', '#fff')
+    .style('stroke-width', '4px')
+    .style('stroke-linejoin', 'round')
+    .text(d => d.rel);
+
+  // ── Nodes ──────────────────────────────────────────────────────────────────
   const nodeG = _g.append('g').attr('class', 'nodes')
     .selectAll('g')
     .data(nodesCopy)
@@ -235,25 +268,55 @@ function buildGraph() {
     .on('mouseleave', hideTooltip)
     .on('click', nodeClick);
 
-  nodeG.append('circle')
-    .attr('r', d => d.isMe ? 24 : 14)
-    .attr('fill', d => d.isMe ? '#3A6B20' : '#f0ede6')
-    .attr('stroke', d => d.isMe ? '#fff' : 'rgba(28,10,0,0.18)')
-    .attr('stroke-width', d => d.isMe ? 3 : 1.5);
+  // Me node — circle
+  const meNodes = nodeG.filter(d => d.isMe);
+  meNodes.append('circle')
+    .attr('r', ME_R)
+    .attr('fill', '#3A6B20')
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 3);
+  meNodes.append('text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+    .attr('font-size', 11).attr('font-weight', 800).attr('fill', '#fff')
+    .text('You');
 
-  nodeG.append('text')
+  // Contact nodes — pill rect + name + birthday
+  const contactNodes = nodeG.filter(d => !d.isMe);
+  contactNodes.append('rect')
+    .attr('x', -NW / 2).attr('y', -NH / 2)
+    .attr('width', NW).attr('height', NH)
+    .attr('rx', NRX)
+    .attr('fill', '#f7f4ef')
+    .attr('stroke', 'rgba(28,10,0,0.22)')
+    .attr('stroke-width', 2);
+
+  // Name text — shift up when birthday present, centred when not
+  contactNodes.append('text')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'central')
+    .attr('y', d => d.birthday ? -8 : 0)
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', d => d.isMe ? 11 : 10)
-    .attr('font-weight', 700)
-    .attr('fill', d => d.isMe ? '#fff' : '#1C0A00')
-    .text(d => d.isMe ? 'You' : (d.name || '?').charAt(0).toUpperCase());
+    .attr('font-size', 10).attr('font-weight', 700).attr('fill', '#1C0A00')
+    .text(d => truncate(d.name, 18));
+
+  // Birthday text
+  contactNodes.filter(d => !!d.birthday)
+    .append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('y', 9)
+    .attr('font-family', "'DM Sans', sans-serif")
+    .attr('font-size', 8.5).attr('fill', 'rgba(28,10,0,0.48)')
+    .text(d => formatBirthday(d.birthday));
 
   _simulation.on('tick', () => {
     _linkSel
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _labelSel
+      .attr('x', d => (d.source.x + d.target.x) / 2)
+      .attr('y', d => (d.source.y + d.target.y) / 2);
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
   });
 
@@ -275,7 +338,6 @@ function toggleAll() {
 
 function applyFilter() {
   const active = getActiveGroups();
-  // Sync "All" checkbox
   document.getElementById('cb-all').checked = active.size === GROUPS.length;
   applyVisibility();
   closePanel();
@@ -286,6 +348,7 @@ function applyVisibility() {
   const active = getActiveGroups();
 
   _linkSel.attr('display', l => active.has(l.group) ? null : 'none');
+  _labelSel.attr('display', l => active.has(l.group) ? null : 'none');
 
   _nodeSel.attr('display', d => {
     if (d.isMe) return null;
@@ -333,7 +396,7 @@ function openPanel(d) {
 
   const bday = d.birthday;
   document.getElementById('spBirthdayWrap').style.display = bday ? '' : 'none';
-  document.getElementById('spBirthday').textContent = bday || '';
+  document.getElementById('spBirthday').textContent = bday ? formatBirthday(bday) : '';
 
   const city = d.city;
   document.getElementById('spCityWrap').style.display = city ? '' : 'none';
@@ -360,7 +423,7 @@ function openPanel(d) {
     }).join('');
   }
 
-  document.getElementById('spViewFull').href = `/account/contacts#${nodeId}`;
+  document.getElementById('spViewFull').href = `/account/contacts?id=${nodeId}`;
   document.getElementById('sidePanel').classList.add('open');
   highlightNode(nodeId);
 }
@@ -372,7 +435,6 @@ function closePanel() {
 
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
-  const active = getActiveGroups();
   const connectedIds = new Set([nodeId]);
   _allLinks.forEach(l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
@@ -381,28 +443,24 @@ function highlightNode(nodeId) {
     if (t === nodeId) connectedIds.add(s);
   });
 
-  _nodeSel
-    .filter(d => d.getAttribute ? d.getAttribute('display') !== 'none' : true)
-    .selectAll('circle')
-    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.12);
-  _nodeSel
-    .filter(d => d.getAttribute ? d.getAttribute('display') !== 'none' : true)
-    .selectAll('text')
-    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.12);
-  _linkSel
-    .filter(l => active.has(l.group))
-    .attr('stroke-opacity', l => {
-      const s = typeof l.source === 'object' ? l.source.id : l.source;
-      const t = typeof l.target === 'object' ? l.target.id : l.target;
-      return (s === nodeId || t === nodeId) ? 0.85 : 0.05;
-    });
+  _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.12);
+  _linkSel.attr('stroke-opacity', l => {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    return (s === nodeId || t === nodeId) ? 0.9 : 0.04;
+  });
+  _labelSel.attr('opacity', l => {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    return (s === nodeId || t === nodeId) ? 1 : 0.04;
+  });
 }
 
 function clearHighlight() {
   if (!_nodeSel) return;
-  _nodeSel.selectAll('circle').attr('opacity', 1);
-  _nodeSel.selectAll('text').attr('opacity', 1);
-  if (_linkSel) _linkSel.attr('stroke-opacity', 0.4);
+  _nodeSel.attr('opacity', 1);
+  _linkSel.attr('stroke-opacity', 0.55);
+  _labelSel.attr('opacity', 1);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());
