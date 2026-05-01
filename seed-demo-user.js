@@ -64,25 +64,37 @@ async function seed() {
   const userId = userRes.rows[0].id;
   console.log(`Demo user id: ${userId}`);
 
-  // Groups
+  // ── Delete all existing data in dependency order ───────────────────────────
+  await pool.query(`DELETE FROM contact_group_memberships WHERE user_id=$1`, [userId]);
+  await pool.query(`DELETE FROM contact_relationships WHERE user_id=$1`, [userId]);
+  await pool.query(`DELETE FROM contacts WHERE user_id=$1`, [userId]);
+  // relationship_types is self-referential via mirror_id — null it out first
+  await pool.query(
+    `UPDATE relationship_types SET mirror_id = NULL
+     WHERE group_id IN (SELECT id FROM groups WHERE user_id=$1)`,
+    [userId]
+  );
+  await pool.query(
+    `DELETE FROM relationship_types
+     WHERE group_id IN (SELECT id FROM groups WHERE user_id=$1)`,
+    [userId]
+  );
+  await pool.query(`DELETE FROM groups WHERE user_id=$1`, [userId]);
+  console.log('Old data cleared');
+
+  // ── Insert groups ──────────────────────────────────────────────────────────
   const groupNames = ['Family', 'Work', 'School', 'Friends'];
   const groupIds = {};
   for (const g of groupNames) {
     const r = await pool.query(
-      `INSERT INTO groups (user_id, name) VALUES ($1, $2)
-       ON CONFLICT DO NOTHING RETURNING id`,
+      `INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id`,
       [userId, g]
     );
-    if (r.rows.length) {
-      groupIds[g] = r.rows[0].id;
-    } else {
-      const existing = await pool.query(`SELECT id FROM groups WHERE user_id=$1 AND name=$2`, [userId, g]);
-      groupIds[g] = existing.rows[0].id;
-    }
+    groupIds[g] = r.rows[0].id;
   }
   console.log('Groups:', groupIds);
 
-  // Relationship types with mirrors
+  // ── Insert relationship types with mirrors ─────────────────────────────────
   const rtDefs = [
     { group: 'Family', pairs: [['Mother','Son'],['Father','Son'],['Mother','Daughter'],['Father','Daughter'],['Brother','Brother'],['Sister','Sister'],['Brother','Sister'],['Spouse','Spouse']] },
     { group: 'Work',   pairs: [['Boss','Reports to'],['Colleague','Colleague']] },
@@ -90,35 +102,25 @@ async function seed() {
     { group: 'Friends',pairs: [['Friend','Friend']] },
   ];
 
-  const rtIds = {}; // name -> id
+  const rtIds = {};
 
   for (const { group, pairs } of rtDefs) {
     const gid = groupIds[group];
     for (const [a, b] of pairs) {
-      // Insert a
-      let aRes = await pool.query(
-        `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2)
-         ON CONFLICT DO NOTHING RETURNING id`,
+      const aRes = await pool.query(
+        `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`,
         [gid, a]
       );
-      if (!aRes.rows.length) {
-        aRes = await pool.query(`SELECT id FROM relationship_types WHERE group_id=$1 AND name=$2`, [gid, a]);
-      }
       const aId = aRes.rows[0].id;
       rtIds[`${group}:${a}`] = aId;
 
       if (a === b) {
-        // Self-mirror
         await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$1`, [aId]);
       } else {
-        let bRes = await pool.query(
-          `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2)
-           ON CONFLICT DO NOTHING RETURNING id`,
+        const bRes = await pool.query(
+          `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`,
           [gid, b]
         );
-        if (!bRes.rows.length) {
-          bRes = await pool.query(`SELECT id FROM relationship_types WHERE group_id=$1 AND name=$2`, [gid, b]);
-        }
         const bId = bRes.rows[0].id;
         rtIds[`${group}:${b}`] = bId;
         await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [bId, aId]);
@@ -127,17 +129,6 @@ async function seed() {
     }
   }
   console.log('Relationship types seeded');
-
-  // Delete old data for this user to avoid duplicates on re-run
-  await pool.query(`DELETE FROM contact_group_memberships WHERE user_id=$1`, [userId]);
-  await pool.query(`DELETE FROM contact_relationships WHERE user_id=$1`, [userId]);
-  await pool.query(`DELETE FROM contacts WHERE user_id=$1`, [userId]);
-  // Delete subgroups created by previous seed runs (keep the 4 main relationship groups)
-  const mainGroupIdList = Object.values(groupIds);
-  await pool.query(
-    `DELETE FROM groups WHERE user_id=$1 AND id != ALL($2::int[])`,
-    [userId, mainGroupIdList]
-  );
 
   // Generate 200 contacts
   const generated = generateContacts(200);
