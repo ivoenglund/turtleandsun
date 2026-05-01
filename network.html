@@ -158,6 +158,7 @@ function formatBirthdayShort(str) {
 function yearOf(str) { return str ? parseInt(str.split('-')[0]) : null; }
 
 function truncate(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+function cleanRel(s) { return (s || '').replace(/ of$/i, ''); }
 
 async function init() {
   const res = await fetch('/api/network');
@@ -268,10 +269,12 @@ function buildGraph() {
 
   _simulation = d3.forceSimulation(nodesCopy)
     .force('link', d3.forceLink([...relLinksCopy, ...memberLinksCopy]).id(d => d.id)
-      .distance(d => d.isMembership ? 110 : 170)
-      .strength(d => d.isMembership ? 0.12 : 0.35))
-    .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -120 : -350))
-    .force('center', d3.forceCenter(_width / 2, _height / 2))
+      .distance(d => d.isMembership ? 65 : 120)
+      .strength(d => d.isMembership ? 0.25 : 0.5))
+    .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -80 : -180))
+    .force('center', d3.forceCenter(_width / 2, _height / 2).strength(1))
+    .force('x', d3.forceX(_width / 2).strength(0.05))
+    .force('y', d3.forceY(_height / 2).strength(0.05))
     .force('collision', d3.forceCollide().radius(d => {
       if (d.isMe)    return ME_R + 8;
       if (d.isGroup) return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 4;
@@ -281,15 +284,16 @@ function buildGraph() {
   // Membership links
   _memberLinkSel = _g.append('g').attr('class', 'member-links')
     .selectAll('line').data(memberLinksCopy).join('line')
-    .attr('stroke', 'rgba(28,10,0,0.18)')
-    .attr('stroke-width', 1.5)
+    .attr('stroke', '#555')
+    .attr('stroke-opacity', 0.45)
+    .attr('stroke-width', 2)
     .attr('stroke-dasharray', '5,4');
 
   // Relationship links
   _relLinkSel = _g.append('g').attr('class', 'rel-links')
     .selectAll('line').data(relLinksCopy).join('line')
-    .attr('stroke', d => GROUP_COLORS[d.group] || '#888')
-    .attr('stroke-opacity', 0.55)
+    .attr('stroke', d => GROUP_COLORS[d.group] || '#333')
+    .attr('stroke-opacity', 0.75)
     .attr('stroke-width', 2.5)
     .style('cursor', 'pointer');
 
@@ -355,19 +359,19 @@ function buildGraph() {
   cG.append('rect')
     .attr('x', -NW / 2).attr('y', -NH / 2).attr('width', NW).attr('height', NH).attr('rx', NRX)
     .attr('fill', d => {
-      if (d.died_on) return 'rgba(28,10,0,0.07)';
+      if (d.died_on) return '#f0ede6';
       if (d.is_pet) return '#FFF3DC';
       return '#f7f4ef';
     })
-    .attr('stroke', d => d.died_on ? 'rgba(28,10,0,0.18)' : d.is_pet ? '#b85e10' : 'rgba(28,10,0,0.22)')
-    .attr('stroke-width', d => d.is_pet ? 2 : 1.5);
+    .attr('stroke', d => d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#333')
+    .attr('stroke-width', 3);
 
   cG.append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('y', d => (d.birthday || d.died_on) ? -8 : 0)
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 10).attr('font-weight', 700)
-    .attr('fill', d => d.died_on ? 'rgba(28,10,0,0.38)' : '#1C0A00')
+    .attr('font-size', 10).attr('font-weight', 800)
+    .attr('fill', d => d.died_on ? '#888' : '#1C0A00')
     .attr('font-style', d => d.died_on ? 'italic' : 'normal')
     .text(d => truncate((d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed'), 18));
 
@@ -375,7 +379,7 @@ function buildGraph() {
   cG.filter(d => !!d.died_on).append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
     .attr('font-family', "'DM Sans', sans-serif")
-    .attr('font-size', 8.5).attr('fill', 'rgba(28,10,0,0.35)')
+    .attr('font-size', 8.5).attr('font-weight', 600).attr('fill', '#999')
     .text(d => {
       const by = yearOf(d.birthday);
       const dy = yearOf(d.died_on);
@@ -385,7 +389,7 @@ function buildGraph() {
   cG.filter(d => !d.died_on && !!d.birthday).append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
     .attr('font-family', "'DM Sans', sans-serif")
-    .attr('font-size', 8.5).attr('fill', 'rgba(28,10,0,0.48)')
+    .attr('font-size', 8.5).attr('font-weight', 600).attr('fill', 'rgba(28,10,0,0.55)')
     .text(d => formatBirthdayShort(d.birthday));
 
   _nodeSel = nodeG;
@@ -428,30 +432,60 @@ function applyFilter() {
   applyVisibility(); closePanel();
 }
 
+// Returns a Set of visible contact-node IDs given current filter state.
+function computeVisibleNodeIds(active, showOnlyLiving) {
+  const visible = new Set();
+  _nodeSel.each(d => {
+    if (d.isMe) { visible.add(d.id); return; }
+    if (showOnlyLiving && d.died_on) return;
+    const relGroups = _nodeGroups[d.id];
+    if (relGroups) { for (const g of relGroups) { if (active.has(g)) { visible.add(d.id); return; } } }
+    const memGroups = _contactGroupNames[d.id];
+    if (memGroups) { for (const g of memGroups) { if (active.has(g)) { visible.add(d.id); return; } } }
+  });
+  return visible;
+}
+
+// Returns a Set of visible group-hub node IDs.
+function computeVisibleGroupIds(active) {
+  const visible = new Set();
+  _groupNodeSel.each(d => { if (active.has(_groupNodeName[d.id])) visible.add(d.id); });
+  return visible;
+}
+
 function applyVisibility() {
   if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
 
-  _relLinkSel.attr('display', l => active.has(l.group) ? null : 'none');
-  _hitAreaSel.attr('display', l => active.has(l.group) ? null : 'none');
+  const visibleNodeIds  = computeVisibleNodeIds(active, showOnlyLiving);
+  const visibleGroupIds = computeVisibleGroupIds(active);
 
-  _groupNodeSel.attr('display', d => active.has(_groupNodeName[d.id]) ? null : 'none');
+  // Contact nodes
+  _nodeSel.attr('display', d => visibleNodeIds.has(d.id) ? null : 'none');
 
+  // Group hub nodes
+  _groupNodeSel.attr('display', d => visibleGroupIds.has(d.id) ? null : 'none');
+
+  // Rel links: group must be active AND both endpoint nodes visible
+  const relVisible = l => {
+    if (!active.has(l.group)) return false;
+    const sId = typeof l.source === 'object' ? l.source.id : l.source;
+    const tId = typeof l.target === 'object' ? l.target.id : l.target;
+    return visibleNodeIds.has(sId) && visibleNodeIds.has(tId);
+  };
+  _relLinkSel.attr('display', l => relVisible(l) ? null : 'none');
+  _hitAreaSel.attr('display', l => relVisible(l) ? null : 'none');
+
+  // Membership links: group must be active, group hub visible, contact node visible
   _memberLinkSel.attr('display', l => {
     const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+    const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
     const gname = _groupNodeName[srcId] || l.groupName;
-    return active.has(gname) ? null : 'none';
-  });
-
-  _nodeSel.attr('display', d => {
-    if (d.isMe) return null;
-    if (showOnlyLiving && d.died_on) return 'none';
-    const relGroups = _nodeGroups[d.id];
-    if (relGroups) { for (const g of relGroups) { if (active.has(g)) return null; } }
-    const memGroups = _contactGroupNames[d.id];
-    if (memGroups) { for (const g of memGroups) { if (active.has(g)) return null; } }
-    return 'none';
+    if (!active.has(gname)) return 'none';
+    if (!visibleGroupIds.has(srcId)) return 'none';
+    if (!visibleNodeIds.has(tgtId)) return 'none';
+    return null;
   });
 }
 
@@ -482,12 +516,13 @@ function edgeEnter(event, d) {
   const sName = sNode ? (sNode.name || 'Unknown') : 'Unknown';
   const tName = tNode ? (tNode.name || 'Unknown') : 'Unknown';
   let text;
-  if (!d.relA && !d.relB) {
+  const rA = cleanRel(d.relA), rB = cleanRel(d.relB);
+  if (!rA && !rB) {
     text = `${sName} ↔ ${tName}`;
-  } else if (!d.relB || d.relA === d.relB) {
-    text = `${sName} & ${tName}: ${d.relA}`;
+  } else if (!rB || rA === rB) {
+    text = `${sName} & ${tName}: ${rA}`;
   } else {
-    text = `${truncate(sName,16)}: ${d.relA}\n${truncate(tName,16)}: ${d.relB}`;
+    text = `${truncate(sName,16)}: ${rA}\n${truncate(tName,16)}: ${rB}`;
   }
   tooltip.style.whiteSpace = 'pre';
   tooltip.textContent = text;
@@ -545,7 +580,7 @@ function openPanel(d) {
         ? (typeof l.target === 'object' ? l.target.id : l.target)
         : s;
       const other = _contactMap[otherId];
-      const myRel = isSource ? (l.relA || l.relB) : (l.relB || l.relA);
+      const myRel = cleanRel(isSource ? (l.relA || l.relB) : (l.relB || l.relA));
       return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(myRel || '')}</span></div>`;
     }).join('');
   }
@@ -569,18 +604,27 @@ function highlightNode(nodeId) {
     if (s === nodeId) connectedIds.add(t);
     if (t === nodeId) connectedIds.add(s);
   });
-  _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.1);
+  _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.08);
+  _groupNodeSel.attr('opacity', 0.08);
+  // Dim non-connected visible rel links (display:none edges are unaffected)
   _relLinkSel.attr('stroke-opacity', l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
     const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return (s === nodeId || t === nodeId) ? 0.9 : 0.05;
+    return (s === nodeId || t === nodeId) ? 0.9 : 0.04;
+  });
+  // Dim membership links
+  _memberLinkSel.attr('stroke-opacity', l => {
+    const tId = typeof l.target === 'object' ? l.target.id : l.target;
+    return connectedIds.has(tId) ? 0.5 : 0.04;
   });
 }
 
 function clearHighlight() {
   if (!_nodeSel) return;
   _nodeSel.attr('opacity', 1);
-  _relLinkSel.attr('stroke-opacity', 0.55);
+  _groupNodeSel.attr('opacity', 1);
+  _relLinkSel.attr('stroke-opacity', 0.75);
+  _memberLinkSel.attr('stroke-opacity', 0.45);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());
