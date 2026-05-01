@@ -33,7 +33,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 /* ── Floating overlays ──────────────────────────────────────────── */
 .fo-filters,.fo-detail{position:fixed;z-index:50;}
 
-.fo-filters{top:62px;left:14px;width:210px;max-height:calc(100vh - 82px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
+.fo-filters{top:62px;left:14px;width:210px;max-height:calc(100vh - 82px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
 .fo-detail{top:62px;right:14px;width:320px;max-height:calc(100vh - 82px);overflow:hidden;display:none;flex-direction:column;}
@@ -41,24 +41,25 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 .fo-filters.fo-hidden{display:none;}
 
-.fo-hdr{display:flex;align-items:center;gap:6px;margin-bottom:0;background:#FFF9E6;border-radius:3px;padding:3px 6px;width:fit-content;}
-.fo-close-btn{width:18px;height:18px;border:none;background:none;cursor:pointer;font-size:16px;color:rgba(28,10,0,0.35);line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.fo-hdr{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.fo-close-btn{width:18px;height:18px;border:none;background:none;cursor:pointer;font-size:16px;color:rgba(28,10,0,0.45);line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-close-btn:hover{color:#1C0A00;}
-.fo-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.3);}
+.fo-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.35);text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fo-detail-hdr{display:flex;justify-content:flex-end;padding-bottom:4px;}
-.fo-detail-hdr .fo-close-btn{background:#FFF9E6;border-radius:3px;padding:4px 6px;}
 
-.fo-show-btn{position:fixed;top:64px;left:14px;z-index:50;border:none;cursor:pointer;font-size:18px;line-height:1;color:rgba(28,10,0,0.5);font-weight:700;display:none;background:#FFF9E6;border-radius:3px;padding:3px 6px;}
+.fo-show-btn{position:fixed;top:64px;left:14px;z-index:50;border:none;background:none;cursor:pointer;font-size:22px;line-height:1;color:rgba(28,10,0,0.4);font-weight:700;display:none;padding:0;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fo-show-btn:hover{color:#1C0A00;}
 
-/* Filter items – chip backgrounds for legibility */
-#leftFilterContent{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
-.fp-item{padding:3px 6px;display:flex;align-items:center;background:#FFF9E6;border-radius:3px;width:fit-content;}
-.fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;}
+/* Filter items – text-shadow for legibility over canvas */
+.fp-item{padding:3px 0;display:flex;align-items:center;}
+.fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fp-item input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
 .fp-sub{padding-left:16px;}
 .fp-sub2{padding-left:28px;}
-.fp-sep{height:4px;background:none;margin:0;}
+.fp-sep{height:1px;background:rgba(28,10,0,0.12);margin:6px 0;}
+
+/* Label fade transition for zoom-based hiding */
+.contact-node-g text,.group-node-g text{transition:opacity 0.2s;}
 
 /* Mobile */
 .fo-backdrop{display:none;position:fixed;inset:0;bottom:56px;background:rgba(0,0,0,0.35);z-index:190;}
@@ -296,6 +297,11 @@ let GROUP_DEPTH = {};
 let _simulation, _svg, _g;
 let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel, _subgroupLinkSel, _meLinkSel;
 let _width, _height;
+let _currentTransform = d3.zoomIdentity;
+let _filteredOutNodeIds = new Set();
+let _filteredOutGroupIds = new Set();
+let _cullTimer = null;
+let _isDragging = false;
 let _subgroupIds = new Set();
 let _subgroupParents = {};
 let _rawGroups = [];
@@ -600,7 +606,18 @@ function buildGraph() {
   _svg = d3.select('#graph-svg').attr('width', _width).attr('height', _height);
   _svg.selectAll('*').remove();
 
-  const zoom = d3.zoom().scaleExtent([0.05, 4]).filter(event => event.type !== 'dblclick').on('zoom', e => _g.attr('transform', e.transform));
+  const zoom = d3.zoom().scaleExtent([0.05, 4])
+    .filter(event => event.type !== 'dblclick')
+    .on('start', () => { if (_simulation && !_isDragging) _simulation.stop(); })
+    .on('zoom', e => {
+      _g.attr('transform', e.transform);
+      _currentTransform = e.transform;
+      updateLabelVisibility(e.transform.k);
+    })
+    .on('end', e => {
+      if (e.transform) _currentTransform = e.transform;
+      scheduleViewportCull();
+    });
   _svg.call(zoom);
   _g = _svg.append('g');
 
@@ -761,6 +778,8 @@ function buildGraph() {
     _memberLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
     groupG.attr('transform', d => `translate(${d.x},${d.y})`);
+  }).on('end', () => {
+    scheduleViewportCull();
   });
 
   applyVisibility();
@@ -784,6 +803,7 @@ function toggleAll() {
 function applyFilter() {
   const allChecked = [...document.querySelectorAll('#cbGroup input[data-group]')].every(cb => cb.checked);
   document.getElementById('cb-all').checked = allChecked;
+  if (_simulation) _simulation.alpha(0.1).restart();
   applyVisibility();
 }
 
@@ -837,6 +857,12 @@ function applyVisibility() {
   const visibleNodeIds  = computeVisibleNodeIds(active, showOnlyLiving);
   const visibleGroupIds = computeVisibleGroupIds(active);
 
+  // Track filter state separately so viewport culling can respect it
+  _filteredOutNodeIds = new Set();
+  _filteredOutGroupIds = new Set();
+  _nodeSel.each(d => { if (!visibleNodeIds.has(d.id)) _filteredOutNodeIds.add(d.id); });
+  _groupNodeSel.each(d => { if (!visibleGroupIds.has(d.id)) _filteredOutGroupIds.add(d.id); });
+
   _nodeSel.attr('display', d => visibleNodeIds.has(d.id) ? null : 'none');
   _groupNodeSel.attr('display', d => visibleGroupIds.has(d.id) ? null : 'none');
 
@@ -874,12 +900,58 @@ function applyVisibility() {
       return visibleGroupIds.has(tgtId) ? null : 'none';
     });
   }
+
+  scheduleViewportCull();
 }
 
 // ── Drag ──────────────────────────────────────────────────────────────────────
-function dragStart(event, d) { if (!event.active) _simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+function dragStart(event, d) {
+  _isDragging = true;
+  if (!event.active) {
+    // Un-cull all nodes before restarting so moving nodes reveal neighbours
+    if (_nodeSel) _nodeSel.attr('display', n => _filteredOutNodeIds.has(n.id) ? 'none' : null);
+    if (_groupNodeSel) _groupNodeSel.attr('display', n => _filteredOutGroupIds.has(n.id) ? 'none' : null);
+    _simulation.alphaTarget(0.3).restart();
+  }
+  d.fx = d.x; d.fy = d.y;
+}
 function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
-function dragEnd(event, d) { if (!event.active) _simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+function dragEnd(event, d) { _isDragging = false; if (!event.active) _simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+
+// ── Label visibility (zoom-based) ────────────────────────────────────────────
+function updateLabelVisibility(scale) {
+  if (!_nodeSel || !_groupNodeSel) return;
+  _nodeSel.selectAll('text').style('opacity', scale < 0.5 ? '0' : '1');
+  _groupNodeSel.selectAll('text').style('opacity', scale < 0.3 ? '0' : '1');
+}
+
+// ── Viewport culling ──────────────────────────────────────────────────────────
+function scheduleViewportCull() {
+  clearTimeout(_cullTimer);
+  _cullTimer = setTimeout(runViewportCull, 150);
+}
+
+function runViewportCull() {
+  if (!_nodeSel || !_groupNodeSel) return;
+  if (_simulation && _simulation.alpha() > 0.02) return; // skip during active sim
+  const container = document.getElementById('graph-container');
+  if (!container || container.style.display === 'none') return;
+  const W = container.clientWidth, H = container.clientHeight;
+  const buf = 200;
+  const t = _currentTransform;
+  const x0 = (-t.x - buf) / t.k, x1 = (W - t.x + buf) / t.k;
+  const y0 = (-t.y - buf) / t.k, y1 = (H - t.y + buf) / t.k;
+  _nodeSel.attr('display', d => {
+    if (_filteredOutNodeIds.has(d.id)) return 'none';
+    if (d.x == null) return null;
+    return (d.x >= x0 && d.x <= x1 && d.y >= y0 && d.y <= y1) ? null : 'none';
+  });
+  _groupNodeSel.attr('display', d => {
+    if (_filteredOutGroupIds.has(d.id)) return 'none';
+    if (d.x == null) return null;
+    return (d.x >= x0 && d.x <= x1 && d.y >= y0 && d.y <= y1) ? null : 'none';
+  });
+}
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 const tooltip = document.getElementById('tooltip');
