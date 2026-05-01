@@ -18,20 +18,20 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
 .nav-links a:hover{opacity:1;}
 
-.top-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.1);padding:10px 24px;display:flex;align-items:center;gap:20px;flex-shrink:0;flex-wrap:wrap;}
-.top-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;min-width:0;}
-.cb-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.cb-label{display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;user-select:none;}
-.cb-label input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
-.cb-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.cb-sep{width:1px;height:16px;background:rgba(28,10,0,0.15);flex-shrink:0;}
+.top-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.1);padding:10px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;}
+.top-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;}
+.cb-group{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;min-width:0;}
+.cb-label{display:flex;align-items:center;gap:5px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;}
+.cb-label input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
+.cb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.cb-sep{width:1px;height:14px;background:rgba(28,10,0,0.15);flex-shrink:0;}
 .btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
 .btn-back:hover{background:#1C0A00;}
 
 #graph-container{flex:1;position:relative;overflow:hidden;background:#fff;}
 #graph-svg{width:100%;height:100%;display:block;}
 
-.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.15s;z-index:100;max-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
+.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.12s;z-index:100;max-width:260px;line-height:1.4;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
 .tooltip.visible{opacity:1;}
 
 .side-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:#FFF9E6;box-shadow:-4px 0 24px rgba(0,0,0,0.12);transition:right 0.25s cubic-bezier(0.4,0,0.2,1);z-index:200;display:flex;flex-direction:column;}
@@ -74,26 +74,16 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <div class="top-bar">
   <h1>My Network</h1>
-  <div class="cb-group">
+  <div class="cb-group" id="cbGroup">
     <label class="cb-label">
       <input type="checkbox" id="cb-all" checked onchange="toggleAll()">All
     </label>
     <div class="cb-sep"></div>
+    <!-- dynamic group checkboxes rendered here -->
+    <div class="cb-sep"></div>
     <label class="cb-label">
-      <input type="checkbox" id="cb-Family" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#c0195a;"></span>Family
-    </label>
-    <label class="cb-label">
-      <input type="checkbox" id="cb-Work" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#2a5016;"></span>Work
-    </label>
-    <label class="cb-label">
-      <input type="checkbox" id="cb-School" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#1a5f8a;"></span>School
-    </label>
-    <label class="cb-label">
-      <input type="checkbox" id="cb-Friends" checked onchange="applyFilter()">
-      <span class="cb-dot" style="background:#b85e10;"></span>Friends
+      <input type="checkbox" id="cb-living" onchange="applyVisibility()">
+      Show only living
     </label>
   </div>
   <a href="/account/contacts" class="btn-back">← Contacts</a>
@@ -116,6 +106,10 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
       <div class="sp-label">Birthday</div>
       <div class="sp-value" id="spBirthday"></div>
     </div>
+    <div class="sp-field" id="spDiedWrap">
+      <div class="sp-label">Died on</div>
+      <div class="sp-value" id="spDied"></div>
+    </div>
     <div class="sp-field" id="spCityWrap">
       <div class="sp-label">City</div>
       <div class="sp-value" id="spCity"></div>
@@ -132,47 +126,38 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-const GROUP_COLORS = {
-  'Family':  '#c0195a',
-  'Work':    '#2a5016',
-  'School':  '#1a5f8a',
-  'Friends': '#b85e10',
-};
-const GROUPS = ['Family', 'Work', 'School', 'Friends'];
+const PALETTE = ['#c0195a','#2a6b50','#1a5f8a','#b85e10','#6b2d9a','#1a8a6b','#8a4f1a','#1a3f8a','#4a8a1a'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// Contact node pill dimensions
 const NW = 130, NH = 46, NRX = 10;
-// Group hub node dimensions
-const GNW = 114, GNH = 34, GNRX = 17;
+const GNW = 120, GNH = 34, GNRX = 17;
 const ME_R = 26;
 
-let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {}, _nodeGroups = {};
-let _groupNodeCategory = {};     // 'g_X' → category string ('Work', 'School', …)
-let _contactGroupCategories = {}; // contactId → Set<category>
+let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {};
+let _nodeGroups = {};
+let _groupNodeName = {};
+let _contactGroupNames = {};
+let _allGroupNames = [];
+let GROUP_COLORS = {};
 let _simulation, _svg, _g;
-let _nodeSel, _groupNodeSel, _relLinkSel, _memberLinkSel, _labelSelA, _labelSelB;
+let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel;
 let _width, _height;
 
-function formatBirthday(str) {
+function formatDate(str) {
   if (!str) return '';
-  const p = str.split('-');
+  const p = (str.split('T')[0]).split('-');
+  if (p.length < 3) return str;
+  return `${parseInt(p[2], 10)} ${MONTHS[parseInt(p[1], 10) - 1] || p[1]} ${p[0]}`;
+}
+function formatBirthdayShort(str) {
+  if (!str) return '';
+  const p = (str.split('T')[0]).split('-');
   if (p.length < 3) return str;
   return `${parseInt(p[2], 10)} ${MONTHS[parseInt(p[1], 10) - 1] || p[1]}`;
 }
+function yearOf(str) { return str ? parseInt(str.split('-')[0]) : null; }
 
-function truncate(s, n) {
-  s = s || '';
-  return s.length > n ? s.slice(0, n - 1) + '…' : s;
-}
-
-function labelTransform(d, f) {
-  const x = d.source.x * (1 - f) + d.target.x * f;
-  const y = d.source.y * (1 - f) + d.target.y * f;
-  let a = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
-  if (a > 90 || a < -90) a += 180; // keep text left-to-right
-  return `translate(${x},${y}) rotate(${a})`;
-}
+function truncate(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 
 async function init() {
   const res = await fetch('/api/network');
@@ -181,28 +166,51 @@ async function init() {
 
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
-  // Group hub nodes from memberships
-  _groupNodeCategory = {};
-  _contactGroupCategories = {};
+  // Build group name maps from memberships
+  _groupNodeName = {};
+  _contactGroupNames = {};
   const groupNodeMap = {};
+  const groupNameSet = new Set();
+
   (data.group_memberships || []).forEach(m => {
     if (!groupNodeMap[m.group_id]) {
-      groupNodeMap[m.group_id] = {
-        id: `g_${m.group_id}`, name: m.group_name, isGroup: true, category: m.group_category,
-      };
-      _groupNodeCategory[`g_${m.group_id}`] = m.group_category;
+      groupNodeMap[m.group_id] = { id: `g_${m.group_id}`, name: m.group_name, isGroup: true };
+      _groupNodeName[`g_${m.group_id}`] = m.group_name;
     }
-    if (m.group_category) {
-      if (!_contactGroupCategories[m.contact_id]) _contactGroupCategories[m.contact_id] = new Set();
-      _contactGroupCategories[m.contact_id].add(m.group_category);
-    }
+    groupNameSet.add(m.group_name);
+    if (!_contactGroupNames[m.contact_id]) _contactGroupNames[m.contact_id] = new Set();
+    _contactGroupNames[m.contact_id].add(m.group_name);
   });
+
+  // Also collect group names from relationships
+  (data.relationships || []).forEach(r => groupNameSet.add(r.group_name));
+
+  _allGroupNames = Array.from(groupNameSet).sort((a, b) => {
+    if (a === 'Family') return -1;
+    if (b === 'Family') return 1;
+    return a.localeCompare(b);
+  });
+
+  // Assign colors
+  GROUP_COLORS = {};
+  _allGroupNames.forEach((g, i) => { GROUP_COLORS[g] = PALETTE[i % PALETTE.length]; });
+
+  // Build dynamic checkboxes
+  const cbGroup = document.getElementById('cbGroup');
+  const insertBefore = document.querySelector('#cbGroup .cb-sep:last-of-type');
+  _allGroupNames.forEach((g, i) => {
+    const label = document.createElement('label');
+    label.className = 'cb-label';
+    label.innerHTML = `<input type="checkbox" data-group="${g.replace(/"/g,'&quot;')}" checked onchange="applyFilter()"><span class="cb-dot" style="background:${GROUP_COLORS[g]};"></span>${esc(g)}`;
+    cbGroup.insertBefore(label, insertBefore);
+  });
+
   const groupNodes = Object.values(groupNodeMap);
   _memberLinks = (data.group_memberships || []).map(m => ({
     source: `g_${m.group_id}`,
     target: m.contact_id,
     isMembership: true,
-    groupCategory: m.group_category,
+    groupName: m.group_name,
   }));
 
   _allNodes = [
@@ -211,22 +219,18 @@ async function init() {
     ...groupNodes,
   ];
 
-  // Bidirectional merge: each pair gets relA (at lo-id end) and relB (at hi-id end)
   const pairMap = new Map();
   (data.relationships || []).forEach(r => {
     const lo = Math.min(r.contact_a_id, r.contact_b_id);
     const hi = Math.max(r.contact_a_id, r.contact_b_id);
     const key = `${lo}-${hi}`;
-    if (!pairMap.has(key)) {
-      pairMap.set(key, { source: lo, target: hi, group: r.group_name, relA: null, relB: null });
-    }
+    if (!pairMap.has(key)) pairMap.set(key, { source: lo, target: hi, group: r.group_name, relA: null, relB: null });
     const link = pairMap.get(key);
     if (r.contact_a_id === lo) link.relA = r.relationship;
     else link.relB = r.relationship;
   });
   _relLinks = Array.from(pairMap.values());
 
-  // nodeGroups: which relationship categories each contact belongs to
   _relLinks.forEach(l => {
     [l.source, l.target].forEach(id => {
       if (!_nodeGroups[id]) _nodeGroups[id] = new Set();
@@ -250,7 +254,6 @@ function buildGraph() {
   _svg.call(zoom);
   _g = _svg.append('g');
 
-  // Clone all nodes; build id→node map
   const nodesCopy = _allNodes.map(n => ({ ...n }));
   const idToNode = {};
   nodesCopy.forEach(n => { idToNode[n.id] = n; });
@@ -265,8 +268,8 @@ function buildGraph() {
 
   _simulation = d3.forceSimulation(nodesCopy)
     .force('link', d3.forceLink([...relLinksCopy, ...memberLinksCopy]).id(d => d.id)
-      .distance(d => d.isMembership ? 110 : 160)
-      .strength(d => d.isMembership ? 0.15 : 0.35))
+      .distance(d => d.isMembership ? 110 : 170)
+      .strength(d => d.isMembership ? 0.12 : 0.35))
     .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -120 : -350))
     .force('center', d3.forceCenter(_width / 2, _height / 2))
     .force('collision', d3.forceCollide().radius(d => {
@@ -275,44 +278,32 @@ function buildGraph() {
       return Math.sqrt((NW / 2) ** 2 + (NH / 2) ** 2) + 6;
     }));
 
-  // ── Layer 1: Membership links (dashed grey) ───────────────────────────────
+  // Membership links
   _memberLinkSel = _g.append('g').attr('class', 'member-links')
     .selectAll('line').data(memberLinksCopy).join('line')
-    .attr('stroke', 'rgba(28,10,0,0.2)')
+    .attr('stroke', 'rgba(28,10,0,0.18)')
     .attr('stroke-width', 1.5)
     .attr('stroke-dasharray', '5,4');
 
-  // ── Layer 2: Relationship links ───────────────────────────────────────────
+  // Relationship links
   _relLinkSel = _g.append('g').attr('class', 'rel-links')
     .selectAll('line').data(relLinksCopy).join('line')
-    .attr('stroke', d => GROUP_COLORS[d.group] || '#555')
+    .attr('stroke', d => GROUP_COLORS[d.group] || '#888')
     .attr('stroke-opacity', 0.55)
-    .attr('stroke-width', 2);
+    .attr('stroke-width', 2.5)
+    .style('cursor', 'pointer');
 
-  // ── Layer 3: Two-ended relationship labels ────────────────────────────────
-  const labelBase = sel => sel
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 9).attr('font-weight', 700)
-    .attr('fill', d => GROUP_COLORS[d.group] || '#333')
-    .style('paint-order', 'stroke')
-    .style('stroke', '#fff').style('stroke-width', '4px').style('stroke-linejoin', 'round');
+  // Invisible wider hit-area for edge hover/tooltip
+  _hitAreaSel = _g.append('g').attr('class', 'rel-hitareas')
+    .selectAll('line').data(relLinksCopy).join('line')
+    .attr('stroke', 'transparent')
+    .attr('stroke-width', 16)
+    .style('cursor', 'pointer')
+    .on('mouseenter', edgeEnter)
+    .on('mousemove', moveTooltip)
+    .on('mouseleave', hideTooltip);
 
-  const labG = _g.append('g').attr('class', 'link-labels');
-
-  // Label A: source-end (25%) for asymmetric, midpoint (50%) for symmetric
-  _labelSelA = labG.selectAll('.lbl-a').data(relLinksCopy).join('text')
-    .attr('class', 'lbl-a').call(labelBase)
-    .attr('x', 0).attr('y', -4)
-    .text(d => d.relA || d.relB || '');
-
-  // Label B: target-end (75%), text empty for symmetric (hidden via empty string)
-  _labelSelB = labG.selectAll('.lbl-b').data(relLinksCopy).join('text')
-    .attr('class', 'lbl-b').call(labelBase)
-    .attr('x', 0).attr('y', -4)
-    .text(d => (d.relA && d.relB && d.relA !== d.relB) ? d.relB : '');
-
-  // ── Layer 4: Group hub nodes ──────────────────────────────────────────────
+  // Group hub nodes
   const groupNodesCopy = nodesCopy.filter(n => n.isGroup);
   const groupG = _g.append('g').attr('class', 'group-nodes')
     .selectAll('g').data(groupNodesCopy).join('g')
@@ -323,18 +314,24 @@ function buildGraph() {
   groupG.append('rect')
     .attr('x', -GNW / 2).attr('y', -GNH / 2)
     .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
-    .attr('fill', '#eef6ee')
-    .attr('stroke', '#3A6B20').attr('stroke-width', 1.5).attr('stroke-dasharray', '5,3');
+    .attr('fill', d => {
+      const c = GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20';
+      return c + '18';
+    })
+    .attr('stroke', d => GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20')
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '5,3');
 
   groupG.append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 10).attr('font-weight', 700).attr('fill', '#2a5016')
+    .attr('font-size', 10).attr('font-weight', 700)
+    .attr('fill', d => GROUP_COLORS[_groupNodeName[d.id]] || '#2a5016')
     .text(d => truncate(d.name, 15));
 
   _groupNodeSel = groupG;
 
-  // ── Layer 5: Contact + me nodes ───────────────────────────────────────────
+  // Contact + me nodes
   const contactsCopy = nodesCopy.filter(n => !n.isGroup);
   const nodeG = _g.append('g').attr('class', 'contact-nodes')
     .selectAll('g').data(contactsCopy).join('g')
@@ -357,18 +354,39 @@ function buildGraph() {
   const cG = nodeG.filter(d => !d.isMe);
   cG.append('rect')
     .attr('x', -NW / 2).attr('y', -NH / 2).attr('width', NW).attr('height', NH).attr('rx', NRX)
-    .attr('fill', '#f7f4ef').attr('stroke', 'rgba(28,10,0,0.22)').attr('stroke-width', 2);
+    .attr('fill', d => {
+      if (d.died_on) return 'rgba(28,10,0,0.07)';
+      if (d.is_pet) return '#FFF3DC';
+      return '#f7f4ef';
+    })
+    .attr('stroke', d => d.died_on ? 'rgba(28,10,0,0.18)' : d.is_pet ? '#b85e10' : 'rgba(28,10,0,0.22)')
+    .attr('stroke-width', d => d.is_pet ? 2 : 1.5);
+
   cG.append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-    .attr('y', d => d.birthday ? -8 : 0)
+    .attr('y', d => (d.birthday || d.died_on) ? -8 : 0)
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 10).attr('font-weight', 700).attr('fill', '#1C0A00')
-    .text(d => truncate(d.name, 18));
-  cG.filter(d => !!d.birthday).append('text')
+    .attr('font-size', 10).attr('font-weight', 700)
+    .attr('fill', d => d.died_on ? 'rgba(28,10,0,0.38)' : '#1C0A00')
+    .attr('font-style', d => d.died_on ? 'italic' : 'normal')
+    .text(d => truncate((d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed'), 18));
+
+  // Date line: "1925–2010" for deceased, "15 Mar" for birthday for living
+  cG.filter(d => !!d.died_on).append('text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
+    .attr('font-family', "'DM Sans', sans-serif")
+    .attr('font-size', 8.5).attr('fill', 'rgba(28,10,0,0.35)')
+    .text(d => {
+      const by = yearOf(d.birthday);
+      const dy = yearOf(d.died_on);
+      return by && dy ? `${by} – ${dy}` : dy ? `† ${dy}` : '';
+    });
+
+  cG.filter(d => !d.died_on && !!d.birthday).append('text')
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
     .attr('font-family', "'DM Sans', sans-serif")
     .attr('font-size', 8.5).attr('fill', 'rgba(28,10,0,0.48)')
-    .text(d => formatBirthday(d.birthday));
+    .text(d => formatBirthdayShort(d.birthday));
 
   _nodeSel = nodeG;
 
@@ -376,16 +394,12 @@ function buildGraph() {
     _relLinkSel
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    _hitAreaSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     _memberLinkSel
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-
-    _labelSelA.attr('transform', d => {
-      const sym = !d.relA || !d.relB || d.relA === d.relB;
-      return labelTransform(d, sym ? 0.5 : 0.25);
-    });
-    _labelSelB.attr('transform', d => labelTransform(d, 0.75));
-
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
     groupG.attr('transform', d => `translate(${d.x},${d.y})`);
   });
@@ -393,53 +407,50 @@ function buildGraph() {
   applyVisibility();
 }
 
-// ── Checkboxes ────────────────────────────────────────────────────────────────
+// ── Filters ───────────────────────────────────────────────────────────────────
 function getActiveGroups() {
-  return new Set(GROUPS.filter(g => document.getElementById(`cb-${g}`).checked));
+  const active = new Set();
+  document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => {
+    if (cb.checked) active.add(cb.dataset.group);
+  });
+  return active;
 }
+
 function toggleAll() {
   const checked = document.getElementById('cb-all').checked;
-  GROUPS.forEach(g => { document.getElementById(`cb-${g}`).checked = checked; });
+  document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => cb.checked = checked);
   applyVisibility(); closePanel();
 }
+
 function applyFilter() {
-  const active = getActiveGroups();
-  document.getElementById('cb-all').checked = active.size === GROUPS.length;
+  const allChecked = [...document.querySelectorAll('#cbGroup input[data-group]')].every(cb => cb.checked);
+  document.getElementById('cb-all').checked = allChecked;
   applyVisibility(); closePanel();
 }
+
 function applyVisibility() {
   if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
+  const showOnlyLiving = document.getElementById('cb-living').checked;
 
-  // Relationship links and their labels
   _relLinkSel.attr('display', l => active.has(l.group) ? null : 'none');
-  _labelSelA.attr('display', l => active.has(l.group) ? null : 'none');
-  _labelSelB.attr('display', l => active.has(l.group) ? null : 'none');
+  _hitAreaSel.attr('display', l => active.has(l.group) ? null : 'none');
 
-  // Group hub nodes: hide when their category is unchecked
-  _groupNodeSel.attr('display', d => {
-    const cat = _groupNodeCategory[d.id];
-    return (!cat || active.has(cat)) ? null : 'none';
-  });
+  _groupNodeSel.attr('display', d => active.has(_groupNodeName[d.id]) ? null : 'none');
 
-  // Membership lines: hide when the group node's category is unchecked
   _memberLinkSel.attr('display', l => {
     const srcId = typeof l.source === 'object' ? l.source.id : l.source;
-    const cat = _groupNodeCategory[srcId] || l.groupCategory;
-    return (!cat || active.has(cat)) ? null : 'none';
+    const gname = _groupNodeName[srcId] || l.groupName;
+    return active.has(gname) ? null : 'none';
   });
 
-  // Contact nodes: visible if any direct relationship OR group membership is in active set
   _nodeSel.attr('display', d => {
     if (d.isMe) return null;
+    if (showOnlyLiving && d.died_on) return 'none';
     const relGroups = _nodeGroups[d.id];
-    if (relGroups) {
-      for (const g of relGroups) { if (active.has(g)) return null; }
-    }
-    const memCats = _contactGroupCategories[d.id];
-    if (memCats) {
-      for (const cat of memCats) { if (active.has(cat)) return null; }
-    }
+    if (relGroups) { for (const g of relGroups) { if (active.has(g)) return null; } }
+    const memGroups = _contactGroupNames[d.id];
+    if (memGroups) { for (const g of memGroups) { if (active.has(g)) return null; } }
     return 'none';
   });
 }
@@ -457,17 +468,42 @@ function dragEnd(event, d) {
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 const tooltip = document.getElementById('tooltip');
+
 function showTooltip(event, d) {
   if (d.isMe) return;
   tooltip.textContent = d.name || 'Unnamed';
   tooltip.classList.add('visible');
   moveTooltip(event);
 }
+
+function edgeEnter(event, d) {
+  const sNode = typeof d.source === 'object' ? d.source : null;
+  const tNode = typeof d.target === 'object' ? d.target : null;
+  const sName = sNode ? (sNode.name || 'Unknown') : 'Unknown';
+  const tName = tNode ? (tNode.name || 'Unknown') : 'Unknown';
+  let text;
+  if (!d.relA && !d.relB) {
+    text = `${sName} ↔ ${tName}`;
+  } else if (!d.relB || d.relA === d.relB) {
+    text = `${sName} & ${tName}: ${d.relA}`;
+  } else {
+    text = `${truncate(sName,16)}: ${d.relA}\n${truncate(tName,16)}: ${d.relB}`;
+  }
+  tooltip.style.whiteSpace = 'pre';
+  tooltip.textContent = text;
+  tooltip.classList.add('visible');
+  moveTooltip(event);
+}
+
 function moveTooltip(event) {
   tooltip.style.left = (event.clientX + 14) + 'px';
-  tooltip.style.top = (event.clientY - 10) + 'px';
+  tooltip.style.top  = (event.clientY - 10) + 'px';
 }
-function hideTooltip() { tooltip.classList.remove('visible'); }
+
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+  tooltip.style.whiteSpace = 'normal';
+}
 
 // ── Side panel ────────────────────────────────────────────────────────────────
 function nodeClick(event, d) {
@@ -477,11 +513,15 @@ function nodeClick(event, d) {
 }
 
 function openPanel(d) {
-  document.getElementById('spName').textContent = d.name || 'Unnamed';
+  document.getElementById('spName').textContent = (d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed');
 
   const bday = d.birthday;
   document.getElementById('spBirthdayWrap').style.display = bday ? '' : 'none';
-  document.getElementById('spBirthday').textContent = bday ? formatBirthday(bday) : '';
+  document.getElementById('spBirthday').textContent = bday ? formatDate(bday) : '';
+
+  const died = d.died_on;
+  document.getElementById('spDiedWrap').style.display = died ? '' : 'none';
+  document.getElementById('spDied').textContent = died ? formatDate(died) : '';
 
   const city = d.city;
   document.getElementById('spCityWrap').style.display = city ? '' : 'none';
@@ -505,7 +545,6 @@ function openPanel(d) {
         ? (typeof l.target === 'object' ? l.target.id : l.target)
         : s;
       const other = _contactMap[otherId];
-      // Show relationship from this node's perspective
       const myRel = isSource ? (l.relA || l.relB) : (l.relB || l.relA);
       return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(myRel || '')}</span></div>`;
     }).join('');
@@ -530,22 +569,11 @@ function highlightNode(nodeId) {
     if (s === nodeId) connectedIds.add(t);
     if (t === nodeId) connectedIds.add(s);
   });
-
   _nodeSel.attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.1);
   _relLinkSel.attr('stroke-opacity', l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
     const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return (s === nodeId || t === nodeId) ? 0.9 : 0.04;
-  });
-  _labelSelA.attr('opacity', l => {
-    const s = typeof l.source === 'object' ? l.source.id : l.source;
-    const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return (s === nodeId || t === nodeId) ? 1 : 0.04;
-  });
-  _labelSelB.attr('opacity', l => {
-    const s = typeof l.source === 'object' ? l.source.id : l.source;
-    const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return (s === nodeId || t === nodeId) ? 1 : 0.04;
+    return (s === nodeId || t === nodeId) ? 0.9 : 0.05;
   });
 }
 
@@ -553,8 +581,6 @@ function clearHighlight() {
   if (!_nodeSel) return;
   _nodeSel.attr('opacity', 1);
   _relLinkSel.attr('stroke-opacity', 0.55);
-  _labelSelA.attr('opacity', 1);
-  _labelSelB.attr('opacity', 1);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Occasions — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;min-height:100vh;}
+
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);}
+.nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
+.nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
+.nav-links{display:flex;gap:28px;align-items:center;}
+.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
+.nav-links a:hover{opacity:1;}
+.nav-account-wrap{position:relative;}
+#accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
+#accountDropdown.open{display:block;}
+#accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
+#accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
+#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;box-sizing:border-box;}
+#accountDropdown input:focus{border-color:#3A6B20;}
+#accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
+#accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
+#accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
+#accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
+#accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
+#ddUser{display:none;}
+.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
+.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
+.dd-user-link:hover{opacity:0.72;}
+.dd-user-logout{color:#c0392b !important;}
+
+.page-header{max-width:880px;margin:0 auto;padding:40px 32px 0;}
+.page-header h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:26px;font-weight:800;color:#1C0A00;margin-bottom:6px;}
+.page-header p{font-size:14px;color:rgba(28,10,0,0.5);}
+
+.page-body{max-width:880px;margin:0 auto;padding:28px 32px 80px;}
+
+.filter-row{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.filter-row label{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;}
+.filter-row input[type=checkbox]{width:15px;height:15px;accent-color:#3A6B20;}
+.filter-row select{padding:7px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;}
+.filter-row select:focus{border-color:#3A6B20;}
+
+.section-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin:24px 0 10px;}
+
+.occasion-card{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,0.06);display:flex;align-items:center;gap:16px;}
+.occasion-card.birthday .oc-icon{background:#e8f0e0;color:#3A6B20;}
+.occasion-card.remembrance .oc-icon{background:#f0ede6;color:rgba(28,10,0,0.4);}
+.occasion-card.occasion .oc-icon{background:#fef3e2;color:#b85e10;}
+.occasion-card.milestone .oc-icon{background:#e8e0f0;color:#6b2d9a;}
+.oc-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.oc-main{flex:1;min-width:0;}
+.oc-occasion{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;}
+.oc-contact{font-size:13px;color:rgba(28,10,0,0.55);margin-top:2px;}
+.oc-years{font-size:12px;color:#3A6B20;font-weight:600;margin-top:1px;}
+.oc-date-col{text-align:right;flex-shrink:0;}
+.oc-date{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;}
+.oc-days{font-size:12px;margin-top:2px;}
+.oc-days.soon{color:#c0392b;font-weight:600;}
+.oc-days.upcoming{color:rgba(28,10,0,0.4);}
+.oc-action{flex-shrink:0;margin-left:8px;}
+.btn-loveogram{padding:7px 14px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;}
+.btn-loveogram:hover{background:#1C0A00;}
+
+.empty-state{text-align:center;padding:60px 32px;color:rgba(28,10,0,0.3);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;}
+
+@media(max-width:600px){
+  .page-header,.page-body{padding-left:16px;padding-right:16px;}
+  .occasion-card{flex-wrap:wrap;gap:10px;}
+  .oc-action{width:100%;}
+  .btn-loveogram{width:100%;text-align:center;display:block;}
+}
+</style>
+</head>
+<body>
+
+<div class="nav-bar">
+  <div class="nav-wrap">
+    <div class="nav">
+      <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
+      <div class="nav-links">
+        <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
+        <span class="nav-account-wrap">
+          <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
+          <div id="accountDropdown">
+            <div id="ddGuest">
+              <h4>Log in</h4>
+              <p>Enter your email and we'll send you a magic link.</p>
+              <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
+              <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
+              <div class="dd-msg" id="ddMsg"></div>
+            </div>
+            <div id="ddUser">
+              <div class="dd-user-email" id="ddUserEmail"></div>
+              <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
+              <a class="dd-user-link" href="/account/contacts">Contacts</a>
+              <a class="dd-user-link" href="/account/occasions">Occasions</a>
+              <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
+            </div>
+          </div>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>Upcoming Occasions</h1>
+  <p>Birthdays, anniversaries, and milestones for the people you care about.</p>
+</div>
+
+<div class="page-body">
+  <div class="filter-row">
+    <label>
+      <input type="checkbox" id="cbBirthdays" checked onchange="render()">
+      🎂 Birthdays
+    </label>
+    <label>
+      <input type="checkbox" id="cbOccasions" checked onchange="render()">
+      ✨ Occasions
+    </label>
+    <label>
+      <input type="checkbox" id="cbRemembrance" onchange="render()">
+      🕯 Remembrance
+    </label>
+    <select id="windowSel" onchange="render()">
+      <option value="30">Next 30 days</option>
+      <option value="90">Next 3 months</option>
+      <option value="180">Next 6 months</option>
+      <option value="365" selected>Next 12 months</option>
+    </select>
+  </div>
+  <div id="listContainer"><div class="empty-state">Loading…</div></div>
+</div>
+
+<script>
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+let _items = [];
+
+function nextYearlyDate(start, today) {
+  const thisYear = new Date(today.getFullYear(), start.getMonth(), start.getDate());
+  if (thisYear >= today) return thisYear;
+  return new Date(today.getFullYear() + 1, start.getMonth(), start.getDate());
+}
+
+function nextMilestoneInfo(start, today) {
+  const yearsElapsed = today.getFullYear() - start.getFullYear() +
+    (today >= new Date(today.getFullYear(), start.getMonth(), start.getDate()) ? 0 : -1);
+  let nextMile = Math.ceil((yearsElapsed + 1) / 10) * 10;
+  if (nextMile < 10) nextMile = 10;
+  const date = new Date(start.getFullYear() + nextMile, start.getMonth(), start.getDate());
+  return { date, years: nextMile };
+}
+
+function ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function daysUntil(date, today) {
+  return Math.round((date - today) / (1000 * 60 * 60 * 24));
+}
+
+function computeItems(occasions, contacts) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const windowDays = parseInt(document.getElementById('windowSel').value, 10);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() + windowDays);
+
+  const items = [];
+
+  for (const o of occasions) {
+    const start = new Date(o.start_date);
+    let nextDate = null;
+    let yearsCount = null;
+    let isMilestone = false;
+
+    if (o.frequency === 'yearly') {
+      nextDate = nextYearlyDate(start, today);
+      yearsCount = nextDate.getFullYear() - start.getFullYear();
+    } else if (o.frequency === 'milestone') {
+      const info = nextMilestoneInfo(start, today);
+      nextDate = info.date;
+      yearsCount = info.years;
+      isMilestone = true;
+    } else {
+      if (start >= today) nextDate = start;
+    }
+    if (!nextDate || nextDate > cutoff) continue;
+
+    items.push({
+      type: isMilestone ? 'milestone' : 'occasion',
+      contact_id: o.contact_id,
+      contact_name: o.contact_name,
+      occasion_name: o.name,
+      next_date: nextDate,
+      years_count: yearsCount,
+    });
+  }
+
+  for (const c of contacts) {
+    if (!c.birthday) continue;
+    const start = new Date(c.birthday);
+    if (isNaN(start.getTime())) continue;
+    const nextDate = nextYearlyDate(start, today);
+    if (!nextDate || nextDate > cutoff) continue;
+    const age = nextDate.getFullYear() - start.getFullYear();
+    items.push({
+      type: 'birthday',
+      contact_id: c.id,
+      contact_name: c.name,
+      occasion_name: 'Birthday',
+      next_date: nextDate,
+      years_count: age,
+    });
+  }
+
+  for (const c of contacts) {
+    if (!c.died_on) continue;
+    const start = new Date(c.died_on);
+    if (isNaN(start.getTime())) continue;
+    const nextDate = nextYearlyDate(start, today);
+    if (!nextDate || nextDate > cutoff) continue;
+    const years = nextDate.getFullYear() - start.getFullYear();
+    items.push({
+      type: 'remembrance',
+      contact_id: c.id,
+      contact_name: c.name,
+      occasion_name: 'Remembrance',
+      next_date: nextDate,
+      years_count: years,
+    });
+  }
+
+  items.sort((a, b) => a.next_date - b.next_date);
+  return items;
+}
+
+function render() {
+  const showBirthdays   = document.getElementById('cbBirthdays').checked;
+  const showOccasions   = document.getElementById('cbOccasions').checked;
+  const showRemembrance = document.getElementById('cbRemembrance').checked;
+
+  const filtered = _items.filter(item => {
+    if (item.type === 'birthday') return showBirthdays;
+    if (item.type === 'remembrance') return showRemembrance;
+    return showOccasions;
+  });
+
+  const container = document.getElementById('listContainer');
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state">No upcoming occasions in this window.</div>';
+    return;
+  }
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // Group by month
+  const byMonth = new Map();
+  for (const item of filtered) {
+    const key = `${item.next_date.getFullYear()}-${item.next_date.getMonth()}`;
+    if (!byMonth.has(key)) byMonth.set(key, { label: `${MONTHS_FULL[item.next_date.getMonth()]} ${item.next_date.getFullYear()}`, items: [] });
+    byMonth.get(key).items.push(item);
+  }
+
+  let html = '';
+  for (const [, group] of byMonth) {
+    html += `<div class="section-label">${esc(group.label)}</div>`;
+    for (const item of group.items) {
+      const days = daysUntil(item.next_date, today);
+      const daysText = days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+      const daysClass = days <= 7 ? 'soon' : 'upcoming';
+      const dateDisplay = `${item.next_date.getDate()} ${MONTHS[item.next_date.getMonth()]}`;
+
+      let icon, yearsText = '';
+      if (item.type === 'birthday') { icon = '🎂'; yearsText = item.years_count ? `Turns ${item.years_count}` : ''; }
+      else if (item.type === 'remembrance') { icon = '🕯'; yearsText = item.years_count ? `${ordinal(item.years_count)} anniversary` : ''; }
+      else if (item.type === 'milestone') { icon = '⭐'; yearsText = item.years_count ? `${ordinal(item.years_count)} milestone` : ''; }
+      else { icon = '✨'; yearsText = item.years_count ? `${ordinal(item.years_count)} year` : ''; }
+
+      html += `
+        <div class="occasion-card ${item.type}">
+          <div class="oc-icon">${icon}</div>
+          <div class="oc-main">
+            <div class="oc-occasion">${esc(item.occasion_name)}</div>
+            <div class="oc-contact">${esc(item.contact_name || 'Unknown')}</div>
+            ${yearsText ? `<div class="oc-years">${esc(yearsText)}</div>` : ''}
+          </div>
+          <div class="oc-date-col">
+            <div class="oc-date">${dateDisplay}</div>
+            <div class="oc-days ${daysClass}">${daysText}</div>
+          </div>
+          <div class="oc-action">
+            <a class="btn-loveogram" href="/?contact=${item.contact_id}">Send Loveogram</a>
+          </div>
+        </div>
+      `;
+    }
+  }
+  container.innerHTML = html;
+}
+
+async function load() {
+  const res = await fetch('/api/occasions/upcoming');
+  if (res.status === 401) { window.location.href = '/login'; return; }
+  const data = await res.json();
+  _items = computeItems(data.occasions || [], data.contacts || []);
+  render();
+}
+
+// ── Nav auth ──────────────────────────────────────────────────────────────────
+let _authStatus = null;
+async function initAuthNav() {
+  try {
+    const res = await fetch('/api/auth/status');
+    _authStatus = res.ok ? await res.json() : false;
+  } catch { _authStatus = false; }
+  if (!_authStatus || !_authStatus.loggedIn) { window.location.href = '/login'; return; }
+  document.getElementById('ddGuest').style.display = 'none';
+  document.getElementById('ddUser').style.display = 'block';
+  document.getElementById('ddUserEmail').textContent = _authStatus.email;
+  document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
+  load();
+}
+function handleAccountClick(e) {
+  e.preventDefault();
+  if (_authStatus === null) return;
+  document.getElementById('accountDropdown').classList.toggle('open');
+}
+async function sendNavMagicLink() {
+  const email = document.getElementById('ddEmail').value.trim();
+  const btn = document.getElementById('ddBtn');
+  const msg = document.getElementById('ddMsg');
+  if (!email || !email.includes('@')) { msg.className = 'dd-msg err'; msg.textContent = 'Enter a valid email.'; return; }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res = await fetch('/auth/request-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    const data = await res.json();
+    if (data.ok) { document.getElementById('ddEmail').style.display = 'none'; btn.style.display = 'none'; msg.className = 'dd-msg ok'; msg.textContent = 'Check your inbox.'; }
+    else { msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+  } catch { msg.className = 'dd-msg err'; msg.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Send login link'; }
+}
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('accountDropdown');
+  const wrap = document.querySelector('.nav-account-wrap');
+  if (dd && wrap && dd.classList.contains('open') && !wrap.contains(e.target)) dd.classList.remove('open');
+});
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+initAuthNav();
+</script>
+</body>
+</html>

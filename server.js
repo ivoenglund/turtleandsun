@@ -156,6 +156,41 @@ app.post('/auth/request-link', async (req, res) => {
   }
 });
 
+async function ensureFamilyGroup(userId) {
+  const existing = await pool.query(
+    `SELECT id FROM groups WHERE user_id = $1 AND name = 'Family'`, [userId]
+  );
+  if (existing.rows.length) return;
+  const gRes = await pool.query(
+    `INSERT INTO groups (user_id, name) VALUES ($1, 'Family') RETURNING id`, [userId]
+  );
+  const gid = gRes.rows[0].id;
+  const pairs = [
+    ['Mother of', 'Son of'],
+    ['Mother of', 'Daughter of'],
+    ['Father of', 'Son of'],
+    ['Father of', 'Daughter of'],
+    ['Spouse', 'Spouse'],
+    ['Owner of', 'Pet of'],
+  ];
+  for (const [a, b] of pairs) {
+    const aRes = await pool.query(
+      `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`, [gid, a]
+    );
+    const aId = aRes.rows[0].id;
+    if (a === b) {
+      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$1`, [aId]);
+    } else {
+      const bRes = await pool.query(
+        `INSERT INTO relationship_types (group_id, name) VALUES ($1, $2) RETURNING id`, [gid, b]
+      );
+      const bId = bRes.rows[0].id;
+      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [bId, aId]);
+      await pool.query(`UPDATE relationship_types SET mirror_id=$1 WHERE id=$2`, [aId, bId]);
+    }
+  }
+}
+
 app.get('/auth/verify', async (req, res) => {
   const { token } = req.query;
   if (!token) return res.redirect('/login?error=missing');
@@ -163,6 +198,7 @@ app.get('/auth/verify', async (req, res) => {
     const email = await verifyMagicLink(token);
     if (!email) return res.redirect('/login?error=invalid');
     const userId = await findOrCreateUser(email);
+    await ensureFamilyGroup(userId);
     const { token: sessionToken, expiresAt } = await createSession(userId);
     setSessionCookie(res, sessionToken, expiresAt);
     const adminCheck = await pool.query(
@@ -334,10 +370,113 @@ app.get('/account/network', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'network.html'));
 });
 
+app.get('/account/occasions', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'occasions.html'));
+});
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+app.get('/api/groups', requireAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, name FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
+  );
+  res.json(result.rows);
+});
+
+app.post('/api/groups', requireAuth, async (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
+  try {
+    const result = await pool.query(
+      `INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id, name`, [req.user.id, name.trim()]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/groups/:id', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM contact_group_memberships WHERE group_id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2 AND name != 'Family'`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Contact group memberships ─────────────────────────────────────────────────
+
+app.get('/api/contacts/:id/groups', requireAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT g.id, g.name FROM contact_group_memberships m
+     JOIN groups g ON g.id = m.group_id
+     WHERE m.contact_id = $1 AND m.user_id = $2`,
+    [req.params.id, req.user.id]
+  );
+  res.json(result.rows);
+});
+
+app.post('/api/contacts/:id/groups', requireAuth, async (req, res) => {
+  const { group_ids } = req.body;
+  try {
+    await pool.query(`DELETE FROM contact_group_memberships WHERE contact_id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    for (const gid of (group_ids || [])) {
+      await pool.query(
+        `INSERT INTO contact_group_memberships (user_id, contact_id, group_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        [req.user.id, req.params.id, gid]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Occasions ─────────────────────────────────────────────────────────────────
+
+app.get('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, name, start_date, frequency, notes FROM occasions WHERE contact_id = $1 AND user_id = $2 ORDER BY start_date`,
+    [req.params.id, req.user.id]
+  );
+  res.json(result.rows);
+});
+
+app.post('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
+  const { name, start_date, frequency, notes } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO occasions (user_id, contact_id, name, start_date, frequency, notes)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [req.user.id, req.params.id, name, start_date, frequency, notes || null]
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/occasions/:id', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM occasions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
+  try {
+    const [occasions, contacts] = await Promise.all([
+      pool.query(
+        `SELECT o.id, o.name, o.start_date, o.frequency, o.notes, c.id AS contact_id, c.name AS contact_name
+         FROM occasions o JOIN contacts c ON c.id = o.contact_id
+         WHERE o.user_id = $1`, [req.user.id]
+      ),
+      pool.query(
+        `SELECT id, name, birthday, died_on FROM contacts WHERE user_id = $1`, [req.user.id]
+      ),
+    ]);
+    res.json({ occasions: occasions.rows, contacts: contacts.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/network', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, name, email, birthday, city FROM contacts WHERE user_id = $1`,
+      `SELECT id, name, email, birthday, city, died_on, is_pet FROM contacts WHERE user_id = $1`,
       [req.user.id]
     );
     const relationships = await pool.query(
@@ -349,7 +488,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
       [req.user.id]
     );
     const groupMemberships = await pool.query(
-      `SELECT cgm.group_id, g.name AS group_name, g.category AS group_category, cgm.contact_id
+      `SELECT cgm.group_id, g.name AS group_name, cgm.contact_id
        FROM contact_group_memberships cgm
        JOIN groups g ON g.id = cgm.group_id
        WHERE cgm.user_id = $1`,
@@ -370,7 +509,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
 app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder
+      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet
        FROM contacts WHERE user_id = $1 ORDER BY name ASC NULLS LAST`,
       [req.user.id]
     );
@@ -396,7 +535,7 @@ app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
 app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(
-      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder
+      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet
        FROM contacts WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]
     );
@@ -423,12 +562,12 @@ app.get('/api/contacts/:id', requireAuth, async (req, res) => {
 });
 
 app.put('/api/contacts/:id', requireAuth, async (req, res) => {
-  const { name, email, phone, street, city, country, postal_code, birthday } = req.body;
+  const { name, email, phone, street, city, country, postal_code, birthday, died_on, is_pet } = req.body;
   try {
     await pool.query(
-      `UPDATE contacts SET name=$1, email=$2, phone=$3, street=$4, city=$5, country=$6, postal_code=$7, birthday=$8
-       WHERE id=$9 AND user_id=$10`,
-      [name, email, phone, street, city, country, postal_code, birthday, req.params.id, req.user.id]
+      `UPDATE contacts SET name=$1, email=$2, phone=$3, street=$4, city=$5, country=$6, postal_code=$7, birthday=$8, died_on=$9, is_pet=$10
+       WHERE id=$11 AND user_id=$12`,
+      [name, email, phone, street, city, country, postal_code, birthday || null, died_on || null, !!is_pet, req.params.id, req.user.id]
     );
     res.json({ ok: true });
   } catch (err) {

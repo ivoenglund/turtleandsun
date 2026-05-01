@@ -114,6 +114,17 @@ async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       expires_at TIMESTAMPTZ NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS occasions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      contact_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      start_date DATE NOT NULL,
+      frequency TEXT NOT NULL CHECK (frequency IN ('yearly', 'milestone', 'one-time')),
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
 
   // Migrate existing tables to add new columns
@@ -132,6 +143,8 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS postal_code TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS birthday TEXT;
     ALTER TABLE groups ADD COLUMN IF NOT EXISTS category TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS died_on DATE;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_pet BOOLEAN DEFAULT FALSE;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support
