@@ -57,6 +57,41 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;z-index:50;}
 #loading p{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(28,10,0,0.4);}
+
+.view-toggle{display:flex;border-radius:8px;overflow:hidden;border:1px solid rgba(28,10,0,0.15);flex-shrink:0;}
+.vtb{padding:6px 18px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;background:#fff;color:rgba(28,10,0,0.45);transition:background 0.15s,color 0.15s;}
+.vtb.active{background:#3A6B20;color:#fff;}
+.vtb:hover:not(.active){background:#f0ede6;color:#1C0A00;}
+
+#outline-container{flex:1;overflow-y:auto;background:#fff;display:none;}
+.outline-inner{max-width:760px;margin:0 auto;padding:24px 24px 100px;}
+.ol-group{margin-bottom:10px;border-radius:10px;border:1px solid rgba(28,10,0,0.09);overflow:hidden;}
+.ol-group-hdr{display:flex;align-items:center;gap:8px;padding:11px 16px;background:#f7f4ef;cursor:pointer;user-select:none;}
+.ol-group-hdr:hover{background:#f0ede6;}
+.ol-tri{font-size:9px;color:rgba(28,10,0,0.35);width:12px;text-align:center;transition:transform 0.15s;flex-shrink:0;}
+.ol-group.ol-collapsed .ol-tri,.ol-sub.ol-collapsed .ol-tri{transform:rotate(-90deg);}
+.ol-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.ol-group-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;flex:1;}
+.ol-count{font-size:11px;color:rgba(28,10,0,0.35);flex-shrink:0;}
+.ol-cb{width:14px;height:14px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
+.ol-group-body{padding:4px 0;}
+.ol-group.ol-collapsed .ol-group-body,.ol-sub.ol-collapsed .ol-sub-body{display:none;}
+.ol-sub{margin:4px 16px 6px;border-radius:8px;border:1px solid rgba(28,10,0,0.07);overflow:hidden;}
+.ol-sub-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fafaf8;cursor:pointer;user-select:none;}
+.ol-sub-hdr:hover{background:#f5f2ea;}
+.ol-sub-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;color:#1C0A00;flex:1;}
+.ol-sub-body{padding:2px 0;}
+.ol-row{display:flex;align-items:center;gap:8px;padding:7px 16px;cursor:pointer;border-bottom:1px solid rgba(28,10,0,0.04);}
+.ol-row:last-child{border-bottom:none;}
+.ol-row:hover{background:#FFF9E6;}
+.ol-deceased .ol-row-name{color:#888;font-style:italic;}
+.ol-row-cb{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
+.ol-row-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;flex:1;min-width:0;}
+.ol-row-meta{font-size:11px;color:rgba(28,10,0,0.4);flex-shrink:0;white-space:nowrap;}
+#ol-bulk-bar{position:fixed;bottom:-64px;left:0;right:0;background:#1C0A00;color:#FFF9E6;padding:14px 24px;display:flex;align-items:center;justify-content:center;z-index:150;transition:bottom 0.2s;}
+#ol-bulk-bar.visible{bottom:0;}
+.btn-loveogram{padding:9px 24px;background:#c0195a;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;}
+.btn-loveogram:hover{background:#9e1048;}
 </style>
 </head>
 <body>
@@ -75,6 +110,10 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 
 <div class="top-bar">
   <h1>My Network</h1>
+  <div class="view-toggle">
+    <button class="vtb active" id="btn-view-network" onclick="switchView('network')">Network</button>
+    <button class="vtb" id="btn-view-outline" onclick="switchView('outline')">Outline</button>
+  </div>
   <div class="cb-group" id="cbGroup">
     <label class="cb-label">
       <input type="checkbox" id="cb-all" checked onchange="toggleAll()">All
@@ -93,6 +132,14 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 <div id="graph-container">
   <div id="loading"><p>Loading network…</p></div>
   <svg id="graph-svg"></svg>
+</div>
+
+<div id="outline-container">
+  <div class="outline-inner" id="outline-inner"></div>
+</div>
+
+<div id="ol-bulk-bar">
+  <a href="/pricing" class="btn-loveogram" id="btn-loveogram">Send Loveogram</a>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
@@ -147,6 +194,11 @@ let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel, _subgroup
 let _width, _height;
 let _subgroupIds = new Set();   // group IDs that are subgroups
 let _subgroupParents = {};      // subgroupId → parentGroupId
+let _rawGroups = [];
+let _groupMembersMap = {};
+let _contactFamilyRelLabel = {};
+let _currentView = 'network';
+let _selectedContacts = new Set();
 let _contactOccasions = {};  // contactId → [{ name, date, years }]
 let _nodeHeights = {};        // contactId → computed pill height
 const _today = new Date(); _today.setHours(0, 0, 0, 0);
@@ -368,6 +420,22 @@ async function init() {
     else link.relB = r.relationship;
   });
   _relLinks = Array.from(pairMap.values());
+
+  // Build outline data structures
+  _rawGroups = data.groups || [];
+  _groupMembersMap = {};
+  (data.group_memberships || []).forEach(m => {
+    if (!_groupMembersMap[m.group_id]) _groupMembersMap[m.group_id] = [];
+    const c = _contactMap[m.contact_id];
+    if (c && !_groupMembersMap[m.group_id].find(x => x.id === c.id))
+      _groupMembersMap[m.group_id].push(c);
+  });
+  _contactFamilyRelLabel = {};
+  _relLinks.forEach(l => {
+    if (l.group !== 'Family') return;
+    if (l.relA && !_contactFamilyRelLabel[l.source]) _contactFamilyRelLabel[l.source] = cleanRel(l.relA);
+    if (l.relB && !_contactFamilyRelLabel[l.target]) _contactFamilyRelLabel[l.target] = cleanRel(l.relB);
+  });
 
   _relLinks.forEach(l => {
     [l.source, l.target].forEach(id => {
@@ -618,6 +686,7 @@ function computeVisibleGroupIds(active) {
 }
 
 function applyVisibility() {
+  if (_currentView === 'outline') { renderOutline(); return; }
   if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
@@ -798,6 +867,167 @@ window.addEventListener('resize', () => {
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Outline view ──────────────────────────────────────────────────────────────
+function switchView(view) {
+  _currentView = view;
+  document.getElementById('btn-view-network').classList.toggle('active', view === 'network');
+  document.getElementById('btn-view-outline').classList.toggle('active', view === 'outline');
+  document.getElementById('graph-container').style.display = view === 'network' ? '' : 'none';
+  document.getElementById('outline-container').style.display = view === 'outline' ? '' : 'none';
+  if (view === 'network') { applyVisibility(); closePanel(); }
+  else renderOutline();
+}
+
+function renderOutline() {
+  const active = getActiveGroups();
+  const showOnlyLiving = document.getElementById('cb-living').checked;
+  const inner = document.getElementById('outline-inner');
+  inner.innerHTML = '';
+  _selectedContacts.clear();
+  updateBulkBar();
+
+  const topGroups = _rawGroups.filter(g => !g.parent_group_id);
+  topGroups.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
+
+  topGroups.forEach(g => {
+    if (!active.has(g.name)) return;
+    const color = GROUP_COLORS[g.name] || '#3A6B20';
+    const isFamily = g.name === 'Family';
+    const subgroups = _rawGroups.filter(s => s.parent_group_id === g.id && active.has(s.name))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const directMembers = (_groupMembersMap[g.id] || []).filter(c => !showOnlyLiving || !c.died_on);
+    const subgroupMemberIds = new Set();
+    subgroups.forEach(s => (_groupMembersMap[s.id] || []).forEach(c => subgroupMemberIds.add(c.id)));
+    const trueDirectMembers = directMembers.filter(c => !subgroupMemberIds.has(c.id));
+    let totalVisible = trueDirectMembers.length;
+    subgroups.forEach(s => totalVisible += (_groupMembersMap[s.id] || []).filter(c => !showOnlyLiving || !c.died_on).length);
+    if (totalVisible === 0 && subgroups.length === 0) return;
+
+    const el = document.createElement('div');
+    el.className = 'ol-group';
+    el.dataset.groupId = g.id;
+    el.innerHTML = `<div class="ol-group-hdr" onclick="toggleOlGroup(this)">
+      <input type="checkbox" class="ol-cb" onchange="olGroupCbChange(this,${g.id})" onclick="event.stopPropagation()">
+      <span class="ol-tri">▼</span>
+      <span class="ol-dot" style="background:${color}"></span>
+      <span class="ol-group-name">${isFamily ? '♥ ' : ''}${esc(g.name)}</span>
+      <span class="ol-count">${totalVisible}</span>
+    </div><div class="ol-group-body"></div>`;
+
+    const body = el.querySelector('.ol-group-body');
+    if (isFamily) renderOlFamilySection(body, directMembers);
+    else renderOlSubSection(body, subgroups, trueDirectMembers, showOnlyLiving);
+    inner.appendChild(el);
+  });
+}
+
+function renderOlFamilySection(body, members) {
+  const pets = members.filter(c => c.is_pet).sort((a, b) => (a.name||'').localeCompare(b.name||''));
+  const nonPets = members.filter(c => !c.is_pet).sort((a, b) => (a.name||'').localeCompare(b.name||''));
+  nonPets.forEach(c => body.appendChild(makeOlRow(c, 0, true)));
+  if (!pets.length) return;
+  const petsEl = document.createElement('div');
+  petsEl.className = 'ol-sub';
+  petsEl.innerHTML = `<div class="ol-sub-hdr" onclick="toggleOlSub(this)">
+    <input type="checkbox" class="ol-cb" onchange="olSubCbChange(this)" onclick="event.stopPropagation()">
+    <span class="ol-tri">▼</span>
+    <span class="ol-sub-name">🐾 Pets</span>
+    <span class="ol-count">${pets.length}</span>
+  </div><div class="ol-sub-body"></div>`;
+  const pb = petsEl.querySelector('.ol-sub-body');
+  pets.forEach(c => pb.appendChild(makeOlRow(c, 1, false)));
+  body.appendChild(petsEl);
+}
+
+function renderOlSubSection(body, subgroups, directMembers, showOnlyLiving) {
+  directMembers.sort((a, b) => (a.name||'').localeCompare(b.name||''));
+  directMembers.forEach(c => body.appendChild(makeOlRow(c, 0, false)));
+  subgroups.forEach(s => {
+    const sMembers = (_groupMembersMap[s.id] || []).filter(c => !showOnlyLiving || !c.died_on)
+      .sort((a, b) => (a.name||'').localeCompare(b.name||''));
+    if (!sMembers.length) return;
+    const subEl = document.createElement('div');
+    subEl.className = 'ol-sub';
+    subEl.dataset.subId = s.id;
+    subEl.innerHTML = `<div class="ol-sub-hdr" onclick="toggleOlSub(this)">
+      <input type="checkbox" class="ol-cb" onchange="olSubCbChange(this)" onclick="event.stopPropagation()">
+      <span class="ol-tri">▼</span>
+      <span class="ol-sub-name">${esc(s.name)}</span>
+      <span class="ol-count">${sMembers.length}</span>
+    </div><div class="ol-sub-body"></div>`;
+    const sb = subEl.querySelector('.ol-sub-body');
+    sMembers.forEach(c => sb.appendChild(makeOlRow(c, 1, false)));
+    body.appendChild(subEl);
+  });
+}
+
+function makeOlRow(c, depth, showRelLabel) {
+  const row = document.createElement('div');
+  row.className = 'ol-row' + (c.died_on ? ' ol-deceased' : '');
+  row.dataset.contactId = c.id;
+  if (depth > 0) row.style.paddingLeft = (depth * 12 + 16) + 'px';
+  const name = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+  const metaRaw = olMeta(c);
+  const relLabel = showRelLabel ? (_contactFamilyRelLabel[c.id] || '') : '';
+  let metaStr = '';
+  if (metaRaw && relLabel) metaStr = `(${metaRaw}) — ${relLabel}`;
+  else if (metaRaw) metaStr = `(${metaRaw})`;
+  else if (relLabel) metaStr = relLabel;
+  row.innerHTML = `<input type="checkbox" class="ol-row-cb" onclick="event.stopPropagation()" onchange="olRowCbChange(this,${c.id})">
+    <span class="ol-row-name">${esc(name)}</span>
+    <span class="ol-row-meta">${esc(metaStr)}</span>`;
+  row.addEventListener('click', e => { if (e.target.tagName === 'INPUT') return; openPanel(c); });
+  return row;
+}
+
+function olMeta(c) {
+  if (c.died_on) {
+    const by = yearOf(c.birthday), dy = yearOf(c.died_on);
+    const age = calcAge(c.birthday, c.died_on);
+    if (by && dy) return `${by}–${dy}${age !== null ? `, ${age} yrs` : ''} †`;
+    return dy ? `† ${dy}` : '†';
+  }
+  const parts = [];
+  if (c.birthday) { const y = yearOf(c.birthday); if (y) parts.push(y); }
+  const age = calcAge(c.birthday, null);
+  if (age !== null) parts.push(`${age} yrs`);
+  return parts.join(', ');
+}
+
+function toggleOlGroup(hdr) { hdr.closest('.ol-group').classList.toggle('ol-collapsed'); }
+function toggleOlSub(hdr) { hdr.closest('.ol-sub').classList.toggle('ol-collapsed'); }
+
+function olGroupCbChange(cb, groupId) {
+  const el = document.querySelector(`.ol-group[data-group-id="${groupId}"]`);
+  if (!el) return;
+  el.querySelectorAll('.ol-row-cb').forEach(rc => {
+    rc.checked = cb.checked;
+    const id = parseInt(rc.closest('.ol-row').dataset.contactId);
+    cb.checked ? _selectedContacts.add(id) : _selectedContacts.delete(id);
+  });
+  updateBulkBar();
+}
+
+function olSubCbChange(cb) {
+  cb.closest('.ol-sub').querySelectorAll('.ol-row-cb').forEach(rc => {
+    rc.checked = cb.checked;
+    const id = parseInt(rc.closest('.ol-row').dataset.contactId);
+    cb.checked ? _selectedContacts.add(id) : _selectedContacts.delete(id);
+  });
+  updateBulkBar();
+}
+
+function olRowCbChange(cb, contactId) {
+  cb.checked ? _selectedContacts.add(contactId) : _selectedContacts.delete(contactId);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const n = _selectedContacts.size;
+  document.getElementById('ol-bulk-bar').classList.toggle('visible', n > 0);
+  document.getElementById('btn-loveogram').textContent = `Send Loveogram to ${n} contact${n !== 1 ? 's' : ''}`;
 }
 
 init();
