@@ -8,7 +8,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
-body{font-family:'DM Sans',sans-serif;background:#1C0A00;color:#FFF9E6;display:flex;flex-direction:column;}
+body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex;flex-direction:column;}
 
 .nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
 .nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
@@ -18,22 +18,23 @@ body{font-family:'DM Sans',sans-serif;background:#1C0A00;color:#FFF9E6;display:f
 .nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
 .nav-links a:hover{opacity:1;}
 
-.top-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.1);padding:10px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;}
-.top-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;}
-.top-bar select{padding:7px 12px;border:1.5px solid #e0dcd4;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;cursor:pointer;}
-.top-bar select:focus{border-color:#3A6B20;}
-.btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.top-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.1);padding:10px 24px;display:flex;align-items:center;gap:20px;flex-shrink:0;flex-wrap:wrap;}
+.top-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;min-width:0;}
+.cb-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.cb-label{display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;user-select:none;}
+.cb-label input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
+.cb-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.cb-sep{width:1px;height:16px;background:rgba(28,10,0,0.15);flex-shrink:0;}
+.btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
 .btn-back:hover{background:#1C0A00;}
 
-#graph-container{flex:1;position:relative;overflow:hidden;}
+#graph-container{flex:1;position:relative;overflow:hidden;background:#fff;}
 #graph-svg{width:100%;height:100%;display:block;}
 
-/* Tooltip */
-.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.15s;z-index:100;max-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.4);}
+.tooltip{position:fixed;background:#1C0A00;color:#FFF9E6;padding:8px 12px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.15s;z-index:100;max-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.25);}
 .tooltip.visible{opacity:1;}
 
-/* Side panel */
-.side-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:#FFF9E6;box-shadow:-4px 0 24px rgba(0,0,0,0.18);transition:right 0.25s cubic-bezier(0.4,0,0.2,1);z-index:200;display:flex;flex-direction:column;padding:0;}
+.side-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:#FFF9E6;box-shadow:-4px 0 24px rgba(0,0,0,0.12);transition:right 0.25s cubic-bezier(0.4,0,0.2,1);z-index:200;display:flex;flex-direction:column;}
 .side-panel.open{right:0;}
 .sp-header{padding:20px 20px 16px;border-bottom:1px solid rgba(28,10,0,0.08);display:flex;align-items:flex-start;justify-content:space-between;}
 .sp-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1C0A00;line-height:1.2;}
@@ -53,17 +54,8 @@ body{font-family:'DM Sans',sans-serif;background:#1C0A00;color:#FFF9E6;display:f
 .btn-view-full{display:block;width:100%;padding:10px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;}
 .btn-view-full:hover{background:#1C0A00;}
 
-/* Loading overlay */
-#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#1C0A00;z-index:50;}
-#loading p{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(255,249,230,0.6);}
-
-/* Legend */
-.legend{position:absolute;bottom:20px;left:20px;background:rgba(255,249,230,0.12);backdrop-filter:blur(6px);border-radius:10px;padding:12px 16px;z-index:10;}
-.legend-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(255,249,230,0.5);margin-bottom:8px;}
-.legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,249,230,0.8);margin-bottom:4px;}
-.legend-item:last-child{margin-bottom:0;}
-.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.legend-line{width:18px;height:3px;border-radius:2px;flex-shrink:0;}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;z-index:50;}
+#loading p{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:rgba(28,10,0,0.4);}
 </style>
 </head>
 <body>
@@ -82,26 +74,35 @@ body{font-family:'DM Sans',sans-serif;background:#1C0A00;color:#FFF9E6;display:f
 
 <div class="top-bar">
   <h1>My Network</h1>
-  <select id="groupFilter" onchange="applyFilter()">
-    <option value="all">All groups</option>
-    <option value="Family">Family</option>
-    <option value="Work">Work</option>
-    <option value="School">School</option>
-    <option value="Friends">Friends</option>
-  </select>
+  <div class="cb-group">
+    <label class="cb-label">
+      <input type="checkbox" id="cb-all" checked onchange="toggleAll()">
+      All
+    </label>
+    <div class="cb-sep"></div>
+    <label class="cb-label">
+      <input type="checkbox" id="cb-Family" checked onchange="applyFilter()">
+      <span class="cb-dot" style="background:#e74c8b;"></span>Family
+    </label>
+    <label class="cb-label">
+      <input type="checkbox" id="cb-Work" checked onchange="applyFilter()">
+      <span class="cb-dot" style="background:#3A6B20;"></span>Work
+    </label>
+    <label class="cb-label">
+      <input type="checkbox" id="cb-School" checked onchange="applyFilter()">
+      <span class="cb-dot" style="background:#2980b9;"></span>School
+    </label>
+    <label class="cb-label">
+      <input type="checkbox" id="cb-Friends" checked onchange="applyFilter()">
+      <span class="cb-dot" style="background:#e67e22;"></span>Friends
+    </label>
+  </div>
   <a href="/account/contacts" class="btn-back">← Contacts</a>
 </div>
 
 <div id="graph-container">
   <div id="loading"><p>Loading network…</p></div>
   <svg id="graph-svg"></svg>
-  <div class="legend">
-    <div class="legend-title">Groups</div>
-    <div class="legend-item"><div class="legend-line" style="background:#e74c8b;"></div> Family</div>
-    <div class="legend-item"><div class="legend-line" style="background:#3A6B20;"></div> Work</div>
-    <div class="legend-item"><div class="legend-line" style="background:#2980b9;"></div> School</div>
-    <div class="legend-item"><div class="legend-line" style="background:#e67e22;"></div> Friends</div>
-  </div>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
@@ -138,11 +139,11 @@ const GROUP_COLORS = {
   'School':  '#2980b9',
   'Friends': '#e67e22',
 };
-const DEFAULT_LINK_COLOR = 'rgba(255,249,230,0.15)';
+const GROUPS = ['Family', 'Work', 'School', 'Friends'];
 
 let _allNodes = [], _allLinks = [], _contactMap = {};
-let _simulation, _svg, _g, _linkSel, _nodeSel, _labelSel;
-let _activeFilter = 'all';
+let _nodeGroups = {}; // nodeId -> Set of group names that have a relationship
+let _simulation, _svg, _g, _nodeSel, _linkSel;
 let _width, _height;
 
 async function init() {
@@ -150,10 +151,8 @@ async function init() {
   if (res.status === 401) { window.location.href = '/login'; return; }
   const data = await res.json();
 
-  // Build contact map
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
-  // Nodes: user center + contacts
   _allNodes = [
     { id: '__me__', name: 'You', isMe: true },
     ...data.contacts.map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c }))
@@ -170,6 +169,14 @@ async function init() {
     }
   });
 
+  // Build nodeGroups map for visibility decisions
+  _allLinks.forEach(l => {
+    [l.source, l.target].forEach(id => {
+      if (!_nodeGroups[id]) _nodeGroups[id] = new Set();
+      _nodeGroups[id].add(l.group);
+    });
+  });
+
   document.getElementById('loading').style.display = 'none';
   buildGraph();
 }
@@ -179,10 +186,7 @@ function buildGraph() {
   _width = container.clientWidth;
   _height = container.clientHeight;
 
-  _svg = d3.select('#graph-svg')
-    .attr('width', _width)
-    .attr('height', _height);
-
+  _svg = d3.select('#graph-svg').attr('width', _width).attr('height', _height);
   _svg.selectAll('*').remove();
 
   const zoom = d3.zoom()
@@ -192,46 +196,14 @@ function buildGraph() {
   _svg.call(zoom);
   _g = _svg.append('g');
 
-  // Defs: arrow marker (unused but ready)
-  _svg.append('defs');
-
-  drawGraph(_allNodes, _allLinks);
-}
-
-function getVisibleNodesLinks(filter) {
-  if (filter === 'all') return { nodes: _allNodes, links: _allLinks };
-
-  // Contacts that have at least one relationship in this group
-  const relatedIds = new Set();
-  _allLinks.forEach(l => {
-    if (l.group === filter) {
-      relatedIds.add(typeof l.source === 'object' ? l.source.id : l.source);
-      relatedIds.add(typeof l.target === 'object' ? l.target.id : l.target);
-    }
-  });
-
-  const nodes = _allNodes.filter(n => n.isMe || relatedIds.has(n.id));
-  const nodeIds = new Set(nodes.map(n => n.id));
-  const links = _allLinks.filter(l => {
-    const s = typeof l.source === 'object' ? l.source.id : l.source;
-    const t = typeof l.target === 'object' ? l.target.id : l.target;
-    return l.group === filter && nodeIds.has(s) && nodeIds.has(t);
-  });
-  return { nodes, links };
-}
-
-function drawGraph(nodes, links) {
-  if (_simulation) _simulation.stop();
-  _g.selectAll('*').remove();
-
-  // Clone nodes/links so D3 mutation doesn't contaminate originals
-  const nodesCopy = nodes.map(n => ({ ...n }));
+  // Clone so D3 mutation doesn't contaminate originals
+  const nodesCopy = _allNodes.map(n => ({ ...n }));
   const idToNode = {};
   nodesCopy.forEach(n => { idToNode[n.id] = n; });
-  const linksCopy = links.map(l => ({
+  const linksCopy = _allLinks.map(l => ({
     ...l,
-    source: idToNode[typeof l.source === 'object' ? l.source.id : l.source],
-    target: idToNode[typeof l.target === 'object' ? l.target.id : l.target],
+    source: idToNode[l.source],
+    target: idToNode[l.target],
   })).filter(l => l.source && l.target);
 
   _simulation = d3.forceSimulation(nodesCopy)
@@ -240,16 +212,14 @@ function drawGraph(nodes, links) {
     .force('center', d3.forceCenter(_width / 2, _height / 2))
     .force('collision', d3.forceCollide().radius(d => d.isMe ? 28 : 18));
 
-  // Links
   _linkSel = _g.append('g').attr('class', 'links')
     .selectAll('line')
     .data(linksCopy)
     .join('line')
-    .attr('stroke', d => GROUP_COLORS[d.group] || DEFAULT_LINK_COLOR)
-    .attr('stroke-opacity', 0.45)
+    .attr('stroke', d => GROUP_COLORS[d.group] || 'rgba(28,10,0,0.12)')
+    .attr('stroke-opacity', 0.4)
     .attr('stroke-width', 1.5);
 
-  // Node groups
   const nodeG = _g.append('g').attr('class', 'nodes')
     .selectAll('g')
     .data(nodesCopy)
@@ -265,21 +235,19 @@ function drawGraph(nodes, links) {
     .on('mouseleave', hideTooltip)
     .on('click', nodeClick);
 
-  // Circles
   nodeG.append('circle')
     .attr('r', d => d.isMe ? 24 : 14)
-    .attr('fill', d => d.isMe ? '#3A6B20' : '#FFF9E6')
-    .attr('stroke', d => d.isMe ? '#FFF9E6' : 'rgba(255,249,230,0.25)')
+    .attr('fill', d => d.isMe ? '#3A6B20' : '#f0ede6')
+    .attr('stroke', d => d.isMe ? '#fff' : 'rgba(28,10,0,0.18)')
     .attr('stroke-width', d => d.isMe ? 3 : 1.5);
 
-  // Labels inside circles
   nodeG.append('text')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'central')
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
     .attr('font-size', d => d.isMe ? 11 : 10)
     .attr('font-weight', 700)
-    .attr('fill', d => d.isMe ? '#FFF9E6' : '#1C0A00')
+    .attr('fill', d => d.isMe ? '#fff' : '#1C0A00')
     .text(d => d.isMe ? 'You' : (d.name || '?').charAt(0).toUpperCase());
 
   _simulation.on('tick', () => {
@@ -289,16 +257,43 @@ function drawGraph(nodes, links) {
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
   });
 
-  // Store refs for highlight
   _nodeSel = nodeG;
-  _linkSel2 = _linkSel;
+  applyVisibility();
+}
+
+// ── Filter (checkboxes) ───────────────────────────────────────────────────────
+function getActiveGroups() {
+  return new Set(GROUPS.filter(g => document.getElementById(`cb-${g}`).checked));
+}
+
+function toggleAll() {
+  const checked = document.getElementById('cb-all').checked;
+  GROUPS.forEach(g => { document.getElementById(`cb-${g}`).checked = checked; });
+  applyVisibility();
+  closePanel();
 }
 
 function applyFilter() {
-  _activeFilter = document.getElementById('groupFilter').value;
-  const { nodes, links } = getVisibleNodesLinks(_activeFilter);
-  drawGraph(nodes, links);
+  const active = getActiveGroups();
+  // Sync "All" checkbox
+  document.getElementById('cb-all').checked = active.size === GROUPS.length;
+  applyVisibility();
   closePanel();
+}
+
+function applyVisibility() {
+  if (!_nodeSel || !_linkSel) return;
+  const active = getActiveGroups();
+
+  _linkSel.attr('display', l => active.has(l.group) ? null : 'none');
+
+  _nodeSel.attr('display', d => {
+    if (d.isMe) return null;
+    const groups = _nodeGroups[d.id];
+    if (!groups) return 'none';
+    for (const g of groups) { if (active.has(g)) return null; }
+    return 'none';
+  });
 }
 
 // ── Drag ──────────────────────────────────────────────────────────────────────
@@ -344,7 +339,6 @@ function openPanel(d) {
   document.getElementById('spCityWrap').style.display = city ? '' : 'none';
   document.getElementById('spCity').textContent = city || '';
 
-  // Relationships for this node
   const nodeId = d.id;
   const rels = _allLinks.filter(l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
@@ -357,9 +351,10 @@ function openPanel(d) {
     relsEl.innerHTML = '<div style="font-size:12px;color:rgba(28,10,0,0.35);">No relationships recorded.</div>';
   } else {
     relsEl.innerHTML = rels.map(l => {
-      const otherId = (typeof l.source === 'object' ? l.source.id : l.source) === nodeId
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const otherId = s === nodeId
         ? (typeof l.target === 'object' ? l.target.id : l.target)
-        : (typeof l.source === 'object' ? l.source.id : l.source);
+        : s;
       const other = _contactMap[otherId];
       return `<div class="sp-rel-item"><span class="sp-rel-name">${esc(other ? other.name || 'Unnamed' : 'Unknown')}</span><span class="sp-rel-type">${esc(l.rel)}</span></div>`;
     }).join('');
@@ -367,8 +362,6 @@ function openPanel(d) {
 
   document.getElementById('spViewFull').href = `/account/contacts#${nodeId}`;
   document.getElementById('sidePanel').classList.add('open');
-
-  // Highlight connected nodes
   highlightNode(nodeId);
 }
 
@@ -379,6 +372,7 @@ function closePanel() {
 
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
+  const active = getActiveGroups();
   const connectedIds = new Set([nodeId]);
   _allLinks.forEach(l => {
     const s = typeof l.source === 'object' ? l.source.id : l.source;
@@ -387,30 +381,32 @@ function highlightNode(nodeId) {
     if (t === nodeId) connectedIds.add(s);
   });
 
-  _nodeSel.selectAll('circle')
-    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.15);
-  _nodeSel.selectAll('text')
-    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.15);
-  if (_linkSel2) {
-    _linkSel2.attr('stroke-opacity', l => {
+  _nodeSel
+    .filter(d => d.getAttribute ? d.getAttribute('display') !== 'none' : true)
+    .selectAll('circle')
+    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.12);
+  _nodeSel
+    .filter(d => d.getAttribute ? d.getAttribute('display') !== 'none' : true)
+    .selectAll('text')
+    .attr('opacity', d => d.isMe || connectedIds.has(d.id) ? 1 : 0.12);
+  _linkSel
+    .filter(l => active.has(l.group))
+    .attr('stroke-opacity', l => {
       const s = typeof l.source === 'object' ? l.source.id : l.source;
       const t = typeof l.target === 'object' ? l.target.id : l.target;
       return (s === nodeId || t === nodeId) ? 0.85 : 0.05;
     });
-  }
 }
 
 function clearHighlight() {
   if (!_nodeSel) return;
   _nodeSel.selectAll('circle').attr('opacity', 1);
   _nodeSel.selectAll('text').attr('opacity', 1);
-  if (_linkSel2) _linkSel2.attr('stroke-opacity', 0.45);
+  if (_linkSel) _linkSel.attr('stroke-opacity', 0.4);
 }
 
-// Close panel on svg click
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());
 
-// Resize
 window.addEventListener('resize', () => {
   const container = document.getElementById('graph-container');
   _width = container.clientWidth;
@@ -423,7 +419,6 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-let _linkSel2;
 init();
 </script>
 </body>
