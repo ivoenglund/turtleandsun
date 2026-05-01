@@ -100,6 +100,10 @@ const CP = (() => {
 /* Overlay mode: transparent bg, text-shadow for legibility */
 .fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
 .fo-detail .cp-close-btn{text-shadow:0 0 8px rgba(255,249,230,1);}
+.fo-detail .cp-name-bar{border-bottom:none;}
+.fo-detail .cp-section{border-bottom:none;}
+.fo-detail .cp-row{border-bottom:none;}
+.fo-detail .cp-list-row{border-bottom:none;}
 .fo-detail .cp-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-section-hdr{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-inp{background:transparent!important;border-left-color:transparent;border-left-width:1px;}
