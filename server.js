@@ -377,18 +377,39 @@ app.get('/account/occasions', requireAuth, (req, res) => {
 // ── Groups ────────────────────────────────────────────────────────────────────
 
 app.get('/api/groups', requireAuth, async (req, res) => {
-  const result = await pool.query(
-    `SELECT id, name FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
-  );
-  res.json(result.rows);
+  try {
+    const result = await pool.query(
+      `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
+    );
+    const topLevel = result.rows.filter(g => !g.parent_group_id);
+    const byParent = {};
+    result.rows.filter(g => g.parent_group_id).forEach(g => {
+      if (!byParent[g.parent_group_id]) byParent[g.parent_group_id] = [];
+      byParent[g.parent_group_id].push({ id: g.id, name: g.name });
+    });
+    const nested = topLevel.map(g => ({
+      id: g.id, name: g.name,
+      subgroups: (byParent[g.id] || []).sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+    nested.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
+    res.json(nested);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/groups', requireAuth, async (req, res) => {
-  const { name } = req.body;
+  const { name, parent_group_id } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
+  if (parent_group_id) {
+    const parent = await pool.query(
+      `SELECT name FROM groups WHERE id = $1 AND user_id = $2`, [parent_group_id, req.user.id]
+    );
+    if (!parent.rows.length) return res.status(404).json({ error: 'Parent group not found' });
+    if (parent.rows[0].name === 'Family') return res.status(400).json({ error: 'Family cannot have subgroups.' });
+  }
   try {
     const result = await pool.query(
-      `INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id, name`, [req.user.id, name.trim()]
+      `INSERT INTO groups (user_id, name, parent_group_id) VALUES ($1, $2, $3) RETURNING id, name, parent_group_id`,
+      [req.user.id, name.trim(), parent_group_id || null]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -396,6 +417,14 @@ app.post('/api/groups', requireAuth, async (req, res) => {
 
 app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   try {
+    // Delete subgroups first (memberships, then the subgroup rows)
+    const subs = await pool.query(
+      `SELECT id FROM groups WHERE parent_group_id = $1 AND user_id = $2`, [req.params.id, req.user.id]
+    );
+    for (const sub of subs.rows) {
+      await pool.query(`DELETE FROM contact_group_memberships WHERE group_id = $1 AND user_id = $2`, [sub.id, req.user.id]);
+      await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2`, [sub.id, req.user.id]);
+    }
     await pool.query(`DELETE FROM contact_group_memberships WHERE group_id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2 AND name != 'Family'`, [req.params.id, req.user.id]);
     res.json({ ok: true });
@@ -488,16 +517,20 @@ app.get('/api/network', requireAuth, async (req, res) => {
       [req.user.id]
     );
     const groupMemberships = await pool.query(
-      `SELECT cgm.group_id, g.name AS group_name, cgm.contact_id
+      `SELECT cgm.group_id, g.name AS group_name, g.parent_group_id, cgm.contact_id
        FROM contact_group_memberships cgm
        JOIN groups g ON g.id = cgm.group_id
        WHERE cgm.user_id = $1`,
       [req.user.id]
     );
+    const groups = await pool.query(
+      `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
+    );
     res.json({
       contacts: contacts.rows,
       relationships: relationships.rows,
       group_memberships: groupMemberships.rows,
+      groups: groups.rows,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

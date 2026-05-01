@@ -92,11 +92,15 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .save-msg{font-size:12px;}
 .save-msg.ok{color:#3A6B20;} .save-msg.err{color:#c0392b;}
 
-.groups-list{display:flex;flex-wrap:wrap;gap:8px;}
+.groups-list{display:flex;flex-direction:column;gap:5px;}
+.group-tree-row{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#f9f7f2;border:1.5px solid #e0dcd4;border-radius:8px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;user-select:none;transition:border-color 0.15s,background 0.15s;}
+.group-tree-row:hover{border-color:#3A6B20;}
+.group-tree-row input[type=checkbox]{width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
+.group-tree-row.checked{background:#e8f0e0;border-color:#3A6B20;}
+.group-tree-children{padding-left:20px;display:flex;flex-direction:column;gap:3px;margin-top:2px;}
+.group-tree-row.group-tree-sub{font-size:12px;padding:5px 10px;border-radius:6px;}
 .group-cb-label{display:flex;align-items:center;gap:6px;padding:7px 12px;background:#f9f7f2;border:1.5px solid #e0dcd4;border-radius:8px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;user-select:none;transition:border-color 0.15s,background 0.15s;}
-.group-cb-label:hover{border-color:#3A6B20;}
 .group-cb-label input[type=checkbox]{width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;}
-.group-cb-label.checked{background:#e8f0e0;border-color:#3A6B20;}
 
 .table-wrap{overflow-x:auto;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -138,11 +142,15 @@ tr:last-child td{border-bottom:none;}
 .groups-mgr-item:last-child{border-bottom:none;}
 .groups-mgr-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;}
 .groups-mgr-lock{font-size:11px;color:rgba(28,10,0,0.35);margin-left:6px;}
+.groups-mgr-sub{padding-left:22px;background:#faf8f5;}
+.groups-mgr-sub .groups-mgr-name{font-size:12px;color:rgba(28,10,0,0.7);}
 .add-group-row{display:flex;gap:8px;margin-bottom:14px;}
 .add-group-row input{flex:1;padding:8px 12px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:13px;font-family:'DM Sans';outline:none;}
 .add-group-row input:focus{border-color:#3A6B20;}
 .btn-add-group{padding:8px 14px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .btn-add-group:hover{background:#1C0A00;}
+.btn-add-sub{padding:3px 8px;background:#f0ede6;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.6);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;white-space:nowrap;}
+.btn-add-sub:hover{border-color:#3A6B20;color:#3A6B20;}
 
 @media(max-width:700px){
   .nav-wrap,.sync-strip{padding:0 16px;}
@@ -477,19 +485,43 @@ async function selectContact(id) {
 }
 
 // ── Groups section ────────────────────────────────────────────────────────────
+function allGroupsFlat() {
+  const flat = [];
+  for (const g of _allGroups) {
+    flat.push(g);
+    for (const s of (g.subgroups || [])) flat.push(s);
+  }
+  return flat;
+}
+
 function renderGroupCheckboxes() {
   const el = document.getElementById('groupsCheckboxes');
   if (!_allGroups.length) {
     el.innerHTML = '<span style="font-size:13px;color:rgba(28,10,0,0.35);">No groups yet. Use ⚙ Groups to create one.</span>';
     return;
   }
-  el.innerHTML = _allGroups.map(g => {
+  let html = '';
+  for (const g of _allGroups) {
     const checked = _contactGroupIds.has(g.id);
-    return `<label class="group-cb-label${checked ? ' checked' : ''}" id="gcbl-${g.id}">
-      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleGroupMembership(${g.id},this)">
-      ${esc(g.name)}
-    </label>`;
-  }).join('');
+    html += `<div>
+      <label class="group-tree-row${checked ? ' checked' : ''}" id="gcbl-${g.id}">
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleGroupMembership(${g.id},this)">
+        ${esc(g.name)}
+      </label>`;
+    if (g.subgroups && g.subgroups.length) {
+      html += '<div class="group-tree-children">';
+      for (const s of g.subgroups) {
+        const schecked = _contactGroupIds.has(s.id);
+        html += `<label class="group-tree-row group-tree-sub${schecked ? ' checked' : ''}" id="gcbl-${s.id}">
+          <input type="checkbox" ${schecked ? 'checked' : ''} onchange="toggleGroupMembership(${s.id},this)">
+          ↳ ${esc(s.name)}
+        </label>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  el.innerHTML = html;
 }
 
 async function toggleGroupMembership(groupId, cb) {
@@ -502,7 +534,7 @@ async function toggleGroupMembership(groupId, cb) {
   if (label) label.classList.toggle('checked', cb.checked);
 
   // Check if Family status changed
-  const familyGroup = _allGroups.find(g => g.name === 'Family');
+  const familyGroup = allGroupsFlat().find(g => g.name === 'Family');
   const nowInFamily = familyGroup ? _contactGroupIds.has(familyGroup.id) : false;
   if (nowInFamily !== _inFamilyGroup) {
     _inFamilyGroup = nowInFamily;
@@ -699,10 +731,22 @@ function renderGroupsMgr() {
   if (!_allGroups.length) { el.innerHTML = '<div style="font-size:13px;color:rgba(28,10,0,0.4);padding:8px 0;">No groups yet.</div>'; return; }
   el.innerHTML = _allGroups.map(g => {
     const isFamily = g.name === 'Family';
-    return `<div class="groups-mgr-item">
+    let html = `<div class="groups-mgr-item">
       <span class="groups-mgr-name">${esc(g.name)}${isFamily ? '<span class="groups-mgr-lock">🔒 system</span>' : ''}</span>
-      ${isFamily ? '' : `<button class="btn-del" onclick="deleteGroup(${g.id})">Remove</button>`}
+      <div style="display:flex;gap:4px;align-items:center;">
+        ${isFamily ? '' : `<button class="btn-add-sub" onclick="openAddSubgroupModal(${g.id},${JSON.stringify(g.name)})">+ Sub</button>`}
+        ${isFamily ? '' : `<button class="btn-del" onclick="deleteGroup(${g.id})">Remove</button>`}
+      </div>
     </div>`;
+    if (g.subgroups && g.subgroups.length) {
+      g.subgroups.forEach(s => {
+        html += `<div class="groups-mgr-item groups-mgr-sub">
+          <span class="groups-mgr-name">↳ ${esc(s.name)}</span>
+          <button class="btn-del" onclick="deleteGroup(${s.id},true)">Remove</button>
+        </div>`;
+      });
+    }
+    return html;
   }).join('');
 }
 
@@ -716,18 +760,48 @@ async function addGroup() {
   });
   if (res.ok) {
     const g = await res.json();
-    _allGroups.push(g);
-    _allGroups.sort((a, b) => a.name.localeCompare(b.name));
+    _allGroups.push({ id: g.id, name: g.name, subgroups: [] });
+    _allGroups.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
     document.getElementById('newGroupName').value = '';
     renderGroupsMgr();
     if (_currentId) renderGroupCheckboxes();
   }
 }
 
-async function deleteGroup(id) {
+async function openAddSubgroupModal(parentId, parentName) {
+  const name = prompt(`New subgroup under "${parentName}":`);
+  if (!name || !name.trim()) return;
+  const res = await fetch('/api/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim(), parent_group_id: parentId }),
+  });
+  if (res.ok) {
+    const g = await res.json();
+    const parent = _allGroups.find(p => p.id === parentId);
+    if (parent) {
+      if (!parent.subgroups) parent.subgroups = [];
+      parent.subgroups.push({ id: g.id, name: g.name });
+      parent.subgroups.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    renderGroupsMgr();
+    if (_currentId) renderGroupCheckboxes();
+  } else {
+    const d = await res.json();
+    alert(d.error || 'Failed to create subgroup.');
+  }
+}
+
+async function deleteGroup(id, isSubgroup = false) {
   const res = await fetch(`/api/groups/${id}`, { method: 'DELETE' });
   if (res.ok) {
-    _allGroups = _allGroups.filter(g => g.id !== id);
+    if (isSubgroup) {
+      for (const g of _allGroups) {
+        if (g.subgroups) g.subgroups = g.subgroups.filter(s => s.id !== id);
+      }
+    } else {
+      _allGroups = _allGroups.filter(g => g.id !== id);
+    }
     _contactGroupIds.delete(id);
     renderGroupsMgr();
     if (_currentId) renderGroupCheckboxes();

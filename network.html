@@ -24,6 +24,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .cb-label{display:flex;align-items:center;gap:5px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;}
 .cb-label input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
 .cb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.cb-sub-label{padding-left:8px;opacity:0.88;}
 .cb-sep{width:1px;height:14px;background:rgba(28,10,0,0.15);flex-shrink:0;}
 .btn-back{padding:7px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
 .btn-back:hover{background:#1C0A00;}
@@ -131,6 +132,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 const NW = 130, NH = 46, NRX = 10;
 const GNW = 164, GNH = 60, GNRX = 14;
+const SGW = 134, SGH = 44, SGRX = 11;  // subgroup hub size (smaller than top-level)
 const ME_R = 26;
 const FAMILY_COLOR = '#9e3a3a';
 
@@ -141,8 +143,10 @@ let _contactGroupNames = {};
 let _allGroupNames = [];
 let GROUP_COLORS = {};
 let _simulation, _svg, _g;
-let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel;
+let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel, _subgroupLinkSel;
 let _width, _height;
+let _subgroupIds = new Set();   // group IDs that are subgroups
+let _subgroupParents = {};      // subgroupId → parentGroupId
 let _contactOccasions = {};  // contactId → [{ name, date, years }]
 let _nodeHeights = {};        // contactId → computed pill height
 const _today = new Date(); _today.setHours(0, 0, 0, 0);
@@ -250,6 +254,12 @@ function nodeLayout(d) {
   return { h, items };
 }
 
+function toggleParentCb(cb, parentGroupName) {
+  document.querySelectorAll(`#cbGroup input[data-parent-group="${CSS.escape(parentGroupName)}"]`)
+    .forEach(child => { child.checked = cb.checked; });
+  applyFilter();
+}
+
 async function init() {
   const [netRes, occRes] = await Promise.all([
     fetch('/api/network'),
@@ -261,44 +271,76 @@ async function init() {
 
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
+  // Build subgroup hierarchy from data.groups
+  _subgroupIds = new Set();
+  _subgroupParents = {};
+  const groupDefsById = {};
+  (data.groups || []).forEach(g => {
+    groupDefsById[g.id] = g;
+    if (g.parent_group_id) { _subgroupIds.add(g.id); _subgroupParents[g.id] = g.parent_group_id; }
+  });
+
   // Build group name maps from memberships
   _groupNodeName = {};
   _contactGroupNames = {};
   const groupNodeMap = {};
-  const groupNameSet = new Set();
 
   (data.group_memberships || []).forEach(m => {
     if (!groupNodeMap[m.group_id]) {
       groupNodeMap[m.group_id] = { id: `g_${m.group_id}`, name: m.group_name, isGroup: true };
       _groupNodeName[`g_${m.group_id}`] = m.group_name;
     }
-    groupNameSet.add(m.group_name);
     if (!_contactGroupNames[m.contact_id]) _contactGroupNames[m.contact_id] = new Set();
     _contactGroupNames[m.contact_id].add(m.group_name);
   });
 
-  // Also collect group names from relationships
-  (data.relationships || []).forEach(r => groupNameSet.add(r.group_name));
-
-  _allGroupNames = Array.from(groupNameSet).sort((a, b) => {
-    if (a === 'Family') return -1;
-    if (b === 'Family') return 1;
-    return a.localeCompare(b);
+  // Create nodes for all defined groups (even those with no direct members)
+  (data.groups || []).forEach(g => {
+    if (!groupNodeMap[g.id]) {
+      groupNodeMap[g.id] = { id: `g_${g.id}`, name: g.name, isGroup: true };
+      _groupNodeName[`g_${g.id}`] = g.name;
+    }
   });
 
-  // Assign colors
+  // Assign colors: top-level groups get palette colors; subgroups inherit parent's color
+  const topGroupDefs = (data.groups || []).filter(g => !g.parent_group_id);
+  topGroupDefs.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
   GROUP_COLORS = {};
-  _allGroupNames.forEach((g, i) => { GROUP_COLORS[g] = PALETTE[i % PALETTE.length]; });
-  GROUP_COLORS['Family'] = FAMILY_COLOR;
+  topGroupDefs.forEach((g, i) => {
+    GROUP_COLORS[g.name] = g.name === 'Family' ? FAMILY_COLOR : PALETTE[i % PALETTE.length];
+  });
+  (data.groups || []).filter(g => g.parent_group_id).forEach(g => {
+    const parent = groupDefsById[g.parent_group_id];
+    GROUP_COLORS[g.name] = parent ? GROUP_COLORS[parent.name] : PALETTE[0];
+  });
 
-  // Build dynamic checkboxes
+  _allGroupNames = (data.groups || []).map(g => g.name);
+
+  // Build filter checkboxes with parent/subgroup hierarchy
   const cbGroup = document.getElementById('cbGroup');
   const insertBefore = document.querySelector('#cbGroup .cb-sep:last-of-type');
-  _allGroupNames.forEach((g, i) => {
+  const subsByParentId = {};
+  (data.groups || []).filter(g => g.parent_group_id).forEach(g => {
+    if (!subsByParentId[g.parent_group_id]) subsByParentId[g.parent_group_id] = [];
+    subsByParentId[g.parent_group_id].push(g);
+  });
+  topGroupDefs.forEach(g => {
+    const color = GROUP_COLORS[g.name];
     const label = document.createElement('label');
     label.className = 'cb-label';
-    label.innerHTML = `<input type="checkbox" data-group="${g.replace(/"/g,'&quot;')}" checked onchange="applyFilter()"><span class="cb-dot" style="background:${GROUP_COLORS[g]};"></span>${esc(g)}`;
+    const gAttr = g.name.replace(/"/g, '&quot;');
+    const gJs = g.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    label.innerHTML = `<input type="checkbox" data-group="${gAttr}" checked onchange="toggleParentCb(this,'${gJs}')">`
+      + `<span class="cb-dot" style="background:${color};"></span>${esc(g.name)}`;
     cbGroup.insertBefore(label, insertBefore);
+    (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name)).forEach(s => {
+      const sLabel = document.createElement('label');
+      sLabel.className = 'cb-label cb-sub-label';
+      const sAttr = s.name.replace(/"/g, '&quot;');
+      sLabel.innerHTML = `<input type="checkbox" data-group="${sAttr}" data-parent-group="${gAttr}" checked onchange="applyFilter()">`
+        + `<span class="cb-dot" style="width:6px;height:6px;background:${color};opacity:0.7;"></span>${esc(s.name)}`;
+      cbGroup.insertBefore(sLabel, insertBefore);
+    });
   });
 
   const groupNodes = Object.values(groupNodeMap);
@@ -366,20 +408,40 @@ function buildGraph() {
   _nodeHeights = {};
   _allNodes.forEach(n => { if (!n.isGroup && !n.isMe) _nodeHeights[n.id] = nodeLayout(n).h; });
 
+  // Build subgroup ↔ parent-group links for the simulation
+  const subgroupLinksCopy = [];
+  Object.entries(_subgroupParents).forEach(([subIdStr, parentId]) => {
+    const subNode = idToNode[`g_${subIdStr}`];
+    const parentNode = idToNode[`g_${parentId}`];
+    if (subNode && parentNode) subgroupLinksCopy.push({ source: parentNode, target: subNode, isSubgroupLink: true });
+  });
+
   _simulation = d3.forceSimulation(nodesCopy)
-    .force('link', d3.forceLink([...relLinksCopy, ...memberLinksCopy]).id(d => d.id)
-      .distance(d => d.isMembership ? 80 : 120)
-      .strength(d => d.isMembership ? 0.25 : 0.5))
+    .force('link', d3.forceLink([...relLinksCopy, ...memberLinksCopy, ...subgroupLinksCopy]).id(d => d.id)
+      .distance(d => d.isSubgroupLink ? 55 : d.isMembership ? 80 : 120)
+      .strength(d => d.isSubgroupLink ? 0.8 : d.isMembership ? 0.25 : 0.5))
     .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -100 : -220))
     .force('center', d3.forceCenter(_width / 2, _height / 2).strength(1))
     .force('x', d3.forceX(_width / 2).strength(0.025))
     .force('y', d3.forceY(_height / 2).strength(0.025))
     .force('collision', d3.forceCollide().radius(d => {
-      if (d.isMe)    return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 6;
-      if (d.isGroup) return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 4;
+      if (d.isMe) return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 6;
+      if (d.isGroup) {
+        const isSub = _subgroupIds.has(parseInt(d.id.replace('g_', '')));
+        const w = isSub ? SGW : GNW, h = isSub ? SGH : GNH;
+        return Math.sqrt((w / 2) ** 2 + (h / 2) ** 2) + 4;
+      }
       const h = _nodeHeights[d.id] || NH;
       return Math.sqrt((NW / 2) ** 2 + (h / 2) ** 2) + 6;
     }));
+
+  // Subgroup hierarchy lines (rendered first — below everything else)
+  _subgroupLinkSel = _g.append('g').attr('class', 'subgroup-links')
+    .selectAll('line').data(subgroupLinksCopy).join('line')
+    .attr('stroke', d => GROUP_COLORS[_groupNodeName[d.target.id]] || '#888')
+    .attr('stroke-opacity', 0.3)
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '3,4');
 
   // Membership links
   _memberLinkSel = _g.append('g').attr('class', 'member-links')
@@ -415,31 +477,29 @@ function buildGraph() {
     .style('cursor', 'default')
     .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd));
 
-  groupG.append('rect')  // solid white background masks lines that pass behind
-    .attr('x', -GNW / 2).attr('y', -GNH / 2)
-    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
-    .attr('fill', '#fff').attr('stroke', 'none');
-
-  groupG.append('rect')
-    .attr('x', -GNW / 2).attr('y', -GNH / 2)
-    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
-    .attr('fill', d => {
-      const c = GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20';
-      return c + '1a';
-    })
-    .attr('stroke', d => GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20')
-    .attr('stroke-width', 4)
-    .attr('stroke-dasharray', '6,4');
-
-  groupG.append('text')
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 13).attr('font-weight', 800)
-    .attr('fill', d => GROUP_COLORS[_groupNodeName[d.id]] || '#2a5016')
-    .text(d => {
-      const name = _groupNodeName[d.id] || d.name;
-      return truncate((name === 'Family' ? '♥ ' : '') + name, 17);
-    });
+  groupG.each(function(d) {
+    const gid = parseInt(d.id.replace('g_', ''));
+    const isSub = _subgroupIds.has(gid);
+    const w = isSub ? SGW : GNW, h = isSub ? SGH : GNH, rx = isSub ? SGRX : GNRX;
+    const color = GROUP_COLORS[_groupNodeName[d.id]] || '#3A6B20';
+    const g = d3.select(this);
+    // White background masks lines passing behind
+    g.append('rect').attr('x', -w/2).attr('y', -h/2).attr('width', w).attr('height', h).attr('rx', rx)
+      .attr('fill', '#fff').attr('stroke', 'none');
+    // Colored overlay
+    g.append('rect').attr('x', -w/2).attr('y', -h/2).attr('width', w).attr('height', h).attr('rx', rx)
+      .attr('fill', color + '1a').attr('stroke', color)
+      .attr('stroke-width', isSub ? 2 : 4)
+      .attr('stroke-dasharray', isSub ? '4,3' : '6,4');
+    // Label
+    const name = _groupNodeName[d.id] || d.name;
+    g.append('text')
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+      .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+      .attr('font-size', isSub ? 10 : 13).attr('font-weight', 800)
+      .attr('fill', color)
+      .text(truncate((name === 'Family' ? '♥ ' : '') + name, isSub ? 13 : 17));
+  });
 
   _groupNodeSel = groupG;
 
@@ -496,6 +556,9 @@ function buildGraph() {
   _nodeSel = nodeG;
 
   _simulation.on('tick', () => {
+    _subgroupLinkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     _relLinkSel
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
@@ -588,6 +651,15 @@ function applyVisibility() {
     if (!visibleNodeIds.has(tgtId)) return 'none';
     return null;
   });
+
+  // Subgroup hierarchy lines: both group hubs must be visible
+  if (_subgroupLinkSel) {
+    _subgroupLinkSel.attr('display', l => {
+      const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+      const tgtId = typeof l.target === 'object' ? l.target.id : l.target;
+      return visibleGroupIds.has(srcId) && visibleGroupIds.has(tgtId) ? null : 'none';
+    });
+  }
 }
 
 // ── Drag ──────────────────────────────────────────────────────────────────────

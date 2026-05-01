@@ -126,12 +126,26 @@ async function seed() {
     );
     return r.rows[0].id;
   }
+  async function makeSubgroup(name, parentId) {
+    const r = await pool.query(
+      `INSERT INTO groups (user_id, name, parent_group_id) VALUES ($1, $2, $3) RETURNING id`,
+      [userId, name, parentId]
+    );
+    return r.rows[0].id;
+  }
   const gAcme    = await makeGroup('Acme Corp');
   const g1995    = await makeGroup('Class of 1995');
   const gChess   = await makeGroup('Chess Club');
   const gRunning = await makeGroup('Running Club');
   const gHiking  = await makeGroup('Hiking Group');
   const gBook    = await makeGroup('Book Club');
+
+  // Subgroups under Acme Corp and Hiking Group
+  const gMyTeam      = await makeSubgroup('My team', gAcme);
+  const gEngineering = await makeSubgroup('Engineering', gAcme);
+  const gLeadership  = await makeSubgroup('Leadership', gAcme);
+  const gWeekend     = await makeSubgroup('Weekend warriors', gHiking);
+  const gMountain    = await makeSubgroup('Mountain group', gHiking);
   console.log('User groups seeded');
 
   // ── Insert contacts ───────────────────────────────────────────────────────────
@@ -271,12 +285,24 @@ async function seed() {
     return ids;
   }
 
-  await insertGroup(acmeContacts,    gAcme);
+  // Acme Corp: insert contacts into parent group, then assign subgroups
+  const acmeIds = await insertGroup(acmeContacts, gAcme);
+  // My team: first 8, Engineering: next 8, Leadership: last 4 (of 25 total)
+  for (let i = 0; i < 8; i++)  await addMembership(acmeIds[i], gMyTeam);
+  for (let i = 8; i < 16; i++) await addMembership(acmeIds[i], gEngineering);
+  for (let i = 16; i < 20; i++) await addMembership(acmeIds[i], gLeadership);
+
   await insertGroup(classContacts,   g1995);
   await insertGroup(chessContacts,   gChess);
   await insertGroup(runningContacts, gRunning);
-  await insertGroup(hikingContacts,  gHiking);
-  await insertGroup(bookContacts,    gBook);
+
+  // Hiking: insert into parent group, then assign subgroups
+  const hikingIds = await insertGroup(hikingContacts, gHiking);
+  // Weekend warriors: first 10, Mountain group: last 10
+  for (let i = 0; i < 10; i++)  await addMembership(hikingIds[i], gWeekend);
+  for (let i = 10; i < 20; i++) await addMembership(hikingIds[i], gMountain);
+
+  await insertGroup(bookContacts, gBook);
 
   console.log('Group contacts and memberships seeded');
 
