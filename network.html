@@ -142,6 +142,9 @@ let GROUP_COLORS = {};
 let _simulation, _svg, _g;
 let _nodeSel, _groupNodeSel, _relLinkSel, _hitAreaSel, _memberLinkSel;
 let _width, _height;
+let _contactOccasions = {};  // contactId → [{ name, date, years }]
+let _nodeHeights = {};        // contactId → computed pill height
+const _today = new Date(); _today.setHours(0, 0, 0, 0);
 
 function formatDate(str) {
   if (!str) return '';
@@ -160,10 +163,100 @@ function yearOf(str) { return str ? parseInt(str.split('-')[0]) : null; }
 function truncate(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 function cleanRel(s) { return (s || '').replace(/ of$/i, ''); }
 
+function calcAge(birthdayStr, diedOnStr) {
+  if (!birthdayStr) return null;
+  const b = new Date(birthdayStr.split('T')[0]);
+  const ref = diedOnStr ? new Date(diedOnStr.split('T')[0]) : _today;
+  let age = ref.getFullYear() - b.getFullYear();
+  const m = ref.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < b.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+
+function nextYearlyDate(dateStr) {
+  if (!dateStr) return null;
+  const p = dateStr.split('T')[0].split('-');
+  const month = parseInt(p[1]) - 1, day = parseInt(p[2]);
+  let next = new Date(_today.getFullYear(), month, day);
+  if (next < _today) next = new Date(_today.getFullYear() + 1, month, day);
+  return next;
+}
+
+function processOccasions(occasions) {
+  _contactOccasions = {};
+  occasions.forEach(o => {
+    let label, daysUntil;
+    if (o.frequency === 'yearly') {
+      const next = nextYearlyDate(o.start_date);
+      if (!next) return;
+      const years = next.getFullYear() - yearOf(o.start_date);
+      const yPart = years > 0 ? ` (${years}y)` : '';
+      label = `${truncate(o.name, 11)}: ${next.getDate()} ${MONTHS[next.getMonth()]}${yPart}`;
+      daysUntil = Math.round((next - _today) / 864e5);
+    } else {
+      const next = new Date(o.start_date.split('T')[0]);
+      if (next < _today) return;
+      label = `${truncate(o.name, 11)}: ${next.getDate()} ${MONTHS[next.getMonth()]}`;
+      daysUntil = Math.round((next - _today) / 864e5);
+    }
+    if (!_contactOccasions[o.contact_id]) _contactOccasions[o.contact_id] = [];
+    _contactOccasions[o.contact_id].push({ label, daysUntil });
+  });
+  Object.values(_contactOccasions).forEach(arr => arr.sort((a, b) => a.daysUntil - b.daysUntil));
+}
+
+function nodeLayout(d) {
+  const ROWY = 13, PAD = 8, GAP = 2;
+  const hasDate = !!(d.birthday || d.died_on);
+  const occs = (_contactOccasions[d.id] || []).slice(0, 2);
+  const rows = 1 + (hasDate ? 1 : 0) + occs.length;
+  const contentH = rows * ROWY + Math.max(0, rows - 1) * GAP;
+  const h = Math.max(38, PAD * 2 + contentH);
+  const startY = -contentH / 2 + ROWY / 2;
+  const items = [];
+  let ri = 0;
+  items.push({
+    y: startY + ri++ * (ROWY + GAP),
+    text: truncate((d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed'), 18),
+    fontSize: 10, fontWeight: 800,
+    fill: d.died_on ? '#888' : '#1C0A00',
+    fontStyle: d.died_on ? 'italic' : 'normal',
+  });
+  if (hasDate) {
+    let txt = '';
+    if (d.died_on) {
+      const by = yearOf(d.birthday), dy = yearOf(d.died_on);
+      const age = calcAge(d.birthday, d.died_on);
+      txt = by && dy ? `${by} – ${dy}` + (age !== null ? ` — ${age}` : '')
+                     : dy ? `† ${dy}` + (age !== null ? ` — ${age}` : '') : '';
+    } else {
+      const age = calcAge(d.birthday, null);
+      txt = formatBirthdayShort(d.birthday) + (age !== null ? ` — ${age}` : '');
+    }
+    items.push({
+      y: startY + ri++ * (ROWY + GAP),
+      text: txt, fontSize: 8.5, fontWeight: 600,
+      fill: d.died_on ? '#999' : 'rgba(28,10,0,0.55)', fontStyle: 'normal',
+    });
+  }
+  occs.forEach(o => {
+    items.push({
+      y: startY + ri++ * (ROWY + GAP),
+      text: o.label, fontSize: 8, fontWeight: 500,
+      fill: '#b85e10', fontStyle: 'normal',
+    });
+  });
+  return { h, items };
+}
+
 async function init() {
-  const res = await fetch('/api/network');
-  if (res.status === 401) { window.location.href = '/login'; return; }
-  const data = await res.json();
+  const [netRes, occRes] = await Promise.all([
+    fetch('/api/network'),
+    fetch('/api/occasions/upcoming'),
+  ]);
+  if (netRes.status === 401) { window.location.href = '/login'; return; }
+  const data = await netRes.json();
+  if (occRes.ok) { const occData = await occRes.json(); processOccasions(occData.occasions || []); }
 
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
@@ -267,18 +360,23 @@ function buildGraph() {
     .map(l => ({ ...l, source: idToNode[l.source], target: idToNode[l.target] }))
     .filter(l => l.source && l.target);
 
+  // Pre-compute node heights for collision radii before simulation starts
+  _nodeHeights = {};
+  _allNodes.forEach(n => { if (!n.isGroup && !n.isMe) _nodeHeights[n.id] = nodeLayout(n).h; });
+
   _simulation = d3.forceSimulation(nodesCopy)
     .force('link', d3.forceLink([...relLinksCopy, ...memberLinksCopy]).id(d => d.id)
-      .distance(d => d.isMembership ? 65 : 120)
+      .distance(d => d.isMembership ? 80 : 120)
       .strength(d => d.isMembership ? 0.25 : 0.5))
-    .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -80 : -180))
+    .force('charge', d3.forceManyBody().strength(d => d.isGroup ? -100 : -220))
     .force('center', d3.forceCenter(_width / 2, _height / 2).strength(1))
-    .force('x', d3.forceX(_width / 2).strength(0.05))
-    .force('y', d3.forceY(_height / 2).strength(0.05))
+    .force('x', d3.forceX(_width / 2).strength(0.025))
+    .force('y', d3.forceY(_height / 2).strength(0.025))
     .force('collision', d3.forceCollide().radius(d => {
       if (d.isMe)    return ME_R + 8;
       if (d.isGroup) return Math.sqrt((GNW / 2) ** 2 + (GNH / 2) ** 2) + 4;
-      return Math.sqrt((NW / 2) ** 2 + (NH / 2) ** 2) + 6;
+      const h = _nodeHeights[d.id] || NH;
+      return Math.sqrt((NW / 2) ** 2 + (h / 2) ** 2) + 6;
     }));
 
   // Membership links
@@ -354,43 +452,27 @@ function buildGraph() {
     .attr('font-family', "'Plus Jakarta Sans', sans-serif")
     .attr('font-size', 11).attr('font-weight', 800).attr('fill', '#fff').text('You');
 
-  // Contact pills
+  // Contact pills — dynamic per-node layout based on content
   const cG = nodeG.filter(d => !d.isMe);
-  cG.append('rect')
-    .attr('x', -NW / 2).attr('y', -NH / 2).attr('width', NW).attr('height', NH).attr('rx', NRX)
-    .attr('fill', d => {
-      if (d.died_on) return '#f0ede6';
-      if (d.is_pet) return '#FFF3DC';
-      return '#f7f4ef';
-    })
-    .attr('stroke', d => d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#333')
-    .attr('stroke-width', 3);
-
-  cG.append('text')
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-    .attr('y', d => (d.birthday || d.died_on) ? -8 : 0)
-    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 10).attr('font-weight', 800)
-    .attr('fill', d => d.died_on ? '#888' : '#1C0A00')
-    .attr('font-style', d => d.died_on ? 'italic' : 'normal')
-    .text(d => truncate((d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed'), 18));
-
-  // Date line: "1925–2010" for deceased, "15 Mar" for birthday for living
-  cG.filter(d => !!d.died_on).append('text')
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
-    .attr('font-family', "'DM Sans', sans-serif")
-    .attr('font-size', 8.5).attr('font-weight', 600).attr('fill', '#999')
-    .text(d => {
-      const by = yearOf(d.birthday);
-      const dy = yearOf(d.died_on);
-      return by && dy ? `${by} – ${dy}` : dy ? `† ${dy}` : '';
+  cG.each(function(d) {
+    const { h, items } = nodeLayout(d);
+    const g = d3.select(this);
+    g.append('rect')
+      .attr('x', -NW / 2).attr('y', -h / 2)
+      .attr('width', NW).attr('height', h).attr('rx', NRX)
+      .attr('fill', d.died_on ? '#f0ede6' : d.is_pet ? '#FFF3DC' : '#f7f4ef')
+      .attr('stroke', nodeStroke(d))
+      .attr('stroke-width', 3);
+    items.forEach(item => {
+      g.append('text')
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+        .attr('y', item.y)
+        .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+        .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
+        .attr('fill', item.fill).attr('font-style', item.fontStyle)
+        .text(item.text);
     });
-
-  cG.filter(d => !d.died_on && !!d.birthday).append('text')
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', 9)
-    .attr('font-family', "'DM Sans', sans-serif")
-    .attr('font-size', 8.5).attr('font-weight', 600).attr('fill', 'rgba(28,10,0,0.55)')
-    .text(d => formatBirthdayShort(d.birthday));
+  });
 
   _nodeSel = nodeG;
 
