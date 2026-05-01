@@ -92,20 +92,21 @@ const CP = (() => {
 
 @media(max-width:1000px){.cp-lbl{width:86px;font-size:10px;}}
 
-/* Overlay mode: transparent bg, text-shadow for legibility */
-.fo-detail .cp-name-bar{text-shadow:0 0 8px rgba(255,249,230,0.95);}
-.fo-detail .cp-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
-.fo-detail .cp-section-hdr{text-shadow:0 0 8px rgba(255,249,230,1);}
-.fo-detail .cp-inp{background:transparent!important;}
-.fo-detail .cp-inp:focus{background:rgba(255,249,230,0.75)!important;}
-.fo-detail .cp-list-primary{text-shadow:0 0 6px rgba(255,249,230,0.8);}
-.fo-detail .cp-list-secondary{text-shadow:0 0 6px rgba(255,249,230,0.8);}
-.fo-detail .cp-badge{background:rgba(240,237,230,0.75);}
-.fo-detail .cp-badge-dec{background:rgba(245,234,234,0.75);}
-.fo-detail .cp-toast.ok{background:rgba(232,240,224,0.88);}
-.fo-detail .cp-toast.err{background:rgba(253,236,234,0.88);}
-.fo-detail .cp-pill{background:rgba(250,248,245,0.75);}
-.fo-detail .cp-pill.active{background:rgba(232,240,224,0.88);}
+/* Overlay mode: per-element chip backgrounds */
+.fo-detail .cp-name-bar{background:#FFF9E6;border-radius:3px;padding:6px 10px;width:fit-content;border-bottom:none;}
+.fo-detail .cp-section{border-bottom:none;margin-bottom:4px;}
+.fo-detail .cp-section-hdr{background:#FFF9E6;border-radius:3px;padding:4px 10px;width:fit-content;margin-bottom:2px;}
+.fo-detail .cp-tbl{display:flex;flex-direction:column;gap:2px;padding-bottom:2px;align-items:flex-start;}
+.fo-detail .cp-row{background:#FFF9E6;border-radius:3px;border-bottom:none;width:fit-content;}
+.fo-detail .cp-inp{width:150px;background:transparent!important;}
+.fo-detail .cp-inp:focus{background:rgba(58,107,32,0.06)!important;}
+.fo-detail .cp-list{display:flex;flex-direction:column;gap:2px;padding:2px 0;align-items:flex-start;}
+.fo-detail .cp-list-row{background:#FFF9E6;border-radius:3px;border-bottom:none;padding:4px 10px;width:fit-content;}
+.fo-detail .cp-list-empty{background:#FFF9E6;border-radius:3px;padding:4px 10px;width:fit-content;}
+.fo-detail .cp-pills{padding:4px 0;}
+.fo-detail .cp-pills-empty{background:#FFF9E6;border-radius:3px;padding:4px 10px;width:fit-content;}
+.fo-detail .cp-add-row{background:#FFF9E6;border-radius:3px;width:fit-content;}
+.fo-detail .cp-form-msg{width:fit-content;}
     `;
     document.head.appendChild(s);
   }
