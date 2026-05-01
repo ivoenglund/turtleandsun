@@ -395,6 +395,10 @@ app.get('/print/labels', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-labels.html'));
 });
 
+app.get('/print/calendar', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'print-calendar.html'));
+});
+
 // ── Groups ────────────────────────────────────────────────────────────────────
 
 app.get('/api/groups', requireAuth, async (req, res) => {

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Print Calendar — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:flex;flex-direction:column;}
+
+/* ── Nav ──────────────────────────────────────────────────────────────────── */
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;}
+.nav-back{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:rgba(28,10,0,0.6);text-decoration:none;}
+.nav-back:hover{color:#1C0A00;}
+.nav-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#1C0A00;flex:1;}
+.btn-print-cal{padding:9px 22px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-print-cal:hover{background:#1C0A00;}
+
+/* ── Controls ─────────────────────────────────────────────────────────────── */
+.controls-bar{background:#fff;border-bottom:1px solid rgba(28,10,0,0.08);padding:10px 24px;display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;flex-shrink:0;}
+.ctrl{display:flex;flex-direction:column;gap:4px;}
+.ctrl-lbl{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.4);}
+.ctrl input[type=number],.ctrl select{padding:7px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;}
+.ctrl input[type=number]{width:88px;}
+.ctrl select{width:160px;}
+.ctrl input[type=number]:focus,.ctrl select:focus{border-color:#3A6B20;}
+.ctrl-check{display:flex;align-items:center;gap:7px;padding-bottom:8px;}
+.ctrl-check label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;}
+.ctrl-check input[type=checkbox]{width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.main-area{flex:1;display:flex;min-height:0;overflow:hidden;}
+
+/* ── Filter sidebar ───────────────────────────────────────────────────────── */
+.filter-panel{width:220px;flex-shrink:0;background:#fff;border-right:1px solid rgba(28,10,0,0.08);overflow-y:auto;padding:16px;}
+.fp-section{margin-bottom:18px;}
+.fp-sec-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);margin-bottom:8px;}
+.fp-sep{height:1px;background:rgba(28,10,0,0.07);margin:10px 0;}
+.fp-check{display:flex;align-items:center;gap:7px;padding:3px 0;}
+.fp-check label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;color:#1C0A00;display:flex;align-items:center;gap:5px;}
+.fp-check input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
+.fp-check.sub{padding-left:16px;}
+.fp-check.sub2{padding-left:28px;}
+.fp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* ── Calendar area ────────────────────────────────────────────────────────── */
+.cal-area{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:28px;align-items:center;}
+
+/* ── Calendar page (screen = paper card) ─────────────────────────────────── */
+.cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:100%;max-width:560px;padding:24px 24px 16px;display:flex;flex-direction:column;}
+
+.cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;border-bottom:2px solid #1C0A00;}
+.cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:28px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
+.cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:500;color:rgba(28,10,0,0.35);}
+
+.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:5px;}
+.cal-dow-cell{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);text-align:center;padding:3px 1px;}
+
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(var(--rows,6),90px);border-left:1.5px solid rgba(28,10,0,0.1);border-top:1.5px solid rgba(28,10,0,0.1);}
+.cal-cell{border-right:1.5px solid rgba(28,10,0,0.1);border-bottom:1.5px solid rgba(28,10,0,0.1);padding:6px 7px;overflow:hidden;}
+.cal-cell.other-month{background:#fdfcfa;}
+.cal-cell.other-month .cal-day-num{color:rgba(28,10,0,0.18);}
+.cal-cell.other-month .cal-events{display:none;}
+.cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:rgba(28,10,0,0.4);margin-bottom:4px;}
+.cal-events{display:flex;flex-direction:column;gap:2px;}
+.cal-event{font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;line-height:1.3;padding:1.5px 4px;border-radius:3px;word-break:break-word;}
+
+/* Color mode */
+body.color-mode .cal-event.birthday{background:#e8f0e0;color:#2d5a16;}
+body.color-mode .cal-event.remembrance{background:#f0ede6;color:rgba(28,10,0,0.6);}
+body.color-mode .cal-event.occasion{background:#fef3e2;color:#b85e10;}
+body.color-mode .cal-event.milestone{background:#e8e0f0;color:#6b2d9a;}
+/* B&W mode */
+body:not(.color-mode) .cal-event{color:#1C0A00;background:none;padding-left:0;}
+body:not(.color-mode) .cal-event.birthday::before{content:'● ';font-size:7px;vertical-align:middle;}
+body:not(.color-mode) .cal-event.remembrance::before{content:'† ';}
+body:not(.color-mode) .cal-event.occasion::before{content:'◆ ';font-size:7px;vertical-align:middle;}
+body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;vertical-align:middle;}
+
+.cal-page-footer{margin-top:10px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;color:rgba(28,10,0,0.22);letter-spacing:0.06em;text-transform:uppercase;}
+
+#loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
+
+/* ── Print ─────────────────────────────────────────────────────────────────── */
+@media print {
+  html,body{height:100%;overflow:visible;background:#fff;}
+  .nav-bar,.controls-bar,.filter-panel{display:none!important;}
+  .main-area{display:block;height:auto;overflow:visible;}
+  .cal-area{overflow:visible;padding:0;gap:0;align-items:stretch;display:block;}
+
+  .cal-page{
+    box-shadow:none;border-radius:0;max-width:none;width:100%;
+    padding:0;display:flex;flex-direction:column;
+    height:100vh;page-break-after:always;
+  }
+  .cal-page:last-child{page-break-after:auto;}
+
+  .cal-page-header{padding-bottom:5mm;margin-bottom:3mm;border-bottom-width:1px;}
+  .cal-month-name{font-size:34pt;}
+  .cal-year-name{font-size:16pt;}
+  .cal-dow-row{margin-bottom:2mm;}
+  .cal-dow-cell{font-size:7pt;}
+
+  .cal-grid{
+    flex:1;
+    display:grid!important;
+    grid-template-columns:repeat(7,1fr);
+    grid-template-rows:repeat(var(--rows,6),1fr);
+    border-left:1px solid #ccc;
+    border-top:1px solid #ccc;
+  }
+  .cal-cell{border-right:1px solid #ccc;border-bottom:1px solid #ccc;padding:4px 5px;overflow:hidden;}
+  .cal-day-num{font-size:8pt;margin-bottom:2px;}
+  .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
+  .cal-page-footer{font-size:7pt;color:rgba(0,0,0,0.3);margin-top:5px;}
+
+  body.color-mode .cal-event.birthday{background:#e8f0e0!important;color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body.color-mode .cal-event.remembrance{background:#f0ede6!important;color:#555!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body.color-mode .cal-event.occasion{background:#fef3e2!important;color:#b85e10!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body.color-mode .cal-event.milestone{background:#e8e0f0!important;color:#6b2d9a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+
+  @page{size:A4 portrait;margin:12mm 10mm 12mm;}
+  body.paper-letter @page{size:Letter portrait;margin:12mm 10mm 12mm;}
+}
+</style>
+</head>
+<body class="color-mode paper-a4">
+
+<div class="nav-bar">
+  <a class="nav-back" href="/account/network?view=calendar">← Back to calendar</a>
+  <h1 class="nav-title">Print Calendar</h1>
+  <button class="btn-print-cal" onclick="window.print()">Print</button>
+</div>
+
+<div class="controls-bar">
+  <div class="ctrl">
+    <div class="ctrl-lbl">Year</div>
+    <input type="number" id="yearInput" value="2026" min="1900" max="2100" oninput="renderCalendar()">
+  </div>
+  <div class="ctrl">
+    <div class="ctrl-lbl">View</div>
+    <select id="viewSel" onchange="onViewChange()">
+      <option value="month">Single month</option>
+      <option value="year">Whole year — 12 pages</option>
+    </select>
+  </div>
+  <div class="ctrl" id="monthCtrl">
+    <div class="ctrl-lbl">Month</div>
+    <select id="monthSel" onchange="renderCalendar()">
+      <option value="0">January</option><option value="1">February</option>
+      <option value="2">March</option><option value="3">April</option>
+      <option value="4">May</option><option value="5">June</option>
+      <option value="6">July</option><option value="7">August</option>
+      <option value="8">September</option><option value="9">October</option>
+      <option value="10">November</option><option value="11">December</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <div class="ctrl-lbl">Paper</div>
+    <select id="paperSel" onchange="applyPaper()">
+      <option value="a4">A4</option>
+      <option value="letter">US Letter</option>
+    </select>
+  </div>
+  <div class="ctrl-check">
+    <input type="checkbox" id="colorCb" checked onchange="applyColor()">
+    <label for="colorCb">Colour</label>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="filter-panel">
+    <div class="fp-section">
+      <div class="fp-sec-title">People</div>
+      <div class="fp-check">
+        <input type="checkbox" id="fp-living" onchange="renderCalendar()">
+        <label for="fp-living">Living only</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="fp-unrelated" checked onchange="renderCalendar()">
+        <label for="fp-unrelated">Show unrelated</label>
+      </div>
+    </div>
+    <div class="fp-sep"></div>
+    <div class="fp-section">
+      <div class="fp-sec-title">Types</div>
+      <div class="fp-check">
+        <input type="checkbox" id="typ-birthday" checked onchange="renderCalendar()">
+        <label for="typ-birthday"><span class="fp-dot" style="background:#e8f0e0;border:1px solid #3A6B2044;"></span>Birthdays</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="typ-remembrance" checked onchange="renderCalendar()">
+        <label for="typ-remembrance"><span class="fp-dot" style="background:#f0ede6;border:1px solid rgba(28,10,0,0.12);"></span>Remembrances</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="typ-occasion" checked onchange="renderCalendar()">
+        <label for="typ-occasion"><span class="fp-dot" style="background:#fef3e2;border:1px solid #b85e1044;"></span>Occasions</label>
+      </div>
+      <div class="fp-check">
+        <input type="checkbox" id="typ-milestone" checked onchange="renderCalendar()">
+        <label for="typ-milestone"><span class="fp-dot" style="background:#e8e0f0;border:1px solid #6b2d9a44;"></span>Milestones</label>
+      </div>
+    </div>
+    <div class="fp-sep"></div>
+    <div class="fp-section">
+      <div class="fp-sec-title">Groups</div>
+      <div class="fp-check">
+        <input type="checkbox" id="grp-all" checked onchange="toggleAllGroups(this)">
+        <label for="grp-all" style="font-weight:700;">All groups</label>
+      </div>
+      <div id="groupChecks"></div>
+    </div>
+  </div>
+
+  <div class="cal-area" id="calArea">
+    <div id="loading-msg">Loading…</div>
+  </div>
+</div>
+
+<script>
+const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+let _allContacts = [];
+let _allOccasions = [];
+let _contactMap = {};
+let _contactGroups = {};
+let _rawGroups = [];
+let _groupById = {};
+let _groupByName = {};
+let _loaded = false;
+
+const _params = new URLSearchParams(location.search);
+const _initYear = parseInt(_params.get('year')) || new Date().getFullYear();
+const _initMonth = _params.has('month') ? parseInt(_params.get('month')) : null;
+
+function ordinal(n) {
+  if (n <= 0) return String(n);
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function load() {
+  const [netRes, occRes] = await Promise.all([
+    fetch('/api/network'),
+    fetch('/api/occasions/upcoming'),
+  ]);
+  if (!netRes.ok) { window.location.href = '/login'; return; }
+  const netData = await netRes.json();
+  const occData = occRes.ok ? await occRes.json() : {};
+
+  _allContacts = netData.contacts || [];
+  _rawGroups   = netData.groups || [];
+  _allOccasions = occData.occasions || [];
+
+  _allContacts.forEach(c => { _contactMap[c.id] = c; });
+  _rawGroups.forEach(g => { _groupById[g.id] = g; _groupByName[g.name] = g; });
+  (netData.group_memberships || []).forEach(m => {
+    if (!_contactGroups[m.contact_id]) _contactGroups[m.contact_id] = new Set();
+    _contactGroups[m.contact_id].add(m.group_name);
+  });
+
+  buildGroupFilters();
+  _loaded = true;
+
+  document.getElementById('yearInput').value = _initYear;
+  if (_initMonth !== null) {
+    document.getElementById('viewSel').value = 'month';
+    document.getElementById('monthSel').value = _initMonth;
+    document.getElementById('monthCtrl').style.display = '';
+  } else {
+    document.getElementById('viewSel').value = 'year';
+    document.getElementById('monthCtrl').style.display = 'none';
+  }
+
+  document.getElementById('loading-msg').style.display = 'none';
+  renderCalendar();
+}
+
+// ── Group filter ──────────────────────────────────────────────────────────────
+const GP_COLORS = ['#3A6B20','#1a4f8a','#8a4a1a','#4a1a8a','#1a7a5a','#8a1a4a'];
+const FAMILY_COLOR = '#c0195a';
+
+function buildGroupFilters() {
+  const container = document.getElementById('groupChecks');
+  container.innerHTML = '';
+  const topGroups = _rawGroups.filter(g => !g.parent_group_id)
+    .sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
+  const subsByParent = {};
+  _rawGroups.filter(g => g.parent_group_id).forEach(g => {
+    if (!subsByParent[g.parent_group_id]) subsByParent[g.parent_group_id] = [];
+    subsByParent[g.parent_group_id].push(g);
+  });
+  topGroups.forEach((g, i) => {
+    const color = g.name === 'Family' ? FAMILY_COLOR : GP_COLORS[i % GP_COLORS.length];
+    addGroupCheck(container, g, color, 0, subsByParent);
+  });
+}
+
+function addGroupCheck(container, g, color, depth, subsByParent) {
+  const div = document.createElement('div');
+  div.className = 'fp-check' + (depth === 1 ? ' sub' : depth >= 2 ? ' sub2' : '');
+  const dotSz = depth === 0 ? '8px' : '6px';
+  const id = 'grp-' + g.id;
+  div.innerHTML = `<input type="checkbox" id="${id}" data-group-name="${esc(g.name)}" checked onchange="onGroupCheck()"><label for="${id}"><span style="width:${dotSz};height:${dotSz};border-radius:50%;background:${color};flex-shrink:0;${depth>0?'opacity:0.7':''}"></span>${esc(g.name)}</label>`;
+  container.appendChild(div);
+  (subsByParent[g.id] || []).sort((a,b) => a.name.localeCompare(b.name))
+    .forEach(sub => addGroupCheck(container, sub, color, depth + 1, subsByParent));
+}
+
+function toggleAllGroups(cb) {
+  document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(c => { c.checked = cb.checked; });
+  renderCalendar();
+}
+
+function onGroupCheck() {
+  const allChecked = [...document.querySelectorAll('#groupChecks input[type=checkbox]')].every(c => c.checked);
+  document.getElementById('grp-all').checked = allChecked;
+  renderCalendar();
+}
+
+function getActiveGroups() {
+  if (document.getElementById('grp-all').checked) return null;
+  const active = new Set();
+  document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(c => {
+    if (c.checked) active.add(c.dataset.groupName);
+  });
+  return active;
+}
+
+function isGroupActive(groupName, active) {
+  if (!active) return true;
+  if (active.has(groupName)) return true;
+  const g = _groupByName[groupName];
+  if (!g || !g.parent_group_id) return false;
+  const parent = _groupById[g.parent_group_id];
+  return parent ? isGroupActive(parent.name, active) : false;
+}
+
+function isContactVisible(contactId, active, showOnlyLiving, showUnrelated) {
+  const c = _contactMap[contactId];
+  if (!c || c.is_me) return false;
+  if (showOnlyLiving && c.died_on) return false;
+  const groups = _contactGroups[contactId];
+  if (!groups || groups.size === 0) return showUnrelated;
+  if (!active) return true;
+  for (const g of groups) { if (isGroupActive(g, active)) return true; }
+  return false;
+}
+
+// ── Occasion data ─────────────────────────────────────────────────────────────
+function getOccasionsForMonth(year, month) {
+  const active        = getActiveGroups();
+  const showOnlyLiving = document.getElementById('fp-living').checked;
+  const showUnrelated  = document.getElementById('fp-unrelated').checked;
+  const showBirthday   = document.getElementById('typ-birthday').checked;
+  const showRem        = document.getElementById('typ-remembrance').checked;
+  const showOcc        = document.getElementById('typ-occasion').checked;
+  const showMilestone  = document.getElementById('typ-milestone').checked;
+
+  const byDay = {};
+  const add = (day, item) => { if (!byDay[day]) byDay[day] = []; byDay[day].push(item); };
+
+  for (const c of _allContacts) {
+    if (!isContactVisible(c.id, active, showOnlyLiving, showUnrelated)) continue;
+
+    if (showBirthday && c.birthday) {
+      const b = new Date(c.birthday.split('T')[0]);
+      if (!isNaN(b) && b.getMonth() === month) {
+        const birthYear = b.getFullYear();
+        const age = birthYear > 1000 ? year - birthYear : null;
+        const label = (age !== null && age >= 0)
+          ? `${c.name || 'Unnamed'}’s ${ordinal(age)} birthday`
+          : `${c.name || 'Unnamed'}’s birthday`;
+        add(b.getDate(), { type: 'birthday', label });
+      }
+    }
+
+    if (showRem && c.died_on) {
+      const d = new Date(c.died_on.split('T')[0]);
+      if (!isNaN(d) && d.getMonth() === month) {
+        add(d.getDate(), { type: 'remembrance', label: `† ${c.name || 'Unnamed'}` });
+      }
+    }
+  }
+
+  for (const o of _allOccasions) {
+    if (!o.start_date) continue;
+    if (!isContactVisible(o.contact_id, active, showOnlyLiving, showUnrelated)) continue;
+    const s = new Date(o.start_date.split('T')[0]);
+    if (isNaN(s)) continue;
+
+    if (o.frequency === 'yearly') {
+      if (showOcc && s.getMonth() === month) {
+        const startYear = s.getFullYear();
+        const yrs = startYear > 1000 ? year - startYear : null;
+        const label = (yrs !== null && yrs > 0) ? `${o.name} (${ordinal(yrs)})` : o.name;
+        add(s.getDate(), { type: 'occasion', label });
+      }
+    } else if (o.frequency === 'milestone') {
+      if (showMilestone && s.getMonth() === month) {
+        const startYear = s.getFullYear();
+        const yrs = startYear > 1000 ? year - startYear : null;
+        const label = (yrs !== null && yrs > 0) ? `${o.name} (${yrs}y)` : o.name;
+        add(s.getDate(), { type: 'milestone', label });
+      }
+    } else {
+      if (showOcc && s.getFullYear() === year && s.getMonth() === month) {
+        add(s.getDate(), { type: 'occasion', label: o.name });
+      }
+    }
+  }
+
+  const typeOrder = { birthday: 0, remembrance: 1, occasion: 2, milestone: 3 };
+  Object.values(byDay).forEach(arr => arr.sort((a, b) => (typeOrder[a.type]||0) - (typeOrder[b.type]||0)));
+  return byDay;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderMonthPage(year, month) {
+  const byDay = getOccasionsForMonth(year, month);
+  const firstDow       = new Date(year, month, 1).getDay();
+  const daysInMonth    = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const totalRows      = Math.ceil((firstDow + daysInMonth) / 7);
+
+  let cells = '';
+  for (let i = 0; i < totalRows * 7; i++) {
+    const off = i - firstDow;
+    let day, cur;
+    if (off < 0)                  { day = daysInPrevMonth + off + 1; cur = false; }
+    else if (off >= daysInMonth)  { day = off - daysInMonth + 1;     cur = false; }
+    else                          { day = off + 1;                    cur = true;  }
+
+    const events = cur ? (byDay[day] || []) : [];
+    cells += `<div class="cal-cell${cur ? '' : ' other-month'}">
+      <div class="cal-day-num">${day}</div>
+      <div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${esc(e.label)}</div>`).join('')}</div>
+    </div>`;
+  }
+
+  const dowHtml = DOW_LABELS.map(d => `<div class="cal-dow-cell">${d}</div>`).join('');
+
+  return `<div class="cal-page">
+  <div class="cal-page-header">
+    <span class="cal-month-name">${MONTHS_FULL[month]}</span>
+    <span class="cal-year-name">${year}</span>
+  </div>
+  <div class="cal-dow-row">${dowHtml}</div>
+  <div class="cal-grid" style="--rows:${totalRows}">${cells}</div>
+  <div class="cal-page-footer">Turtle and Sun &middot; turtleandsun.com</div>
+</div>`;
+}
+
+function renderCalendar() {
+  if (!_loaded) return;
+  const year  = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
+  const view  = document.getElementById('viewSel').value;
+  const area  = document.getElementById('calArea');
+
+  if (view === 'month') {
+    const month = parseInt(document.getElementById('monthSel').value);
+    document.title = `${MONTHS_FULL[month]} ${year} Calendar — Turtle and Sun`;
+    area.innerHTML = renderMonthPage(year, month);
+  } else {
+    document.title = `${year} Calendar — Turtle and Sun`;
+    let html = '';
+    for (let m = 0; m < 12; m++) html += renderMonthPage(year, m);
+    area.innerHTML = html;
+  }
+}
+
+function onViewChange() {
+  const view = document.getElementById('viewSel').value;
+  document.getElementById('monthCtrl').style.display = view === 'month' ? '' : 'none';
+  renderCalendar();
+}
+
+function applyPaper() {
+  const p = document.getElementById('paperSel').value;
+  document.body.className = document.body.className.replace(/paper-\S+/g, '').trim() + ' paper-' + p;
+}
+
+function applyColor() {
+  document.body.classList.toggle('color-mode', document.getElementById('colorCb').checked);
+}
+
+fetch('/api/auth/status').then(r => r.json()).then(s => {
+  if (!s.loggedIn) { location.href = '/login'; return; }
+  load();
+}).catch(() => { location.href = '/login'; });
+</script>
+</body>
+</html>
