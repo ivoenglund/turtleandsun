@@ -349,7 +349,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
       [req.user.id]
     );
     const groupMemberships = await pool.query(
-      `SELECT cgm.group_id, g.name AS group_name, cgm.contact_id
+      `SELECT cgm.group_id, g.name AS group_name, g.category AS group_category, cgm.contact_id
        FROM contact_group_memberships cgm
        JOIN groups g ON g.id = cgm.group_id
        WHERE cgm.user_id = $1`,
@@ -699,16 +699,6 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
 }
 
 
-app.get('/admin/run-seed-demo', async (req, res) => {
-  try {
-    const seed = require('./seed-demo-user');
-    await seed();
-    res.send('Seed complete. Now remove this route from server.js.');
-  } catch (err) {
-    console.error('Seed error:', err);
-    res.status(500).send('Seed failed: ' + err.message);
-  }
-});
 
 initDb()
   .then(() => seedGallery())

@@ -148,6 +148,8 @@ const GNW = 114, GNH = 34, GNRX = 17;
 const ME_R = 26;
 
 let _allNodes = [], _relLinks = [], _memberLinks = [], _contactMap = {}, _nodeGroups = {};
+let _groupNodeCategory = {};     // 'g_X' → category string ('Work', 'School', …)
+let _contactGroupCategories = {}; // contactId → Set<category>
 let _simulation, _svg, _g;
 let _nodeSel, _groupNodeSel, _relLinkSel, _memberLinkSel, _labelSelA, _labelSelB;
 let _width, _height;
@@ -164,6 +166,14 @@ function truncate(s, n) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
+function labelTransform(d, f) {
+  const x = d.source.x * (1 - f) + d.target.x * f;
+  const y = d.source.y * (1 - f) + d.target.y * f;
+  let a = Math.atan2(d.target.y - d.source.y, d.target.x - d.source.x) * 180 / Math.PI;
+  if (a > 90 || a < -90) a += 180; // keep text left-to-right
+  return `translate(${x},${y}) rotate(${a})`;
+}
+
 async function init() {
   const res = await fetch('/api/network');
   if (res.status === 401) { window.location.href = '/login'; return; }
@@ -172,10 +182,19 @@ async function init() {
   data.contacts.forEach(c => { _contactMap[c.id] = c; });
 
   // Group hub nodes from memberships
+  _groupNodeCategory = {};
+  _contactGroupCategories = {};
   const groupNodeMap = {};
   (data.group_memberships || []).forEach(m => {
     if (!groupNodeMap[m.group_id]) {
-      groupNodeMap[m.group_id] = { id: `g_${m.group_id}`, name: m.group_name, isGroup: true };
+      groupNodeMap[m.group_id] = {
+        id: `g_${m.group_id}`, name: m.group_name, isGroup: true, category: m.group_category,
+      };
+      _groupNodeCategory[`g_${m.group_id}`] = m.group_category;
+    }
+    if (m.group_category) {
+      if (!_contactGroupCategories[m.contact_id]) _contactGroupCategories[m.contact_id] = new Set();
+      _contactGroupCategories[m.contact_id].add(m.group_category);
     }
   });
   const groupNodes = Object.values(groupNodeMap);
@@ -183,6 +202,7 @@ async function init() {
     source: `g_${m.group_id}`,
     target: m.contact_id,
     isMembership: true,
+    groupCategory: m.group_category,
   }));
 
   _allNodes = [
@@ -280,14 +300,16 @@ function buildGraph() {
 
   const labG = _g.append('g').attr('class', 'link-labels');
 
-  // Label A: at source end (30%) for asymmetric, midpoint (50%) for symmetric
+  // Label A: source-end (25%) for asymmetric, midpoint (50%) for symmetric
   _labelSelA = labG.selectAll('.lbl-a').data(relLinksCopy).join('text')
     .attr('class', 'lbl-a').call(labelBase)
+    .attr('x', 0).attr('y', -4)
     .text(d => d.relA || d.relB || '');
 
-  // Label B: at target end (70%), only shown when asymmetric
+  // Label B: target-end (75%), text empty for symmetric (hidden via empty string)
   _labelSelB = labG.selectAll('.lbl-b').data(relLinksCopy).join('text')
     .attr('class', 'lbl-b').call(labelBase)
+    .attr('x', 0).attr('y', -4)
     .text(d => (d.relA && d.relB && d.relA !== d.relB) ? d.relB : '');
 
   // ── Layer 4: Group hub nodes ──────────────────────────────────────────────
@@ -358,18 +380,11 @@ function buildGraph() {
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
 
-    // Label A: midpoint for symmetric, 30% from source for asymmetric
-    _labelSelA.attr('x', d => {
-      const f = (!d.relA || !d.relB || d.relA === d.relB) ? 0.5 : 0.3;
-      return d.source.x * (1 - f) + d.target.x * f;
-    }).attr('y', d => {
-      const f = (!d.relA || !d.relB || d.relA === d.relB) ? 0.5 : 0.3;
-      return d.source.y * (1 - f) + d.target.y * f;
+    _labelSelA.attr('transform', d => {
+      const sym = !d.relA || !d.relB || d.relA === d.relB;
+      return labelTransform(d, sym ? 0.5 : 0.25);
     });
-    // Label B: 70% from source (target end)
-    _labelSelB
-      .attr('x', d => d.source.x * 0.3 + d.target.x * 0.7)
-      .attr('y', d => d.source.y * 0.3 + d.target.y * 0.7);
+    _labelSelB.attr('transform', d => labelTransform(d, 0.75));
 
     nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
     groupG.attr('transform', d => `translate(${d.x},${d.y})`);
@@ -396,18 +411,37 @@ function applyVisibility() {
   if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
 
+  // Relationship links and their labels
   _relLinkSel.attr('display', l => active.has(l.group) ? null : 'none');
   _labelSelA.attr('display', l => active.has(l.group) ? null : 'none');
   _labelSelB.attr('display', l => active.has(l.group) ? null : 'none');
 
+  // Group hub nodes: hide when their category is unchecked
+  _groupNodeSel.attr('display', d => {
+    const cat = _groupNodeCategory[d.id];
+    return (!cat || active.has(cat)) ? null : 'none';
+  });
+
+  // Membership lines: hide when the group node's category is unchecked
+  _memberLinkSel.attr('display', l => {
+    const srcId = typeof l.source === 'object' ? l.source.id : l.source;
+    const cat = _groupNodeCategory[srcId] || l.groupCategory;
+    return (!cat || active.has(cat)) ? null : 'none';
+  });
+
+  // Contact nodes: visible if any direct relationship OR group membership is in active set
   _nodeSel.attr('display', d => {
     if (d.isMe) return null;
-    const groups = _nodeGroups[d.id];
-    if (!groups) return 'none';
-    for (const g of groups) { if (active.has(g)) return null; }
+    const relGroups = _nodeGroups[d.id];
+    if (relGroups) {
+      for (const g of relGroups) { if (active.has(g)) return null; }
+    }
+    const memCats = _contactGroupCategories[d.id];
+    if (memCats) {
+      for (const cat of memCats) { if (active.has(cat)) return null; }
+    }
     return 'none';
   });
-  // Group hub nodes and membership links always visible
 }
 
 // ── Drag ──────────────────────────────────────────────────────────────────────

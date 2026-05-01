@@ -188,36 +188,36 @@ async function seed() {
     await addRel(familyIds[i].id, familyIds[i+1].id, 'Spouse', 'Family');
   }
 
-  // Work relationships: first contact = boss, rest = colleagues/reports
+  // Work: boss hierarchy only — colleagues connect via company group node
   const boss = workIds[0];
   for (let i = 1; i < Math.min(8, workIds.length); i++) {
     await addRel(boss.id, workIds[i].id, 'Boss', 'Work');
   }
-  for (let i = 1; i < workIds.length - 1; i++) {
-    await addRel(workIds[i].id, workIds[i+1].id, 'Colleague', 'Work');
-  }
 
-  // School: all classmates in chains of 3
-  for (let i = 0; i < schoolIds.length - 1; i++) {
-    await addRel(schoolIds[i].id, schoolIds[i+1].id, 'Classmate', 'School');
-  }
+  // School: no direct person links — classmates connect via group node only
 
-  // Friends: pairs
-  for (let i = 0; i < friendIds.length - 1; i += 2) {
-    await addRel(friendIds[i].id, friendIds[i+1].id, 'Friend', 'Friends');
-  }
-  // Cross-friend links
-  for (let i = 0; i < friendIds.length - 3; i += 5) {
-    await addRel(friendIds[i].id, friendIds[i+3].id, 'Friend', 'Friends');
+  // Friends: 8 specific best-friend pairs crossing club boundaries
+  const bestFriendPairs = [
+    [friendIds[0],  friendIds[20]], // Chess × Running
+    [friendIds[5],  friendIds[35]], // Chess × Book
+    [friendIds[10], friendIds[50]], // Chess × Hiking
+    [friendIds[15], friendIds[45]], // Running × Hiking
+    [friendIds[22], friendIds[38]], // Running × Book
+    [friendIds[30], friendIds[55]], // Book × Hiking
+    [friendIds[3],  friendIds[48]], // Chess × Hiking
+    [friendIds[18], friendIds[32]], // Running × Book
+  ];
+  for (const [a, b] of bestFriendPairs) {
+    await addRel(a.id, b.id, 'Friend', 'Friends');
   }
 
   console.log('Relationships seeded');
 
   // ── Subgroups & group memberships ──────────────────────────────────────────
-  async function createSubgroup(name) {
+  async function createSubgroup(name, category) {
     const r = await pool.query(
-      `INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id`,
-      [userId, name]
+      `INSERT INTO groups (user_id, name, category) VALUES ($1, $2, $3) RETURNING id`,
+      [userId, name, category]
     );
     return r.rows[0].id;
   }
@@ -229,14 +229,14 @@ async function seed() {
     );
   }
 
-  const sgAcme      = await createSubgroup('Acme Corp');
-  const sgBuilder   = await createSubgroup('BuilderLab');
-  const sg1995      = await createSubgroup('Class of 1995');
-  const sgKTH       = await createSubgroup('KTH Engineering');
-  const sgChess     = await createSubgroup('Chess Club');
-  const sgRunning   = await createSubgroup('Running Club');
-  const sgBook      = await createSubgroup('Book Club');
-  const sgHiking    = await createSubgroup('Hiking Group');
+  const sgAcme      = await createSubgroup('Acme Corp',       'Work');
+  const sgBuilder   = await createSubgroup('BuilderLab',      'Work');
+  const sg1995      = await createSubgroup('Class of 1995',   'School');
+  const sgKTH       = await createSubgroup('KTH Engineering', 'School');
+  const sgChess     = await createSubgroup('Chess Club',      'Friends');
+  const sgRunning   = await createSubgroup('Running Club',    'Friends');
+  const sgBook      = await createSubgroup('Book Club',       'Friends');
+  const sgHiking    = await createSubgroup('Hiking Group',    'Friends');
 
   for (const c of workIds.slice(0, 25))   await addMembership(c.id, sgAcme);
   for (const c of workIds.slice(25))      await addMembership(c.id, sgBuilder);

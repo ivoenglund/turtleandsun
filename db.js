@@ -131,6 +131,7 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS country TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS postal_code TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS birthday TEXT;
+    ALTER TABLE groups ADD COLUMN IF NOT EXISTS category TEXT;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support
