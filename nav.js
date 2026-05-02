@@ -60,7 +60,7 @@
           '<span class="ts-nav-drawer-email" id="ts-nav-drawer-email"></span>' +
           '<button class="ts-nav-drawer-close" id="ts-nav-drawer-close">&times;</button>' +
         '</div>' +
-        '<a class="ts-nav-drawer-link" href="/">Home</a>' +
+        '<a class="ts-nav-drawer-link" href="/">Myhome</a>' +
         '<a class="ts-nav-drawer-link" href="/pricing">Pricing</a>' +
         '<a class="ts-nav-drawer-link" href="/faq">FAQ</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
@@ -85,7 +85,7 @@
           '<div class="ts-nav">' +
             '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
             '<div class="ts-nav-links">' +
-              '<a href="/" class="ts-nav-link">Home</a>' +
+              '<a href="/" class="ts-nav-link">Myhome</a>' +
               '<a href="/pricing" class="ts-nav-link">Pricing</a>' +
               '<a href="/faq" class="ts-nav-link">FAQ</a>' +
               '<div class="ts-nav-account-wrap">' +

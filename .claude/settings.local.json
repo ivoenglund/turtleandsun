@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(heroku config:get DATABASE_URL -a turtleandsun)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
