@@ -8,7 +8,7 @@
     '.ts-nav-wrap{padding:0;}' +
     '.ts-nav{display:flex;align-items:center;padding:16px 32px 18px 0;}' +
     '.ts-nav-panel-spacer{width:260px;flex-shrink:0;}' +
-    '.ts-nav-gap{flex:1;}' +
+    '.ts-nav-gap{display:none;}' +
     '.ts-nav > a{margin-left:60px;}' +
     '.ts-nav a img{height:72px;width:auto;margin-top:-42px;display:block;}' +
     '.ts-nav-links{display:flex;gap:28px;align-items:center;margin-left:75px;}' +
