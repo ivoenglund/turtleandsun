@@ -343,6 +343,10 @@ function renderFilterPanel() {
   let html = _allGroups.map(g => renderEntry(g, 0, null)).join('');
   html += `<div class="fp-sep"></div>
     <div class="fp-item"><label>
+      <input type="checkbox" id="cb-pets-contacts" onchange="applyContactFilter()">
+      Only pets
+    </label></div>
+    <div class="fp-item"><label>
       <input type="checkbox" id="cb-living-contacts" onchange="applyContactFilter()">
       Only living
     </label></div>
@@ -366,6 +370,7 @@ function filterPanelToggle(cb) {
 function applyContactFilter() {
   const q = (document.getElementById('searchInput').value || '').toLowerCase();
   const showLiving = document.getElementById('cb-living-contacts') && document.getElementById('cb-living-contacts').checked;
+  const showOnlyPets = document.getElementById('cb-pets-contacts') && document.getElementById('cb-pets-contacts').checked;
   const allCbs = [...document.querySelectorAll('#leftFilterContent input[data-group-id]')];
   const allChecked = !allCbs.length || allCbs.every(cb => cb.checked);
   const activeIds = allChecked ? null : new Set(allCbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.groupId)));
@@ -375,6 +380,7 @@ function applyContactFilter() {
     if (!showUnrelated && _relatedContactIds && !_relatedContactIds.has(c.id)) return false;
     if (q && !(c.name || '').toLowerCase().includes(q) && !(c.email || '').toLowerCase().includes(q)) return false;
     if (showLiving && c.died_on) return false;
+    if (showOnlyPets && !c.is_pet) return false;
     if (activeIds) {
       const cg = _contactGroupMap[c.id];
       if (!cg || ![...activeIds].some(id => cg.has(id))) return false;

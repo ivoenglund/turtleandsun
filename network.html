@@ -202,6 +202,9 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   <div id="cbGroup"></div>
   <div class="fp-sep"></div>
   <div class="fp-item">
+    <label><input type="checkbox" id="cb-pets" onchange="applyVisibility()"> Only pets<span class="fp-cnt" id="fp-cnt-pets"></span></label>
+  </div>
+  <div class="fp-item">
     <label><input type="checkbox" id="cb-living" onchange="applyVisibility()"> Only living<span class="fp-cnt" id="fp-cnt-living"></span></label>
   </div>
   <div class="fp-item" id="cb-unrelated-wrap" style="display:none;">
@@ -785,6 +788,12 @@ function updateFilterCounts() {
   const unrelatedCnt = [..._unrelatedIds].filter(id => _contactMap[id]).length;
   const unrelEl = document.getElementById('fp-cnt-unrelated');
   if (unrelEl) unrelEl.textContent = unrelatedCnt;
+
+  // Only pets: total pets (not filtered)
+  let petsCnt = 0;
+  _nodeSel.each(d => { if (!d.isGroup && !d.isMe && d.is_pet) petsCnt++; });
+  const petsEl = document.getElementById('fp-cnt-pets');
+  if (petsEl) petsEl.textContent = petsCnt;
 }
 
 // ── Live node label update ────────────────────────────────────────────────────
@@ -844,10 +853,12 @@ function isGroupNameActive(groupName, active) {
 
 function computeVisibleNodeIds(active, showOnlyLiving) {
   const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
+  const showOnlyPets = document.getElementById('cb-pets') && document.getElementById('cb-pets').checked;
   const visible = new Set();
   _nodeSel.each(d => {
     if (d.isMe) { visible.add(d.id); return; }
     if (showOnlyLiving && d.died_on) return;
+    if (showOnlyPets && !d.is_pet) return;
     if (_unrelatedIds.has(d.id)) {
       if (showUnrelated) visible.add(d.id);
       return;
@@ -1170,12 +1181,14 @@ function calToday() {
 function getOccasionsForMonth(year, month) {
   const showOnlyLiving = document.getElementById('cb-living') && document.getElementById('cb-living').checked;
   const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
+  const showOnlyPets = document.getElementById('cb-pets') && document.getElementById('cb-pets').checked;
   const byDay = {};
   const add = (day, chip) => { if (!byDay[day]) byDay[day] = []; byDay[day].push(chip); };
 
   for (const c of Object.values(_contactMap)) {
     if (showOnlyLiving && c.died_on) continue;
     if (!showUnrelated && _unrelatedIds.has(c.id)) continue;
+    if (showOnlyPets && !c.is_pet) continue;
     if (c.birthday) {
       const b = new Date(c.birthday);
       if (!isNaN(b.getTime()) && b.getMonth() === month) {
@@ -1207,11 +1220,13 @@ function getOccasionsForMonth(year, month) {
 function getOccasionsForDate(date) {
   const showOnlyLiving = document.getElementById('cb-living') && document.getElementById('cb-living').checked;
   const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
+  const showOnlyPets = document.getElementById('cb-pets') && document.getElementById('cb-pets').checked;
   const result = [];
   const month = date.getMonth(), day = date.getDate(), year = date.getFullYear();
   for (const c of Object.values(_contactMap)) {
     if (showOnlyLiving && c.died_on) continue;
     if (!showUnrelated && _unrelatedIds.has(c.id)) continue;
+    if (showOnlyPets && !c.is_pet) continue;
     if (c.birthday) {
       const b = new Date(c.birthday);
       if (!isNaN(b.getTime()) && b.getMonth() === month && b.getDate() === day)
@@ -1306,19 +1321,20 @@ function renderCalWeek(weekStart) {
 }
 
 // ── Outline view ──────────────────────────────────────────────────────────────
-function olGroupTotalCount(groupId, showOnlyLiving, active) {
+function olGroupTotalCount(groupId, showOnlyLiving, showOnlyPets, active) {
   const grp = _groupById[groupId];
   const selfActive = !grp || active.has(grp.name);
   const direct = selfActive
-    ? (_groupMembersMap[groupId] || []).filter(c => !showOnlyLiving || !c.died_on).length
+    ? (_groupMembersMap[groupId] || []).filter(c => (!showOnlyLiving || !c.died_on) && (!showOnlyPets || c.is_pet)).length
     : 0;
   const children = _rawGroups.filter(g => g.parent_group_id === groupId);
-  return direct + children.reduce((sum, g) => sum + olGroupTotalCount(g.id, showOnlyLiving, active), 0);
+  return direct + children.reduce((sum, g) => sum + olGroupTotalCount(g.id, showOnlyLiving, showOnlyPets, active), 0);
 }
 
 function renderOutline() {
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
+  const showOnlyPets = document.getElementById('cb-pets') && document.getElementById('cb-pets').checked;
   const inner = document.getElementById('outline-inner');
   inner.innerHTML = '';
   _selectedContacts.clear();
@@ -1328,7 +1344,7 @@ function renderOutline() {
   topGroups.sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
 
   topGroups.forEach(g => {
-    const totalVisible = olGroupTotalCount(g.id, showOnlyLiving, active);
+    const totalVisible = olGroupTotalCount(g.id, showOnlyLiving, showOnlyPets, active);
     if (totalVisible === 0) return;
     const color = GROUP_COLORS[g.name] || '#3A6B20';
     const isFamily = g.name === 'Family';
@@ -1344,10 +1360,10 @@ function renderOutline() {
     </div><div class="ol-group-body"></div>`;
     const body = el.querySelector('.ol-group-body');
     if (isFamily) {
-      const members = (_groupMembersMap[g.id] || []).filter(c => !showOnlyLiving || !c.died_on);
+      const members = (_groupMembersMap[g.id] || []).filter(c => (!showOnlyLiving || !c.died_on) && (!showOnlyPets || c.is_pet));
       renderOlFamilySection(body, members);
     } else {
-      renderOlChildren(body, g.id, showOnlyLiving, active);
+      renderOlChildren(body, g.id, showOnlyLiving, showOnlyPets, active);
     }
     inner.appendChild(el);
   });
@@ -1356,7 +1372,7 @@ function renderOutline() {
   const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
   if (showUnrelated && _unrelatedIds.size > 0) {
     const unrelatedContacts = [..._unrelatedIds]
-      .map(id => _contactMap[id]).filter(c => c && (!showOnlyLiving || !c.died_on))
+      .map(id => _contactMap[id]).filter(c => c && (!showOnlyLiving || !c.died_on) && (!showOnlyPets || c.is_pet))
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (unrelatedContacts.length > 0) {
       const el = document.createElement('div');
@@ -1392,14 +1408,14 @@ function renderOlFamilySection(body, members) {
   body.appendChild(petsEl);
 }
 
-function renderOlChildren(body, groupId, showOnlyLiving, active) {
+function renderOlChildren(body, groupId, showOnlyLiving, showOnlyPets, active) {
   const grp = _groupById[groupId];
   const selfActive = !grp || active.has(grp.name);
   const allMembers = selfActive
-    ? (_groupMembersMap[groupId] || []).filter(c => !showOnlyLiving || !c.died_on)
+    ? (_groupMembersMap[groupId] || []).filter(c => (!showOnlyLiving || !c.died_on) && (!showOnlyPets || c.is_pet))
     : [];
   const childGroups = _rawGroups
-    .filter(g => g.parent_group_id === groupId && olGroupTotalCount(g.id, showOnlyLiving, active) > 0)
+    .filter(g => g.parent_group_id === groupId && olGroupTotalCount(g.id, showOnlyLiving, showOnlyPets, active) > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
   const childMemberIds = new Set();
   const collectDescendantMembers = gid => {
@@ -1411,7 +1427,7 @@ function renderOlChildren(body, groupId, showOnlyLiving, active) {
     .sort((a, b) => (a.name||'').localeCompare(b.name||''))
     .forEach(c => body.appendChild(makeOlRow(c, 0, false)));
   childGroups.forEach(g => {
-    const count = olGroupTotalCount(g.id, showOnlyLiving, active);
+    const count = olGroupTotalCount(g.id, showOnlyLiving, showOnlyPets, active);
     if (!count) return;
     const subEl = document.createElement('div');
     subEl.className = 'ol-sub';
@@ -1423,7 +1439,7 @@ function renderOlChildren(body, groupId, showOnlyLiving, active) {
       <span class="ol-count">${count}</span>
     </div><div class="ol-sub-body"></div>`;
     const sb = subEl.querySelector('.ol-sub-body');
-    renderOlChildren(sb, g.id, showOnlyLiving, active);
+    renderOlChildren(sb, g.id, showOnlyLiving, showOnlyPets, active);
     body.appendChild(subEl);
   });
 }
