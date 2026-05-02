@@ -703,25 +703,30 @@ function buildGraph() {
   const nodeG = _g.append('g').attr('class', 'contact-nodes')
     .selectAll('g').data(contactsCopy).join('g')
     .attr('class', 'contact-node-g')
-    .style('cursor', d => (d.isMe && !Number.isInteger(d.id)) ? 'default' : 'pointer')
+    .style('cursor', d => d.id === '__me__' ? 'default' : 'pointer')
     .call(d3.drag().clickDistance(4).on('start', dragStart).on('drag', dragged).on('end', dragEnd))
     .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
     .on('click', nodeClick)
     .on('dblclick', nodeDoubleClick);
 
   const meG = nodeG.filter(d => d.isMe);
-  meG.append('rect').attr('x', -GNW / 2).attr('y', -GNH / 2)
-    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
-    .attr('fill', '#fff').attr('stroke', 'none');
-  meG.append('rect').attr('x', -GNW / 2).attr('y', -GNH / 2)
-    .attr('width', GNW).attr('height', GNH).attr('rx', GNRX)
-    .attr('class', 'node-outline')
-    .attr('fill', '#3A6B2022').attr('stroke', '#3A6B20').attr('stroke-width', 4)
-    .attr('stroke-dasharray', '6,4');
-  meG.append('text')
-    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-    .attr('font-family', "'Plus Jakarta Sans', sans-serif")
-    .attr('font-size', 13).attr('font-weight', 800).attr('fill', '#3A6B20').text(d => d.name || 'Me');
+  meG.each(function(d) {
+    const { h: contentH, items } = nodeLayout(d);
+    const rectH = Math.max(contentH, GNH);
+    const g = d3.select(this);
+    g.append('rect').attr('class', 'node-outline')
+      .attr('x', -GNW / 2).attr('y', -rectH / 2)
+      .attr('width', GNW).attr('height', rectH).attr('rx', GNRX)
+      .attr('fill', '#eef6e6').attr('stroke', '#3A6B20').attr('stroke-width', 4)
+      .attr('stroke-dasharray', '6,4');
+    items.forEach(item => {
+      g.append('text')
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', item.y)
+        .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+        .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
+        .attr('fill', '#3A6B20').attr('font-style', item.fontStyle).text(item.text);
+    });
+  });
 
   const cG = nodeG.filter(d => !d.isMe);
   cG.each(function(d) {
@@ -813,16 +818,17 @@ function updateNodeLabel(contactId) {
     if (d.id !== contactId) return;
     d.name = c.name;
     const g = d3.select(this);
-    if (d.isMe) { g.select('text').text(c.name || 'Me'); return; }
     g.selectAll('text').remove();
-    const { h, items } = nodeLayout(d);
-    g.select('.node-outline').attr('height', h).attr('y', -h / 2);
+    const { h: contentH, items } = nodeLayout(d);
+    const rectH = d.isMe ? Math.max(contentH, GNH) : contentH;
+    g.select('.node-outline').attr('height', rectH).attr('y', -rectH / 2)
+      .attr('width', d.isMe ? GNW : NW);
     items.forEach(item => {
       g.append('text')
         .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', item.y)
         .attr('font-family', "'Plus Jakarta Sans', sans-serif")
         .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
-        .attr('fill', item.fill).attr('font-style', item.fontStyle).text(item.text);
+        .attr('fill', d.isMe ? '#3A6B20' : item.fill).attr('font-style', item.fontStyle).text(item.text);
     });
     updateLabelVisibility(_currentTransform.k);
   });
@@ -1002,7 +1008,7 @@ function runViewportCull() {
 const tooltip = document.getElementById('tooltip');
 
 function showTooltip(event, d) {
-  if (d.isMe && !Number.isInteger(d.id)) return;
+  if (d.id === '__me__') return;
   tooltip.textContent = d.name || 'Unnamed';
   tooltip.classList.add('visible');
   moveTooltip(event);
@@ -1034,8 +1040,8 @@ function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whit
 // ── Detail overlay ────────────────────────────────────────────────────────────
 let _detailId = null;
 
-function nodeClick(event, d) { if (d.isMe && !Number.isInteger(d.id)) return; event.stopPropagation(); openDetailPanel(d.id); }
-function nodeDoubleClick(event, d) { if (d.isMe && !Number.isInteger(d.id)) return; event.stopPropagation(); forceOpenDetailPanel(d.id); }
+function nodeClick(event, d) { if (d.id === '__me__') return; event.stopPropagation(); openDetailPanel(d.id); }
+function nodeDoubleClick(event, d) { if (d.id === '__me__') return; event.stopPropagation(); forceOpenDetailPanel(d.id); }
 
 function openDetailPanel(id) {
   _detailId = id;
