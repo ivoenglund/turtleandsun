@@ -37,9 +37,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fp-sub{padding-left:16px;}
 .fp-sub2{padding-left:28px;}
 .fp-sep{height:6px;background:none;margin:0;}
-.fp-cnt{margin-left:auto;font-size:10px;color:rgba(28,10,0,0.3);font-weight:500;font-family:'DM Sans',sans-serif;flex-shrink:0;padding-left:4px;}
+.fp-cnt{margin-left:auto;font-size:10px;color:rgba(28,10,0,0.65);font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;padding-left:4px;line-height:1;align-self:center;}
 
-/* Label fade transition for zoom-based hiding */
 .contact-node-g text,.group-node-g text{transition:opacity 0.2s;}
 
 /* Mobile */
@@ -578,7 +577,6 @@ function buildGraph() {
   _svg.call(zoom);
   _g = _svg.append('g');
 
-  // Start zoomed out — labels hide below scale 0.5, so initial render skips text layout
   const _initScale = 0.4;
   const _initT = d3.zoomIdentity.translate(_width / 2, _height / 2).scale(_initScale);
   _svg.call(zoom.transform, _initT);
@@ -949,11 +947,10 @@ function dragStart(event, d) {
 function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
 function dragEnd(event, d) { _isDragging = false; if (!event.active) _simulation.alphaTarget(0); d.fx = null; d.fy = null; }
 
-// ── Label visibility (zoom-based) ────────────────────────────────────────────
-function updateLabelVisibility(scale) {
+function updateLabelVisibility() {
   if (!_nodeSel || !_groupNodeSel) return;
-  _nodeSel.selectAll('text').style('opacity', scale < 0.5 ? '0' : '1');
-  _groupNodeSel.selectAll('text').style('opacity', scale < 0.3 ? '0' : '1');
+  _nodeSel.selectAll('text').style('opacity', '1');
+  _groupNodeSel.selectAll('text').style('opacity', '1');
 }
 
 // ── Viewport culling ──────────────────────────────────────────────────────────
@@ -1072,11 +1069,22 @@ function nodeStroke(d) { return d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#33
 
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
+  _nodeSel.selectAll('.node-glow').remove();
   _nodeSel.select('.node-outline')
-    .attr('stroke', d => d.id === nodeId ? '#FFB800' : d.isMe ? '#3A6B20' : nodeStroke(d))
-    .attr('stroke-width', d => d.id === nodeId ? 8 : d.isMe ? 4 : 3);
+    .attr('stroke', d => d.id === nodeId ? '#C62828' : d.isMe ? '#3A6B20' : nodeStroke(d))
+    .attr('stroke-width', d => d.id === nodeId ? 9 : d.isMe ? 4 : 3);
+  _nodeSel.filter(d => d.id === nodeId).each(function() {
+    const r = d3.select(this).select('.node-outline');
+    const pad = 8;
+    d3.select(this).insert('rect', '.node-outline')
+      .attr('class', 'node-glow')
+      .attr('x', +r.attr('x') - pad).attr('y', +r.attr('y') - pad)
+      .attr('width', +r.attr('width') + pad * 2).attr('height', +r.attr('height') + pad * 2)
+      .attr('rx', +r.attr('rx') + pad)
+      .attr('fill', 'none').attr('stroke', 'rgba(198,40,40,0.38)').attr('stroke-width', 3);
+  });
   _nodeSel.attr('filter', d => d.id === nodeId
-    ? 'drop-shadow(0 0 3px #FFB800) drop-shadow(0 0 10px rgba(255,184,0,0.75)) drop-shadow(0 0 20px rgba(255,184,0,0.4))'
+    ? 'drop-shadow(0 0 4px rgba(198,40,40,0.95)) drop-shadow(0 0 14px rgba(198,40,40,0.5))'
     : null);
   _nodeSel.attr('transform', d => d.id === nodeId ? `translate(${d.x},${d.y}) scale(1.12)` : `translate(${d.x},${d.y})`);
   _nodeSel.filter(d => d.id === nodeId).raise();
@@ -1084,6 +1092,7 @@ function highlightNode(nodeId) {
 
 function clearHighlight() {
   if (!_nodeSel) return;
+  _nodeSel.selectAll('.node-glow').remove();
   _nodeSel.select('.node-outline')
     .attr('stroke', d => d.isMe ? '#3A6B20' : nodeStroke(d))
     .attr('stroke-width', d => d.isMe ? 4 : 3);
