@@ -17,6 +17,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:50;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;padding-top:65px;}
+.fo-sidebar.ts-panel-lg{width:298px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
 .fo-sidebar::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:3px;}
 .fo-sidebar::-webkit-scrollbar-track{background:transparent;}
@@ -233,7 +234,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <div class="tooltip" id="tooltip"></div>
 
-<script src="/contact-panel.js?v=20260506"></script>
+<script src="/contact-panel.js?v=20260507"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const PALETTE = ['#1A5C32','#1A3566','#4A2060','#5A3010','#1A4A5A','#3D5A1A','#6B2A14','#1A4A3A'];
@@ -1582,8 +1583,12 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     CP.init('cpContainer');
     if (localStorage.getItem('ts-panel-scale') === 'large') {
       document.getElementById('foSidebar').classList.add('ts-panel-lg');
-      const _cb = document.getElementById('ts-panel-scale-toggle');
-      if (_cb) _cb.checked = true;
+      const _t = document.getElementById('ts-panel-scale-toggle');
+      if (_t) _t.textContent = '−';
+      const _bg = document.querySelector('.ts-sidebar-bg');
+      if (_bg) _bg.style.width = '298px';
+      const _cv = document.querySelector('.main-canvas');
+      if (_cv) _cv.style.marginLeft = '298px';
     }
     CP.contacts = contacts;
     CP.allGroups = allGroups;
@@ -1609,17 +1614,17 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
   } catch { window.location.href = '/login'; }
 });
 
-document.addEventListener('change', function(e) {
+document.addEventListener('click', function(e) {
   if (e.target.id !== 'ts-panel-scale-toggle') return;
   const sidebar = document.getElementById('foSidebar');
   if (!sidebar) return;
-  if (e.target.checked) {
-    sidebar.classList.add('ts-panel-lg');
-    localStorage.setItem('ts-panel-scale', 'large');
-  } else {
-    sidebar.classList.remove('ts-panel-lg');
-    localStorage.setItem('ts-panel-scale', 'normal');
-  }
+  const isLarge = sidebar.classList.toggle('ts-panel-lg');
+  e.target.textContent = isLarge ? '−' : '+';
+  const bg = document.querySelector('.ts-sidebar-bg');
+  if (bg) bg.style.width = isLarge ? '298px' : '';
+  const canvas = document.querySelector('.main-canvas');
+  if (canvas) canvas.style.marginLeft = isLarge ? '298px' : '';
+  localStorage.setItem('ts-panel-scale', isLarge ? 'large' : 'normal');
 });
 </script>
 </body>
