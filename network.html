@@ -17,7 +17,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:110;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
-.fo-sidebar.ts-panel-lg{width:298px;}
+.fo-sidebar.ts-panel-lg{width:320px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
 .fo-sidebar::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:3px;}
 .fo-sidebar::-webkit-scrollbar-track{background:transparent;}
@@ -35,8 +35,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fp-item{padding:3px 0;display:flex;align-items:center;gap:6px;}
 .fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fp-item input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
-.fp-sub{font-size:12px;padding-left:1.33em;}
-.fp-sub2{font-size:12px;padding-left:2.33em;}
+.fp-sub{font-size:12px;padding-left:1.4em;}
+.fp-sub2{font-size:12px;padding-left:2.8em;}
 .fp-sep{height:6px;background:none;margin:0;}
 .fp-cnt{margin-left:auto;font-size:10px;color:rgba(28,10,0,0.65);font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;padding-left:4px;line-height:1;margin-top:2px;}
 
@@ -141,14 +141,14 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .cal-chip.occasion{background:#fef3e2;color:#b85e10;}
 .cal-chip.remembrance{background:#f0ede6;color:rgba(28,10,0,0.55);}
 .cal-chip.milestone{background:#e8e0f0;color:#6b2d9a;}
-.fo-sidebar.ts-panel-lg .fp-item label{font-size:16px;}
-.fo-sidebar.ts-panel-lg .fp-sub,.fo-sidebar.ts-panel-lg .fp-sub2{font-size:16px;}
-.fo-sidebar.ts-panel-lg .fp-cnt{font-size:13px;}
-.fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:17px;height:17px;}
-.fo-sidebar.ts-panel-lg .fp-item{padding:4px 0;}
-.fo-sidebar.ts-panel-lg .btn-new-contact{font-size:14px;padding:5px 10px;}
-.fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:14px;padding:5px 10px;}
-.fo-sidebar.ts-panel-lg .panel-ftr{padding:6px 13px;}
+.fo-sidebar.ts-panel-lg .fp-item label{font-size:18px;}
+.fo-sidebar.ts-panel-lg .fp-sub,.fo-sidebar.ts-panel-lg .fp-sub2{font-size:18px;}
+.fo-sidebar.ts-panel-lg .fp-cnt{font-size:15px;}
+.fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:20px;height:20px;}
+.fo-sidebar.ts-panel-lg .fp-item{padding:5px 0;}
+.fo-sidebar.ts-panel-lg .btn-new-contact{font-size:17px;padding:6px 12px;}
+.fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
+.fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
 <script src="/nav.js?v=20260504"></script>
 </head>
@@ -235,7 +235,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <div class="tooltip" id="tooltip"></div>
 
-<script src="/contact-panel.js?v=20260507"></script>
+<script src="/contact-panel.js?v=20260508"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const PALETTE = ['#1A5C32','#1A3566','#4A2060','#5A3010','#1A4A5A','#3D5A1A','#6B2A14','#1A4A3A'];
@@ -1587,9 +1587,9 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
       const _t = document.getElementById('ts-panel-scale-toggle');
       if (_t) _t.textContent = '−';
       const _bg = document.querySelector('.ts-sidebar-bg');
-      if (_bg) _bg.style.width = '298px';
+      if (_bg) _bg.style.width = '320px';
       const _cv = document.querySelector('.main-canvas');
-      if (_cv) _cv.style.marginLeft = '298px';
+      if (_cv) _cv.style.marginLeft = '320px';
     }
     CP.contacts = contacts;
     CP.allGroups = allGroups;
@@ -1622,9 +1622,9 @@ document.addEventListener('click', function(e) {
   const isLarge = sidebar.classList.toggle('ts-panel-lg');
   e.target.textContent = isLarge ? '−' : '+';
   const bg = document.querySelector('.ts-sidebar-bg');
-  if (bg) bg.style.width = isLarge ? '298px' : '';
+  if (bg) bg.style.width = isLarge ? '320px' : '';
   const canvas = document.querySelector('.main-canvas');
-  if (canvas) canvas.style.marginLeft = isLarge ? '298px' : '';
+  if (canvas) canvas.style.marginLeft = isLarge ? '320px' : '';
   localStorage.setItem('ts-panel-scale', isLarge ? 'large' : 'normal');
 });
 </script>

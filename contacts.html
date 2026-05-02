@@ -21,7 +21,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:110;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
-.fo-sidebar.ts-panel-lg{width:298px;}
+.fo-sidebar.ts-panel-lg{width:320px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
 .fo-sidebar::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:3px;}
 .fo-sidebar::-webkit-scrollbar-track{background:transparent;}
@@ -40,8 +40,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fp-item{display:flex;align-items:center;gap:5px;padding:3px 6px;cursor:pointer;user-select:none;background:#FFF9E6;border-radius:3px;width:fit-content;}
 .fp-item label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;display:flex;align-items:center;gap:5px;}
 .fp-item input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
-.fp-sub label{padding-left:0.9em;font-size:11px;opacity:0.85;}
-.fp-sub2 label{padding-left:1.8em;font-size:11px;opacity:0.7;}
+.fp-sub label{padding-left:1.4em;font-size:11px;opacity:0.85;}
+.fp-sub2 label{padding-left:2.8em;font-size:11px;opacity:0.7;}
 .fp-sep{height:4px;background:none;margin:0;}
 
 /* Mobile */
@@ -127,12 +127,12 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-add-sub:hover{border-color:#3A6B20;color:#3A6B20;}
 .btn-del{padding:3px 9px;background:none;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.42);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;}
 .btn-del:hover{border-color:#c0392b;color:#c0392b;}
-.fo-sidebar.ts-panel-lg .fp-item label{font-size:16px;}
-.fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:17px;height:17px;}
-.fo-sidebar.ts-panel-lg .fp-item{padding:4px 8px;}
-.fo-sidebar.ts-panel-lg .btn-new-contact{font-size:14px;padding:5px 10px;}
-.fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:14px;padding:5px 10px;}
-.fo-sidebar.ts-panel-lg .panel-ftr{padding:6px 13px;}
+.fo-sidebar.ts-panel-lg .fp-item label{font-size:18px;}
+.fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:20px;height:20px;}
+.fo-sidebar.ts-panel-lg .fp-item{padding:5px 9px;}
+.fo-sidebar.ts-panel-lg .btn-new-contact{font-size:17px;padding:6px 12px;}
+.fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
+.fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
 <script src="/nav.js?v=20260504"></script>
 </head>
@@ -212,7 +212,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   </div>
 </div>
 
-<script src="/contact-panel.js?v=20260507"></script>
+<script src="/contact-panel.js?v=20260508"></script>
 <script>
 let _contacts = [];
 let _currentId = null;
@@ -557,9 +557,9 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
       const _t = document.getElementById('ts-panel-scale-toggle');
       if (_t) _t.textContent = '−';
       const _bg = document.querySelector('.ts-sidebar-bg');
-      if (_bg) _bg.style.width = '298px';
+      if (_bg) _bg.style.width = '320px';
       const _cv = document.querySelector('.main-canvas');
-      if (_cv) _cv.style.marginLeft = '298px';
+      if (_cv) _cv.style.marginLeft = '320px';
     }
     CP.contacts = _contacts;
     CP.allGroups = _allGroups;
@@ -584,9 +584,9 @@ document.addEventListener('click', function(e) {
   const isLarge = sidebar.classList.toggle('ts-panel-lg');
   e.target.textContent = isLarge ? '−' : '+';
   const bg = document.querySelector('.ts-sidebar-bg');
-  if (bg) bg.style.width = isLarge ? '298px' : '';
+  if (bg) bg.style.width = isLarge ? '320px' : '';
   const canvas = document.querySelector('.main-canvas');
-  if (canvas) canvas.style.marginLeft = isLarge ? '298px' : '';
+  if (canvas) canvas.style.marginLeft = isLarge ? '320px' : '';
   localStorage.setItem('ts-panel-scale', isLarge ? 'large' : 'normal');
 });
 </script>

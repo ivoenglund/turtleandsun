@@ -17,7 +17,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:110;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
-.fo-sidebar.ts-panel-lg{width:298px;}
+.fo-sidebar.ts-panel-lg{width:320px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
 .fo-sidebar::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:3px;}
 .fo-sidebar::-webkit-scrollbar-track{background:transparent;}
@@ -124,14 +124,14 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-loveogram{padding:6px 12px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;display:inline-block;}
 .btn-loveogram:hover{background:#1C0A00;}
 .empty-state{text-align:center;padding:60px 32px;color:rgba(28,10,0,0.3);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;}
-.fo-sidebar.ts-panel-lg .fp-check label{font-size:16px;}
-.fo-sidebar.ts-panel-lg .fp-check input[type=checkbox]{width:17px;height:17px;}
-.fo-sidebar.ts-panel-lg .fp-check{padding:4px 8px;}
-.fo-sidebar.ts-panel-lg .fp-label{font-size:12px;}
-.fo-sidebar.ts-panel-lg .fp-select{font-size:16px;padding:8px 10px;}
-.fo-sidebar.ts-panel-lg .btn-new-contact{font-size:14px;padding:5px 10px;}
-.fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:14px;padding:5px 10px;}
-.fo-sidebar.ts-panel-lg .panel-ftr{padding:6px 13px;}
+.fo-sidebar.ts-panel-lg .fp-check label{font-size:18px;}
+.fo-sidebar.ts-panel-lg .fp-check input[type=checkbox]{width:20px;height:20px;}
+.fo-sidebar.ts-panel-lg .fp-check{padding:5px 9px;}
+.fo-sidebar.ts-panel-lg .fp-label{font-size:14px;}
+.fo-sidebar.ts-panel-lg .fp-select{font-size:18px;padding:9px 12px;}
+.fo-sidebar.ts-panel-lg .btn-new-contact{font-size:17px;padding:6px 12px;}
+.fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
+.fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
 <script src="/nav.js?v=20260504"></script>
 </head>
@@ -200,7 +200,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   <button class="mob-btn" id="mobDetailBtn" disabled onclick="toggleMobileDetail()">Contact</button>
 </div>
 
-<script src="/contact-panel.js?v=20260507"></script>
+<script src="/contact-panel.js?v=20260508"></script>
 <script>
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -495,9 +495,9 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
       const _t = document.getElementById('ts-panel-scale-toggle');
       if (_t) _t.textContent = '−';
       const _bg = document.querySelector('.ts-sidebar-bg');
-      if (_bg) _bg.style.width = '298px';
+      if (_bg) _bg.style.width = '320px';
       const _cv = document.querySelector('.main-canvas');
-      if (_cv) _cv.style.marginLeft = '298px';
+      if (_cv) _cv.style.marginLeft = '320px';
     }
     CP.contacts  = fullContacts;
     CP.allGroups = _allGroups;
@@ -516,9 +516,9 @@ document.addEventListener('click', function(e) {
   const isLarge = sidebar.classList.toggle('ts-panel-lg');
   e.target.textContent = isLarge ? '−' : '+';
   const bg = document.querySelector('.ts-sidebar-bg');
-  if (bg) bg.style.width = isLarge ? '298px' : '';
+  if (bg) bg.style.width = isLarge ? '320px' : '';
   const canvas = document.querySelector('.main-canvas');
-  if (canvas) canvas.style.marginLeft = isLarge ? '298px' : '';
+  if (canvas) canvas.style.marginLeft = isLarge ? '320px' : '';
   localStorage.setItem('ts-panel-scale', isLarge ? 'large' : 'normal');
 });
 </script>

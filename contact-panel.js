@@ -151,22 +151,22 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 .fo-detail .cp-pill{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 /* Scale-up overrides (ts-panel-lg on fo-sidebar) */
-.fo-sidebar.ts-panel-lg .cp-name-lbl{font-size:12px;}
-.fo-sidebar.ts-panel-lg .cp-name-inp{font-size:18px;}
-.fo-sidebar.ts-panel-lg .cp-lbl{font-size:13px;}
-.fo-sidebar.ts-panel-lg .cp-inp{font-size:16px;}
-.fo-sidebar.ts-panel-lg .cp-row{padding:1px 13px;}
-.fo-sidebar.ts-panel-lg .cp-section-hdr{font-size:12px;padding:5px 13px 3px;}
-.fo-sidebar.ts-panel-lg .cp-check-cell label{font-size:14px;gap:9px;}
-.fo-sidebar.ts-panel-lg .cp-pill{font-size:13px;padding:2px 9px;}
-.fo-sidebar.ts-panel-lg .cp-pill-sub{font-size:12px;}
-.fo-sidebar.ts-panel-lg .cp-pills-empty,.fo-sidebar.ts-panel-lg .cp-list-empty{font-size:14px;}
-.fo-sidebar.ts-panel-lg .cp-list-secondary{font-size:13px;}
-.fo-sidebar.ts-panel-lg .cp-list-tag{font-size:12px;}
-.fo-sidebar.ts-panel-lg .cp-btn-add{font-size:12px;padding:3px 10px;}
-.fo-sidebar.ts-panel-lg .cp-btn-del{font-size:12px;padding:2px 8px;}
-.fo-sidebar.ts-panel-lg .cp-group-dd-item{font-size:14px;}
-.fo-sidebar.ts-panel-lg .cp-group-dd-sub{font-size:13px;}
+.fo-sidebar.ts-panel-lg .cp-name-lbl{font-size:14px;}
+.fo-sidebar.ts-panel-lg .cp-name-inp{font-size:21px;}
+.fo-sidebar.ts-panel-lg .cp-lbl{font-size:15px;}
+.fo-sidebar.ts-panel-lg .cp-inp{font-size:18px;}
+.fo-sidebar.ts-panel-lg .cp-row{padding:1px 15px;}
+.fo-sidebar.ts-panel-lg .cp-section-hdr{font-size:14px;padding:6px 15px 3px;}
+.fo-sidebar.ts-panel-lg .cp-check-cell label{font-size:17px;gap:11px;}
+.fo-sidebar.ts-panel-lg .cp-pill{font-size:15px;padding:2px 11px;}
+.fo-sidebar.ts-panel-lg .cp-pill-sub{font-size:14px;}
+.fo-sidebar.ts-panel-lg .cp-pills-empty,.fo-sidebar.ts-panel-lg .cp-list-empty{font-size:17px;}
+.fo-sidebar.ts-panel-lg .cp-list-secondary{font-size:15px;}
+.fo-sidebar.ts-panel-lg .cp-list-tag{font-size:14px;}
+.fo-sidebar.ts-panel-lg .cp-btn-add{font-size:15px;padding:3px 14px;}
+.fo-sidebar.ts-panel-lg .cp-btn-del{font-size:14px;padding:2px 9px;}
+.fo-sidebar.ts-panel-lg .cp-group-dd-item{font-size:17px;}
+.fo-sidebar.ts-panel-lg .cp-group-dd-sub{font-size:15px;}
 .cp-name-hdr-row{display:flex;align-items:center;justify-content:space-between;}
 #ts-panel-scale-toggle{font-size:13px;font-weight:700;cursor:pointer;color:rgba(28,10,0,0.38);user-select:none;line-height:1;flex-shrink:0;font-family:'Plus Jakarta Sans',sans-serif;}
 #ts-panel-scale-toggle:hover{color:#1C0A00;}
