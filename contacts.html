@@ -20,13 +20,12 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;margin-left:260px;}
 
 /* ── Left panels ─────────────────────────────────────────────────── */
-.fo-filters,.fo-detail{position:fixed;left:0;width:260px;z-index:50;}
-.fo-detail{top:0;overflow-y:auto;display:flex;flex-direction:column;max-height:65vh;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
-.fo-detail::-webkit-scrollbar{width:4px;}
-.fo-detail::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:2px;}
-.fo-detail::-webkit-scrollbar-track{background:transparent;}
-.fo-filters{top:65vh;bottom:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:6px 10px;gap:2px;}
-.fo-filters::-webkit-scrollbar{display:none;}
+.fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:50;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
+.fo-sidebar::-webkit-scrollbar{width:6px;}
+.fo-sidebar::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:3px;}
+.fo-sidebar::-webkit-scrollbar-track{background:transparent;}
+.fo-detail{display:flex;flex-direction:column;}
+.fo-filters{display:flex;flex-direction:column;padding:6px 10px;gap:2px;}
 
 .btn-new-contact{padding:4px 8px;background:#3A6B20;color:#fff;border:none;border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;}
 .btn-new-contact:hover{background:#1C0A00;}
@@ -50,6 +49,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 @media(max-width:1000px){
   .ts-sidebar-bg{display:none;}
+  .fo-sidebar{display:contents;}
   .fo-filters,.fo-detail{
     position:fixed;top:0;left:0;right:0;bottom:56px;
     width:auto!important;max-height:none!important;
@@ -136,7 +136,10 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 <!-- Left sidebar background -->
 <div class="ts-sidebar-bg"></div>
 
-<!-- Contact panel (top of left sidebar) -->
+<!-- Left sidebar scroll container -->
+<div class="fo-sidebar" id="foSidebar">
+
+<!-- Contact panel -->
 <div class="fo-detail" id="foDetail">
   <div id="cpContainer" style="display:flex;flex-direction:column;"></div>
   <div class="panel-ftr" id="cpDeleteRow">
@@ -145,9 +148,11 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   </div>
 </div>
 
-<!-- Filter panel (bottom of left sidebar) -->
+<!-- Filter panel -->
 <div class="fo-filters" id="foFilters">
   <div id="leftFilterContent"></div>
+</div>
+
 </div>
 
 <!-- Main contact list -->
@@ -249,12 +254,6 @@ function hideDetail() {
   CP.close();
   document.getElementById('cpDeleteBtn').disabled = true;
   _updateMobileDetailBtn();
-}
-function _positionFilterPanel() {
-  if (window.innerWidth <= 1000) return;
-  const detail = document.getElementById('foDetail');
-  const filters = document.getElementById('foFilters');
-  if (detail && filters) filters.style.top = detail.getBoundingClientRect().bottom + 4 + 'px';
 }
 function _updateMobileDetailBtn() {
   const btn = document.getElementById('mobDetailBtn');
@@ -550,9 +549,6 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     };
 
     renderFilterPanel();
-    _positionFilterPanel();
-    window.addEventListener('resize', _positionFilterPanel);
-    if (window.ResizeObserver) new ResizeObserver(_positionFilterPanel).observe(document.getElementById('foDetail'));
 
     const urlId = new URLSearchParams(location.search).get('id');
     if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }

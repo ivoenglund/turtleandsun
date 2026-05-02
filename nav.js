@@ -9,6 +9,7 @@
     '.ts-nav{display:flex;align-items:center;padding:16px 32px 18px 0;}' +
     '.ts-nav-panel-spacer{width:260px;flex-shrink:0;}' +
     '.ts-nav-gap{flex:1;}' +
+    '.ts-nav > a{margin-left:60px;}' +
     '.ts-nav a img{height:72px;width:auto;margin-top:-42px;display:block;}' +
     '.ts-nav-links{display:flex;gap:28px;align-items:center;}' +
     '.ts-nav-link{font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}' +
