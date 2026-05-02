@@ -40,6 +40,12 @@ const CP = (() => {
 .cp-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
 .cp-badge-dec{background:#f5eaea;color:rgba(120,20,20,0.55);}
 
+/* Scrollbar */
+#cpContent{scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
+#cpContent::-webkit-scrollbar{width:4px;}
+#cpContent::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:2px;}
+#cpContent::-webkit-scrollbar-track{background:transparent;}
+
 /* No-contact dim state */
 #cpContent.cp-no-contact .cp-name-inp,
 #cpContent.cp-no-contact .cp-inp{opacity:0.35;pointer-events:none;}

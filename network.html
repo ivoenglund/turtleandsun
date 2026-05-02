@@ -17,7 +17,10 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-filters,.fo-detail{position:fixed;left:0;width:260px;z-index:50;}
-.fo-detail{top:0;overflow-y:auto;display:flex;flex-direction:column;}
+.fo-detail{top:0;overflow-y:auto;display:flex;flex-direction:column;max-height:65vh;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
+.fo-detail::-webkit-scrollbar{width:4px;}
+.fo-detail::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:2px;}
+.fo-detail::-webkit-scrollbar-track{background:transparent;}
 .fo-filters{top:65vh;bottom:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:6px 10px;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
@@ -731,7 +734,7 @@ function buildGraph() {
     _relLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     _hitAreaSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     _memberLinkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+    nodeG.attr('transform', d => d.id === _detailId ? `translate(${d.x},${d.y}) scale(1.12)` : `translate(${d.x},${d.y})`);
     groupG.attr('transform', d => `translate(${d.x},${d.y})`);
   }).on('end', () => {
     scheduleViewportCull();
@@ -1073,7 +1076,9 @@ function highlightNode(nodeId) {
   if (!_nodeSel) return;
   _nodeSel.select('.node-outline')
     .attr('stroke', d => (d.id === nodeId || d.isMe) ? '#3A6B20' : nodeStroke(d))
-    .attr('stroke-width', d => d.id === nodeId ? 5 : d.isMe ? 4 : 3);
+    .attr('stroke-width', d => d.id === nodeId ? 6 : d.isMe ? 4 : 3);
+  _nodeSel.attr('filter', d => d.id === nodeId ? 'drop-shadow(0 0 6px rgba(58,107,32,0.7))' : null);
+  _nodeSel.attr('transform', d => d.id === nodeId ? `translate(${d.x},${d.y}) scale(1.12)` : `translate(${d.x},${d.y})`);
   _nodeSel.filter(d => d.id === nodeId).raise();
 }
 
@@ -1082,6 +1087,7 @@ function clearHighlight() {
   _nodeSel.select('.node-outline')
     .attr('stroke', d => d.isMe ? '#3A6B20' : nodeStroke(d))
     .attr('stroke-width', d => d.isMe ? 4 : 3);
+  _nodeSel.attr('filter', null);
 }
 
 document.getElementById('graph-svg').addEventListener('click', () => closePanel());

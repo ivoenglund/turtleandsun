@@ -5,8 +5,10 @@
     'body{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}' +
     '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}' +
     '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:100;}' +
-    '.ts-nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}' +
-    '.ts-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}' +
+    '.ts-nav-wrap{padding:0;}' +
+    '.ts-nav{display:flex;align-items:center;padding:16px 32px 18px 0;}' +
+    '.ts-nav-panel-spacer{width:260px;flex-shrink:0;}' +
+    '.ts-nav-gap{flex:1;}' +
     '.ts-nav a img{height:72px;width:auto;margin-top:-42px;display:block;}' +
     '.ts-nav-links{display:flex;gap:28px;align-items:center;}' +
     '.ts-nav-link{font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}' +
@@ -35,7 +37,7 @@
     '.ts-nav-drawer-link.ts-active{color:#3A6B20;font-weight:700;opacity:1;}' +
     '.ts-nav-drawer-logout{color:#c0392b!important;opacity:1!important;}' +
     '.ts-nav-drawer-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 20px;}' +
-    '@media(max-width:1000px){.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}';
+    '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}';
 
   function buildHTML() {
     var dd =
@@ -85,6 +87,9 @@
       '<div class="ts-nav-bar" id="ts-nav-bar">' +
         '<div class="ts-nav-wrap">' +
           '<div class="ts-nav">' +
+            '<div class="ts-nav-panel-spacer"></div>' +
+            '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
+            '<div class="ts-nav-gap"></div>' +
             '<div class="ts-nav-links">' +
               '<a href="/" class="ts-nav-link">Myhome</a>' +
               '<a href="/pricing" class="ts-nav-link">Pricing</a>' +
@@ -95,7 +100,6 @@
               '</div>' +
               '<button class="ts-nav-hamburger" id="ts-nav-hamburger">&#9776;</button>' +
             '</div>' +
-            '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
           '</div>' +
         '</div>' +
       '</div>' +

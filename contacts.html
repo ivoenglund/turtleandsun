@@ -21,7 +21,10 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-filters,.fo-detail{position:fixed;left:0;width:260px;z-index:50;}
-.fo-detail{top:0;overflow-y:auto;display:flex;flex-direction:column;}
+.fo-detail{top:0;overflow-y:auto;display:flex;flex-direction:column;max-height:65vh;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
+.fo-detail::-webkit-scrollbar{width:4px;}
+.fo-detail::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:2px;}
+.fo-detail::-webkit-scrollbar-track{background:transparent;}
 .fo-filters{top:65vh;bottom:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:6px 10px;gap:2px;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
