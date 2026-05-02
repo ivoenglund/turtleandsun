@@ -30,7 +30,7 @@ const CP = (() => {
 
 /* Name bar */
 .cp-name-bar{padding:3px 10px 2px;display:flex;flex-direction:column;gap:0px;border-bottom:1px solid rgba(28,10,0,0.06);}
-.cp-name-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.32);font-family:'Plus Jakarta Sans',sans-serif;}
+.cp-name-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#1C0A00;font-family:'Plus Jakarta Sans',sans-serif;}
 .cp-name-row{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;}
 .cp-name-inp{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:0;line-height:1.2;transition:border-color 0.12s;cursor:text;}
 .cp-name-inp:focus{border-bottom-color:#3A6B20;}
@@ -51,7 +51,7 @@ const CP = (() => {
 /* Stacked field layout */
 .cp-tbl{padding-bottom:1px;}
 .cp-row{display:flex;flex-direction:column;padding:1px 10px 1px;}
-.cp-lbl{font-size:10px;font-weight:500;color:rgba(28,10,0,0.35);text-align:left;line-height:1.2;margin-bottom:0;}
+.cp-lbl{font-size:10px;font-weight:500;color:#1C0A00;text-align:left;line-height:1.2;margin-bottom:0;}
 .cp-inp{width:100%;padding:0 0 1px;border:none;border-bottom:1px solid rgba(28,10,0,0.08);background:transparent;font-size:12px;font-family:'DM Sans',sans-serif;color:#1C0A00;outline:none;line-height:1.2;transition:background 0.12s;}
 .cp-inp:focus{background:rgba(58,107,32,0.04);border-bottom-color:#3A6B20;}
 .cp-inp:hover:not(:focus){background:rgba(28,10,0,0.02);}
