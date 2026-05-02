@@ -29,7 +29,9 @@ const CP = (() => {
 .cp-empty{display:flex;align-items:center;justify-content:center;height:160px;font-size:13px;color:rgba(28,10,0,0.25);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;text-align:center;padding:24px;}
 
 /* Name bar */
-.cp-name-bar{padding:10px 16px 8px;display:flex;align-items:center;gap:7px;flex-wrap:nowrap;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cp-name-bar{padding:10px 16px 8px;display:flex;flex-direction:column;gap:3px;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cp-name-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.32);font-family:'Plus Jakarta Sans',sans-serif;}
+.cp-name-row{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;}
 .cp-name-inp{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#1C0A00;background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:0;transition:border-color 0.12s;cursor:text;}
 .cp-name-inp:focus{border-bottom-color:#3A6B20;}
 .cp-name-inp::placeholder{color:rgba(28,10,0,0.28);}
@@ -68,6 +70,14 @@ const CP = (() => {
 .cp-pill input[type=checkbox]{width:12px;height:12px;accent-color:#3A6B20;cursor:pointer;}
 .cp-pill-sub{font-size:10px;padding:2px 8px;}
 .cp-pills-empty{padding:6px 16px 10px;font-size:12px;color:rgba(28,10,0,0.3);}
+.cp-group-add-btn{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1.5px dashed rgba(28,10,0,0.25);background:none;cursor:pointer;font-size:15px;line-height:1;color:rgba(28,10,0,0.4);flex-shrink:0;padding:0;}
+.cp-group-add-btn:hover{border-color:rgba(28,10,0,0.5);color:rgba(28,10,0,0.7);}
+.cp-pill-remove{border:none;background:none;cursor:pointer;font-size:12px;line-height:1;color:rgba(28,10,0,0.35);padding:0 0 0 3px;flex-shrink:0;}
+.cp-pill-remove:hover{color:#c0392b;}
+.cp-group-dropdown{padding:4px 12px 8px;}
+.cp-group-dd-item{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;font-family:'DM Sans',sans-serif;color:rgba(28,10,0,0.7);cursor:pointer;line-height:1.4;}
+.cp-group-dd-item input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
+.cp-group-dd-sub{padding-left:12px;font-size:11px;color:rgba(28,10,0,0.5);}
 
 /* Compact list rows (rels, occasions, loveograms) */
 .cp-list{padding:2px 16px 6px;}
@@ -98,9 +108,13 @@ const CP = (() => {
 @media(max-width:1000px){.cp-lbl{width:86px;font-size:10px;}}
 
 /* Overlay mode: transparent bg, text-shadow for legibility */
+.fo-detail .cp-name-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
 .fo-detail .cp-close-btn{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-name-bar{border-bottom:none;}
+.fo-detail .cp-group-add-btn{color:rgba(28,10,0,0.45);text-shadow:0 0 8px rgba(255,249,230,1);}
+.fo-detail .cp-group-dropdown{background:rgba(255,249,230,0.93);border-radius:6px;margin:0 8px 4px;}
+.fo-detail .cp-group-dd-item{text-shadow:0 0 6px rgba(255,249,230,0.8);}
 .fo-detail .cp-section{border-bottom:none;}
 .fo-detail .cp-row{border-bottom:none;}
 .fo-detail .cp-list-row{border-bottom:none;}
@@ -116,7 +130,7 @@ const CP = (() => {
 .fo-detail .cp-toast.err{background:rgba(253,236,234,0.88);}
 .fo-detail .cp-pill{background:rgba(250,248,245,0.75);}
 .fo-detail .cp-pill.active{background:rgba(232,240,224,0.88);}
-.fo-detail .cp-name-bar,.fo-detail .cp-section,.fo-detail .cp-tbl,.fo-detail .cp-row,.fo-detail .cp-pills,.fo-detail .cp-list,.fo-detail .cp-list-row,.fo-detail .cp-add-row,.fo-detail .cp-form-msg,.fo-detail .cp-toast,.fo-detail .cp-empty{max-width:100%;box-sizing:border-box;}
+.fo-detail .cp-name-bar,.fo-detail .cp-name-row,.fo-detail .cp-section,.fo-detail .cp-tbl,.fo-detail .cp-row,.fo-detail .cp-pills,.fo-detail .cp-list,.fo-detail .cp-list-row,.fo-detail .cp-add-row,.fo-detail .cp-form-msg,.fo-detail .cp-toast,.fo-detail .cp-empty,.fo-detail .cp-group-dropdown{max-width:100%;box-sizing:border-box;}
 .fo-detail .cp-pill{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     `;
     document.head.appendChild(s);
@@ -127,11 +141,14 @@ const CP = (() => {
 <div id="cpContent" style="display:none;overflow-y:auto;flex:1;min-height:0;">
 
   <div class="cp-name-bar">
-    <input class="cp-name-inp" id="cpFName" type="text" data-field="name" onblur="CP._scheduleSave()" placeholder="Name">
-    <span id="cpPetIcon" style="display:none;">🐾</span>
-    <span class="cp-badge" id="cpPhBadge" style="display:none;">Manual</span>
-    <span class="cp-badge cp-badge-dec" id="cpDeceasedBadge" style="display:none;">† Deceased</span>
-    <button class="cp-close-btn" onclick="window.hideDetail&&hideDetail()" aria-label="Close">×</button>
+    <span class="cp-name-lbl">Contact name</span>
+    <div class="cp-name-row">
+      <input class="cp-name-inp" id="cpFName" type="text" data-field="name" onblur="CP._scheduleSave()" placeholder="Name">
+      <span id="cpPetIcon" style="display:none;">🐾</span>
+      <span class="cp-badge" id="cpPhBadge" style="display:none;">Manual</span>
+      <span class="cp-badge cp-badge-dec" id="cpDeceasedBadge" style="display:none;">† Deceased</span>
+      <button class="cp-close-btn" onclick="window.hideDetail&&hideDetail()" aria-label="Close">×</button>
+    </div>
   </div>
 
   <div class="cp-toast" id="cpSaveMsg"></div>
@@ -142,7 +159,7 @@ const CP = (() => {
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Pet</span><div class="cp-check-cell"><label><input type="checkbox" id="cpFIsPet" onchange="CP._scheduleSave()"> This is a pet</label></div></div>
+      <div class="cp-row"><span class="cp-lbl">Pet</span><div class="cp-check-cell"><input type="checkbox" id="cpFIsPet" onchange="CP._scheduleSave()"></div></div>
     </div>
   </div>
 
@@ -314,37 +331,41 @@ const CP = (() => {
     return flat;
   }
 
-  function _renderGroupCheckboxes() {
+  function _renderGroupCheckboxes(keepDropdownOpen) {
     const el = document.getElementById('cpGroupsCheckboxes');
-    if (!_allGroups.length) {
-      el.innerHTML = '<div class="cp-pills-empty">No groups yet.</div>';
-      return;
-    }
+    const flat = _allGroupsFlat();
+    const topIds = new Set(_allGroups.map(g => g.id));
+
     let html = '<div class="cp-pills">';
-    for (const g of _allGroups) {
-      const checked = _contactGroupIds.has(g.id);
-      html += `<label class="cp-pill${checked ? ' active' : ''}" id="cpgcb-${g.id}">
-        <input type="checkbox" ${checked ? 'checked' : ''} onchange="CP._toggleGroupMembership(${g.id},this)">
-        ${_esc(g.name)}
-      </label>`;
-      for (const s of (g.subgroups || [])) {
-        const sc = _contactGroupIds.has(s.id);
-        html += `<label class="cp-pill cp-pill-sub${sc ? ' active' : ''}" id="cpgcb-${s.id}">
-          <input type="checkbox" ${sc ? 'checked' : ''} onchange="CP._toggleGroupMembership(${s.id},this)">
-          ↳ ${_esc(s.name)}
-        </label>`;
-      }
+    const activeGroups = flat.filter(g => _contactGroupIds.has(g.id));
+    for (const g of activeGroups) {
+      const prefix = topIds.has(g.id) ? '' : '↳ ';
+      html += `<span class="cp-pill active">${_esc(prefix + g.name)}<button class="cp-pill-remove" onclick="CP._removeFromGroup(${g.id})" title="Remove">×</button></span>`;
+    }
+    if (flat.length > 0) {
+      html += `<button class="cp-group-add-btn" onclick="CP._toggleGroupDropdown()" title="Add group">+</button>`;
     }
     html += '</div>';
+
+    if (flat.length > 0) {
+      const ddDisplay = keepDropdownOpen ? '' : 'none';
+      html += `<div class="cp-group-dropdown" id="cpGroupDropdown" style="display:${ddDisplay};">`;
+      for (const g of _allGroups) {
+        const checked = _contactGroupIds.has(g.id);
+        html += `<label class="cp-group-dd-item"><input type="checkbox" ${checked ? 'checked' : ''} onchange="CP._toggleGroupMembership(${g.id},this)"> ${_esc(g.name)}</label>`;
+        for (const s of (g.subgroups || [])) {
+          const sc = _contactGroupIds.has(s.id);
+          html += `<label class="cp-group-dd-item cp-group-dd-sub"><input type="checkbox" ${sc ? 'checked' : ''} onchange="CP._toggleGroupMembership(${s.id},this)"> ↳ ${_esc(s.name)}</label>`;
+        }
+      }
+      html += '</div>';
+    } else {
+      html += '<div class="cp-pills-empty">No groups yet.</div>';
+    }
     el.innerHTML = html;
   }
 
-  async function _toggleGroupMembership(groupId, cb) {
-    const label = document.getElementById(`cpgcb-${groupId}`);
-    if (cb.checked) _contactGroupIds.add(groupId);
-    else _contactGroupIds.delete(groupId);
-    if (label) label.classList.toggle('active', cb.checked);
-
+  async function _syncGroupsToServer() {
     const familyGroup = _allGroupsFlat().find(g => g.name === 'Family');
     const nowInFamily = familyGroup ? _contactGroupIds.has(familyGroup.id) : false;
     if (nowInFamily !== _inFamilyGroup) {
@@ -352,12 +373,29 @@ const CP = (() => {
       document.getElementById('cpFamilyCard').style.display = _inFamilyGroup ? '' : 'none';
       if (_inFamilyGroup) _populateRelSelects(_currentId);
     }
-
     await fetch(`/api/contacts/${_currentId}/groups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ group_ids: [..._contactGroupIds] }),
     });
+  }
+
+  async function _toggleGroupMembership(groupId, cb) {
+    if (cb.checked) _contactGroupIds.add(groupId);
+    else _contactGroupIds.delete(groupId);
+    await _syncGroupsToServer();
+    _renderGroupCheckboxes(true);
+  }
+
+  async function _removeFromGroup(groupId) {
+    _contactGroupIds.delete(groupId);
+    await _syncGroupsToServer();
+    _renderGroupCheckboxes(false);
+  }
+
+  function _toggleGroupDropdown() {
+    const dd = document.getElementById('cpGroupDropdown');
+    if (dd) dd.style.display = dd.style.display === 'none' ? '' : 'none';
   }
 
   function _renderRelationships(rels) {
@@ -481,6 +519,8 @@ const CP = (() => {
     _saveContact,
     _scheduleSave,
     _toggleGroupMembership,
+    _removeFromGroup,
+    _toggleGroupDropdown,
     _addRelationship,
     _deleteRelationship,
     _addOccasion,
