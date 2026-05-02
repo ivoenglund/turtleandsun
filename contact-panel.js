@@ -98,6 +98,12 @@ const CP = (() => {
 .cp-status-pending{background:#fff3cd;color:#856404;}
 .cp-status-failed{background:#fdecea;color:#c0392b;}
 
+/* Paired address row (two columns side by side) */
+.cp-addr-pair{display:flex;gap:6px;padding:1px 10px 1px;}
+.cp-addr-col{display:flex;flex-direction:column;min-width:0;}
+.cp-addr-col.wide{flex:2;}
+.cp-addr-col.narrow{flex:1;}
+
 /* Compact add forms */
 .cp-add-row{display:flex;gap:4px;padding:2px 10px 3px;flex-wrap:wrap;}
 .cp-add-inp{flex:1;min-width:80px;padding:2px 6px;border:1px solid #e0dcd4;border-radius:4px;font-size:11px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;line-height:1.2;}
@@ -180,10 +186,16 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 
   <div class="cp-section">
     <div class="cp-tbl">
-      <div class="cp-row"><span class="cp-lbl">Street</span><input class="cp-inp" type="text" id="cpFStreet" data-field="street" onblur="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">City</span><input class="cp-inp" type="text" id="cpFCity" data-field="city" onblur="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Country</span><input class="cp-inp" type="text" id="cpFCountry" data-field="country" onblur="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Post code</span><input class="cp-inp" type="text" id="cpFPostal" data-field="postal_code" onblur="CP._scheduleSave()"></div>
+      <div class="cp-row"><span class="cp-lbl">Street 1</span><input class="cp-inp" type="text" id="cpFStreet" data-field="street" onblur="CP._scheduleSave()"></div>
+      <div class="cp-row"><span class="cp-lbl">Street 2</span><input class="cp-inp" type="text" id="cpFStreet2" data-field="street_2" onblur="CP._scheduleSave()"></div>
+      <div class="cp-addr-pair">
+        <div class="cp-addr-col wide"><span class="cp-lbl">City</span><input class="cp-inp" type="text" id="cpFCity" data-field="city" onblur="CP._scheduleSave()"></div>
+        <div class="cp-addr-col narrow"><span class="cp-lbl">Region</span><input class="cp-inp" type="text" id="cpFRegion" data-field="region" onblur="CP._scheduleSave()"></div>
+      </div>
+      <div class="cp-addr-pair">
+        <div class="cp-addr-col narrow"><span class="cp-lbl">Postal</span><input class="cp-inp" type="text" id="cpFPostal" data-field="postal_code" onblur="CP._scheduleSave()"></div>
+        <div class="cp-addr-col wide"><span class="cp-lbl">Country</span><input class="cp-inp" type="text" id="cpFCountry" data-field="country" onblur="CP._scheduleSave()"></div>
+      </div>
     </div>
   </div>
 
@@ -264,7 +276,9 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     document.getElementById('cpFBirthday').value = c.birthday ? c.birthday.split('T')[0] : '';
     document.getElementById('cpFDiedOn').value = c.died_on ? c.died_on.split('T')[0] : '';
     document.getElementById('cpFStreet').value = c.street || '';
+    document.getElementById('cpFStreet2').value = c.street_2 || '';
     document.getElementById('cpFCity').value = c.city || '';
+    document.getElementById('cpFRegion').value = c.region || '';
     document.getElementById('cpFCountry').value = c.country || '';
     document.getElementById('cpFPostal').value = c.postal_code || '';
     document.getElementById('cpFIsPet').checked = !!c.is_pet;
@@ -289,7 +303,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     const content = document.getElementById('cpContent');
     if (content) content.classList.add('cp-no-contact');
 
-    ['cpFName','cpFEmail','cpFPhone','cpFStreet','cpFCity','cpFCountry','cpFPostal'].forEach(id => {
+    ['cpFName','cpFEmail','cpFPhone','cpFStreet','cpFStreet2','cpFCity','cpFRegion','cpFCountry','cpFPostal'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -337,7 +351,9 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
       email: document.getElementById('cpFEmail').value,
       phone: document.getElementById('cpFPhone').value,
       street: document.getElementById('cpFStreet').value,
+      street_2: document.getElementById('cpFStreet2').value,
       city: document.getElementById('cpFCity').value,
+      region: document.getElementById('cpFRegion').value,
       country: document.getElementById('cpFCountry').value,
       postal_code: document.getElementById('cpFPostal').value,
       birthday: document.getElementById('cpFBirthday').value || null,

@@ -147,6 +147,8 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_pet BOOLEAN DEFAULT FALSE;
     ALTER TABLE groups ADD COLUMN IF NOT EXISTS parent_group_id INTEGER REFERENCES groups(id);
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_me BOOLEAN DEFAULT FALSE;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS street_2 TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS region TEXT;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support

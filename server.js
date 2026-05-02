@@ -299,19 +299,22 @@ app.get('/auth/google/callback', async (req, res) => {
       const phone = c.phoneNumbers?.[0]?.value    || null;
       const addr = c.addresses?.[0] || null;
       const street = addr?.streetAddress || null;
+      const street_2 = addr?.extendedAddress || null;
       const city = addr?.city || null;
+      const region = addr?.region || null;
       const country = addr?.country || null;
       const postal_code = addr?.postalCode || null;
       const bd = c.birthdays?.[0]?.date;
       const birthday = bd ? `${bd.year || ''}-${String(bd.month).padStart(2,'0')}-${String(bd.day).padStart(2,'0')}` : null;
       await pool.query(
-        `INSERT INTO contacts (user_id, google_id, name, email, phone, street, city, country, postal_code, birthday)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO contacts (user_id, google_id, name, email, phone, street, street_2, city, region, country, postal_code, birthday)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (user_id, google_id) DO UPDATE
            SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
-               street = EXCLUDED.street, city = EXCLUDED.city, country = EXCLUDED.country,
+               street = EXCLUDED.street, street_2 = EXCLUDED.street_2,
+               city = EXCLUDED.city, region = EXCLUDED.region, country = EXCLUDED.country,
                postal_code = EXCLUDED.postal_code, birthday = EXCLUDED.birthday`,
-        [user.id, googleId, name, email, phone, street, city, country, postal_code, birthday]
+        [user.id, googleId, name, email, phone, street, street_2, city, region, country, postal_code, birthday]
       );
       saved++;
     }
@@ -590,7 +593,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
 app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
+      `SELECT id, google_id, name, email, phone, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
        FROM contacts WHERE user_id = $1 ORDER BY is_me DESC NULLS LAST, name ASC NULLS LAST`,
       [req.user.id]
     );
@@ -629,7 +632,7 @@ app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
 app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(
-      `SELECT id, google_id, name, email, phone, street, city, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
+      `SELECT id, google_id, name, email, phone, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
        FROM contacts WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]
     );
@@ -656,12 +659,12 @@ app.get('/api/contacts/:id', requireAuth, async (req, res) => {
 });
 
 app.put('/api/contacts/:id', requireAuth, async (req, res) => {
-  const { name, email, phone, street, city, country, postal_code, birthday, died_on, is_pet } = req.body;
+  const { name, email, phone, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet } = req.body;
   try {
     await pool.query(
-      `UPDATE contacts SET name=$1, email=$2, phone=$3, street=$4, city=$5, country=$6, postal_code=$7, birthday=$8, died_on=$9, is_pet=$10
-       WHERE id=$11 AND user_id=$12`,
-      [name, email, phone, street, city, country, postal_code, birthday || null, died_on || null, !!is_pet, req.params.id, req.user.id]
+      `UPDATE contacts SET name=$1, email=$2, phone=$3, street=$4, street_2=$5, city=$6, region=$7, country=$8, postal_code=$9, birthday=$10, died_on=$11, is_pet=$12
+       WHERE id=$13 AND user_id=$14`,
+      [name, email, phone, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, req.params.id, req.user.id]
     );
     res.json({ ok: true });
   } catch (err) {
