@@ -168,9 +168,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 .fo-sidebar.ts-panel-lg .cp-group-dd-item{font-size:14px;}
 .fo-sidebar.ts-panel-lg .cp-group-dd-sub{font-size:13px;}
 .cp-name-hdr-row{display:flex;align-items:center;justify-content:space-between;}
-.ts-panel-scale-btn{background:none;border:1.5px solid rgba(28,10,0,0.14);border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:rgba(28,10,0,0.38);padding:1px 7px;line-height:1.5;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-panel-scale-btn:hover{color:#1C0A00;border-color:rgba(28,10,0,0.3);}
-.ts-panel-scale-btn.ts-active{color:#3A6B20;border-color:#3A6B20;background:rgba(58,107,32,0.07);}
+#ts-panel-scale-toggle{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
     `;
     document.head.appendChild(s);
   }
@@ -182,7 +180,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
   <div class="cp-name-bar">
     <div class="cp-name-hdr-row">
       <span class="cp-name-lbl">Name</span>
-      <button class="ts-panel-scale-btn" id="tsPanelScaleBtn" onclick="tsPanelScaleToggle()" title="Toggle panel size">↕</button>
+      <input type="checkbox" id="ts-panel-scale-toggle" title="Scale panel 30%">
     </div>
     <div class="cp-name-row">
       <input class="cp-name-inp" id="cpFName" type="text" data-field="name" onblur="CP._scheduleSave()" placeholder="Name">

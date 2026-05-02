@@ -20,7 +20,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;margin-left:260px;}
 
 /* ── Left panels ─────────────────────────────────────────────────── */
-.fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:50;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
+.fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:50;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;padding-top:65px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
 .fo-sidebar::-webkit-scrollbar-thumb{background:rgba(28,10,0,0.18);border-radius:3px;}
 .fo-sidebar::-webkit-scrollbar-track{background:transparent;}
@@ -211,7 +211,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   </div>
 </div>
 
-<script src="/contact-panel.js?v=20260505"></script>
+<script src="/contact-panel.js?v=20260506"></script>
 <script>
 let _contacts = [];
 let _currentId = null;
@@ -551,6 +551,11 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     }
 
     CP.init('cpContainer');
+    if (localStorage.getItem('ts-panel-scale') === 'large') {
+      document.getElementById('foSidebar').classList.add('ts-panel-lg');
+      const _cb = document.getElementById('ts-panel-scale-toggle');
+      if (_cb) _cb.checked = true;
+    }
     CP.contacts = _contacts;
     CP.allGroups = _allGroups;
     CP.relTypes = _relTypes;
@@ -567,19 +572,18 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
   } catch { window.location.href = '/login'; }
 });
 
-function tsPanelScaleToggle() {
+document.addEventListener('change', function(e) {
+  if (e.target.id !== 'ts-panel-scale-toggle') return;
   const sidebar = document.getElementById('foSidebar');
-  const btn = document.getElementById('tsPanelScaleBtn');
-  const isLarge = sidebar.classList.toggle('ts-panel-lg');
-  btn.classList.toggle('ts-active', isLarge);
-  localStorage.setItem('ts-panel-scale', isLarge ? '1' : '0');
-}
-if (localStorage.getItem('ts-panel-scale') === '1') {
-  const s = document.getElementById('foSidebar');
-  const b = document.getElementById('tsPanelScaleBtn');
-  if (s) s.classList.add('ts-panel-lg');
-  if (b) b.classList.add('ts-active');
-}
+  if (!sidebar) return;
+  if (e.target.checked) {
+    sidebar.classList.add('ts-panel-lg');
+    localStorage.setItem('ts-panel-scale', 'large');
+  } else {
+    sidebar.classList.remove('ts-panel-lg');
+    localStorage.setItem('ts-panel-scale', 'normal');
+  }
+});
 </script>
 </body>
 </html>
