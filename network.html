@@ -501,6 +501,7 @@ async function init() {
   }));
 
   const meContact = (data.contacts || []).find(c => c.is_me);
+  console.log('[Network] Me contact from API:', meContact || '(none — fallback node used)');
   _meNodeId = meContact ? meContact.id : '__me__';
   _allNodes = [
     meContact
@@ -1042,7 +1043,7 @@ function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whit
 // ── Detail overlay ────────────────────────────────────────────────────────────
 let _detailId = null;
 
-function nodeClick(event, d) { if (d.id === '__me__') return; event.stopPropagation(); openDetailPanel(d.id); }
+function nodeClick(event, d) { if (d.id === '__me__') return; if (d.isMe) console.log('[Network] Me node clicked, opening contact id:', d.id, 'data:', d); event.stopPropagation(); openDetailPanel(d.id); }
 function nodeDoubleClick(event, d) { if (d.id === '__me__') return; event.stopPropagation(); forceOpenDetailPanel(d.id); }
 
 function openDetailPanel(id) {

@@ -173,7 +173,7 @@ async function ensureIsMe(userId, email) {
   );
   if (!existing.rows.length) {
     await pool.query(
-      `INSERT INTO contacts (user_id, name, email, is_me) VALUES ($1, 'Me', $2, TRUE)`,
+      `INSERT INTO contacts (user_id, email, is_me) VALUES ($1, $2, TRUE)`,
       [userId, email]
     );
   }

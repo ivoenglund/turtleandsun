@@ -157,6 +157,19 @@ async function initDb() {
     CREATE UNIQUE INDEX IF NOT EXISTS prompts_style_id_unique ON prompts (style_id);
   `);
 
+  // Backfill: remove system-generated 'Me' name from is_me contacts
+  await pool.query(`UPDATE contacts SET name = NULL WHERE is_me = TRUE AND name = 'Me'`);
+
+  // Backfill: create is_me contact for every user that doesn't have one yet
+  await pool.query(`
+    INSERT INTO contacts (user_id, email, is_me)
+    SELECT u.id, u.email, TRUE
+    FROM users u
+    WHERE NOT EXISTS (
+      SELECT 1 FROM contacts c WHERE c.user_id = u.id AND c.is_me = TRUE
+    )
+  `);
+
   console.log('Database tables ready');
 }
 
