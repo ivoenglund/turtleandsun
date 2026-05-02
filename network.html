@@ -151,6 +151,12 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .btn-new-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
+
+/* Keep Leaflet below nav */
+#map-container{z-index:0;}
+#leaflet-map,.leaflet-container{z-index:0;}
+.leaflet-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-marker-pane,.leaflet-popup-pane{z-index:auto;}
+.leaflet-top,.leaflet-bottom{z-index:400;}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
