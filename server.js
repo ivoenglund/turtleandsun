@@ -114,6 +114,17 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
 app.use(cookieParser());
 app.use(express.json());
+
+// Prevent caching of HTML pages so deploys take effect immediately
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path === '/' || (!req.path.includes('.') && !req.path.startsWith('/api/'))) {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'turtleandsun-landing.html')));
