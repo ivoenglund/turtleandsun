@@ -40,8 +40,10 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fp-item{display:flex;align-items:center;gap:5px;padding:3px 6px;cursor:pointer;user-select:none;background:#FFF9E6;border-radius:3px;width:fit-content;}
 .fp-item label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;display:flex;align-items:center;gap:5px;}
 .fp-item input[type=checkbox]{width:13px;height:13px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
-.fp-sub label{padding-left:1.4em;font-size:11px;opacity:0.85;}
-.fp-sub2 label{padding-left:2.8em;font-size:11px;opacity:0.7;}
+.fp-sub{margin-left:18px;}
+.fp-sub2{margin-left:36px;}
+.fp-sub label{font-size:11px;opacity:0.85;}
+.fp-sub2 label{font-size:11px;opacity:0.7;}
 .fp-sep{height:4px;background:none;margin:0;}
 
 /* Mobile */
@@ -130,6 +132,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .fp-item label{font-size:18px;}
 .fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:20px;height:20px;}
 .fo-sidebar.ts-panel-lg .fp-item{padding:5px 9px;}
+.fo-sidebar.ts-panel-lg .fp-sub{margin-left:27px;}
+.fo-sidebar.ts-panel-lg .fp-sub2{margin-left:54px;}
 .fo-sidebar.ts-panel-lg .btn-new-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
@@ -212,7 +216,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   </div>
 </div>
 
-<script src="/contact-panel.js?v=20260508"></script>
+<script src="/contact-panel.js?v=20260511"></script>
 <script>
 let _contacts = [];
 let _currentId = null;

@@ -167,6 +167,17 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 .fo-sidebar.ts-panel-lg .cp-btn-del{font-size:14px;padding:2px 9px;}
 .fo-sidebar.ts-panel-lg .cp-group-dd-item{font-size:17px;}
 .fo-sidebar.ts-panel-lg .cp-group-dd-sub{font-size:15px;}
+.fo-sidebar.ts-panel-lg .cp-name-bar{padding:4px 15px 3px;}
+.fo-sidebar.ts-panel-lg .cp-pills{padding:3px 15px 4px;}
+.fo-sidebar.ts-panel-lg .cp-list{padding:2px 15px 3px;}
+.fo-sidebar.ts-panel-lg .cp-add-row{padding:3px 15px 4px;}
+.fo-sidebar.ts-panel-lg .cp-addr-pair{padding:1px 15px 1px;}
+.fo-sidebar.ts-panel-lg .cp-form-msg{padding:0 15px 2px;}
+.fo-sidebar.ts-panel-lg .cp-list-row{font-size:17px;padding:3px 0;}
+.fo-sidebar.ts-panel-lg .cp-add-inp,.fo-sidebar.ts-panel-lg .cp-add-sel{font-size:16px;padding:4px 8px;}
+.fo-sidebar.ts-panel-lg .cp-check-cell input[type=checkbox]{width:17px;height:17px;}
+.fo-sidebar.ts-panel-lg .cp-badge{font-size:14px;padding:2px 9px;}
+.fo-sidebar.ts-panel-lg #ts-panel-scale-toggle{font-size:16px;}
 .cp-name-hdr-row{display:flex;align-items:center;justify-content:space-between;}
 #ts-panel-scale-toggle{font-size:13px;font-weight:700;cursor:pointer;color:rgba(28,10,0,0.38);user-select:none;line-height:1;flex-shrink:0;font-family:'Plus Jakarta Sans',sans-serif;}
 #ts-panel-scale-toggle:hover{color:#1C0A00;}
