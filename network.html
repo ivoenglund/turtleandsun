@@ -152,7 +152,10 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
-<script src="/nav.js?v=20260504"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="/nav.js?v=20260514"></script>
 </head>
 <body>
 
@@ -165,6 +168,10 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   <div id="outline-container">
     <div class="outline-inner" id="outline-inner"></div>
   </div>
+  <div id="map-container" style="flex:1;display:none;position:relative;">
+    <div id="leaflet-map" style="width:100%;height:100%;"></div>
+  </div>
+
   <div id="calendar-container">
     <div class="cal-toolbar">
       <button class="cal-today-btn" onclick="calToday()">Today</button>
@@ -238,6 +245,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 <div class="tooltip" id="tooltip"></div>
 
 <script src="/contact-panel.js?v=20260514"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const PALETTE = ['#1A5C32','#1A3566','#4A2060','#5A3010','#1A4A5A','#3D5A1A','#6B2A14','#1A4A3A'];
@@ -905,6 +914,7 @@ function applyVisibility() {
   updateFilterCounts();
   if (_currentView === 'outline') { renderOutline(); return; }
   if (_currentView === 'calendar') { renderCalendar(); return; }
+  if (_currentView === 'map') { renderMap(); return; }
   if (!_nodeSel || !_relLinkSel) return;
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
@@ -1148,9 +1158,111 @@ function switchView(view) {
   document.getElementById('graph-container').style.display = view === 'network' ? '' : 'none';
   document.getElementById('outline-container').style.display = view === 'outline' ? 'block' : 'none';
   document.getElementById('calendar-container').style.display = view === 'calendar' ? 'flex' : 'none';
+  document.getElementById('map-container').style.display = view === 'map' ? 'flex' : 'none';
   if (view === 'network') { applyVisibility(); closePanel(); }
   else if (view === 'outline') renderOutline();
   else if (view === 'calendar') renderCalendar();
+  else if (view === 'map') renderMap();
+}
+
+// ── Map view ──────────────────────────────────────────────────────────────────
+let _leafletMap = null;
+let _markerClusterGroup = null;
+let _mapMarkers = [];
+
+function _getMarkerColor(contactId) {
+  const groupNames = _contactGroupNames[contactId];
+  if (!groupNames || groupNames.size === 0) {
+    const relGroups = _nodeGroups[contactId];
+    if (relGroups && relGroups.size > 0) {
+      const first = [...relGroups][0];
+      return GROUP_COLORS[first] || '#3A6B20';
+    }
+    return '#9aa5b4';
+  }
+  const first = [...groupNames][0];
+  return GROUP_COLORS[first] || '#3A6B20';
+}
+
+function _makeMarkerIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 22 32">
+    <path d="M11 0C4.925 0 0 4.925 0 11c0 8.25 11 21 11 21s11-12.75 11-21C22 4.925 17.075 0 11 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="11" cy="11" r="4.5" fill="#fff" opacity="0.85"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [22, 32],
+    iconAnchor: [11, 32],
+    popupAnchor: [0, -32],
+  });
+}
+
+function renderMap() {
+  const container = document.getElementById('leaflet-map');
+  if (!container) return;
+
+  if (!_leafletMap) {
+    _leafletMap = L.map('leaflet-map', { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(_leafletMap);
+    _markerClusterGroup = L.markerClusterGroup({ maxClusterRadius: 48, showCoverageOnHover: false });
+    _leafletMap.addLayer(_markerClusterGroup);
+  } else {
+    _markerClusterGroup.clearLayers();
+    _mapMarkers = [];
+  }
+
+  const active = getActiveGroups();
+  const showOnlyLiving = document.getElementById('cb-living').checked;
+  const showOnlyPets = document.getElementById('cb-pets') && document.getElementById('cb-pets').checked;
+  const showUnrelated = !document.getElementById('cb-show-unrelated') || document.getElementById('cb-show-unrelated').checked;
+
+  const pinned = [];
+  for (const c of Object.values(_contactMap)) {
+    if (c.is_me) continue;
+    if (!c.latitude || !c.longitude) continue;
+    if (showOnlyLiving && c.died_on) continue;
+    if (showOnlyPets && !c.is_pet) continue;
+    if (_unrelatedIds.has(c.id) && !showUnrelated) continue;
+
+    // Group filter
+    const relGroups = _nodeGroups[c.id];
+    const memGroups = _contactGroupNames[c.id];
+    if (!_unrelatedIds.has(c.id)) {
+      let groupVisible = false;
+      if (relGroups) { for (const g of relGroups) { if (isGroupNameActive(g, active)) { groupVisible = true; break; } } }
+      if (!groupVisible && memGroups) { for (const g of memGroups) { if (isGroupNameActive(g, active)) { groupVisible = true; break; } } }
+      if (!groupVisible) continue;
+    }
+
+    pinned.push(c);
+  }
+
+  const bounds = [];
+  for (const c of pinned) {
+    const color = _getMarkerColor(c.id);
+    const icon = _makeMarkerIcon(color);
+    const marker = L.marker([c.latitude, c.longitude], { icon });
+    const label = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+    marker.bindTooltip(label, { permanent: false, direction: 'top', offset: [0, -28] });
+    marker.on('click', () => { forceOpenDetailPanel(c.id); });
+    _mapMarkers.push(marker);
+    bounds.push([c.latitude, c.longitude]);
+  }
+
+  _markerClusterGroup.addLayers(_mapMarkers);
+
+  if (bounds.length > 0) {
+    _leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+  } else if (!_leafletMap._loaded) {
+    _leafletMap.setView([20, 0], 2);
+  }
+
+  // Force Leaflet to recalculate size in case the container was hidden
+  setTimeout(() => { if (_leafletMap) _leafletMap.invalidateSize(); }, 50);
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -1616,6 +1728,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
           if (sp) sp.textContent = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
         }
       } else if (_currentView === 'calendar') renderCalendar();
+      else if (_currentView === 'map') renderMap();
     };
 
     initCalendar();

@@ -15,6 +15,23 @@ const {
   requireAuth, requireRole,
 } = require('./auth');
 
+async function geocodeContact(contact) {
+  const parts = [contact.street, contact.city, contact.region, contact.country].filter(Boolean);
+  if (parts.length < 2) return null;
+  const query = encodeURIComponent(parts.join(', '));
+  const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'turtleandsun.com' } });
+    const data = await res.json();
+    if (data.length > 0) {
+      return { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) };
+    }
+  } catch (err) {
+    console.error('Geocoding error:', err.message);
+  }
+  return null;
+}
+
 function googleOAuthClient() {
   const base = process.env.APP_URL || 'http://localhost:8080';
   return new google.auth.OAuth2(
@@ -558,7 +575,7 @@ app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
 app.get('/api/network', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, name, email, birthday, city, died_on, is_pet, is_me FROM contacts WHERE user_id = $1`,
+      `SELECT id, name, email, birthday, city, died_on, is_pet, is_me, latitude, longitude FROM contacts WHERE user_id = $1`,
       [req.user.id]
     );
     const relationships = await pool.query(
@@ -669,8 +686,29 @@ app.put('/api/contacts/:id', requireAuth, async (req, res) => {
       [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, req.params.id, req.user.id]
     );
     res.json({ ok: true });
+
+    // Async background geocoding — check if address changed and re-geocode
+    const existing = await pool.query(
+      `SELECT latitude, longitude, street, city, region, country FROM contacts WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (existing.rows.length) {
+      const row = existing.rows[0];
+      const addressChanged = row.street !== (street || null) || row.city !== (city || null) ||
+                             row.region !== (region || null) || row.country !== (country || null);
+      if (addressChanged || (!row.latitude && (city || country))) {
+        const coords = await geocodeContact({ street, city, region, country });
+        if (coords) {
+          await pool.query(
+            `UPDATE contacts SET latitude=$1, longitude=$2 WHERE id=$3 AND user_id=$4`,
+            [coords.latitude, coords.longitude, req.params.id, req.user.id]
+          );
+        }
+      }
+    }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+    else console.error('Background geocode error:', err.message);
   }
 });
 
@@ -949,6 +987,26 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
 }
 
 
+
+app.get('/admin/geocode-all', requireAuth, async (req, res) => {
+  const contacts = await pool.query(
+    'SELECT * FROM contacts WHERE user_id = $1 AND latitude IS NULL AND city IS NOT NULL',
+    [req.user.id]
+  );
+  let geocoded = 0;
+  for (const c of contacts.rows) {
+    const coords = await geocodeContact(c);
+    if (coords) {
+      await pool.query(
+        'UPDATE contacts SET latitude = $1, longitude = $2 WHERE id = $3',
+        [coords.latitude, coords.longitude, c.id]
+      );
+      geocoded++;
+    }
+    await new Promise(r => setTimeout(r, 1100));
+  }
+  res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
+});
 
 app.get('/admin/run-seed-demo', async (req, res) => {
   try {

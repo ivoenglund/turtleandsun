@@ -150,6 +150,8 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS street_2 TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS region TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support

@@ -48,6 +48,7 @@
         '<a class="ts-nav-dd-link ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-dd-link ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
         '<a class="ts-nav-dd-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
+        '<a class="ts-nav-dd-link ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-dd-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<div class="ts-nav-dd-sep"></div>' +
         '<a class="ts-nav-dd-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
@@ -73,6 +74,7 @@
         '<a class="ts-nav-drawer-link ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-drawer-link ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
         '<a class="ts-nav-drawer-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
+        '<a class="ts-nav-drawer-link ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-drawer-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
         '<a class="ts-nav-drawer-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
@@ -135,7 +137,7 @@
     var p = window.location.pathname;
     var view = new URLSearchParams(window.location.search).get('view');
     if (p === '/account/contacts') return 'contacts';
-    if (p === '/account/network') return view === 'outline' ? 'outline' : view === 'calendar' ? 'calendar' : 'network';
+    if (p === '/account/network') return view === 'outline' ? 'outline' : view === 'calendar' ? 'calendar' : view === 'map' ? 'map' : 'network';
     if (p === '/account/occasions') return 'occasions';
     if (p === '/account') return 'account';
     if (p === '/admin') return 'admin';
