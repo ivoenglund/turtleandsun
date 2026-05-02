@@ -116,7 +116,10 @@ const CP = (() => {
 @media(max-width:1000px){.cp-lbl{font-size:10px;}}
 
 /* Hide yyyy-mm-dd placeholder on empty unfocused date inputs */
-.cp-inp[type="date"]:not(:valid):not(:focus)::-webkit-datetime-edit{color:transparent;}
+.cp-inp[type="date"].is-empty::-webkit-datetime-edit,
+.cp-add-inp[type="date"].is-empty::-webkit-datetime-edit{color:transparent;}
+.cp-inp[type="date"].is-empty:focus::-webkit-datetime-edit,
+.cp-add-inp[type="date"].is-empty:focus::-webkit-datetime-edit{color:inherit;}
 
 /* Suppress browser autofill/contact icons in all inputs */
 input::-webkit-contacts-auto-fill-button,
@@ -213,8 +216,8 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Company</span><input class="cp-inp" type="text" id="cpFCompany" data-field="company" onblur="CP._scheduleSave()"></div>
       <div class="cp-addr-pair">
-        <div class="cp-addr-col wide"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
-        <div class="cp-addr-col wide"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave()"></div>
+        <div class="cp-addr-col wide"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave();CP._syncDP(this)" onblur="CP._syncDP(this)"></div>
+        <div class="cp-addr-col wide"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave();CP._syncDP(this)" onblur="CP._syncDP(this)"></div>
       </div>
       <div class="cp-row"><span class="cp-lbl">Pet</span><div class="cp-check-cell"><input type="checkbox" id="cpFIsPet" onchange="CP._scheduleSave()"></div></div>
     </div>
@@ -254,7 +257,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     <div id="cpOccBody"></div>
     <div class="cp-add-row">
       <input class="cp-add-inp" type="text" id="cpOccName" placeholder="Occasion name">
-      <input class="cp-add-inp" type="date" id="cpOccDate" style="max-width:120px;">
+      <input class="cp-add-inp" type="date" id="cpOccDate" style="max-width:120px;" onchange="CP._syncDP(this)" onblur="CP._syncDP(this)">
       <select class="cp-add-sel" id="cpOccFreq" style="max-width:82px;">
         <option value="yearly">Yearly</option>
         <option value="milestone">Milestone</option>
@@ -276,7 +279,10 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
   function init(containerId) {
     _injectCSS();
     const el = document.getElementById(containerId);
-    if (el) el.innerHTML = _HTML;
+    if (el) {
+      el.innerHTML = _HTML;
+      el.querySelectorAll('input[type="date"]').forEach(_syncDP);
+    }
   }
 
   async function open(id) {
@@ -311,6 +317,8 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     document.getElementById('cpFPhone').value = c.phone || '';
     document.getElementById('cpFBirthday').value = c.birthday ? c.birthday.split('T')[0] : '';
     document.getElementById('cpFDiedOn').value = c.died_on ? c.died_on.split('T')[0] : '';
+    _syncDP(document.getElementById('cpFBirthday'));
+    _syncDP(document.getElementById('cpFDiedOn'));
     document.getElementById('cpFCompany').value = c.company || '';
     document.getElementById('cpFStreet').value = c.street || '';
     document.getElementById('cpFStreet2').value = c.street_2 || '';
@@ -379,6 +387,10 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
   function _scheduleSave() {
     clearTimeout(_saveTimer);
     _saveTimer = setTimeout(_doSave, 500);
+  }
+
+  function _syncDP(input) {
+    input.classList.toggle('is-empty', !input.value);
   }
 
   async function _doSave() {
@@ -575,6 +587,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     if (res.ok) {
       document.getElementById('cpOccName').value = '';
       document.getElementById('cpOccDate').value = '';
+      _syncDP(document.getElementById('cpOccDate'));
       const newOccs = await (await fetch(`/api/contacts/${_currentId}/occasions`)).json();
       _renderOccasions(newOccs);
     } else { const d = await res.json(); msg.textContent = d.error || 'Failed.'; }
@@ -618,6 +631,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     onSaved: null,
     _saveContact,
     _scheduleSave,
+    _syncDP,
     _toggleGroupMembership,
     _removeFromGroup,
     _toggleGroupDropdown,
