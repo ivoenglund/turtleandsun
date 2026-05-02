@@ -35,8 +35,6 @@ const CP = (() => {
 .cp-name-inp{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:0;line-height:1.2;transition:border-color 0.12s;cursor:text;}
 .cp-name-inp:focus{border-bottom-color:#3A6B20;}
 .cp-name-inp::placeholder{color:rgba(28,10,0,0.28);}
-.cp-close-btn{margin-left:auto;border:none;background:none;cursor:pointer;font-size:16px;color:rgba(28,10,0,0.35);line-height:1;padding:0;flex-shrink:0;display:flex;align-items:center;}
-.cp-close-btn:hover{color:#1C0A00;}
 .cp-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
 .cp-badge-dec{background:#f5eaea;color:rgba(120,20,20,0.55);}
 
@@ -44,7 +42,6 @@ const CP = (() => {
 #cpContent.cp-no-contact .cp-name-inp,
 #cpContent.cp-no-contact .cp-inp{opacity:0.35;pointer-events:none;}
 #cpContent.cp-no-contact .cp-check-cell{opacity:0.35;pointer-events:none;}
-#cpContent.cp-no-contact .cp-close-btn{opacity:0;}
 
 /* Sections */
 .cp-section{border-bottom:1px solid rgba(28,10,0,0.06);}
@@ -131,7 +128,6 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 /* Sidebar mode: transparent bg, text-shadow for legibility */
 .fo-detail .cp-name-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
-.fo-detail .cp-close-btn{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-name-bar{border-bottom:none;}
 .fo-detail .cp-group-add-btn{color:rgba(28,10,0,0.45);text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-group-dropdown{background:rgba(255,249,230,0.93);border-radius:6px;margin:0 4px 3px;}
@@ -168,7 +164,6 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
       <span id="cpPetIcon" style="display:none;">🐾</span>
       <span class="cp-badge" id="cpPhBadge" style="display:none;">Manual</span>
       <span class="cp-badge cp-badge-dec" id="cpDeceasedBadge" style="display:none;">† Deceased</span>
-      <button class="cp-close-btn" onclick="window.hideDetail&&hideDetail()" aria-label="Close">×</button>
     </div>
   </div>
 

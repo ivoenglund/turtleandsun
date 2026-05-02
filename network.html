@@ -37,7 +37,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fp-sub{padding-left:16px;}
 .fp-sub2{padding-left:28px;}
 .fp-sep{height:6px;background:none;margin:0;}
-.fp-cnt{margin-left:auto;font-size:10px;color:rgba(28,10,0,0.65);font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;padding-left:4px;line-height:1;align-self:center;}
+.fp-cnt{margin-left:auto;font-size:10px;color:rgba(28,10,0,0.65);font-weight:600;font-family:'DM Sans',sans-serif;flex-shrink:0;padding-left:4px;line-height:1;margin-top:2px;}
 
 .contact-node-g text,.group-node-g text{transition:opacity 0.2s;}
 
@@ -760,31 +760,29 @@ function computeGroupMemberCount(groupId, showOnlyLiving) {
 
 function updateFilterCounts() {
   if (!_nodeSel) return;
-  const showOnlyLiving = document.getElementById('cb-living').checked;
-  const active = getActiveGroups();
 
+  // Per-group: always total members regardless of filter state
   document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => {
     const g = _groupByName[cb.dataset.group];
     if (!g) return;
     const sp = cb.closest('.fp-item').querySelector('.fp-cnt');
-    if (sp) sp.textContent = computeGroupMemberCount(g.id, showOnlyLiving);
+    if (sp) sp.textContent = computeGroupMemberCount(g.id, false);
   });
 
-  const visibleIds = computeVisibleNodeIds(active, showOnlyLiving);
+  // All groups: total contacts ever (not filtered)
   let allCnt = 0;
-  _nodeSel.each(d => { if (!d.isGroup && !d.isMe && visibleIds.has(d.id)) allCnt++; });
+  _nodeSel.each(d => { if (!d.isGroup && !d.isMe) allCnt++; });
   const allEl = document.getElementById('fp-cnt-all');
   if (allEl) allEl.textContent = allCnt;
 
-  const livingIds = computeVisibleNodeIds(active, true);
+  // Only living: total living contacts (not filtered)
   let livingCnt = 0;
-  _nodeSel.each(d => { if (!d.isGroup && !d.isMe && livingIds.has(d.id)) livingCnt++; });
+  _nodeSel.each(d => { if (!d.isGroup && !d.isMe && !d.died_on) livingCnt++; });
   const livingEl = document.getElementById('fp-cnt-living');
   if (livingEl) livingEl.textContent = livingCnt;
 
-  const unrelatedCnt = [..._unrelatedIds].filter(id => {
-    const c = _contactMap[id]; return c && (!showOnlyLiving || !c.died_on);
-  }).length;
+  // Show unrelated: total unrelated contacts (not filtered)
+  const unrelatedCnt = [..._unrelatedIds].filter(id => _contactMap[id]).length;
   const unrelEl = document.getElementById('fp-cnt-unrelated');
   if (unrelEl) unrelEl.textContent = unrelatedCnt;
 }
