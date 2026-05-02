@@ -21,18 +21,16 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 /* ── Left panels ─────────────────────────────────────────────────── */
 .fo-filters,.fo-detail{position:fixed;left:0;width:260px;z-index:50;}
-.fo-detail{top:62px;bottom:35vh;overflow:hidden;display:flex;flex-direction:column;}
+.fo-detail{top:62px;overflow-y:auto;display:flex;flex-direction:column;}
 .fo-filters{top:65vh;bottom:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;padding:6px 10px;gap:2px;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
-.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 10px 4px;flex-shrink:0;}
-.panel-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.35);}
 .btn-new-contact{padding:4px 8px;background:#3A6B20;color:#fff;border:none;border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;}
 .btn-new-contact:hover{background:#1C0A00;}
-.panel-ftr{padding:5px 10px;flex-shrink:0;border-top:1px solid rgba(28,10,0,0.06);}
-.btn-delete-contact{width:100%;padding:7px;background:none;border:1.5px solid rgba(192,57,43,0.3);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:rgba(192,57,43,0.7);cursor:pointer;}
-.btn-delete-contact:hover{border-color:#c0392b;color:#c0392b;background:rgba(192,57,43,0.04);}
-.fil-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.3);margin-bottom:2px;}
+.panel-ftr{padding:5px 10px;flex-shrink:0;border-top:1px solid rgba(28,10,0,0.06);display:flex;align-items:center;gap:6px;}
+.btn-delete-contact{padding:4px 8px;background:none;border:1.5px solid rgba(192,57,43,0.3);border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;color:rgba(192,57,43,0.7);cursor:pointer;margin-left:auto;}
+.btn-delete-contact:hover:not(:disabled){border-color:#c0392b;color:#c0392b;background:rgba(192,57,43,0.04);}
+.btn-delete-contact:disabled{opacity:0.35;cursor:not-allowed;}
 
 /* Filter items – chip backgrounds for legibility */
 #leftFilterContent{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
@@ -137,19 +135,15 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <!-- Contact panel (top of left sidebar) -->
 <div class="fo-detail" id="foDetail">
-  <div class="panel-hdr">
-    <span class="panel-title">Contact</span>
+  <div id="cpContainer" style="display:flex;flex-direction:column;"></div>
+  <div class="panel-ftr" id="cpDeleteRow">
     <button class="btn-new-contact" onclick="newContact()">+ New contact</button>
-  </div>
-  <div id="cpContainer" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;"></div>
-  <div class="panel-ftr" id="cpDeleteRow" style="display:none;">
-    <button class="btn-delete-contact" onclick="confirmDeleteContact()">Delete contact</button>
+    <button class="btn-delete-contact" id="cpDeleteBtn" onclick="confirmDeleteContact()" disabled>Delete</button>
   </div>
 </div>
 
 <!-- Filter panel (bottom of left sidebar) -->
 <div class="fo-filters" id="foFilters">
-  <div class="fil-label">Filters</div>
   <div id="leftFilterContent"></div>
 </div>
 
@@ -240,8 +234,7 @@ function openDetail(id) {
     document.getElementById('mobDetailBtn').classList.add('active');
   }
   CP.open(id);
-  const ftr = document.getElementById('cpDeleteRow');
-  if (ftr) ftr.style.display = '';
+  document.getElementById('cpDeleteBtn').disabled = false;
   _updateMobileDetailBtn();
 }
 function hideDetail() {
@@ -251,9 +244,14 @@ function hideDetail() {
   document.getElementById('foBackdrop').classList.remove('mob-open');
   document.querySelectorAll('.mob-btn').forEach(b => b.classList.remove('active'));
   CP.close();
-  const ftr = document.getElementById('cpDeleteRow');
-  if (ftr) ftr.style.display = 'none';
+  document.getElementById('cpDeleteBtn').disabled = true;
   _updateMobileDetailBtn();
+}
+function _positionFilterPanel() {
+  if (window.innerWidth <= 1000) return;
+  const detail = document.getElementById('foDetail');
+  const filters = document.getElementById('foFilters');
+  if (detail && filters) filters.style.top = detail.getBoundingClientRect().bottom + 4 + 'px';
 }
 function _updateMobileDetailBtn() {
   const btn = document.getElementById('mobDetailBtn');
@@ -271,7 +269,7 @@ async function confirmDeleteContact() {
   _contacts = _contacts.filter(c => c.id !== _currentId);
   _currentId = null;
   CP.close();
-  document.getElementById('cpDeleteRow').style.display = 'none';
+  document.getElementById('cpDeleteBtn').disabled = true;
   applyContactFilter();
 }
 
@@ -422,8 +420,7 @@ function selectContact(id) {
   document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
   if (window.innerWidth > 1000) {
     CP.open(id);
-    const ftr = document.getElementById('cpDeleteRow');
-    if (ftr) ftr.style.display = '';
+    document.getElementById('cpDeleteBtn').disabled = false;
   }
   _updateMobileDetailBtn();
 }
@@ -550,6 +547,9 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     };
 
     renderFilterPanel();
+    _positionFilterPanel();
+    window.addEventListener('resize', _positionFilterPanel);
+    if (window.ResizeObserver) new ResizeObserver(_positionFilterPanel).observe(document.getElementById('foDetail'));
 
     const urlId = new URLSearchParams(location.search).get('id');
     if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }
