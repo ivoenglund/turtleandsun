@@ -107,6 +107,16 @@ const CP = (() => {
 
 @media(max-width:1000px){.cp-lbl{width:86px;font-size:10px;}}
 
+/* Suppress browser autofill/contact icons in all inputs */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button{display:none!important;width:0!important;height:0!important;}
+
+/* Overlay: hard-cap all children to panel width */
+.fo-detail *{max-width:100%;box-sizing:border-box;}
+.fo-detail .cp-add-inp,.fo-detail .cp-add-sel{min-width:0;}
+.fo-detail .cp-list-primary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fo-detail .cp-pills{overflow:hidden;}
+
 /* Overlay mode: transparent bg, text-shadow for legibility */
 .fo-detail .cp-name-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
@@ -155,7 +165,7 @@ const CP = (() => {
 
   <div class="cp-section">
     <div class="cp-tbl">
-      <div class="cp-row"><span class="cp-lbl">Email</span><input class="cp-inp" type="email" id="cpFEmail" data-field="email" onblur="CP._scheduleSave()"></div>
+      <div class="cp-row"><span class="cp-lbl">Email</span><input class="cp-inp" type="text" inputmode="email" autocomplete="email" id="cpFEmail" data-field="email" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave()"></div>
