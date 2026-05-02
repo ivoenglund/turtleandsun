@@ -57,6 +57,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .fp-sub{padding-left:16px;}
 .fp-sub2{padding-left:28px;}
 .fp-sep{height:6px;background:none;margin:0;}
+.fp-cnt{margin-left:auto;font-size:10px;color:rgba(28,10,0,0.3);font-weight:500;font-family:'DM Sans',sans-serif;flex-shrink:0;padding-left:4px;}
 
 /* Label fade transition for zoom-based hiding */
 .contact-node-g text,.group-node-g text{transition:opacity 0.2s;}
@@ -230,16 +231,16 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 <div class="fo-filters" id="foFilters">
   <div class="fp-item">
     <button class="fo-close-btn" onclick="hideFilters()" aria-label="Hide filters">×</button>
-    <label><input type="checkbox" id="cb-all" checked onchange="toggleAll()"> All groups</label>
+    <label><input type="checkbox" id="cb-all" checked onchange="toggleAll()"> All groups<span class="fp-cnt" id="fp-cnt-all"></span></label>
   </div>
   <div class="fp-sep"></div>
   <div id="cbGroup"></div>
   <div class="fp-sep"></div>
   <div class="fp-item">
-    <label><input type="checkbox" id="cb-living" onchange="applyVisibility()"> Only living</label>
+    <label><input type="checkbox" id="cb-living" onchange="applyVisibility()"> Only living<span class="fp-cnt" id="fp-cnt-living"></span></label>
   </div>
   <div class="fp-item" id="cb-unrelated-wrap" style="display:none;">
-    <label><input type="checkbox" id="cb-show-unrelated" checked onchange="applyVisibility()"> Show unrelated</label>
+    <label><input type="checkbox" id="cb-show-unrelated" checked onchange="applyVisibility()"> Show unrelated<span class="fp-cnt" id="fp-cnt-unrelated"></span></label>
   </div>
 </div>
 <button class="fo-show-btn" id="foShowFilters" onclick="showFilters()" title="Show filters">+</button>
@@ -508,7 +509,7 @@ async function init() {
     const dotOpacity = depth === 1 ? ';opacity:0.7' : depth >= 2 ? ';opacity:0.55' : '';
     const pName = depth > 0 ? ((groupDefsById[g.parent_group_id] || {}).name || '') : '';
     const pAttr = pName ? ` data-parent-group="${pName.replace(/"/g, '&quot;')}"` : '';
-    item.innerHTML = `<label><input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)"><span style="display:inline-block;width:${dotSize};height:${dotSize};border-radius:50%;background:${color}${dotOpacity};flex-shrink:0;"></span> ${esc(g.name)}</label>`;
+    item.innerHTML = `<label><input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)"><span style="display:inline-block;width:${dotSize};height:${dotSize};border-radius:50%;background:${color}${dotOpacity};flex-shrink:0;"></span> ${esc(g.name)}<span class="fp-cnt"></span></label>`;
     cbGroup.appendChild(item);
     (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name))
       .forEach(s => addCbForGroup(s, depth + 1, color));
@@ -786,6 +787,72 @@ function buildGraph() {
   updateLabelVisibility(_currentTransform.k);
 }
 
+// ── Filter counts ─────────────────────────────────────────────────────────────
+function computeGroupMemberCount(groupId, showOnlyLiving) {
+  const seen = new Set();
+  const collect = gid => {
+    (_groupMembersMap[gid] || []).forEach(c => { if (!showOnlyLiving || !c.died_on) seen.add(c.id); });
+    _rawGroups.filter(g => g.parent_group_id === gid).forEach(g => collect(g.id));
+  };
+  collect(groupId);
+  return seen.size;
+}
+
+function updateFilterCounts() {
+  if (!_nodeSel) return;
+  const showOnlyLiving = document.getElementById('cb-living').checked;
+  const active = getActiveGroups();
+
+  document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => {
+    const g = _groupByName[cb.dataset.group];
+    if (!g) return;
+    const sp = cb.closest('.fp-item').querySelector('.fp-cnt');
+    if (sp) sp.textContent = computeGroupMemberCount(g.id, showOnlyLiving);
+  });
+
+  const visibleIds = computeVisibleNodeIds(active, showOnlyLiving);
+  let allCnt = 0;
+  _nodeSel.each(d => { if (!d.isGroup && !d.isMe && visibleIds.has(d.id)) allCnt++; });
+  const allEl = document.getElementById('fp-cnt-all');
+  if (allEl) allEl.textContent = allCnt;
+
+  const livingIds = computeVisibleNodeIds(active, true);
+  let livingCnt = 0;
+  _nodeSel.each(d => { if (!d.isGroup && !d.isMe && livingIds.has(d.id)) livingCnt++; });
+  const livingEl = document.getElementById('fp-cnt-living');
+  if (livingEl) livingEl.textContent = livingCnt;
+
+  const unrelatedCnt = [..._unrelatedIds].filter(id => {
+    const c = _contactMap[id]; return c && (!showOnlyLiving || !c.died_on);
+  }).length;
+  const unrelEl = document.getElementById('fp-cnt-unrelated');
+  if (unrelEl) unrelEl.textContent = unrelatedCnt;
+}
+
+// ── Live node label update ────────────────────────────────────────────────────
+function updateNodeLabel(contactId) {
+  if (!_nodeSel) return;
+  const c = _contactMap[contactId];
+  if (!c) return;
+  _nodeSel.each(function(d) {
+    if (d.id !== contactId) return;
+    d.name = c.name;
+    const g = d3.select(this);
+    if (d.isMe) { g.select('text').text(c.name || 'Me'); return; }
+    g.selectAll('text').remove();
+    const { h, items } = nodeLayout(d);
+    g.select('.node-outline').attr('height', h).attr('y', -h / 2);
+    items.forEach(item => {
+      g.append('text')
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', item.y)
+        .attr('font-family', "'Plus Jakarta Sans', sans-serif")
+        .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
+        .attr('fill', item.fill).attr('font-style', item.fontStyle).text(item.text);
+    });
+    updateLabelVisibility(_currentTransform.k);
+  });
+}
+
 // ── Filters ───────────────────────────────────────────────────────────────────
 function getActiveGroups() {
   const active = new Set();
@@ -849,6 +916,7 @@ function computeVisibleGroupIds(active) {
 }
 
 function applyVisibility() {
+  updateFilterCounts();
   if (_currentView === 'outline') { renderOutline(); return; }
   if (_currentView === 'calendar') { renderCalendar(); return; }
   if (!_nodeSel || !_relLinkSel) return;
@@ -1527,7 +1595,20 @@ async function initAuthNav() {
     CP.contacts = contacts;
     CP.allGroups = allGroups;
     CP.relTypes = relTypes;
-    CP.onSaved = () => {};
+    CP.onSaved = (updated) => {
+      if (!updated || !updated.id) return;
+      const id = updated.id;
+      if (_contactMap[id]) Object.assign(_contactMap[id], updated);
+      if (_currentView === 'network') updateNodeLabel(id);
+      else if (_currentView === 'outline') {
+        const row = document.querySelector(`.ol-row[data-contact-id="${id}"]`);
+        if (row) {
+          const c = _contactMap[id];
+          const sp = row.querySelector('.ol-row-name');
+          if (sp) sp.textContent = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+        }
+      } else if (_currentView === 'calendar') renderCalendar();
+    };
 
     initOverlays();
     initCalendar();
