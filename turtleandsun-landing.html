@@ -10,11 +10,6 @@
 body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);min-height:100vh;}
 .sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}
 .wrap{max-width:1100px;margin:0 auto;padding:0 40px;position:relative;z-index:1;}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0 21px;}
-.nav img{height:90px;width:auto;margin-top:-56px;}
-.nav-links{display:flex;gap:36px;}
-.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.72;}
-.nav-links a:hover{opacity:1;}
 .hero-imgs{display:grid;grid-template-columns:1.45fr 1fr 1fr 1fr;gap:10px;align-items:flex-end;margin-top:-11px;margin-bottom:20px;}
 .hi{display:flex;flex-direction:column;align-items:center;gap:10px;}
 .hi-box{width:100%;border-radius:6px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.35),0 4px 12px rgba(0,0,0,0.2);}
@@ -76,52 +71,12 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .btn-upgrade:hover{background:#1C0A00;}
 .btn-skip{width:100%;padding:11px;background:transparent;color:rgba(60,20,0,0.55);border:1.5px solid rgba(0,0,0,0.14);border-radius:10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.18s;}
 .btn-skip:hover{border-color:rgba(0,0,0,0.3);color:#1C0A00;}
-.nav-account-wrap{position:relative;}
-#accountDropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:20px 20px 16px;width:272px;z-index:300;}
-#accountDropdown.open{display:block;}
-#accountDropdown h4{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;color:#1C0A00;margin-bottom:4px;}
-#accountDropdown p{font-size:12px;color:rgba(60,20,0,0.6);margin-bottom:14px;line-height:1.5;}
-#accountDropdown input{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:14px;outline:none;box-sizing:border-box;}
-#accountDropdown input:focus{border-color:#3A6B20;}
-#accountDropdown .dd-btn{display:block;width:100%;padding:9px;background:#3A6B20;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
-#accountDropdown .dd-btn:hover:not(:disabled){background:#1C0A00;}
-#accountDropdown .dd-btn:disabled{opacity:0.5;cursor:not-allowed;}
-#accountDropdown .dd-msg{font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
-#accountDropdown .dd-msg.ok{color:#3A6B20;} #accountDropdown .dd-msg.err{color:#c0392b;}
-#ddUser{display:none;}
-.dd-user-email{font-size:12px;color:rgba(60,20,0,0.5);padding:0 0 10px;border-bottom:1px solid #f0ede6;margin-bottom:8px;}
-.dd-user-link{display:block;padding:8px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;}
-.dd-user-link:hover{opacity:0.72;}
-.dd-user-logout{color:#c0392b !important;}
 </style>
+<script src="/nav.js?v=20260502"></script>
 </head>
 <body>
 <div class="sun"></div>
 <div class="wrap">
-  <div class="nav">
-    <img src="/logo.png" alt="Turtle and Sun">
-    <div class="nav-links">
-      <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
-      <span class="nav-account-wrap">
-        <a href="#" id="navAccount" onclick="handleAccountClick(event)">Account</a>
-        <div id="accountDropdown">
-          <div id="ddGuest">
-            <h4>Log in</h4>
-            <p>Enter your email and we'll send you a magic link.</p>
-            <input type="email" id="ddEmail" placeholder="you@example.com" autocomplete="email">
-            <button class="dd-btn" id="ddBtn" onclick="sendNavMagicLink()">Send login link</button>
-            <div class="dd-msg" id="ddMsg"></div>
-          </div>
-          <div id="ddUser">
-            <div class="dd-user-email" id="ddUserEmail"></div>
-            <a class="dd-user-link" id="ddAccountLink" href="/account">My Account</a>
-            <a class="dd-user-link" href="/account/contacts">Sync Contacts</a>
-            <a class="dd-user-link dd-user-logout" href="/auth/logout">Log out</a>
-          </div>
-        </div>
-      </span>
-    </div>
-  </div>
 
   <div style="width:100%;margin-bottom:64px;"><h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(32px,4.5vw,58px);font-weight:800;line-height:1.1;color:#1C0A00;margin-bottom:0;width:100%;">Upload photo.<br>Pick a look from the gallery.<br><span style="color:#3A6B20;">Create magic for someone you love.</span></h1></div>
   <div class="hero-imgs" style="position:relative;">
@@ -450,79 +405,13 @@ document.getElementById('upsellModal').addEventListener('click', function(e) {
   if (e.target === this) this.classList.remove('open');
 });
 
-// ── Account nav ──────────────────────────────────────────────────────────────
-let _authStatus = null; // null = loading, false = guest, object = user
-
-async function initAuthNav() {
-  try {
-    const res = await fetch('/api/auth/status');
-    _authStatus = res.ok ? await res.json() : false;
-  } catch {
-    _authStatus = false;
-  }
-  if (_authStatus && _authStatus.loggedIn) {
-    document.getElementById('ddGuest').style.display = 'none';
-    document.getElementById('ddUser').style.display = 'block';
-    document.getElementById('ddUserEmail').textContent = _authStatus.email;
-    document.getElementById('ddAccountLink').href = _authStatus.isAdmin ? '/admin' : '/account';
-    // Skip email input in step 2 for logged-in users
+NavBar.init({ requireAuth: false }).then(status => {
+  if (status && status.loggedIn) {
     const emailInput = document.getElementById('previewEmail');
     if (emailInput) emailInput.style.display = 'none';
-    window._previewEmail = _authStatus.email;
-  }
-}
-
-function handleAccountClick(e) {
-  e.preventDefault();
-  if (_authStatus === null) return;
-  const dd = document.getElementById('accountDropdown');
-  dd.classList.toggle('open');
-  if (dd.classList.contains('open') && (!_authStatus || !_authStatus.loggedIn)) {
-    document.getElementById('ddEmail').focus();
-  }
-}
-
-async function sendNavMagicLink() {
-  const email = document.getElementById('ddEmail').value.trim();
-  const btn = document.getElementById('ddBtn');
-  const msg = document.getElementById('ddMsg');
-  if (!email || !email.includes('@')) {
-    msg.className = 'dd-msg err'; msg.textContent = 'Enter a valid email.'; return;
-  }
-  btn.disabled = true; btn.textContent = 'Sending…';
-  msg.className = 'dd-msg'; msg.textContent = '';
-  try {
-    const res = await fetch('/auth/request-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById('ddEmail').style.display = 'none';
-      btn.style.display = 'none';
-      msg.className = 'dd-msg ok';
-      msg.textContent = 'Check your inbox for the login link.';
-    } else {
-      msg.className = 'dd-msg err'; msg.textContent = data.error || 'Failed. Try again.';
-      btn.disabled = false; btn.textContent = 'Send login link';
-    }
-  } catch {
-    msg.className = 'dd-msg err'; msg.textContent = 'Network error.';
-    btn.disabled = false; btn.textContent = 'Send login link';
-  }
-}
-
-// Close dropdown when clicking outside
-document.addEventListener('click', function(e) {
-  const dd = document.getElementById('accountDropdown');
-  const wrap = document.querySelector('.nav-account-wrap');
-  if (dd.classList.contains('open') && !wrap.contains(e.target)) {
-    dd.classList.remove('open');
+    window._previewEmail = status.email;
   }
 });
-
-initAuthNav();
 </script>
 </body>
 </html>
