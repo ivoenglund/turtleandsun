@@ -4,14 +4,14 @@
   var CSS =
     'body{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}' +
     '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}' +
-    '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:1500;}' +
+    '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:100;}' +
     '.ts-nav-wrap{padding:0;}' +
     '.ts-nav{display:flex;align-items:center;padding:16px 32px 18px 0;}' +
     '.ts-nav-panel-spacer{width:260px;flex-shrink:0;}' +
     '.ts-nav-gap{flex:1;}' +
     '.ts-nav > a{margin-left:60px;}' +
     '.ts-nav a img{height:72px;width:auto;margin-top:-42px;display:block;}' +
-    '.ts-nav-links{display:flex;gap:28px;align-items:center;}' +
+    '.ts-nav-links{display:flex;gap:28px;align-items:center;margin-left:75px;}' +
     '.ts-nav-link{font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}' +
     '.ts-nav-link:hover{opacity:1;}' +
     '.ts-nav-account-wrap{position:relative;}' +
@@ -66,7 +66,7 @@
           '<span class="ts-nav-drawer-email" id="ts-nav-drawer-email"></span>' +
           '<button class="ts-nav-drawer-close" id="ts-nav-drawer-close">&times;</button>' +
         '</div>' +
-        '<a class="ts-nav-drawer-link" href="/">Myhome</a>' +
+        '<a class="ts-nav-drawer-link" href="/">Home</a>' +
         '<a class="ts-nav-drawer-link" href="/pricing">Pricing</a>' +
         '<a class="ts-nav-drawer-link" href="/faq">FAQ</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
@@ -94,7 +94,7 @@
             '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
             '<div class="ts-nav-gap"></div>' +
             '<div class="ts-nav-links">' +
-              '<a href="/" class="ts-nav-link">Myhome</a>' +
+              '<a href="/" class="ts-nav-link">Home</a>' +
               '<a href="/pricing" class="ts-nav-link">Pricing</a>' +
               '<a href="/faq" class="ts-nav-link">FAQ</a>' +
               '<div class="ts-nav-account-wrap">' +
