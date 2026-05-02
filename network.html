@@ -359,7 +359,7 @@ function nodeLayout(d) {
   let ri = 0;
   items.push({
     y: startY + ri++ * (ROWY + GAP),
-    text: truncate((d.is_pet ? '🐾 ' : '') + (d.name || 'Unnamed'), 18),
+    text: truncate((d.is_pet ? '🐾 ' : '') + (d.name || (d.isMe ? '—' : 'Unnamed')), 18),
     fontSize: 10, fontWeight: 800,
     fill: d.died_on ? '#888' : '#1C0A00',
     fontStyle: d.died_on ? 'italic' : 'normal',
@@ -504,8 +504,8 @@ async function init() {
   _meNodeId = meContact ? meContact.id : '__me__';
   _allNodes = [
     meContact
-      ? { ...meContact, id: meContact.id, name: meContact.name || 'Me', isMe: true }
-      : { id: '__me__', name: 'Me', isMe: true },
+      ? { ...meContact, isMe: true }
+      : { id: '__me__', name: '', isMe: true },
     ...data.contacts.filter(c => !c.is_me).map(c => ({ id: c.id, name: c.name || 'Unnamed', ...c })),
     ...groupNodes,
   ];
@@ -1011,7 +1011,7 @@ const tooltip = document.getElementById('tooltip');
 
 function showTooltip(event, d) {
   if (d.id === '__me__') return;
-  tooltip.textContent = d.name || 'Unnamed';
+  tooltip.textContent = d.name || (d.isMe ? '—' : 'Unnamed');
   tooltip.classList.add('visible');
   moveTooltip(event);
 }
