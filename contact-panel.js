@@ -2,7 +2,7 @@
 // Usage:
 //   CP.init('containerId')          inject HTML into element
 //   CP.open(contactId)              load and show full record
-//   CP.close()                      show empty state
+//   CP.close()                      clear panel to empty state (panel stays visible)
 //   CP.contacts = arr               set for relationship dropdowns
 //   CP.allGroups = arr              set for group checkboxes
 //   CP.relTypes = arr               set for relationship type dropdown
@@ -26,10 +26,10 @@ const CP = (() => {
     const s = document.createElement('style');
     s.id = 'cp-styles';
     s.textContent = `
-.cp-empty{display:flex;align-items:center;justify-content:center;height:160px;font-size:13px;color:rgba(28,10,0,0.25);font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;text-align:center;padding:24px;}
+.cp-empty{display:none;}
 
 /* Name bar */
-.cp-name-bar{padding:5px 14px 4px;display:flex;flex-direction:column;gap:1px;border-bottom:1px solid rgba(28,10,0,0.06);}
+.cp-name-bar{padding:3px 10px 2px;display:flex;flex-direction:column;gap:0px;border-bottom:1px solid rgba(28,10,0,0.06);}
 .cp-name-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,10,0,0.32);font-family:'Plus Jakarta Sans',sans-serif;}
 .cp-name-row{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;}
 .cp-name-inp{flex:1;min-width:0;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:0;line-height:1.2;transition:border-color 0.12s;cursor:text;}
@@ -40,16 +40,22 @@ const CP = (() => {
 .cp-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#f0ede6;color:rgba(28,10,0,0.45);}
 .cp-badge-dec{background:#f5eaea;color:rgba(120,20,20,0.55);}
 
+/* No-contact dim state */
+#cpContent.cp-no-contact .cp-name-inp,
+#cpContent.cp-no-contact .cp-inp{opacity:0.35;pointer-events:none;}
+#cpContent.cp-no-contact .cp-check-cell{opacity:0.35;pointer-events:none;}
+#cpContent.cp-no-contact .cp-close-btn{opacity:0;}
+
 /* Sections */
 .cp-section{border-bottom:1px solid rgba(28,10,0,0.06);}
 .cp-section:last-child{border-bottom:none;}
-.cp-section-hdr{padding:8px 16px 3px;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.28);}
+.cp-section-hdr{padding:4px 10px 2px;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.28);}
 
-/* Stacked field layout — maximum vertical compactness */
-.cp-tbl{padding-bottom:3px;}
-.cp-row{display:flex;flex-direction:column;padding:1px 14px 1px;}
+/* Stacked field layout */
+.cp-tbl{padding-bottom:1px;}
+.cp-row{display:flex;flex-direction:column;padding:1px 10px 1px;}
 .cp-lbl{font-size:10px;font-weight:500;color:rgba(28,10,0,0.35);text-align:left;line-height:1.2;margin-bottom:0;}
-.cp-inp{width:100%;padding:0 0 2px;border:none;border-bottom:1px solid rgba(28,10,0,0.08);background:transparent;font-size:12px;font-family:'DM Sans',sans-serif;color:#1C0A00;outline:none;line-height:1.2;transition:background 0.12s;}
+.cp-inp{width:100%;padding:0 0 1px;border:none;border-bottom:1px solid rgba(28,10,0,0.08);background:transparent;font-size:12px;font-family:'DM Sans',sans-serif;color:#1C0A00;outline:none;line-height:1.2;transition:background 0.12s;}
 .cp-inp:focus{background:rgba(58,107,32,0.04);border-bottom-color:#3A6B20;}
 .cp-inp:hover:not(:focus){background:rgba(28,10,0,0.02);}
 .cp-check-cell{padding:0;border:none;display:flex;align-items:center;}
@@ -57,35 +63,35 @@ const CP = (() => {
 .cp-check-cell input[type=checkbox]{width:12px;height:12px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
 
 /* Save toast */
-.cp-toast{margin:2px 14px 1px;padding:2px 8px;border-radius:4px;font-size:11px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-align:center;display:none;}
+.cp-toast{margin:1px 10px 1px;padding:2px 8px;border-radius:4px;font-size:11px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-align:center;display:none;}
 .cp-toast.ok{background:#e8f0e0;color:#2d5a16;display:block;}
 .cp-toast.err{background:#fdecea;color:#c0392b;display:block;}
 
 /* Group pills */
-.cp-pills{display:flex;flex-wrap:wrap;gap:3px;padding:3px 14px 4px;}
+.cp-pills{display:flex;flex-wrap:wrap;gap:3px;padding:2px 10px 3px;}
 .cp-pill{display:flex;align-items:center;gap:4px;padding:1px 7px;border-radius:20px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:600;cursor:pointer;user-select:none;border:1px solid rgba(28,10,0,0.11);color:rgba(28,10,0,0.45);background:#faf8f5;transition:all 0.12s;}
 .cp-pill:hover{border-color:rgba(28,10,0,0.2);color:rgba(28,10,0,0.7);}
 .cp-pill.active{background:#e8f0e0;border-color:#3A6B20;color:#2d5a16;}
 .cp-pill input[type=checkbox]{width:11px;height:11px;accent-color:#3A6B20;cursor:pointer;}
 .cp-pill-sub{font-size:9px;padding:1px 6px;}
-.cp-pills-empty{padding:3px 14px 4px;font-size:11px;color:rgba(28,10,0,0.3);}
+.cp-pills-empty{padding:2px 10px 3px;font-size:11px;color:rgba(28,10,0,0.3);}
 .cp-group-add-btn{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px dashed rgba(28,10,0,0.25);background:none;cursor:pointer;font-size:13px;line-height:1;color:rgba(28,10,0,0.4);flex-shrink:0;padding:0;}
 .cp-group-add-btn:hover{border-color:rgba(28,10,0,0.5);color:rgba(28,10,0,0.7);}
 .cp-pill-remove{border:none;background:none;cursor:pointer;font-size:11px;line-height:1;color:rgba(28,10,0,0.35);padding:0 0 0 2px;flex-shrink:0;}
 .cp-pill-remove:hover{color:#c0392b;}
-.cp-group-dropdown{padding:2px 12px 4px;}
+.cp-group-dropdown{padding:2px 10px 3px;}
 .cp-group-dd-item{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px;font-family:'DM Sans',sans-serif;color:rgba(28,10,0,0.7);cursor:pointer;line-height:1.3;}
 .cp-group-dd-item input[type=checkbox]{width:12px;height:12px;accent-color:#3A6B20;cursor:pointer;flex-shrink:0;}
 .cp-group-dd-sub{padding-left:10px;font-size:10px;color:rgba(28,10,0,0.5);}
 
 /* Compact list rows (rels, occasions, loveograms) */
-.cp-list{padding:1px 14px 3px;}
+.cp-list{padding:1px 10px 2px;}
 .cp-list-row{display:flex;align-items:center;gap:6px;padding:2px 0;border-bottom:1px solid rgba(28,10,0,0.04);font-size:11px;}
 .cp-list-row:last-child{border-bottom:none;}
 .cp-list-primary{flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;color:#1C0A00;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cp-list-secondary{color:rgba(28,10,0,0.42);font-size:10px;white-space:nowrap;}
 .cp-list-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#f0ede6;color:rgba(28,10,0,0.45);white-space:nowrap;}
-.cp-list-empty{padding:3px 14px 4px;font-size:11px;color:rgba(28,10,0,0.28);font-style:italic;}
+.cp-list-empty{padding:2px 10px 3px;font-size:11px;color:rgba(28,10,0,0.28);font-style:italic;}
 
 /* Status tags */
 .cp-status-done{background:#c8e6c9;color:#1b5e20;}
@@ -93,7 +99,7 @@ const CP = (() => {
 .cp-status-failed{background:#fdecea;color:#c0392b;}
 
 /* Compact add forms */
-.cp-add-row{display:flex;gap:4px;padding:2px 14px 4px;flex-wrap:wrap;}
+.cp-add-row{display:flex;gap:4px;padding:2px 10px 3px;flex-wrap:wrap;}
 .cp-add-inp{flex:1;min-width:80px;padding:2px 6px;border:1px solid #e0dcd4;border-radius:4px;font-size:11px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;line-height:1.2;}
 .cp-add-inp:focus{border-color:#3A6B20;}
 .cp-add-sel{flex:1;min-width:90px;padding:2px 6px;border:1px solid #e0dcd4;border-radius:4px;font-size:11px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;line-height:1.2;}
@@ -102,7 +108,7 @@ const CP = (() => {
 .cp-btn-add:hover{background:#1C0A00;}
 .cp-btn-del{padding:1px 6px;background:none;border:1px solid rgba(28,10,0,0.13);border-radius:3px;font-size:9px;cursor:pointer;color:rgba(28,10,0,0.38);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;flex-shrink:0;}
 .cp-btn-del:hover{border-color:#c0392b;color:#c0392b;}
-.cp-form-msg{font-size:10px;padding:0 14px 2px;min-height:12px;color:#c0392b;}
+.cp-form-msg{font-size:10px;padding:0 10px 1px;min-height:12px;color:#c0392b;}
 
 @media(max-width:1000px){.cp-lbl{font-size:10px;}}
 
@@ -116,13 +122,13 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 .fo-detail .cp-list-primary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fo-detail .cp-pills{overflow:hidden;}
 
-/* Overlay mode: transparent bg, text-shadow for legibility */
+/* Sidebar mode: transparent bg, text-shadow for legibility */
 .fo-detail .cp-name-lbl{text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.8);}
 .fo-detail .cp-name-inp{text-shadow:0 0 8px rgba(255,249,230,0.95);color:#1C0A00;}
 .fo-detail .cp-close-btn{text-shadow:0 0 8px rgba(255,249,230,1);}
 .fo-detail .cp-name-bar{border-bottom:none;}
 .fo-detail .cp-group-add-btn{color:rgba(28,10,0,0.45);text-shadow:0 0 8px rgba(255,249,230,1);}
-.fo-detail .cp-group-dropdown{background:rgba(255,249,230,0.93);border-radius:6px;margin:0 8px 4px;}
+.fo-detail .cp-group-dropdown{background:rgba(255,249,230,0.93);border-radius:6px;margin:0 4px 3px;}
 .fo-detail .cp-group-dd-item{text-shadow:0 0 6px rgba(255,249,230,0.8);}
 .fo-detail .cp-section{border-bottom:none;}
 .fo-detail .cp-row{border-bottom:none;}
@@ -146,11 +152,11 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
   }
 
   const _HTML = `
-<div class="cp-empty" id="cpEmpty">Select a contact to see details.</div>
-<div id="cpContent" style="display:none;overflow-y:auto;flex:1;min-height:0;">
+<div class="cp-empty" id="cpEmpty" style="display:none;"></div>
+<div id="cpContent" class="cp-no-contact" style="display:block;overflow-y:auto;flex:1;min-height:0;">
 
   <div class="cp-name-bar">
-    <span class="cp-name-lbl">Contact name</span>
+    <span class="cp-name-lbl">Name</span>
     <div class="cp-name-row">
       <input class="cp-name-inp" id="cpFName" type="text" data-field="name" onblur="CP._scheduleSave()" placeholder="Name">
       <span id="cpPetIcon" style="display:none;">🐾</span>
@@ -177,7 +183,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
       <div class="cp-row"><span class="cp-lbl">Street</span><input class="cp-inp" type="text" id="cpFStreet" data-field="street" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">City</span><input class="cp-inp" type="text" id="cpFCity" data-field="city" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Country</span><input class="cp-inp" type="text" id="cpFCountry" data-field="country" onblur="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Po code</span><input class="cp-inp" type="text" id="cpFPostal" data-field="postal_code" onblur="CP._scheduleSave()"></div>
+      <div class="cp-row"><span class="cp-lbl">Post code</span><input class="cp-inp" type="text" id="cpFPostal" data-field="postal_code" onblur="CP._scheduleSave()"></div>
     </div>
   </div>
 
@@ -195,12 +201,13 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     <div class="cp-form-msg" id="cpRelMsg"></div>
   </div>
 
-  <div class="cp-section">
+  <div class="cp-section" id="cpOccSection" style="display:none;">
+    <div class="cp-section-hdr">Occasions</div>
     <div id="cpOccBody"></div>
     <div class="cp-add-row">
       <input class="cp-add-inp" type="text" id="cpOccName" placeholder="Occasion name">
-      <input class="cp-add-inp" type="date" id="cpOccDate" style="max-width:130px;">
-      <select class="cp-add-sel" id="cpOccFreq" style="max-width:90px;">
+      <input class="cp-add-inp" type="date" id="cpOccDate" style="max-width:120px;">
+      <select class="cp-add-sel" id="cpOccFreq" style="max-width:82px;">
         <option value="yearly">Yearly</option>
         <option value="milestone">Milestone</option>
         <option value="one-time">One-time</option>
@@ -210,7 +217,8 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     <div class="cp-form-msg" id="cpOccMsg"></div>
   </div>
 
-  <div class="cp-section">
+  <div class="cp-section" id="cpLovSection" style="display:none;">
+    <div class="cp-section-hdr">Loveogram history</div>
     <div id="cpLovBody"></div>
   </div>
 
@@ -226,9 +234,12 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
   async function open(id) {
     _currentId = id;
     clearTimeout(_saveTimer);
-    document.getElementById('cpEmpty').style.display = 'none';
-    document.getElementById('cpContent').style.display = 'block';
     _hideToast();
+
+    const content = document.getElementById('cpContent');
+    if (content) content.classList.remove('cp-no-contact');
+
+    document.getElementById('cpOccSection').style.display = '';
 
     const [cRes, cgRes, occRes] = await Promise.all([
       fetch(`/api/contacts/${id}`),
@@ -270,11 +281,35 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 
   function close() {
     _currentId = null;
+    _contactGroupIds = new Set();
+    _inFamilyGroup = false;
     clearTimeout(_saveTimer);
-    const empty = document.getElementById('cpEmpty');
+    _hideToast();
+
     const content = document.getElementById('cpContent');
-    if (empty) empty.style.display = '';
-    if (content) content.style.display = 'none';
+    if (content) content.classList.add('cp-no-contact');
+
+    ['cpFName','cpFEmail','cpFPhone','cpFStreet','cpFCity','cpFCountry','cpFPostal'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    ['cpFBirthday','cpFDiedOn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const pet = document.getElementById('cpFIsPet');
+    if (pet) pet.checked = false;
+
+    ['cpPetIcon','cpPhBadge','cpDeceasedBadge'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    document.getElementById('cpFamilyCard').style.display = 'none';
+    document.getElementById('cpOccSection').style.display = 'none';
+    document.getElementById('cpLovSection').style.display = 'none';
+
+    _renderGroupCheckboxes();
   }
 
   function _hideToast() {
@@ -325,7 +360,6 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     } catch { _showToast('Network error', false); }
   }
 
-  // Keep as public alias for backward compat
   function _saveContact() { return _doSave(); }
 
   function _allGroupsFlat() {
@@ -342,6 +376,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 
   function _renderGroupCheckboxes(keepDropdownOpen) {
     const el = document.getElementById('cpGroupsCheckboxes');
+    if (!el) return;
     const flat = _allGroupsFlat();
     const topIds = new Set(_allGroups.map(g => g.id));
 
@@ -368,7 +403,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
         }
       }
       html += '</div>';
-    } else {
+    } else if (_currentId) {
       html += '<div class="cp-pills-empty">No groups yet.</div>';
     }
     el.innerHTML = html;
@@ -457,12 +492,11 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
   function _renderOccasions(occs) {
     const el = document.getElementById('cpOccBody');
     if (!occs.length) {
-      el.innerHTML = '<div class="cp-list-empty">No occasions yet.</div>';
+      el.innerHTML = '';
       return;
     }
     el.innerHTML = '<div class="cp-list">' + occs.map(o => {
       const d = (o.start_date || '').split('T')[0];
-      const [y, m, day] = d.split('-');
       const dateStr = d ? new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
       return `<div class="cp-list-row">
         <span class="cp-list-primary">${_esc(o.name)}</span>
@@ -500,15 +534,18 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 
   function _renderLoveograms(lovs) {
     const el = document.getElementById('cpLovBody');
+    const section = document.getElementById('cpLovSection');
     if (!lovs.length) {
-      el.innerHTML = '<div class="cp-list-empty">No Loveograms sent yet.</div>';
+      if (section) section.style.display = 'none';
+      if (el) el.innerHTML = '';
       return;
     }
+    if (section) section.style.display = '';
     el.innerHTML = '<div class="cp-list">' + lovs.map(o => {
       const cls = (o.status === 'paid' || o.status === 'delivered') ? 'done' : o.status === 'failed' ? 'failed' : 'pending';
       const date = new Date(o.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
       return `<div class="cp-list-row">
-        <span class="cp-list-secondary" style="width:80px;flex-shrink:0;">${date}</span>
+        <span class="cp-list-secondary" style="width:72px;flex-shrink:0;">${date}</span>
         <span class="cp-list-primary">${_esc(o.product)}</span>
         <span class="cp-list-secondary">$${parseFloat(o.amount).toFixed(2)}</span>
         <span class="cp-list-tag cp-status-${cls}">${_esc(o.status)}</span>
