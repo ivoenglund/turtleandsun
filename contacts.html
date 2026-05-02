@@ -10,23 +10,6 @@
 html,body{height:100%;}
 body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:flex;flex-direction:column;}
 
-.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;}
-.nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
-.nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
-.nav-links{display:flex;gap:28px;align-items:center;}
-.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
-.nav-links a:hover{opacity:1;}
-.nav-account-wrap{position:relative;}
-.nav-account-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;cursor:pointer;background:none;border:none;padding:0;}
-.nav-account-btn:hover{opacity:1;}
-#accountDropdown{visibility:hidden;opacity:0;transform:translateY(-6px);transition:opacity 0.15s,transform 0.15s,visibility 0s 0.15s;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:14px 18px;width:220px;z-index:300;}
-#accountDropdown.open{visibility:visible;opacity:1;transform:translateY(0);transition:opacity 0.15s,transform 0.15s,visibility 0s 0s;}
-.dd-user-email{font-size:11px;color:rgba(60,20,0,0.5);padding-bottom:8px;border-bottom:1px solid #f0ede6;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dd-nav-link{display:block;padding:6px 0;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.75;}
-.dd-nav-link:hover{opacity:1;color:#3A6B20;}
-.dd-nav-logout{color:#c0392b !important;opacity:1 !important;}
-.dd-nav-sep{height:1px;background:rgba(28,10,0,0.07);margin:6px 0;}
 
 #syncBanner{display:none;padding:10px 32px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;flex-shrink:0;}
 #syncBanner.ok{background:#e8f0e0;color:#2d5a16;}
@@ -149,39 +132,9 @@ body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;display:f
 .btn-del{padding:3px 9px;background:none;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.42);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;}
 .btn-del:hover{border-color:#c0392b;color:#c0392b;}
 </style>
+<script src="/nav.js"></script>
 </head>
 <body>
-
-<div class="nav-bar">
-  <div class="nav-wrap">
-    <div class="nav">
-      <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
-      <div class="nav-links">
-        <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
-        <span class="nav-account-wrap">
-          <button class="nav-account-btn" onclick="handleAccountClick(event)">Account</button>
-          <div id="accountDropdown">
-            <div class="dd-user-email" id="ddUserEmail"></div>
-            <a class="dd-nav-link" href="/account/contacts">Contacts</a>
-            <div class="dd-nav-sep"></div>
-            <a class="dd-nav-link" href="/account/network?view=network">Network</a>
-            <a class="dd-nav-link" href="/account/network?view=outline">Outline</a>
-            <a class="dd-nav-link" href="/account/network?view=calendar">Calendar</a>
-            <a class="dd-nav-link" href="/account/occasions">Occasions</a>
-            <div class="dd-nav-sep"></div>
-            <a class="dd-nav-link" href="/print/labels">Print address labels</a>
-            <a class="dd-nav-link" href="/account/occasions">Print occasion list</a>
-            <a class="dd-nav-link" href="/print/calendar">Print calendar</a>
-            <div class="dd-nav-sep"></div>
-            <a class="dd-nav-link" href="/auth/google/contacts">↻ Sync Google contacts</a>
-            <a class="dd-nav-link" href="/account">Account settings</a>
-            <a class="dd-nav-link dd-nav-logout" href="/auth/logout">Log out</a>
-          </div>
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
 
 <div id="syncBanner"></div>
 
@@ -556,27 +509,13 @@ async function confirmPlaceholder() {
   if (res.ok) { const { id } = await res.json(); await loadContacts(); selectContact(id); }
 }
 
-// ── Nav ───────────────────────────────────────────────────────────────────────
-function handleAccountClick(e) {
-  e.stopPropagation();
-  document.getElementById('accountDropdown').classList.toggle('open');
-}
-document.addEventListener('click', function(e) {
-  const dd = document.getElementById('accountDropdown');
-  const wrap = document.querySelector('.nav-account-wrap');
-  if (dd && wrap && dd.classList.contains('open') && !wrap.contains(e.target)) dd.classList.remove('open');
-});
-
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-async function initAuthNav() {
+NavBar.init({ requireAuth: true }).then(async (status) => {
+  if (!status) return;
   try {
-    const res = await fetch('/api/auth/status');
-    const status = res.ok ? await res.json() : false;
-    if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
-    document.getElementById('ddUserEmail').textContent = status.email;
     await Promise.all([loadContacts(), loadGroups(), loadRelTypes()]);
     const [, relIdsRes] = await Promise.all([
       loadGroupMemberships(),
@@ -603,9 +542,7 @@ async function initAuthNav() {
     const urlId = new URLSearchParams(location.search).get('id');
     if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }
   } catch { window.location.href = '/login'; }
-}
-
-initAuthNav();
+});
 </script>
 </body>
 </html>

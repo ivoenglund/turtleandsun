@@ -10,22 +10,6 @@
 html,body{height:100%;overflow:hidden;}
 body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex;flex-direction:column;}
 
-.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;position:relative;z-index:100;}
-.nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}
-.nav a img{height:72px;width:auto;margin-top:-42px;display:block;}
-.nav-links{display:flex;gap:28px;align-items:center;}
-.nav-links a{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}
-.nav-links a:hover{opacity:1;}
-.nav-account-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;color:#1C0A00;background:none;border:1px solid rgba(28,10,0,0.18);border-radius:8px;padding:7px 16px;cursor:pointer;transition:background 0.15s;}
-.nav-account-btn:hover{background:rgba(28,10,0,0.06);}
-#accountDropdown{position:absolute;top:calc(100% - 4px);right:32px;background:#fff;border:1px solid rgba(28,10,0,0.12);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);min-width:200px;z-index:500;padding:8px 0;opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity 0.18s ease,visibility 0.18s ease,transform 0.18s ease;}
-#accountDropdown.open{opacity:1;visibility:visible;transform:translateY(0);}
-.dd-user-email{padding:10px 16px 8px;font-size:12px;color:rgba(28,10,0,0.45);font-family:'Plus Jakarta Sans',sans-serif;border-bottom:1px solid rgba(28,10,0,0.08);margin-bottom:4px;}
-.dd-nav-link{display:block;padding:8px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:#1C0A00;text-decoration:none;transition:background 0.1s;}
-.dd-nav-link:hover{background:#FFF9E6;}
-.dd-nav-sep{height:1px;background:rgba(28,10,0,0.08);margin:4px 0;}
-.dd-nav-logout{color:#c0195a;}
 
 /* ── Main canvas (full width) ───────────────────────────────────── */
 .main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
@@ -33,10 +17,10 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 /* ── Floating overlays ──────────────────────────────────────────── */
 .fo-filters,.fo-detail{position:fixed;z-index:50;}
 
-.fo-filters{top:76px;left:14px;width:210px;max-height:calc(100vh - 96px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
+.fo-filters{top:64px;left:14px;width:210px;max-height:calc(100vh - 84px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
-.fo-detail{top:76px;right:14px;width:245px;max-width:245px;max-height:calc(100vh - 96px);overflow:hidden;display:none;flex-direction:column;}
+.fo-detail{top:64px;right:14px;width:245px;max-width:245px;max-height:calc(100vh - 84px);overflow:hidden;display:none;flex-direction:column;}
 .fo-detail.fo-open{display:flex;}
 
 .fo-filters.fo-hidden{display:none;}
@@ -47,7 +31,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .fo-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.35);text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fo-detail-hdr{display:flex;justify-content:flex-end;padding-bottom:4px;}
 
-.fo-show-btn{position:fixed;top:78px;left:14px;z-index:50;border:none;background:none;cursor:pointer;font-size:22px;line-height:1;color:rgba(28,10,0,0.4);font-weight:700;display:none;padding:0;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
+.fo-show-btn{position:fixed;top:66px;left:14px;z-index:50;border:none;background:none;cursor:pointer;font-size:22px;line-height:1;color:rgba(28,10,0,0.4);font-weight:700;display:none;padding:0;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fo-show-btn:hover{color:#1C0A00;}
 
 /* Filter items – text-shadow for legibility over canvas */
@@ -163,37 +147,9 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .cal-chip.milestone{background:#e8e0f0;color:#6b2d9a;}
 
 </style>
+<script src="/nav.js"></script>
 </head>
 <body>
-
-<div class="nav-bar">
-  <div class="nav-wrap">
-    <div class="nav">
-      <a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>
-      <div class="nav-links">
-        <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/faq">FAQ</a>
-        <button class="nav-account-btn" onclick="handleAccountClick(event)">Account</button>
-      </div>
-    </div>
-  </div>
-  <div id="accountDropdown">
-    <div class="dd-user-email" id="ddUserEmail"></div>
-    <a class="dd-nav-link" href="/account/contacts">Contacts</a>
-    <div class="dd-nav-sep"></div>
-    <a class="dd-nav-link" href="/account/network?view=network">Network</a>
-    <a class="dd-nav-link" href="/account/network?view=outline">Outline</a>
-    <a class="dd-nav-link" href="/account/network?view=calendar">Calendar</a>
-    <a class="dd-nav-link" href="/account/occasions">Occasions</a>
-    <div class="dd-nav-sep"></div>
-    <a class="dd-nav-link" href="/print/labels">Print address labels</a>
-    <a class="dd-nav-link" href="/account/occasions">Print occasion list</a>
-    <a class="dd-nav-link" href="/print/calendar">Print calendar</a>
-    <div class="dd-nav-sep"></div>
-    <a class="dd-nav-link" href="/auth/google/contacts">↻ Sync Google contacts</a>
-    <a class="dd-nav-link" href="/account">Account settings</a>
-    <a class="dd-nav-link dd-nav-logout" href="/auth/logout">Log out</a>
-  </div>
-</div>
 
 <!-- Full-width canvas -->
 <div class="main-canvas">
@@ -1520,13 +1476,6 @@ function updateBulkBar() {
   document.getElementById('btn-loveogram').textContent = `Send Loveogram to ${n} contact${n !== 1 ? 's' : ''}`;
 }
 
-// ── Nav dropdown ──────────────────────────────────────────────────────────────
-function handleAccountClick(e) {
-  e.stopPropagation();
-  document.getElementById('accountDropdown').classList.toggle('open');
-}
-document.addEventListener('click', () => document.getElementById('accountDropdown').classList.remove('open'));
-
 // ── Filter/overlay helpers ────────────────────────────────────────────────────
 function showFilters() {
   document.getElementById('foFilters').classList.remove('fo-hidden');
@@ -1573,14 +1522,9 @@ function closeMobileOverlays() {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileOverlays(); hideDetail(); } });
 
-// ── Auth & boot ───────────────────────────────────────────────────────────────
-async function initAuthNav() {
+NavBar.init({ requireAuth: true }).then(async (status) => {
+  if (!status) return;
   try {
-    const res = await fetch('/api/auth/status');
-    const status = res.ok ? await res.json() : false;
-    if (!status || !status.loggedIn) { window.location.href = '/login'; return; }
-    document.getElementById('ddUserEmail').textContent = status.email;
-
     const [, contactsRes, groupsRes, relTypesRes] = await Promise.all([
       init(),
       fetch('/api/contacts'),
@@ -1615,9 +1559,7 @@ async function initAuthNav() {
     setTimeout(resizeGraph, 250);
     switchView(_currentView);
   } catch { window.location.href = '/login'; }
-}
-
-initAuthNav();
+});
 </script>
 </body>
 </html>
