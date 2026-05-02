@@ -140,11 +140,6 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .cal-chip.occasion{background:#fef3e2;color:#b85e10;}
 .cal-chip.remembrance{background:#f0ede6;color:rgba(28,10,0,0.55);}
 .cal-chip.milestone{background:#e8e0f0;color:#6b2d9a;}
-/* Scale toggle */
-.sidebar-scale-row{display:flex;justify-content:flex-end;padding:2px 6px 0;flex-shrink:0;}
-.ts-panel-scale-btn{background:none;border:1.5px solid rgba(28,10,0,0.14);border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:rgba(28,10,0,0.38);padding:1px 7px;line-height:1.5;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-panel-scale-btn:hover{color:#1C0A00;border-color:rgba(28,10,0,0.3);}
-.ts-panel-scale-btn.ts-active{color:#3A6B20;border-color:#3A6B20;background:rgba(58,107,32,0.07);}
 .fo-sidebar.ts-panel-lg .fp-item label{font-size:16px;}
 .fo-sidebar.ts-panel-lg .fp-cnt{font-size:13px;}
 .fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:17px;height:17px;}
@@ -194,7 +189,6 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <!-- Left sidebar scroll container -->
 <div class="fo-sidebar" id="foSidebar">
-<div class="sidebar-scale-row"><button class="ts-panel-scale-btn" id="tsPanelScaleBtn" onclick="tsPanelScaleToggle()" title="Toggle panel size">↕</button></div>
 
 <!-- Contact panel -->
 <div class="fo-detail" id="foDetail">
@@ -239,7 +233,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <div class="tooltip" id="tooltip"></div>
 
-<script src="/contact-panel.js?v=20260504"></script>
+<script src="/contact-panel.js?v=20260505"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
 const PALETTE = ['#1A5C32','#1A3566','#4A2060','#5A3010','#1A4A5A','#3D5A1A','#6B2A14','#1A4A3A'];

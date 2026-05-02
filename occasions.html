@@ -123,11 +123,6 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-loveogram{padding:6px 12px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;display:inline-block;}
 .btn-loveogram:hover{background:#1C0A00;}
 .empty-state{text-align:center;padding:60px 32px;color:rgba(28,10,0,0.3);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:500;}
-/* Scale toggle */
-.sidebar-scale-row{display:flex;justify-content:flex-end;padding:2px 6px 0;flex-shrink:0;}
-.ts-panel-scale-btn{background:none;border:1.5px solid rgba(28,10,0,0.14);border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:rgba(28,10,0,0.38);padding:1px 7px;line-height:1.5;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-panel-scale-btn:hover{color:#1C0A00;border-color:rgba(28,10,0,0.3);}
-.ts-panel-scale-btn.ts-active{color:#3A6B20;border-color:#3A6B20;background:rgba(58,107,32,0.07);}
 .fo-sidebar.ts-panel-lg .fp-check label{font-size:16px;}
 .fo-sidebar.ts-panel-lg .fp-check input[type=checkbox]{width:17px;height:17px;}
 .fo-sidebar.ts-panel-lg .fp-check{padding:4px 8px;}
@@ -146,7 +141,6 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <!-- Left sidebar scroll container -->
 <div class="fo-sidebar" id="foSidebar">
-<div class="sidebar-scale-row"><button class="ts-panel-scale-btn" id="tsPanelScaleBtn" onclick="tsPanelScaleToggle()" title="Toggle panel size">↕</button></div>
 
 <!-- Contact panel -->
 <div class="fo-detail" id="foDetail">
@@ -205,7 +199,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   <button class="mob-btn" id="mobDetailBtn" disabled onclick="toggleMobileDetail()">Contact</button>
 </div>
 
-<script src="/contact-panel.js?v=20260504"></script>
+<script src="/contact-panel.js?v=20260505"></script>
 <script>
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];

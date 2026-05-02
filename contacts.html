@@ -126,11 +126,6 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-add-sub:hover{border-color:#3A6B20;color:#3A6B20;}
 .btn-del{padding:3px 9px;background:none;border:1px solid #e0dcd4;border-radius:5px;font-size:11px;cursor:pointer;color:rgba(28,10,0,0.42);font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;}
 .btn-del:hover{border-color:#c0392b;color:#c0392b;}
-/* Scale toggle */
-.sidebar-scale-row{display:flex;justify-content:flex-end;padding:2px 6px 0;flex-shrink:0;}
-.ts-panel-scale-btn{background:none;border:1.5px solid rgba(28,10,0,0.14);border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;color:rgba(28,10,0,0.38);padding:1px 7px;line-height:1.5;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-panel-scale-btn:hover{color:#1C0A00;border-color:rgba(28,10,0,0.3);}
-.ts-panel-scale-btn.ts-active{color:#3A6B20;border-color:#3A6B20;background:rgba(58,107,32,0.07);}
 .fo-sidebar.ts-panel-lg .fp-item label{font-size:16px;}
 .fo-sidebar.ts-panel-lg .fp-item input[type=checkbox]{width:17px;height:17px;}
 .fo-sidebar.ts-panel-lg .fp-item{padding:4px 8px;}
@@ -149,7 +144,6 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 
 <!-- Left sidebar scroll container -->
 <div class="fo-sidebar" id="foSidebar">
-<div class="sidebar-scale-row"><button class="ts-panel-scale-btn" id="tsPanelScaleBtn" onclick="tsPanelScaleToggle()" title="Toggle panel size">↕</button></div>
 
 <!-- Contact panel -->
 <div class="fo-detail" id="foDetail">
@@ -217,7 +211,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   </div>
 </div>
 
-<script src="/contact-panel.js?v=20260504"></script>
+<script src="/contact-panel.js?v=20260505"></script>
 <script>
 let _contacts = [];
 let _currentId = null;
