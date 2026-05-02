@@ -149,6 +149,24 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
 .fo-detail .cp-pill.active{background:rgba(232,240,224,0.88);}
 .fo-detail .cp-name-bar,.fo-detail .cp-name-row,.fo-detail .cp-section,.fo-detail .cp-tbl,.fo-detail .cp-row,.fo-detail .cp-pills,.fo-detail .cp-list,.fo-detail .cp-list-row,.fo-detail .cp-add-row,.fo-detail .cp-form-msg,.fo-detail .cp-toast,.fo-detail .cp-empty,.fo-detail .cp-group-dropdown{max-width:100%;box-sizing:border-box;}
 .fo-detail .cp-pill{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Scale-up overrides (ts-panel-lg on fo-sidebar) */
+.fo-sidebar.ts-panel-lg .cp-name-lbl{font-size:12px;}
+.fo-sidebar.ts-panel-lg .cp-name-inp{font-size:18px;}
+.fo-sidebar.ts-panel-lg .cp-lbl{font-size:13px;}
+.fo-sidebar.ts-panel-lg .cp-inp{font-size:16px;}
+.fo-sidebar.ts-panel-lg .cp-row{padding:1px 13px;}
+.fo-sidebar.ts-panel-lg .cp-section-hdr{font-size:12px;padding:5px 13px 3px;}
+.fo-sidebar.ts-panel-lg .cp-check-cell label{font-size:14px;gap:9px;}
+.fo-sidebar.ts-panel-lg .cp-pill{font-size:13px;padding:2px 9px;}
+.fo-sidebar.ts-panel-lg .cp-pill-sub{font-size:12px;}
+.fo-sidebar.ts-panel-lg .cp-pills-empty,.fo-sidebar.ts-panel-lg .cp-list-empty{font-size:14px;}
+.fo-sidebar.ts-panel-lg .cp-list-secondary{font-size:13px;}
+.fo-sidebar.ts-panel-lg .cp-list-tag{font-size:12px;}
+.fo-sidebar.ts-panel-lg .cp-btn-add{font-size:12px;padding:3px 10px;}
+.fo-sidebar.ts-panel-lg .cp-btn-del{font-size:12px;padding:2px 8px;}
+.fo-sidebar.ts-panel-lg .cp-group-dd-item{font-size:14px;}
+.fo-sidebar.ts-panel-lg .cp-group-dd-sub{font-size:13px;}
     `;
     document.head.appendChild(s);
   }
