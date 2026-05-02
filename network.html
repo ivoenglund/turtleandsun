@@ -666,7 +666,7 @@ function buildGraph() {
 
   _meLinkSel = _g.append('g').attr('class', 'me-links')
     .selectAll('line').data(meLinksCopy).join('line')
-    .attr('stroke', '#2A4D17').attr('stroke-opacity', 0.3)
+    .attr('stroke', '#223E12').attr('stroke-opacity', 0.3)
     .attr('stroke-width', 1.5).attr('stroke-dasharray', '3,6');
 
   _subgroupLinkSel = _g.append('g').attr('class', 'subgroup-links')
@@ -735,14 +735,14 @@ function buildGraph() {
     g.append('rect').attr('class', 'node-outline')
       .attr('x', -GNW / 2).attr('y', -rectH / 2)
       .attr('width', GNW).attr('height', rectH).attr('rx', GNRX)
-      .attr('fill', '#e4eddb').attr('stroke', '#2A4D17').attr('stroke-width', 4)
+      .attr('fill', '#C6CFBD').attr('stroke', '#223E12').attr('stroke-width', 4)
       .attr('stroke-dasharray', '6,4');
     items.forEach(item => {
       g.append('text')
         .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', item.y)
         .attr('font-family', "'Plus Jakarta Sans', sans-serif")
         .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
-        .attr('fill', '#2A4D17').attr('font-style', item.fontStyle).text(item.text);
+        .attr('fill', '#223E12').attr('font-style', item.fontStyle).text(item.text);
     });
   });
 
@@ -846,7 +846,7 @@ function updateNodeLabel(contactId) {
         .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('y', item.y)
         .attr('font-family', "'Plus Jakarta Sans', sans-serif")
         .attr('font-size', item.fontSize).attr('font-weight', item.fontWeight)
-        .attr('fill', d.isMe ? '#2A4D17' : item.fill).attr('font-style', item.fontStyle).text(item.text);
+        .attr('fill', d.isMe ? '#223E12' : item.fill).attr('font-style', item.fontStyle).text(item.text);
     });
     updateLabelVisibility(_currentTransform.k);
   });
@@ -1113,7 +1113,7 @@ function highlightNode(nodeId) {
   if (!_nodeSel) return;
   _nodeSel.selectAll('.node-glow').remove();
   _nodeSel.select('.node-outline')
-    .attr('stroke', d => d.id === nodeId ? '#C62828' : d.isMe ? '#2A4D17' : nodeStroke(d))
+    .attr('stroke', d => d.id === nodeId ? '#C62828' : d.isMe ? '#223E12' : nodeStroke(d))
     .attr('stroke-width', d => d.id === nodeId ? 9 : d.isMe ? 4 : 3);
   _nodeSel.filter(d => d.id === nodeId).each(function() {
     const r = d3.select(this).select('.node-outline');
@@ -1136,7 +1136,7 @@ function clearHighlight() {
   if (!_nodeSel) return;
   _nodeSel.selectAll('.node-glow').remove();
   _nodeSel.select('.node-outline')
-    .attr('stroke', d => d.isMe ? '#2A4D17' : nodeStroke(d))
+    .attr('stroke', d => d.isMe ? '#223E12' : nodeStroke(d))
     .attr('stroke-width', d => d.isMe ? 4 : 3);
   _nodeSel.attr('filter', null);
   _nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
