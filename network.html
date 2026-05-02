@@ -687,7 +687,7 @@ function buildGraph() {
     .selectAll('g').data(contactsCopy).join('g')
     .attr('class', 'contact-node-g')
     .style('cursor', d => (d.isMe && !Number.isInteger(d.id)) ? 'default' : 'pointer')
-    .call(d3.drag().on('start', dragStart).on('drag', dragged).on('end', dragEnd))
+    .call(d3.drag().clickDistance(4).on('start', dragStart).on('drag', dragged).on('end', dragEnd))
     .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip)
     .on('click', nodeClick)
     .on('dblclick', nodeDoubleClick);
@@ -1072,8 +1072,9 @@ function nodeStroke(d) { return d.died_on ? '#999' : d.is_pet ? '#b85e10' : '#33
 function highlightNode(nodeId) {
   if (!_nodeSel) return;
   _nodeSel.select('.node-outline')
-    .attr('stroke', d => d.isMe ? '#3A6B20' : d.id === nodeId ? '#3A6B20' : nodeStroke(d))
-    .attr('stroke-width', d => (d.isMe || d.id === nodeId) ? 4 : 3);
+    .attr('stroke', d => (d.id === nodeId || d.isMe) ? '#3A6B20' : nodeStroke(d))
+    .attr('stroke-width', d => d.id === nodeId ? 5 : d.isMe ? 4 : 3);
+  _nodeSel.filter(d => d.id === nodeId).raise();
 }
 
 function clearHighlight() {
@@ -1254,7 +1255,7 @@ function renderCalMonth(year, month) {
     const chips = cur ? (byDay[day] || []) : [];
     html += `<div class="cal-cell${!cur?' other-month':''}${isToday?' today':''}">
       <div class="cal-day-num">${day}</div>
-      ${chips.slice(0,3).map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" ondblclick="forceOpenDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
+      ${chips.slice(0,3).map(o=>`<span class="cal-chip ${o.type}" onclick="forceOpenDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
       ${chips.length>3?`<span style="font-size:9px;color:rgba(28,10,0,0.4);">+${chips.length-3} more</span>`:''}
     </div>`;
   }
@@ -1284,7 +1285,7 @@ function renderCalWeek(weekStart) {
     const chips = getOccasionsForDate(d);
     html += `<div class="cal-cell${isToday?' today':''}" style="min-height:140px;">
       <div class="cal-day-num">${DOW[i]} ${d.getDate()}</div>
-      ${chips.map(o=>`<span class="cal-chip ${o.type}" onclick="openDetailPanel(${o.contact_id})" ondblclick="forceOpenDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
+      ${chips.map(o=>`<span class="cal-chip ${o.type}" onclick="forceOpenDetailPanel(${o.contact_id})" title="${esc(o.label)}">${esc(o.label)}</span>`).join('')}
     </div>`;
   }
   grid.innerHTML = html;
@@ -1428,8 +1429,7 @@ function makeOlRow(c, depth, showRelLabel) {
   row.innerHTML = `<input type="checkbox" class="ol-row-cb" onclick="event.stopPropagation()" onchange="olRowCbChange(this,${c.id})">
     <span class="ol-row-name">${esc(name)}</span>
     <span class="ol-row-meta">${esc(metaStr)}</span>`;
-  row.addEventListener('click', e => { if (e.target.tagName === 'INPUT') return; openDetailPanel(c.id); });
-  row.addEventListener('dblclick', e => { if (e.target.tagName === 'INPUT') return; forceOpenDetailPanel(c.id); });
+  row.addEventListener('click', e => { if (e.target.tagName === 'INPUT') return; forceOpenDetailPanel(c.id); });
   return row;
 }
 
