@@ -6,7 +6,8 @@
 <title>Log in — Turtle and Sun</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Arial',sans-serif;background:#FFF9E6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+body{font-family:'Arial',sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}
 .card{background:#fff;border-radius:16px;padding:40px 36px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.1);}
 h1{font-size:22px;font-weight:800;color:#1C0A00;margin-bottom:8px;}
 .sub{font-size:14px;color:rgba(60,20,0,0.65);margin-bottom:28px;line-height:1.5;}
@@ -23,6 +24,7 @@ input[type=email]:focus{border-color:#3A6B20;}
 </style>
 </head>
 <body>
+<div class="sun"></div>
 <div class="card">
   <h1>Log in</h1>
   <p class="sub">Enter your email address and we'll send you a magic link to log in instantly — no password needed.</p>

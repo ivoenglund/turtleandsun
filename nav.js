@@ -2,6 +2,8 @@
   'use strict';
 
   var CSS =
+    'body{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}' +
+    '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}' +
     '.ts-nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);flex-shrink:0;position:relative;z-index:100;}' +
     '.ts-nav-wrap{max-width:1200px;margin:0 auto;padding:0 32px;}' +
     '.ts-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 18px;}' +
@@ -117,6 +119,11 @@
     var frag = document.createDocumentFragment();
     while (tmp.firstChild) frag.appendChild(tmp.firstChild);
     document.body.insertBefore(frag, document.body.firstChild);
+    if (!document.querySelector('.sun')) {
+      var sun = document.createElement('div');
+      sun.className = 'sun';
+      document.body.insertBefore(sun, document.body.firstChild);
+    }
   }
 
   function detectPage() {
