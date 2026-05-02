@@ -669,6 +669,18 @@ app.put('/api/contacts/:id', requireAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const uid = req.user.id;
+    await pool.query(`DELETE FROM contact_relationships WHERE (contact_a_id = $1 OR contact_b_id = $1) AND user_id = $2`, [id, uid]);
+    await pool.query(`DELETE FROM contact_group_memberships WHERE contact_id = $1 AND user_id = $2`, [id, uid]);
+    await pool.query(`DELETE FROM occasions WHERE contact_id = $1 AND user_id = $2`, [id, uid]);
+    await pool.query(`DELETE FROM contacts WHERE id = $1 AND user_id = $2`, [id, uid]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/relationship-types', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
