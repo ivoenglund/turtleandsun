@@ -15,7 +15,7 @@
     '.ts-nav-account-btn{font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;cursor:pointer;background:none;border:none;padding:0;opacity:0.7;}' +
     '.ts-nav-account-btn:hover{opacity:1;}' +
     '.ts-nav-hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer;color:#1C0A00;padding:4px;line-height:1;}' +
-    '.ts-nav-dd{visibility:hidden;opacity:0;transform:translateY(-6px);transition:opacity 0.15s,transform 0.15s,visibility 0s 0.15s;position:absolute;top:calc(100% + 10px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:14px 18px;width:220px;z-index:300;}' +
+    '.ts-nav-dd{visibility:hidden;opacity:0;transform:translateY(-6px);transition:opacity 0.15s,transform 0.15s,visibility 0s 0.15s;position:absolute;top:calc(100% + 10px);left:0;background:#fff;border-radius:12px;box-shadow:0 8px 36px rgba(0,0,0,0.16);padding:14px 18px;width:220px;z-index:300;}' +
     '.ts-nav-dd.open{visibility:visible;opacity:1;transform:translateY(0);transition:opacity 0.15s,transform 0.15s,visibility 0s 0s;}' +
     '.ts-nav-dd-email{font-size:11px;color:rgba(60,20,0,0.5);padding-bottom:8px;border-bottom:1px solid #f0ede6;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
     '.ts-nav-dd-link{display:block;padding:6px 0;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.75;}' +
@@ -85,7 +85,6 @@
       '<div class="ts-nav-bar" id="ts-nav-bar">' +
         '<div class="ts-nav-wrap">' +
           '<div class="ts-nav">' +
-            '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
             '<div class="ts-nav-links">' +
               '<a href="/" class="ts-nav-link">Myhome</a>' +
               '<a href="/pricing" class="ts-nav-link">Pricing</a>' +
@@ -96,6 +95,7 @@
               '</div>' +
               '<button class="ts-nav-hamburger" id="ts-nav-hamburger">&#9776;</button>' +
             '</div>' +
+            '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
           '</div>' +
         '</div>' +
       '</div>' +
