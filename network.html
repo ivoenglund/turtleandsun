@@ -36,7 +36,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:#1C0A00;display:flex
 .fo-filters{top:76px;left:14px;width:210px;max-height:calc(100vh - 96px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
 .fo-filters::-webkit-scrollbar{display:none;}
 
-.fo-detail{top:76px;right:14px;width:220px;max-width:220px;max-height:calc(100vh - 96px);overflow:hidden;display:none;flex-direction:column;}
+.fo-detail{top:76px;right:14px;width:245px;max-width:245px;max-height:calc(100vh - 96px);overflow:hidden;display:none;flex-direction:column;}
 .fo-detail.fo-open{display:flex;}
 
 .fo-filters.fo-hidden{display:none;}
@@ -615,6 +615,12 @@ function buildGraph() {
   _svg.call(zoom);
   _g = _svg.append('g');
 
+  // Start zoomed out — labels hide below scale 0.5, so initial render skips text layout
+  const _initScale = 0.4;
+  const _initT = d3.zoomIdentity.translate(_width / 2, _height / 2).scale(_initScale);
+  _svg.call(zoom.transform, _initT);
+  _currentTransform = _initT;
+
   const nodesCopy = _allNodes.map(n => ({ ...n }));
   const idToNode = {};
   nodesCopy.forEach(n => { idToNode[n.id] = n; });
@@ -777,6 +783,7 @@ function buildGraph() {
   });
 
   applyVisibility();
+  updateLabelVisibility(_currentTransform.k);
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
