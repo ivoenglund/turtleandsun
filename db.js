@@ -149,6 +149,7 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_me BOOLEAN DEFAULT FALSE;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS street_2 TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS region TEXT;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company TEXT;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support

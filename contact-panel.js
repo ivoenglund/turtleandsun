@@ -178,6 +178,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     <div class="cp-tbl">
       <div class="cp-row"><span class="cp-lbl">Email</span><input class="cp-inp" type="text" inputmode="email" autocomplete="email" id="cpFEmail" data-field="email" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
+      <div class="cp-row"><span class="cp-lbl">Company</span><input class="cp-inp" type="text" id="cpFCompany" data-field="company" onblur="CP._scheduleSave()"></div>
       <div class="cp-addr-pair">
         <div class="cp-addr-col wide"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
         <div class="cp-addr-col wide"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave()"></div>
@@ -277,6 +278,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     document.getElementById('cpFPhone').value = c.phone || '';
     document.getElementById('cpFBirthday').value = c.birthday ? c.birthday.split('T')[0] : '';
     document.getElementById('cpFDiedOn').value = c.died_on ? c.died_on.split('T')[0] : '';
+    document.getElementById('cpFCompany').value = c.company || '';
     document.getElementById('cpFStreet').value = c.street || '';
     document.getElementById('cpFStreet2').value = c.street_2 || '';
     document.getElementById('cpFCity').value = c.city || '';
@@ -305,7 +307,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     const content = document.getElementById('cpContent');
     if (content) content.classList.add('cp-no-contact');
 
-    ['cpFName','cpFEmail','cpFPhone','cpFStreet','cpFStreet2','cpFCity','cpFRegion','cpFCountry','cpFPostal'].forEach(id => {
+    ['cpFName','cpFEmail','cpFPhone','cpFCompany','cpFStreet','cpFStreet2','cpFCity','cpFRegion','cpFCountry','cpFPostal'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -352,6 +354,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
       name: document.getElementById('cpFName').value,
       email: document.getElementById('cpFEmail').value,
       phone: document.getElementById('cpFPhone').value,
+      company: document.getElementById('cpFCompany').value,
       street: document.getElementById('cpFStreet').value,
       street_2: document.getElementById('cpFStreet2').value,
       city: document.getElementById('cpFCity').value,
