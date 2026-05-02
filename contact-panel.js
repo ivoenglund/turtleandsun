@@ -178,8 +178,10 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     <div class="cp-tbl">
       <div class="cp-row"><span class="cp-lbl">Email</span><input class="cp-inp" type="text" inputmode="email" autocomplete="email" id="cpFEmail" data-field="email" onblur="CP._scheduleSave()"></div>
       <div class="cp-row"><span class="cp-lbl">Phone</span><input class="cp-inp" type="tel" id="cpFPhone" data-field="phone" onblur="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
-      <div class="cp-row"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave()"></div>
+      <div class="cp-addr-pair">
+        <div class="cp-addr-col wide"><span class="cp-lbl">Birthday</span><input class="cp-inp" type="date" id="cpFBirthday" data-field="birthday" onchange="CP._scheduleSave()"></div>
+        <div class="cp-addr-col wide"><span class="cp-lbl">Died on</span><input class="cp-inp" type="date" id="cpFDiedOn" data-field="died_on" onchange="CP._scheduleSave()"></div>
+      </div>
       <div class="cp-row"><span class="cp-lbl">Pet</span><div class="cp-check-cell"><input type="checkbox" id="cpFIsPet" onchange="CP._scheduleSave()"></div></div>
     </div>
   </div>
