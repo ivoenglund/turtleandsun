@@ -115,6 +115,9 @@ const CP = (() => {
 
 @media(max-width:1000px){.cp-lbl{font-size:10px;}}
 
+/* Hide yyyy-mm-dd placeholder on empty unfocused date inputs */
+.cp-inp[type="date"]:not(:valid):not(:focus)::-webkit-datetime-edit{color:transparent;}
+
 /* Suppress browser autofill/contact icons in all inputs */
 input::-webkit-contacts-auto-fill-button,
 input::-webkit-credentials-auto-fill-button{display:none!important;width:0!important;height:0!important;}
