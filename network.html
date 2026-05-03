@@ -478,6 +478,8 @@ async function init() {
     (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name))
       .forEach(s => addCbForGroup(s, depth + 1, color));
   }
+  const topGroupDefs = (data.groups || []).filter(g => !g.parent_group_id)
+    .sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
   topGroupDefs.forEach(g => addCbForGroup(g, 0, GROUP_COLORS[g.name]));
   _groupsWithCheckbox.clear();
   document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => _groupsWithCheckbox.add(cb.dataset.group));
