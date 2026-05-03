@@ -194,13 +194,15 @@
 
       var status = null;
       try {
-        var res = await fetch('/api/auth/status', { credentials: 'include' });
+        var res = await fetch('/api/auth/status', { credentials: 'same-origin' });
         status = res.ok ? await res.json() : null;
       } catch (e) {
         status = null;
       }
+      console.log('[NavBar] auth status response:', status);
 
       if (requireAuth && (!status || !status.loggedIn)) {
+        console.log('[NavBar] redirecting to /login because requireAuth is true and user is not logged in');
         window.location.href = '/login';
         return null;
       }
