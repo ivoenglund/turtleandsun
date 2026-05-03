@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Network — Turtle and Sun</title>
+<title>My Network â€” Turtle and Sun</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -11,11 +11,11 @@ html,body{height:100%;overflow:hidden;}
 body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);color:#1C0A00;display:flex;flex-direction:column;}
 
 
-/* ── Sidebar + main canvas ──────────────────────────────────────── */
+/* â”€â”€ Sidebar + main canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ts-sidebar-bg{position:fixed;left:0;top:0;width:260px;bottom:0;border-right:1px solid rgba(28,10,0,0.1);pointer-events:none;z-index:49;}
 .main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;margin-left:260px;}
 
-/* ── Left panels ─────────────────────────────────────────────────── */
+/* â”€â”€ Left panels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:110;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
 .fo-sidebar.ts-panel-lg{width:320px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
@@ -31,7 +31,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-delete-contact:hover:not(:disabled){border-color:#c0392b;color:#c0392b;background:rgba(192,57,43,0.04);}
 .btn-delete-contact:disabled{opacity:0.35;cursor:not-allowed;}
 
-/* Filter items – text-shadow for legibility over canvas */
+/* Filter items â€“ text-shadow for legibility over canvas */
 .fp-item{padding:3px 0;display:flex;align-items:center;gap:6px;}
 .fp-item label{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;user-select:none;text-shadow:0 0 8px rgba(255,249,230,1),0 0 4px rgba(255,249,230,0.9);}
 .fp-item input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#3A6B20;flex-shrink:0;}
@@ -165,14 +165,14 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-<script src="/nav.js?v=20260503c"></script>
+<script src="/nav.js?v=20260503d"></script>
 </head>
 <body>
 
 <!-- Full-width canvas -->
 <div class="main-canvas">
   <div id="graph-container">
-    <div id="loading"><p>Loading network…</p></div>
+    <div id="loading"><p>Loading networkâ€¦</p></div>
     <svg id="graph-svg"></svg>
   </div>
   <div id="outline-container">
@@ -185,14 +185,14 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   <div id="calendar-container">
     <div class="cal-toolbar">
       <button class="cal-today-btn" onclick="calToday()">Today</button>
-      <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+      <button class="cal-nav-btn" onclick="calNav(-1)">â€¹</button>
       <span class="cal-title" id="calTitle"></span>
-      <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+      <button class="cal-nav-btn" onclick="calNav(1)">â€º</button>
       <button class="cal-zoom-btn active" data-zoom="month" onclick="setCalZoom('month')">Month</button>
       <button class="cal-zoom-btn" data-zoom="week" onclick="setCalZoom('week')">Week</button>
       <div style="flex:1"></div>
-      <button class="cal-print-btn" onclick="printCalendarMonth()">Print month ↗</button>
-      <button class="cal-print-btn" onclick="printCalendarYear()">Print year ↗</button>
+      <button class="cal-print-btn" onclick="printCalendarMonth()">Print month â†—</button>
+      <button class="cal-print-btn" onclick="printCalendarYear()">Print year â†—</button>
     </div>
     <div class="cal-dow-row" id="calDowRow">
       <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div>
@@ -244,7 +244,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 <!-- Mobile -->
 <div class="fo-backdrop" id="foBackdrop" onclick="closeMobileOverlays()"></div>
 <div class="mob-toolbar">
-  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">≡ Filters</button>
+  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">â‰¡ Filters</button>
   <button class="mob-btn" id="mobDetailBtn" disabled onclick="toggleMobileDetail()">Contact</button>
 </div>
 
@@ -315,7 +315,7 @@ function formatBirthdayShort(str) {
   return `${parseInt(p[2], 10)} ${MONTHS[parseInt(p[1], 10) - 1] || p[1]}`;
 }
 function yearOf(str) { return str ? parseInt(str.split('-')[0]) : null; }
-function truncate(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+function truncate(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + 'â€¦' : s; }
 function cleanRel(s) { return (s || '').replace(/ of$/i, ''); }
 
 function calcAge(birthdayStr, diedOnStr) {
@@ -372,7 +372,7 @@ function nodeLayout(d) {
   let ri = 0;
   items.push({
     y: startY + ri++ * (ROWY + GAP),
-    text: truncate((d.is_pet ? '🐾 ' : '') + (d.name || (d.isMe ? '—' : 'Unnamed')), 18),
+    text: truncate((d.is_pet ? 'ðŸ¾ ' : '') + (d.name || (d.isMe ? 'â€”' : 'Unnamed')), 18),
     fontSize: 10, fontWeight: 800,
     fill: d.died_on ? '#888' : '#1C0A00',
     fontStyle: d.died_on ? 'italic' : 'normal',
@@ -382,11 +382,11 @@ function nodeLayout(d) {
     if (d.died_on) {
       const by = yearOf(d.birthday), dy = yearOf(d.died_on);
       const age = calcAge(d.birthday, d.died_on);
-      txt = by && dy ? `${by} – ${dy}` + (age !== null ? ` — ${age}` : '')
-                     : dy ? `† ${dy}` + (age !== null ? ` — ${age}` : '') : '';
+      txt = by && dy ? `${by} â€“ ${dy}` + (age !== null ? ` â€” ${age}` : '')
+                     : dy ? `â€  ${dy}` + (age !== null ? ` â€” ${age}` : '') : '';
     } else {
       const age = calcAge(d.birthday, null);
-      txt = formatBirthdayShort(d.birthday) + (age !== null ? ` — ${age}` : '');
+      txt = formatBirthdayShort(d.birthday) + (age !== null ? ` â€” ${age}` : '');
     }
     items.push({
       y: startY + ri++ * (ROWY + GAP),
@@ -499,7 +499,7 @@ async function init() {
   }));
 
   const meContact = (data.contacts || []).find(c => c.is_me);
-  console.log('[Network] Me contact from API:', meContact || '(none — fallback node used)');
+  console.log('[Network] Me contact from API:', meContact || '(none â€” fallback node used)');
   _meNodeId = meContact ? meContact.id : '__me__';
   _allNodes = [
     meContact
@@ -695,7 +695,7 @@ function buildGraph() {
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
       .attr('font-family', "'Plus Jakarta Sans', sans-serif")
       .attr('font-size', isSub ? 10 : 13).attr('font-weight', 800).attr('fill', '#FFF9E6')
-      .text(truncate((name === 'Family' ? '♥ ' : '') + name, isSub ? 13 : 17));
+      .text(truncate((name === 'Family' ? 'â™¥ ' : '') + name, isSub ? 13 : 17));
   });
 
   _groupNodeSel = groupG;
@@ -764,7 +764,7 @@ function buildGraph() {
   updateLabelVisibility(_currentTransform.k);
 }
 
-// ── Filter counts ─────────────────────────────────────────────────────────────
+// â”€â”€ Filter counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function computeGroupMemberCount(groupId, showOnlyLiving) {
   const seen = new Set();
   const collect = gid => {
@@ -810,7 +810,7 @@ function updateFilterCounts() {
   if (petsEl) petsEl.textContent = petsCnt;
 }
 
-// ── Live node label update ────────────────────────────────────────────────────
+// â”€â”€ Live node label update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function updateNodeLabel(contactId) {
   if (!_nodeSel) return;
   const c = _contactMap[contactId];
@@ -835,7 +835,7 @@ function updateNodeLabel(contactId) {
   });
 }
 
-// ── Filters ───────────────────────────────────────────────────────────────────
+// â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getActiveGroups() {
   const active = new Set();
   document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => {
@@ -958,7 +958,7 @@ function applyVisibility() {
   scheduleViewportCull();
 }
 
-// ── Drag ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Drag â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function dragStart(event, d) {
   _isDragging = true;
   if (!event.active) {
@@ -978,7 +978,7 @@ function updateLabelVisibility() {
   _groupNodeSel.selectAll('text').style('opacity', '1');
 }
 
-// ── Viewport culling ──────────────────────────────────────────────────────────
+// â”€â”€ Viewport culling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function scheduleViewportCull() {
   clearTimeout(_cullTimer);
   _cullTimer = setTimeout(runViewportCull, 150);
@@ -1006,12 +1006,12 @@ function runViewportCull() {
   });
 }
 
-// ── Tooltip ───────────────────────────────────────────────────────────────────
+// â”€â”€ Tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const tooltip = document.getElementById('tooltip');
 
 function showTooltip(event, d) {
   if (d.id === '__me__') return;
-  tooltip.textContent = d.name || (d.isMe ? '—' : 'Unnamed');
+  tooltip.textContent = d.name || (d.isMe ? 'â€”' : 'Unnamed');
   tooltip.classList.add('visible');
   moveTooltip(event);
 }
@@ -1023,7 +1023,7 @@ function edgeEnter(event, d) {
   const tName = tNode ? (tNode.name || 'Unknown') : 'Unknown';
   let text;
   const rA = cleanRel(d.relA), rB = cleanRel(d.relB);
-  if (!rA && !rB) text = `${sName} ↔ ${tName}`;
+  if (!rA && !rB) text = `${sName} â†” ${tName}`;
   else if (!rB || rA === rB) text = `${sName} & ${tName}: ${rA}`;
   else text = `${truncate(sName,16)}: ${rA}\n${truncate(tName,16)}: ${rB}`;
   tooltip.style.whiteSpace = 'pre';
@@ -1039,7 +1039,7 @@ function moveTooltip(event) {
 
 function hideTooltip() { tooltip.classList.remove('visible'); tooltip.style.whiteSpace = 'normal'; }
 
-// ── Detail overlay ────────────────────────────────────────────────────────────
+// â”€â”€ Detail overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let _detailId = null;
 
 function nodeClick(event, d) { if (d.id === '__me__') return; if (d.isMe) console.log('[Network] Me node clicked, opening contact id:', d.id, 'data:', d); event.stopPropagation(); openDetailPanel(d.id); }
@@ -1141,7 +1141,7 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── View switching ────────────────────────────────────────────────────────────
+// â”€â”€ View switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function switchView(view) {
   _currentView = view;
   document.getElementById('graph-container').style.display = view === 'network' ? '' : 'none';
@@ -1154,7 +1154,7 @@ function switchView(view) {
   else if (view === 'map') renderMap();
 }
 
-// ── Map view ──────────────────────────────────────────────────────────────────
+// â”€â”€ Map view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let _leafletMap = null;
 let _markerClusterGroup = null;
 let _mapMarkers = [];
@@ -1166,7 +1166,7 @@ function _contactAge(c) {
   const m = /\b(\d{4})\b/.exec(c.birthday || '');
   if (!m) return null;
   const birthYear = parseInt(m[1]);
-  if (c.died_on) return `${birthYear}–${new Date(c.died_on).getFullYear()}`;
+  if (c.died_on) return `${birthYear}â€“${new Date(c.died_on).getFullYear()}`;
   return String(new Date().getFullYear() - birthYear);
 }
 
@@ -1182,7 +1182,7 @@ function _makePinIcon(c, zoom) {
   }
 
   const name = c.name || '';
-  let label = name.length > 18 ? name.slice(0, 17) + '…' : name;
+  let label = name.length > 18 ? name.slice(0, 17) + 'â€¦' : name;
   if (zoom >= 10) {
     const age = _contactAge(c);
     if (age) label += `, ${age}`;
@@ -1221,7 +1221,7 @@ function renderMap() {
   if (!_leafletMap) {
     _leafletMap = L.map('leaflet-map', { center: [20, 0], zoom: 2, zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: 'Â© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(_leafletMap);
     _markerClusterGroup = L.markerClusterGroup({ maxClusterRadius: 48, showCoverageOnHover: false });
@@ -1278,7 +1278,7 @@ function renderMap() {
 
   for (const c of pinned) {
     const marker = L.marker([c.latitude, c.longitude], { icon: _makePinIcon(c, zoom) });
-    const tooltipName = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+    const tooltipName = (c.is_pet ? 'ðŸ¾ ' : '') + (c.name || 'Unnamed');
     marker.bindTooltip(tooltipName, { permanent: false, direction: 'top', offset: [0, -9] });
     marker.on('click', () => {
       const prev = _selectedMapContactId;
@@ -1303,7 +1303,7 @@ function renderMap() {
   }, 50);
 }
 
-// ── Calendar ──────────────────────────────────────────────────────────────────
+// â”€â”€ Calendar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function initCalendar() {
   const now = new Date();
   _calYear = now.getFullYear();
@@ -1359,13 +1359,13 @@ function getOccasionsForMonth(year, month) {
     if (c.birthday) {
       const b = new Date(c.birthday);
       if (!isNaN(b.getTime()) && b.getMonth() === month) {
-        add(b.getDate(), { contact_id: c.id, label: `🎂 ${c.name || 'Unnamed'}`, type: 'birthday' });
+        add(b.getDate(), { contact_id: c.id, label: `ðŸŽ‚ ${c.name || 'Unnamed'}`, type: 'birthday' });
       }
     }
     if (c.died_on) {
       const d = new Date(c.died_on);
       if (!isNaN(d.getTime()) && d.getMonth() === month) {
-        add(d.getDate(), { contact_id: c.id, label: `🕯 ${c.name || 'Unnamed'}`, type: 'remembrance' });
+        add(d.getDate(), { contact_id: c.id, label: `ðŸ•¯ ${c.name || 'Unnamed'}`, type: 'remembrance' });
       }
     }
   }
@@ -1397,12 +1397,12 @@ function getOccasionsForDate(date) {
     if (c.birthday) {
       const b = new Date(c.birthday);
       if (!isNaN(b.getTime()) && b.getMonth() === month && b.getDate() === day)
-        result.push({ contact_id: c.id, label: `🎂 ${c.name || 'Unnamed'}`, type: 'birthday' });
+        result.push({ contact_id: c.id, label: `ðŸŽ‚ ${c.name || 'Unnamed'}`, type: 'birthday' });
     }
     if (c.died_on) {
       const d = new Date(c.died_on);
       if (!isNaN(d.getTime()) && d.getMonth() === month && d.getDate() === day)
-        result.push({ contact_id: c.id, label: `🕯 ${c.name || 'Unnamed'}`, type: 'remembrance' });
+        result.push({ contact_id: c.id, label: `ðŸ•¯ ${c.name || 'Unnamed'}`, type: 'remembrance' });
     }
   }
   for (const o of _rawOccasions) {
@@ -1426,7 +1426,7 @@ function renderCalendar() {
   } else {
     const end = new Date(_calWeekStart); end.setDate(end.getDate() + 6);
     document.getElementById('calTitle').textContent =
-      `${MONTHS[_calWeekStart.getMonth()]} ${_calWeekStart.getDate()} – ${MONTHS[end.getMonth()]} ${end.getDate()}, ${end.getFullYear()}`;
+      `${MONTHS[_calWeekStart.getMonth()]} ${_calWeekStart.getDate()} â€“ ${MONTHS[end.getMonth()]} ${end.getDate()}, ${end.getFullYear()}`;
     renderCalWeek(_calWeekStart);
   }
 }
@@ -1495,7 +1495,7 @@ function renderCalWeek(weekStart) {
   grid.innerHTML = html;
 }
 
-// ── Outline view ──────────────────────────────────────────────────────────────
+// â”€â”€ Outline view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function olGroupTotalCount(groupId, showOnlyLiving, showOnlyPets, active) {
   const grp = _groupById[groupId];
   const selfActive = !grp || active.has(grp.name);
@@ -1528,9 +1528,9 @@ function renderOutline() {
     el.dataset.groupId = g.id;
     el.innerHTML = `<div class="ol-group-hdr" onclick="toggleOlGroup(this)">
       <input type="checkbox" class="ol-cb" onchange="olGroupCbChange(this,${g.id})" onclick="event.stopPropagation()">
-      <span class="ol-tri">▼</span>
+      <span class="ol-tri">â–¼</span>
       <span class="ol-dot" style="background:${color}"></span>
-      <span class="ol-group-name">${isFamily ? '♥ ' : ''}${esc(g.name)}</span>
+      <span class="ol-group-name">${isFamily ? 'â™¥ ' : ''}${esc(g.name)}</span>
       <span class="ol-count">${totalVisible}</span>
     </div><div class="ol-group-body"></div>`;
     const body = el.querySelector('.ol-group-body');
@@ -1553,7 +1553,7 @@ function renderOutline() {
       const el = document.createElement('div');
       el.className = 'ol-group';
       el.innerHTML = `<div class="ol-group-hdr" onclick="toggleOlGroup(this)">
-        <span class="ol-tri">▼</span>
+        <span class="ol-tri">â–¼</span>
         <span class="ol-dot" style="background:#9aa5b4"></span>
         <span class="ol-group-name">Unrelated</span>
         <span class="ol-count">${unrelatedContacts.length}</span>
@@ -1574,8 +1574,8 @@ function renderOlFamilySection(body, members) {
   petsEl.className = 'ol-sub';
   petsEl.innerHTML = `<div class="ol-sub-hdr" onclick="toggleOlSub(this)">
     <input type="checkbox" class="ol-cb" onchange="olSubCbChange(this)" onclick="event.stopPropagation()">
-    <span class="ol-tri">▼</span>
-    <span class="ol-sub-name">🐾 Pets</span>
+    <span class="ol-tri">â–¼</span>
+    <span class="ol-sub-name">ðŸ¾ Pets</span>
     <span class="ol-count">${pets.length}</span>
   </div><div class="ol-sub-body"></div>`;
   const pb = petsEl.querySelector('.ol-sub-body');
@@ -1609,7 +1609,7 @@ function renderOlChildren(body, groupId, showOnlyLiving, showOnlyPets, active) {
     subEl.dataset.subId = g.id;
     subEl.innerHTML = `<div class="ol-sub-hdr" onclick="toggleOlSub(this)">
       <input type="checkbox" class="ol-cb" onchange="olSubCbChange(this)" onclick="event.stopPropagation()">
-      <span class="ol-tri">▼</span>
+      <span class="ol-tri">â–¼</span>
       <span class="ol-sub-name">${esc(g.name)}</span>
       <span class="ol-count">${count}</span>
     </div><div class="ol-sub-body"></div>`;
@@ -1624,11 +1624,11 @@ function makeOlRow(c, depth, showRelLabel) {
   row.className = 'ol-row' + (c.died_on ? ' ol-deceased' : '');
   row.dataset.contactId = c.id;
   if (depth > 0) row.style.paddingLeft = (depth * 12 + 16) + 'px';
-  const name = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+  const name = (c.is_pet ? 'ðŸ¾ ' : '') + (c.name || 'Unnamed');
   const metaRaw = olMeta(c);
   const relLabel = showRelLabel ? (_contactFamilyRelLabel[c.id] || '') : '';
   let metaStr = '';
-  if (metaRaw && relLabel) metaStr = `(${metaRaw}) — ${relLabel}`;
+  if (metaRaw && relLabel) metaStr = `(${metaRaw}) â€” ${relLabel}`;
   else if (metaRaw) metaStr = `(${metaRaw})`;
   else if (relLabel) metaStr = relLabel;
   row.innerHTML = `<input type="checkbox" class="ol-row-cb" onclick="event.stopPropagation()" onchange="olRowCbChange(this,${c.id})">
@@ -1642,8 +1642,8 @@ function olMeta(c) {
   if (c.died_on) {
     const by = yearOf(c.birthday), dy = yearOf(c.died_on);
     const age = calcAge(c.birthday, c.died_on);
-    if (by && dy) return `${by}–${dy}${age !== null ? `, ${age} yrs` : ''} †`;
-    return dy ? `† ${dy}` : '†';
+    if (by && dy) return `${by}â€“${dy}${age !== null ? `, ${age} yrs` : ''} â€ `;
+    return dy ? `â€  ${dy}` : 'â€ ';
   }
   const parts = [];
   if (c.birthday) { const y = yearOf(c.birthday); if (y) parts.push(y); }
@@ -1686,7 +1686,7 @@ function updateBulkBar() {
   document.getElementById('btn-loveogram').textContent = `Send Loveogram to ${n} contact${n !== 1 ? 's' : ''}`;
 }
 
-// ── New contact / Delete contact ──────────────────────────────────────────────
+// â”€â”€ New contact / Delete contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function newContact() {
   const name = prompt('Name of the new contact:');
   if (!name || !name.trim()) return;
@@ -1752,7 +1752,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     if (localStorage.getItem('ts-panel-scale') === 'large') {
       document.getElementById('foSidebar').classList.add('ts-panel-lg');
       const _t = document.getElementById('ts-panel-scale-toggle');
-      if (_t) _t.textContent = '−';
+      if (_t) _t.textContent = 'âˆ’';
       const _bg = document.querySelector('.ts-sidebar-bg');
       if (_bg) _bg.style.width = '320px';
       const _cv = document.querySelector('.main-canvas');
@@ -1774,7 +1774,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
         if (row) {
           const c = _contactMap[id];
           const sp = row.querySelector('.ol-row-name');
-          if (sp) sp.textContent = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+          if (sp) sp.textContent = (c.is_pet ? 'ðŸ¾ ' : '') + (c.name || 'Unnamed');
         }
       } else if (_currentView === 'calendar') renderCalendar();
       else if (_currentView === 'map') renderMap();
@@ -1791,7 +1791,7 @@ document.addEventListener('click', function(e) {
   const sidebar = document.getElementById('foSidebar');
   if (!sidebar) return;
   const isLarge = sidebar.classList.toggle('ts-panel-lg');
-  e.target.textContent = isLarge ? '−' : '+';
+  e.target.textContent = isLarge ? 'âˆ’' : '+';
   const bg = document.querySelector('.ts-sidebar-bg');
   if (bg) bg.style.width = isLarge ? '320px' : '';
   const canvas = document.querySelector('.main-canvas');

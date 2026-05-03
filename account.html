@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Account — Turtle and Sun</title>
+<title>My Account â€” Turtle and Sun</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -27,11 +27,11 @@ tr:last-child td{border-bottom:none;}
 .loading{text-align:center;padding:60px;color:rgba(60,20,0,0.35);font-size:14px;}
 @media(max-width:700px){.main{padding:24px 16px 0;}}
 </style>
-<script src="/nav.js?v=20260503c"></script>
+<script src="/nav.js?v=20260503d"></script>
 </head>
 <body>
 <div class="main">
-  <div id="loading" class="loading">Loading…</div>
+  <div id="loading" class="loading">Loadingâ€¦</div>
   <div id="content" style="display:none;">
     <div class="welcome">
       <h2 id="welcomeMsg">My account</h2>
@@ -60,20 +60,20 @@ async function load() {
 
     document.getElementById('ordersBody').innerHTML = orders.length
       ? orders.map(o => `<tr>
-          <td>${esc(o.product || '—')}</td>
+          <td>${esc(o.product || 'â€”')}</td>
           <td>$${parseFloat(o.amount || 0).toFixed(2)}</td>
           <td><span class="status status-${o.status}">${o.status}</span></td>
           <td>${fmtDate(o.created_at)}</td>
           <td>
-            ${o.result_url ? `<a class="dl-link" href="${esc(o.result_url)}" target="_blank">Image ↓</a>` : ''}
-            ${o.result_video_url ? `<a class="dl-link" href="${esc(o.result_video_url)}" target="_blank" style="margin-left:8px;">Video ↓</a>` : ''}
-            ${!o.result_url && !o.result_video_url ? '<span style="color:#aaa;font-size:12px;">Processing…</span>' : ''}
+            ${o.result_url ? `<a class="dl-link" href="${esc(o.result_url)}" target="_blank">Image â†“</a>` : ''}
+            ${o.result_video_url ? `<a class="dl-link" href="${esc(o.result_video_url)}" target="_blank" style="margin-left:8px;">Video â†“</a>` : ''}
+            ${!o.result_url && !o.result_video_url ? '<span style="color:#aaa;font-size:12px;">Processingâ€¦</span>' : ''}
           </td>
           <td>
-            ${o.result_url ? `<a class="dl-link" href="/print/loveogram?url=${encodeURIComponent(o.result_url)}" target="_blank">Print card</a>` : '—'}
+            ${o.result_url ? `<a class="dl-link" href="/print/loveogram?url=${encodeURIComponent(o.result_url)}" target="_blank">Print card</a>` : 'â€”'}
           </td>
         </tr>`).join('')
-      : `<tr><td colspan="5" class="empty">No orders yet. <a href="/" style="color:#3A6B20;font-weight:700;">Create your portrait →</a></td></tr>`;
+      : `<tr><td colspan="5" class="empty">No orders yet. <a href="/" style="color:#3A6B20;font-weight:700;">Create your portrait â†’</a></td></tr>`;
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
@@ -83,7 +83,7 @@ async function load() {
 }
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'; }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : 'â€”'; }
 
 NavBar.init({ requireAuth: true }).then(status => { if (status) load(); });
 </script>

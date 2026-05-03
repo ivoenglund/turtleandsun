@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Library — Turtle and Sun (Dev)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#f5f5f5;color:#1C0A00;min-height:100vh;}
+.page{max-width:1100px;margin:0 auto;padding:32px 24px;}
+h1{font-size:20px;font-weight:700;margin-bottom:4px;}
+.subtitle{font-size:13px;color:#666;margin-bottom:24px;}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #eee;}
+td{padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.thumb{width:50px;height:50px;object-fit:cover;border-radius:4px;display:block;}
+.thumb-none{width:50px;height:50px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;}
+.btn-test{font-size:12px;font-weight:600;padding:5px 12px;background:#1C0A00;color:#fff;border:none;border-radius:5px;cursor:pointer;}
+.btn-test:hover{background:#3A3030;}
+.status-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700;background:#e8f5e9;color:#2e7d32;}
+.empty{padding:40px;text-align:center;color:#aaa;font-size:14px;}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:10px;width:860px;max-width:96vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #eee;}
+.modal-header h2{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1;}
+.modal-body{display:flex;flex:1;overflow:hidden;}
+.modal-left{flex:0 0 340px;background:#f5f5f5;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+.modal-left img{width:100%;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.modal-right{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;}
+.section-label{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.address-block{font-size:13px;line-height:1.7;background:#f9f9f9;border-radius:6px;padding:12px 14px;}
+.btn-send{font-size:14px;font-weight:700;padding:10px 20px;background:#D32F2F;color:#fff;border:none;border-radius:6px;cursor:pointer;align-self:flex-start;}
+.btn-send:hover{background:#b71c1c;}
+.btn-send:disabled{opacity:.5;cursor:default;}
+.response-box{flex:1;min-height:120px;background:#111;color:#7eff7e;font-family:monospace;font-size:11px;border-radius:6px;padding:12px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;}
+.response-placeholder{color:#555;font-style:italic;}
+</style>
+<script src="/nav.js?v=20260503d"></script>
+</head>
+<body>
+<div class="page">
+  <h1>Library <span style="font-size:11px;font-weight:500;background:#ffcc00;color:#333;border-radius:4px;padding:2px 6px;vertical-align:middle;margin-left:6px;">DEV</span></h1>
+  <p class="subtitle">Recent 20 Loveograms with generated images. Admin only.</p>
+  <div id="content">Loading…</div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Test Gelato Print</h2>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-left">
+        <img id="modalImg" src="" alt="Loveogram">
+      </div>
+      <div class="modal-right">
+        <div>
+          <div class="section-label">Image URL</div>
+          <div id="modalUrl" style="font-size:11px;word-break:break-all;color:#555;"></div>
+        </div>
+        <div>
+          <div class="section-label">Test Recipient Address (hardcoded)</div>
+          <div class="address-block" id="modalAddress"></div>
+        </div>
+        <div>
+          <div class="section-label">Product UID</div>
+          <div id="modalProduct" style="font-size:12px;font-family:monospace;color:#555;"></div>
+        </div>
+        <button class="btn-send" id="modalSend">Send test order to Gelato sandbox</button>
+        <div>
+          <div class="section-label">API Response</div>
+          <pre class="response-box" id="modalResponse"><span class="response-placeholder">Response will appear here after sending…</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const gelato = {
+  TEST_ADDRESS: null,
+  CARD_PRODUCT_UID: null,
+};
+
+NavBar.init({ requireAuth: true }).then(status => {
+  if (!status) return;
+  if (!status.isAdmin) {
+    document.getElementById('content').innerHTML = '<p style="color:#c00;padding:20px;">Access denied — admins only.</p>';
+    return;
+  }
+  loadLibrary();
+});
+
+async function loadLibrary() {
+  try {
+    const [ordersRes, metaRes] = await Promise.all([
+      fetch('/api/library/orders', { credentials: 'same-origin' }),
+      fetch('/api/gelato/meta', { credentials: 'same-origin' }),
+    ]);
+    const orders = ordersRes.ok ? await ordersRes.json() : [];
+    const meta = metaRes.ok ? await metaRes.json() : {};
+    gelato.TEST_ADDRESS = meta.testAddress || {};
+    gelato.CARD_PRODUCT_UID = meta.cardProductUid || '';
+
+    renderTable(orders);
+    renderModalAddress();
+    document.getElementById('modalProduct').textContent = gelato.CARD_PRODUCT_UID;
+  } catch (err) {
+    document.getElementById('content').innerHTML = `<p style="color:#c00;">Error: ${err.message}</p>`;
+  }
+}
+
+function renderTable(orders) {
+  if (!orders.length) {
+    document.getElementById('content').innerHTML = '<div class="empty">No orders with generated images yet.</div>';
+    return;
+  }
+  const rows = orders.map(o => {
+    const date = new Date(o.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+    const thumb = o.result_url
+      ? `<img class="thumb" src="${esc(o.result_url)}" loading="lazy" alt="">`
+      : `<div class="thumb-none">no img</div>`;
+    return `<tr>
+      <td>${thumb}</td>
+      <td>${esc(o.email || '—')}</td>
+      <td>${esc(o.product || '—')}</td>
+      <td><span class="status-badge">${esc(o.status || '—')}</span></td>
+      <td>${date}</td>
+      <td>${o.result_url ? `<button class="btn-test" onclick="openModal(${o.id}, '${esc(o.result_url)}')">Test Gelato print</button>` : '<span style="color:#aaa;font-size:12px;">no image</span>'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('content').innerHTML = `
+    <table>
+      <thead><tr><th></th><th>Email</th><th>Product</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderModalAddress() {
+  const a = gelato.TEST_ADDRESS;
+  if (!a || !a.addressLine1) return;
+  document.getElementById('modalAddress').innerHTML =
+    `${esc(a.firstName)} ${esc(a.lastName)}<br>
+     ${esc(a.addressLine1)}<br>
+     ${esc(a.city)}, ${esc(a.state)} ${esc(a.postCode)}<br>
+     ${esc(a.country)}<br>
+     ${esc(a.email)}`;
+}
+
+let _currentImageUrl = null;
+let _currentOrderId = null;
+
+function openModal(orderId, imageUrl) {
+  _currentImageUrl = imageUrl;
+  _currentOrderId = orderId;
+  document.getElementById('modalImg').src = imageUrl;
+  document.getElementById('modalUrl').textContent = imageUrl;
+  document.getElementById('modalResponse').innerHTML = '<span class="response-placeholder">Response will appear here after sending…</span>';
+  document.getElementById('modalSend').disabled = false;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  _currentImageUrl = null;
+  _currentOrderId = null;
+}
+
+document.getElementById('modalSend').addEventListener('click', async () => {
+  if (!_currentImageUrl) return;
+  const btn = document.getElementById('modalSend');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  const box = document.getElementById('modalResponse');
+  box.textContent = 'Calling Gelato sandbox…';
+  try {
+    const res = await fetch('/api/gelato/test-print', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: _currentImageUrl, orderId: _currentOrderId }),
+    });
+    const data = await res.json();
+    box.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    box.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send test order to Gelato sandbox';
+  }
+});
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

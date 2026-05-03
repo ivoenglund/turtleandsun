@@ -9,6 +9,7 @@ const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
 const { uploadStream } = require('./cloudinary');
 const { google } = require('googleapis');
+const gelato = require('./gelato');
 const {
   createMagicLink, verifyMagicLink, findOrCreateUser,
   createSession, setSessionCookie, getSessionUser,
@@ -422,6 +423,40 @@ app.get('/account/network', requireAuth, (req, res) => {
 
 app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
+});
+
+app.get('/account/library', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'library.html'));
+});
+
+app.get('/api/library/orders', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, product, status, amount, result_url, created_at
+       FROM orders
+       WHERE result_url IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT 20`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/gelato/meta', requireRole('admin'), (req, res) => {
+  res.json({ testAddress: gelato.TEST_ADDRESS, cardProductUid: gelato.CARD_PRODUCT_UID });
+});
+
+app.post('/api/gelato/test-print', requireRole('admin'), async (req, res) => {
+  const { imageUrl, orderId } = req.body;
+  if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+  try {
+    const result = await gelato.testPrint(imageUrl, orderId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/print/loveogram', requireAuth, (req, res) => {

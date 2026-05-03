@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Contacts — Turtle and Sun</title>
+<title>Contacts â€” Turtle and Sun</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -15,11 +15,11 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 #syncBanner.ok{background:#e8f0e0;color:#2d5a16;}
 #syncBanner.err{background:#fdecea;color:#c0392b;}
 
-/* ── Sidebar + main canvas ──────────────────────────────────────── */
+/* â”€â”€ Sidebar + main canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ts-sidebar-bg{position:fixed;left:0;top:0;width:260px;bottom:0;border-right:1px solid rgba(28,10,0,0.1);pointer-events:none;z-index:49;}
 .main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;margin-left:260px;}
 
-/* ── Left panels ─────────────────────────────────────────────────── */
+/* â”€â”€ Left panels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:110;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
 .fo-sidebar.ts-panel-lg{width:320px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
@@ -35,7 +35,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-delete-contact:hover:not(:disabled){border-color:#c0392b;color:#c0392b;background:rgba(192,57,43,0.04);}
 .btn-delete-contact:disabled{opacity:0.35;cursor:not-allowed;}
 
-/* Filter items – chip backgrounds for legibility */
+/* Filter items â€“ chip backgrounds for legibility */
 #leftFilterContent{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
 .fp-item{display:flex;align-items:center;gap:5px;padding:3px 6px;cursor:pointer;user-select:none;background:#FFF9E6;border-radius:3px;width:fit-content;}
 .fp-item label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;cursor:pointer;display:flex;align-items:center;gap:5px;}
@@ -139,7 +139,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
 <script src="/theme.js?v=20260504"></script>
-<script src="/nav.js?v=20260503c"></script>
+<script src="/nav.js?v=20260503d"></script>
 </head>
 <body>
 
@@ -170,21 +170,21 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 <!-- Main contact list -->
 <div class="main-canvas">
   <div class="list-toolbar">
-    <input class="search-input" id="searchInput" type="text" placeholder="Search contacts…" oninput="applyContactFilter()">
+    <input class="search-input" id="searchInput" type="text" placeholder="Search contactsâ€¦" oninput="applyContactFilter()">
     <div class="list-actions">
       <button class="btn-add-ph" onclick="openPlaceholderModal()">+ Add person</button>
-      <button class="btn-manage-groups" onclick="openGroupsModal()">⚙ Groups</button>
+      <button class="btn-manage-groups" onclick="openGroupsModal()">âš™ Groups</button>
     </div>
   </div>
   <div class="contact-list" id="contactList">
-    <div class="list-empty">Loading…</div>
+    <div class="list-empty">Loadingâ€¦</div>
   </div>
 </div>
 
 <!-- Mobile -->
 <div class="fo-backdrop" id="foBackdrop" onclick="closeMobileOverlays()"></div>
 <div class="mob-toolbar">
-  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">≡ Filters</button>
+  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">â‰¡ Filters</button>
   <button class="mob-btn" id="mobDetailBtn" disabled onclick="toggleMobileDetail()">Contact</button>
 </div>
 
@@ -210,7 +210,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
       <input type="text" id="newGroupName" placeholder="New group name" onkeydown="if(event.key==='Enter')addGroup()">
       <button class="btn-add-group" onclick="addGroup()">Add group</button>
     </div>
-    <div class="groups-mgr-list" id="groupsMgrList">Loading…</div>
+    <div class="groups-mgr-list" id="groupsMgrList">Loadingâ€¦</div>
     <div class="modal-btns">
       <button class="btn-modal-confirm" onclick="closeGroupsModal()">Done</button>
     </div>
@@ -227,14 +227,14 @@ let _contactGroupMap = {};
 let _allGroupsById = {};
 let _relatedContactIds = null;
 
-// ── Sync banner ───────────────────────────────────────────────────────────────
+// â”€â”€ Sync banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 (function() {
   const p = new URLSearchParams(location.search);
   const banner = document.getElementById('syncBanner');
   if (p.get('synced') !== null) {
     const n = parseInt(p.get('synced'), 10);
     banner.className = 'ok';
-    banner.textContent = `✓ Synced ${n} contact${n !== 1 ? 's' : ''} from Google.`;
+    banner.textContent = `âœ“ Synced ${n} contact${n !== 1 ? 's' : ''} from Google.`;
     banner.style.display = 'block';
   } else if (p.get('error')) {
     banner.className = 'err';
@@ -244,7 +244,7 @@ let _relatedContactIds = null;
   if (p.get('synced') !== null || p.get('error')) history.replaceState(null, '', '/account/contacts');
 })();
 
-// ── Panel helpers ─────────────────────────────────────────────────────────────
+// â”€â”€ Panel helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openDetail(id) {
   _currentId = id;
   document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
@@ -318,7 +318,7 @@ function closeMobileOverlays() {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileOverlays(); hideDetail(); } });
 
-// ── Filter panel ──────────────────────────────────────────────────────────────
+// â”€â”€ Filter panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadGroupMemberships() {
   const res = await fetch('/api/group-memberships');
   if (!res.ok) return;
@@ -414,7 +414,7 @@ function applyContactFilter() {
   }));
 }
 
-// ── Contacts list ─────────────────────────────────────────────────────────────
+// â”€â”€ Contacts list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadContacts() {
   const res = await fetch('/api/contacts');
   if (res.status === 401) { window.location.href = '/login'; return; }
@@ -443,7 +443,7 @@ function renderList(contacts) {
     const dot = dotColor ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dotColor};margin-right:5px;flex-shrink:0;vertical-align:middle;"></span>` : '';
     return `
     <div class="contact-item${_currentId === c.id ? ' active' : ''}" onclick="selectContact(${c.id})" ondblclick="forceSelectContact(${c.id})" data-id="${c.id}">
-      <div class="ci-name">${dot}${c.is_pet ? '🐾 ' : ''}${esc(c.name || 'Unnamed')}${c.is_me ? '<span class="ci-me">Me</span>' : ''}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}${c.died_on ? '<span class="ci-deceased">†</span>' : ''}</div>
+      <div class="ci-name">${dot}${c.is_pet ? 'ðŸ¾ ' : ''}${esc(c.name || 'Unnamed')}${c.is_me ? '<span class="ci-me">Me</span>' : ''}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}${c.died_on ? '<span class="ci-deceased">â€ </span>' : ''}</div>
       ${c.email ? `<div class="ci-email">${esc(c.email)}</div>` : ''}
       ${c.birthday ? `<div class="ci-bday">${esc(c.birthday)}</div>` : ''}
     </div>
@@ -451,7 +451,7 @@ function renderList(contacts) {
   }).join('');
 }
 
-// ── Select contact ────────────────────────────────────────────────────────────
+// â”€â”€ Select contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function selectContact(id) {
   _currentId = id;
   document.querySelectorAll('.contact-item').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
@@ -466,7 +466,7 @@ function forceSelectContact(id) {
   openDetail(id);
 }
 
-// ── Manage groups modal ───────────────────────────────────────────────────────
+// â”€â”€ Manage groups modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openGroupsModal() {
   document.getElementById('newGroupName').value = '';
   renderGroupsMgr();
@@ -480,7 +480,7 @@ function renderGroupsMgr() {
   el.innerHTML = _allGroups.map(g => {
     const isFamily = g.name === 'Family';
     let html = `<div class="groups-mgr-item">
-      <span class="groups-mgr-name">${esc(g.name)}${isFamily ? '<span class="groups-mgr-lock">🔒 system</span>' : ''}</span>
+      <span class="groups-mgr-name">${esc(g.name)}${isFamily ? '<span class="groups-mgr-lock">ðŸ”’ system</span>' : ''}</span>
       <div style="display:flex;gap:4px;align-items:center;">
         ${isFamily ? '' : `<button class="btn-add-sub" onclick="openAddSubgroupModal(${g.id},${JSON.stringify(g.name)})">+ Sub</button>`}
         ${isFamily ? '' : `<button class="btn-del" onclick="deleteGroup(${g.id})">Remove</button>`}
@@ -488,7 +488,7 @@ function renderGroupsMgr() {
     if (g.subgroups && g.subgroups.length) {
       g.subgroups.forEach(s => {
         html += `<div class="groups-mgr-item groups-mgr-sub">
-          <span class="groups-mgr-name">↳ ${esc(s.name)}</span>
+          <span class="groups-mgr-name">â†³ ${esc(s.name)}</span>
           <button class="btn-del" onclick="deleteGroup(${s.id},true)">Remove</button>
         </div>`;
       });
@@ -540,7 +540,7 @@ async function deleteGroup(id, isSubgroup = false) {
   }
 }
 
-// ── Placeholder modal ─────────────────────────────────────────────────────────
+// â”€â”€ Placeholder modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openPlaceholderModal() {
   document.getElementById('phName').value = '';
   document.getElementById('phModal').classList.add('open');
@@ -577,7 +577,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     if (localStorage.getItem('ts-panel-scale') === 'large') {
       document.getElementById('foSidebar').classList.add('ts-panel-lg');
       const _t = document.getElementById('ts-panel-scale-toggle');
-      if (_t) _t.textContent = '−';
+      if (_t) _t.textContent = 'âˆ’';
       const _bg = document.querySelector('.ts-sidebar-bg');
       if (_bg) _bg.style.width = '320px';
       const _cv = document.querySelector('.main-canvas');
@@ -606,7 +606,7 @@ document.addEventListener('click', function(e) {
   const sidebar = document.getElementById('foSidebar');
   if (!sidebar) return;
   const isLarge = sidebar.classList.toggle('ts-panel-lg');
-  e.target.textContent = isLarge ? '−' : '+';
+  e.target.textContent = isLarge ? 'âˆ’' : '+';
   const bg = document.querySelector('.ts-sidebar-bg');
   if (bg) bg.style.width = isLarge ? '320px' : '';
   const canvas = document.querySelector('.main-canvas');

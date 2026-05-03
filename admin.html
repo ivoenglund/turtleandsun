@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin — Turtle and Sun</title>
+<title>Admin â€” Turtle and Sun</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -44,12 +44,12 @@ tr:hover td{background:#fffdf5;}
 .loading{text-align:center;padding:40px;color:rgba(60,20,0,0.4);font-size:14px;}
 @media(max-width:700px){.main{padding:24px 16px 0;}}
 </style>
-<script src="/nav.js?v=20260503c"></script>
+<script src="/nav.js?v=20260503d"></script>
 </head>
 <body>
 <div class="main">
   <p class="page-title">Admin Dashboard</p>
-  <div id="loading" class="loading">Loading…</div>
+  <div id="loading" class="loading">Loadingâ€¦</div>
   <div id="content" style="display:none;">
     <div class="stats" id="statsRow"></div>
 
@@ -112,7 +112,7 @@ async function load() {
 
     document.getElementById('ordersBody').innerHTML = orders.length
       ? orders.map(o => `<tr>
-          <td>${o.id}</td><td>${esc(o.email)}</td><td>${esc(o.product || '—')}</td>
+          <td>${o.id}</td><td>${esc(o.email)}</td><td>${esc(o.product || 'â€”')}</td>
           <td><span class="badge badge-${o.status}">${o.status}</span></td>
           <td>$${parseFloat(o.amount || 0).toFixed(2)}</td><td>${fmtDate(o.created_at)}</td>
         </tr>`).join('')
@@ -121,8 +121,8 @@ async function load() {
     document.getElementById('usersBody').innerHTML = users.length
       ? users.map(u => `<tr>
           <td>${u.id}</td><td>${esc(u.email)}</td><td>${u.preview_count}</td>
-          <td>${u.has_purchased ? '✓' : '—'}</td>
-          <td>${(u.roles || []).map(r => `<span class="badge badge-${r}">${r}</span>`).join(' ') || '—'}</td>
+          <td>${u.has_purchased ? 'âœ“' : 'â€”'}</td>
+          <td>${(u.roles || []).map(r => `<span class="badge badge-${r}">${r}</span>`).join(' ') || 'â€”'}</td>
           <td>${fmtDate(u.created_at)}</td>
         </tr>`).join('')
       : '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px;">No users yet</td></tr>';
@@ -149,7 +149,7 @@ async function manageRole(action) {
 }
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'; }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : 'â€”'; }
 
 NavBar.init({ requireAuth: true }).then(status => { if (status) load(); });
 </script>

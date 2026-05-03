@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Occasions — Turtle and Sun</title>
+<title>Occasions â€” Turtle and Sun</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -11,11 +11,11 @@ html,body{height:100%;}
 body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);color:#1C0A00;display:flex;flex-direction:column;}
 
 
-/* ── Sidebar + main canvas ──────────────────────────────────────── */
+/* â”€â”€ Sidebar + main canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ts-sidebar-bg{position:fixed;left:0;top:0;width:260px;bottom:0;border-right:1px solid rgba(28,10,0,0.1);pointer-events:none;z-index:49;}
 .main-canvas{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;margin-left:260px;}
 
-/* ── Left panels ─────────────────────────────────────────────────── */
+/* â”€â”€ Left panels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .fo-sidebar{position:fixed;left:0;top:0;width:260px;height:100vh;overflow-y:auto;z-index:110;scrollbar-width:thin;scrollbar-color:rgba(28,10,0,0.18) transparent;}
 .fo-sidebar.ts-panel-lg{width:320px;}
 .fo-sidebar::-webkit-scrollbar{width:6px;}
@@ -31,7 +31,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .btn-delete-contact:hover:not(:disabled){border-color:#c0392b;color:#c0392b;background:rgba(192,57,43,0.04);}
 .btn-delete-contact:disabled{opacity:0.35;cursor:not-allowed;}
 
-/* Filter items – chip backgrounds for legibility */
+/* Filter items â€“ chip backgrounds for legibility */
 #leftFilterContent{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
 .fp-sep{height:4px;background:none;margin:0;}
 .fp-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(28,10,0,0.3);margin:4px 0 0;background:#FFF9E6;border-radius:3px;padding:3px 6px;width:fit-content;}
@@ -73,7 +73,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   .main-canvas{margin-left:0;padding-bottom:56px;}
 }
 
-/* ── Print ─────────────────────────────────────────────────────────────────── */
+/* â”€â”€ Print â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media print {
   html,body{height:auto;overflow:visible;}
   .nav-bar,.fo-filters,.fo-detail,.fo-show-btn,.fo-backdrop,.mob-toolbar,.btn-print-occ{display:none!important;}
@@ -134,7 +134,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
 <script src="/theme.js?v=20260504"></script>
-<script src="/nav.js?v=20260503c"></script>
+<script src="/nav.js?v=20260503d"></script>
 </head>
 <body>
 
@@ -158,15 +158,15 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
   <div class="fp-label">Type</div>
   <div class="fp-check">
     <input type="checkbox" id="cbBirthdays" checked onchange="render()">
-    <label for="cbBirthdays">🎂 Birthdays</label>
+    <label for="cbBirthdays">ðŸŽ‚ Birthdays</label>
   </div>
   <div class="fp-check">
     <input type="checkbox" id="cbOccasions" checked onchange="render()">
-    <label for="cbOccasions">✨ Occasions</label>
+    <label for="cbOccasions">âœ¨ Occasions</label>
   </div>
   <div class="fp-check">
     <input type="checkbox" id="cbRemembrance" onchange="render()">
-    <label for="cbRemembrance">🕯 Remembrance</label>
+    <label for="cbRemembrance">ðŸ•¯ Remembrance</label>
   </div>
   <div class="fp-sep"></div>
   <div class="fp-label">Window</div>
@@ -190,14 +190,14 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
     <button class="btn-print-occ" onclick="window.print()">Print list</button>
   </div>
   <div class="occ-scroll">
-    <div id="listContainer"><div class="empty-state">Loading…</div></div>
+    <div id="listContainer"><div class="empty-state">Loadingâ€¦</div></div>
   </div>
 </div>
 
 <!-- Mobile -->
 <div class="fo-backdrop" id="foBackdrop" onclick="closeMobileOverlays()"></div>
 <div class="mob-toolbar">
-  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">≡ Filters</button>
+  <button class="mob-btn" id="mobFiltersBtn" onclick="toggleMobileFilters()">â‰¡ Filters</button>
   <button class="mob-btn" id="mobDetailBtn" disabled onclick="toggleMobileDetail()">Contact</button>
 </div>
 
@@ -350,10 +350,10 @@ function render() {
       const isActive = item.contact_id === _activeContactId;
 
       let icon, yearsText = '';
-      if (item.type === 'birthday') { icon = '🎂'; yearsText = item.years_count ? `Turns ${item.years_count}` : ''; }
-      else if (item.type === 'remembrance') { icon = '🕯'; yearsText = item.years_count ? `${ordinal(item.years_count)} anniversary` : ''; }
-      else if (item.type === 'milestone') { icon = '⭐'; yearsText = item.years_count ? `${ordinal(item.years_count)} milestone` : ''; }
-      else { icon = '✨'; yearsText = item.years_count ? `${ordinal(item.years_count)} year` : ''; }
+      if (item.type === 'birthday') { icon = 'ðŸŽ‚'; yearsText = item.years_count ? `Turns ${item.years_count}` : ''; }
+      else if (item.type === 'remembrance') { icon = 'ðŸ•¯'; yearsText = item.years_count ? `${ordinal(item.years_count)} anniversary` : ''; }
+      else if (item.type === 'milestone') { icon = 'â­'; yearsText = item.years_count ? `${ordinal(item.years_count)} milestone` : ''; }
+      else { icon = 'âœ¨'; yearsText = item.years_count ? `${ordinal(item.years_count)} year` : ''; }
 
       const dotColor = getContactColor(item.contact_id);
       const dot = dotColor ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:5px;flex-shrink:0;vertical-align:middle;"></span>` : '';
@@ -389,7 +389,7 @@ async function load() {
   render();
 }
 
-// ── Open contact in panel ─────────────────────────────────────────────────────
+// â”€â”€ Open contact in panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openContact(id) {
   _activeContactId = id;
   document.querySelectorAll('.occasion-card').forEach(el => {
@@ -410,7 +410,7 @@ function forceOpenContact(id) {
   openDetail(id);
 }
 
-// ── Panel helpers ─────────────────────────────────────────────────────────────
+// â”€â”€ Panel helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openDetail(id) {
   _activeContactId = id;
   if (window.innerWidth <= 1000) {
@@ -485,7 +485,7 @@ function closeMobileOverlays() {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileOverlays(); hideDetail(); } });
 
-// ── Nav auth ──────────────────────────────────────────────────────────────────
+// â”€â”€ Nav auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -530,7 +530,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     if (localStorage.getItem('ts-panel-scale') === 'large') {
       document.getElementById('foSidebar').classList.add('ts-panel-lg');
       const _t = document.getElementById('ts-panel-scale-toggle');
-      if (_t) _t.textContent = '−';
+      if (_t) _t.textContent = 'âˆ’';
       const _bg = document.querySelector('.ts-sidebar-bg');
       if (_bg) _bg.style.width = '320px';
       const _cv = document.querySelector('.main-canvas');
@@ -551,7 +551,7 @@ document.addEventListener('click', function(e) {
   const sidebar = document.getElementById('foSidebar');
   if (!sidebar) return;
   const isLarge = sidebar.classList.toggle('ts-panel-lg');
-  e.target.textContent = isLarge ? '−' : '+';
+  e.target.textContent = isLarge ? 'âˆ’' : '+';
   const bg = document.querySelector('.ts-sidebar-bg');
   if (bg) bg.style.width = isLarge ? '320px' : '';
   const canvas = document.querySelector('.main-canvas');

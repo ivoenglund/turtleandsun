@@ -50,6 +50,7 @@
         '<a class="ts-nav-dd-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-dd-link ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-dd-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
+        '<a class="ts-nav-dd-link ts-pg-library ts-admin-only" href="/account/library" style="display:none">Library</a>' +
         '<div class="ts-nav-dd-sep"></div>' +
         '<a class="ts-nav-dd-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-dd-link" href="/print/labels">Print address labels</a>' +
@@ -76,6 +77,7 @@
         '<a class="ts-nav-drawer-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-drawer-link ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-drawer-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
+        '<a class="ts-nav-drawer-link ts-pg-library ts-admin-only" href="/account/library" style="display:none">Library</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
         '<a class="ts-nav-drawer-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-drawer-link" href="/print/labels">Print address labels</a>' +
@@ -218,6 +220,9 @@
           document.querySelectorAll('.ts-pg-account').forEach(function (el) {
             el.href = '/admin';
             el.textContent = 'Admin dashboard';
+          });
+          document.querySelectorAll('.ts-admin-only').forEach(function (el) {
+            el.style.display = '';
           });
         }
       }
