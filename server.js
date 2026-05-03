@@ -600,6 +600,9 @@ app.get('/api/network', requireAuth, async (req, res) => {
     const groups = await pool.query(
       `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
     );
+    const dbGroups = await pool.query(`SELECT id, name, user_id FROM groups ORDER BY user_id, name`);
+    console.log('[api/network] req.user.id:', req.user.id, '| groups returned by query:', groups.rows.length);
+    console.log('[api/network] all groups in DB:', dbGroups.rows.map(g => `${g.id}:${g.name}(uid=${g.user_id})`));
     res.json({
       contacts: contacts.rows,
       relationships: relationships.rows,
