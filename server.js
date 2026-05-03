@@ -429,7 +429,7 @@ app.get('/account/library', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'library.html'));
 });
 
-app.get('/api/library/orders', requireRole('admin'), async (req, res) => {
+app.get('/api/library/orders', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, email, product, status, amount, result_url, created_at
@@ -444,11 +444,11 @@ app.get('/api/library/orders', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.get('/api/gelato/meta', requireRole('admin'), (req, res) => {
+app.get('/api/gelato/meta', requireAuth, (req, res) => {
   res.json({ testAddress: gelato.TEST_ADDRESS, cardProductUid: gelato.CARD_PRODUCT_UID });
 });
 
-app.post('/api/gelato/test-print', requireRole('admin'), async (req, res) => {
+app.post('/api/gelato/test-print', requireAuth, async (req, res) => {
   const { imageUrl, orderId } = req.body;
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
   try {
