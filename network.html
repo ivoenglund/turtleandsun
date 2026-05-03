@@ -400,6 +400,32 @@ function nodeLayout(d) {
   return { h, items };
 }
 
+function buildGroupFilter(treeGroups) {
+  const cbGroup = document.getElementById('cbGroup');
+  if (!cbGroup) return;
+  cbGroup.innerHTML = '';
+  function addCb(g, depth, color, parentName) {
+    const depthClass = depth === 0 ? '' : depth === 1 ? ' fp-sub' : ' fp-sub2';
+    const item = document.createElement('div');
+    item.className = 'fp-item' + depthClass;
+    const gAttr = g.name.replace(/"/g, '&quot;');
+    const dotSize = depth === 0 ? '8px' : depth === 1 ? '6px' : '5px';
+    const dotOpacity = depth === 1 ? ';opacity:0.7' : depth >= 2 ? ';opacity:0.55' : '';
+    const pAttr = parentName ? ` data-parent-group="${parentName.replace(/"/g, '&quot;')}"` : '';
+    item.innerHTML = `<label><input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)"><span style="display:inline-block;width:${dotSize};height:${dotSize};border-radius:50%;background:${color}${dotOpacity};flex-shrink:0;"></span> ${esc(g.name)}<span class="fp-cnt"></span></label>`;
+    cbGroup.appendChild(item);
+    (g.subgroups || []).slice().sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(s => addCb(s, depth + 1, color, g.name));
+  }
+  const sorted = [...treeGroups].sort((a, b) =>
+    a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name)
+  );
+  console.log('[network] buildGroupFilter treeGroups:', sorted.map(g => g.name));
+  sorted.forEach(g => addCb(g, 0, GroupColors.get(g.name), ''));
+  _groupsWithCheckbox.clear();
+  document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => _groupsWithCheckbox.add(cb.dataset.group));
+}
+
 function toggleParentCb(cb) {
   const cascade = (name, checked) => {
     document.querySelectorAll(`#cbGroup input[data-parent-group="${CSS.escape(name)}"]`)
@@ -458,31 +484,7 @@ async function init() {
 
   _allGroupNames = (data.groups || []).map(g => g.name);
 
-  const cbGroup = document.getElementById('cbGroup');
-  const subsByParentId = {};
-  (data.groups || []).filter(g => g.parent_group_id).forEach(g => {
-    if (!subsByParentId[g.parent_group_id]) subsByParentId[g.parent_group_id] = [];
-    subsByParentId[g.parent_group_id].push(g);
-  });
-  function addCbForGroup(g, depth, color) {
-    const depthClass = depth === 0 ? '' : depth === 1 ? ' fp-sub' : ' fp-sub2';
-    const item = document.createElement('div');
-    item.className = 'fp-item' + depthClass;
-    const gAttr = g.name.replace(/"/g, '&quot;');
-    const dotSize = depth === 0 ? '8px' : depth === 1 ? '6px' : '5px';
-    const dotOpacity = depth === 1 ? ';opacity:0.7' : depth >= 2 ? ';opacity:0.55' : '';
-    const pName = depth > 0 ? ((groupDefsById[g.parent_group_id] || {}).name || '') : '';
-    const pAttr = pName ? ` data-parent-group="${pName.replace(/"/g, '&quot;')}"` : '';
-    item.innerHTML = `<label><input type="checkbox" data-group="${gAttr}"${pAttr} checked onchange="toggleParentCb(this)"><span style="display:inline-block;width:${dotSize};height:${dotSize};border-radius:50%;background:${color}${dotOpacity};flex-shrink:0;"></span> ${esc(g.name)}<span class="fp-cnt"></span></label>`;
-    cbGroup.appendChild(item);
-    (subsByParentId[g.id] || []).sort((a, b) => a.name.localeCompare(b.name))
-      .forEach(s => addCbForGroup(s, depth + 1, color));
-  }
-  const topGroupDefs = (data.groups || []).filter(g => !g.parent_group_id)
-    .sort((a, b) => a.name === 'Family' ? -1 : b.name === 'Family' ? 1 : a.name.localeCompare(b.name));
-  topGroupDefs.forEach(g => addCbForGroup(g, 0, GROUP_COLORS[g.name]));
-  _groupsWithCheckbox.clear();
-  document.querySelectorAll('#cbGroup input[data-group]').forEach(cb => _groupsWithCheckbox.add(cb.dataset.group));
+  console.log('[network] data.groups from /api/network:', JSON.stringify(data.groups));
 
   const groupNodes = Object.values(groupNodeMap);
   _memberLinks = (data.group_memberships || []).map(m => ({
@@ -1703,6 +1705,9 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
       const _cv = document.querySelector('.main-canvas');
       if (_cv) _cv.style.marginLeft = '320px';
     }
+    GroupColors.initTree(allGroups);
+    buildGroupFilter(allGroups);
+
     CP.contacts = contacts;
     CP.allGroups = allGroups;
     CP.relTypes = relTypes;
