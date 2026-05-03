@@ -1199,10 +1199,8 @@ function renderMap() {
   const container = document.getElementById('leaflet-map');
   if (!container) return;
 
-  const isFirstRender = !_leafletMap;
-
   if (!_leafletMap) {
-    _leafletMap = L.map('leaflet-map', { zoomControl: true });
+    _leafletMap = L.map('leaflet-map', { center: [20, 0], zoom: 2, zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
@@ -1251,12 +1249,17 @@ function renderMap() {
     pinned.push(c);
   }
 
+  const redIcon = L.divIcon({
+    className: 'ts-map-pin',
+    html: '<div style="width:18px;height:18px;border-radius:50%;background:#D32F2F;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+
   for (const c of pinned) {
-    const color = _getMarkerColor(c.id);
-    const icon = _makeMarkerIcon(color);
-    const marker = L.marker([c.latitude, c.longitude], { icon });
+    const marker = L.marker([c.latitude, c.longitude], { icon: redIcon });
     const label = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
-    marker.bindTooltip(label, { permanent: false, direction: 'top', offset: [0, -28] });
+    marker.bindTooltip(label, { permanent: false, direction: 'top', offset: [0, -9] });
     marker.on('click', () => { forceOpenDetailPanel(c.id); });
     _mapMarkers.push(marker);
   }
@@ -1267,7 +1270,7 @@ function renderMap() {
   setTimeout(() => {
     if (!_leafletMap) return;
     _leafletMap.invalidateSize();
-    if (isFirstRender) fitMapView();
+    fitMapView();
   }, 50);
 }
 
