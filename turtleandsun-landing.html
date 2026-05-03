@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Turtle and Sun â€” Remember to Love</title>
+<title>Turtle and Sun — Remember to Love</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@300;400&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -161,10 +161,10 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
   <div class="g-grid" id="g2"></div>
   <div class="g-grid" id="g3"></div>
   <div class="trust">
-    <div class="ti">âœ“ 100% Happiness Guarantee</div>
-    <div class="ti">ðŸ”’ Secure &amp; Encrypted</div>
-    <div class="ti">â˜…â˜…â˜…â˜…â˜… Rated 4.9/5</div>
-    <div class="ti">âš¡ Ready in minutes</div>
+    <div class="ti">✓ 100% Happiness Guarantee</div>
+    <div class="ti">🔒 Secure &amp; Encrypted</div>
+    <div class="ti">★★★★★ Rated 4.9/5</div>
+    <div class="ti">⚡ Ready in minutes</div>
   </div>
 </div>
 
@@ -177,7 +177,7 @@ document.getElementById('styleDescText').textContent = 'Browse the gallery below
 const styleDescriptions = {
   'people': {
     title: 'A portrait of you or someone you love',
-    text: 'Upload a photo of a person and we transform it into a stunning AI portrait. Choose your style from the gallery â€” oil painting, watercolour, cinematic, and more. Available as a digital image, a short video, or a printed card sent straight to their door.'
+    text: 'Upload a photo of a person and we transform it into a stunning AI portrait. Choose your style from the gallery — oil painting, watercolour, cinematic, and more. Available as a digital image, a short video, or a printed card sent straight to their door.'
   },
   'pets': {
     title: 'Your pet, reimagined',
@@ -189,7 +189,7 @@ const styleDescriptions = {
   },
   'families': {
     title: 'The whole family together',
-    text: 'Upload a family photo â€” or even combine photos of family members who live far apart â€” and we create a portrait of everyone together. The family photo you could never take. Available as image, video, or printed card.'
+    text: 'Upload a family photo — or even combine photos of family members who live far apart — and we create a portrait of everyone together. The family photo you could never take. Available as image, video, or printed card.'
   },
   'prints': {
     title: 'A printed card, posted to their door',
@@ -223,8 +223,8 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   // Reset state for new upload
   cloudinaryUrl = null;
   previewImageUrl = null;
-  document.getElementById('uploadLabel').textContent = file.name.length > 20 ? file.name.slice(0, 18) + 'â€¦' : file.name;
-  document.getElementById('uploadSub').textContent = 'Uploadingâ€¦';
+  document.getElementById('uploadLabel').textContent = file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name;
+  document.getElementById('uploadSub').textContent = 'Uploading…';
 
   // Show local thumbnail
   const reader = new FileReader();
@@ -243,7 +243,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     const data = await res.json();
     if (data.url) {
       cloudinaryUrl = data.url;
-      document.getElementById('uploadSub').textContent = 'Uploaded âœ“';
+      document.getElementById('uploadSub').textContent = 'Uploaded ✓';
     } else {
       document.getElementById('uploadSub').textContent = 'Upload failed';
       console.error('Upload response missing URL:', data);
@@ -268,7 +268,7 @@ document.getElementById('btnPreview').addEventListener('click', async function()
   const spinner = document.getElementById('previewSpinner');
   const result = document.getElementById('previewResult');
   btn.disabled = true;
-  btn.textContent = 'Generatingâ€¦';
+  btn.textContent = 'Generating…';
   spinner.style.display = 'block';
   result.style.display = 'none';
   try {
@@ -331,7 +331,7 @@ async function proceedToCheckout(productOverride) {
   const email = window._orderEmail || '';
   const btn = document.querySelector('.btn-order');
   btn.disabled = true;
-  btn.textContent = 'Redirectingâ€¦';
+  btn.textContent = 'Redirecting…';
   try {
     const res = await fetch('/create-checkout-session', {
       method: 'POST',
@@ -391,9 +391,9 @@ loadGallery('all');
   <div class="upsell-card">
     <div class="upsell-badge">LIMITED OFFER</div>
     <div class="upsell-title">Upgrade to Bundle</div>
-    <div class="upsell-sub">Get your royal portrait as both a <strong>full image</strong> and a <strong>cinematic video</strong> â€” together for one great price.</div>
+    <div class="upsell-sub">Get your royal portrait as both a <strong>full image</strong> and a <strong>cinematic video</strong> — together for one great price.</div>
     <div class="upsell-save">Save $5 vs buying separately</div>
-    <button class="btn-upgrade" id="btnUpgradeBundle">Upgrade to Bundle â€” $29.99</button>
+    <button class="btn-upgrade" id="btnUpgradeBundle">Upgrade to Bundle — $29.99</button>
     <button class="btn-skip" id="btnContinueSelection">Continue with my selection</button>
   </div>
 </div>
