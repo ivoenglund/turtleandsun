@@ -138,6 +138,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
+<script src="/theme.js?v=20260504"></script>
 <script src="/nav.js?v=20260504"></script>
 </head>
 <body>
@@ -340,18 +341,31 @@ async function loadGroupMemberships() {
   });
 }
 
+function getContactPrimaryColor(contactId) {
+  if (!window.GroupColors || !_contactGroupMap[contactId]) return null;
+  const gids = [..._contactGroupMap[contactId]];
+  const topNames = gids.map(id => _allGroupsById[id]).filter(g => g && !g.parent_group_id).map(g => g.name);
+  if (topNames.length) return GroupColors.get(topNames[0]);
+  const any = _allGroupsById[gids[0]];
+  return any ? GroupColors.get(any.name) : null;
+}
+
 function renderFilterPanel() {
-  function renderEntry(g, depth, parentId) {
+  function renderEntry(g, depth, parentId, color) {
+    if (depth === 0 && window.GroupColors) color = GroupColors.get(g.name);
     const cls = depth === 0 ? '' : depth === 1 ? ' fp-sub' : ' fp-sub2';
     const parentAttr = parentId != null ? ` data-parent-id="${parentId}"` : '';
+    const dotSz = depth === 0 ? 8 : depth === 1 ? 6 : 5;
+    const dotOp = depth === 1 ? 0.7 : depth >= 2 ? 0.55 : 1;
+    const dot = color ? `<span style="display:inline-block;width:${dotSz}px;height:${dotSz}px;border-radius:50%;background:${color};opacity:${dotOp};flex-shrink:0;"></span>` : '';
     let html = `<div class="fp-item${cls}"><label>
       <input type="checkbox" data-group-id="${g.id}"${parentAttr} checked onchange="filterPanelToggle(this)">
-      ${esc(g.name)}
+      ${dot} ${esc(g.name)}
     </label></div>`;
-    (g.subgroups || []).forEach(s => { html += renderEntry(s, depth + 1, g.id); });
+    (g.subgroups || []).forEach(s => { html += renderEntry(s, depth + 1, g.id, color); });
     return html;
   }
-  let html = _allGroups.map(g => renderEntry(g, 0, null)).join('');
+  let html = _allGroups.map(g => renderEntry(g, 0, null, null)).join('');
   html += `<div class="fp-sep"></div>
     <div class="fp-item"><label>
       <input type="checkbox" id="cb-pets-contacts" onchange="applyContactFilter()">
@@ -424,13 +438,17 @@ function renderList(contacts) {
     el.innerHTML = '<div class="list-empty">No contacts match the current filters.</div>';
     return;
   }
-  el.innerHTML = contacts.map(c => `
+  el.innerHTML = contacts.map(c => {
+    const dotColor = !c.is_me ? getContactPrimaryColor(c.id) : null;
+    const dot = dotColor ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dotColor};margin-right:5px;flex-shrink:0;vertical-align:middle;"></span>` : '';
+    return `
     <div class="contact-item${_currentId === c.id ? ' active' : ''}" onclick="selectContact(${c.id})" ondblclick="forceSelectContact(${c.id})" data-id="${c.id}">
-      <div class="ci-name">${c.is_pet ? '🐾 ' : ''}${esc(c.name || 'Unnamed')}${c.is_me ? '<span class="ci-me">Me</span>' : ''}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}${c.died_on ? '<span class="ci-deceased">†</span>' : ''}</div>
+      <div class="ci-name">${dot}${c.is_pet ? '🐾 ' : ''}${esc(c.name || 'Unnamed')}${c.is_me ? '<span class="ci-me">Me</span>' : ''}${c.is_placeholder ? '<span class="ci-ph">manual</span>' : ''}${c.died_on ? '<span class="ci-deceased">†</span>' : ''}</div>
       ${c.email ? `<div class="ci-email">${esc(c.email)}</div>` : ''}
       ${c.birthday ? `<div class="ci-bday">${esc(c.birthday)}</div>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ── Select contact ────────────────────────────────────────────────────────────
@@ -574,7 +592,9 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
       applyContactFilter();
     };
 
+    if (window.GroupColors) GroupColors.initTree(_allGroups);
     renderFilterPanel();
+    applyContactFilter();
 
     const urlId = new URLSearchParams(location.search).get('id');
     if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }

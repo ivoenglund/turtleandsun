@@ -133,6 +133,7 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .fo-sidebar.ts-panel-lg .btn-delete-contact{font-size:17px;padding:6px 12px;}
 .fo-sidebar.ts-panel-lg .panel-ftr{padding:8px 15px;}
 </style>
+<script src="/theme.js?v=20260504"></script>
 <script src="/nav.js?v=20260504"></script>
 </head>
 <body>
@@ -210,6 +211,17 @@ let _contacts = [];
 let _allGroups = [];
 let _relTypes = [];
 let _activeContactId = null;
+let _contactGroupMap = {};
+let _allGroupsById = {};
+
+function getContactColor(contactId) {
+  if (!window.GroupColors || !_contactGroupMap[contactId]) return null;
+  const gids = [..._contactGroupMap[contactId]];
+  const topNames = gids.map(id => _allGroupsById[id]).filter(g => g && !g.parent_group_id).map(g => g.name);
+  if (topNames.length) return GroupColors.get(topNames[0]);
+  const any = _allGroupsById[gids[0]];
+  return any ? GroupColors.get(any.name) : null;
+}
 
 function nextYearlyDate(start, today) {
   const thisYear = new Date(today.getFullYear(), start.getMonth(), start.getDate());
@@ -343,12 +355,14 @@ function render() {
       else if (item.type === 'milestone') { icon = '⭐'; yearsText = item.years_count ? `${ordinal(item.years_count)} milestone` : ''; }
       else { icon = '✨'; yearsText = item.years_count ? `${ordinal(item.years_count)} year` : ''; }
 
+      const dotColor = getContactColor(item.contact_id);
+      const dot = dotColor ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:5px;flex-shrink:0;vertical-align:middle;"></span>` : '';
       html += `
         <div class="occasion-card ${item.type}${isActive ? ' active' : ''}" data-contact-id="${item.contact_id}" onclick="openContact(${item.contact_id})" ondblclick="forceOpenContact(${item.contact_id})">
           <div class="oc-icon">${icon}</div>
           <div class="oc-main">
             <div class="oc-occasion">${esc(item.occasion_name)}</div>
-            <div class="oc-contact">${esc(item.contact_name || 'Unknown')}</div>
+            <div class="oc-contact">${dot}${esc(item.contact_name || 'Unknown')}</div>
             ${yearsText ? `<div class="oc-years">${esc(yearsText)}</div>` : ''}
           </div>
           <div class="oc-date-col">
@@ -479,14 +493,37 @@ function esc(s) {
 NavBar.init({ requireAuth: true }).then(async (status) => {
   if (!status) return;
   try {
-    const [, groupsRes, relTypesRes, fullContactsRes] = await Promise.all([
+    const [, groupsRes, relTypesRes, fullContactsRes, membershipsRes] = await Promise.all([
       load(),
       fetch('/api/groups'),
       fetch('/api/relationship-types'),
       fetch('/api/contacts'),
+      fetch('/api/group-memberships'),
     ]);
     _allGroups = groupsRes.ok ? await groupsRes.json() : [];
     _relTypes  = relTypesRes.ok ? await relTypesRes.json() : [];
+
+    if (membershipsRes.ok) {
+      const memberships = await membershipsRes.json();
+      _allGroupsById = {};
+      function flattenTree(g, parentId) {
+        _allGroupsById[g.id] = { id: g.id, name: g.name, parent_group_id: parentId };
+        (g.subgroups || []).forEach(s => flattenTree(s, g.id));
+      }
+      _allGroups.forEach(g => flattenTree(g, null));
+      _contactGroupMap = {};
+      memberships.forEach(m => {
+        if (!_contactGroupMap[m.contact_id]) _contactGroupMap[m.contact_id] = new Set();
+        let gid = m.group_id;
+        while (gid) {
+          _contactGroupMap[m.contact_id].add(gid);
+          const g = _allGroupsById[gid];
+          gid = g ? g.parent_group_id : null;
+        }
+      });
+    }
+
+    if (window.GroupColors) { GroupColors.initTree(_allGroups); render(); }
     const fullContacts = fullContactsRes.ok ? await fullContactsRes.json() : _contacts;
 
     CP.init('cpContainer');

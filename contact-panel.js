@@ -440,6 +440,17 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     return flat;
   }
 
+  function _pillStyle(groupName) {
+    if (!window.GroupColors) return '';
+    const color = GroupColors.get(groupName);
+    const bg = GroupColors.lightenHex(color, 0.72);
+    return ` style="background:${bg};border-color:${color};color:${color};"`;
+  }
+
+  function _groupDot(color, size, opacity) {
+    return `<span style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;background:${color};opacity:${opacity};flex-shrink:0;"></span>`;
+  }
+
   function _renderGroupCheckboxes(keepDropdownOpen) {
     const el = document.getElementById('cpGroupsCheckboxes');
     if (!el) return;
@@ -450,7 +461,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     const activeGroups = flat.filter(g => _contactGroupIds.has(g.id));
     for (const g of activeGroups) {
       const prefix = topIds.has(g.id) ? '' : '↳ ';
-      html += `<span class="cp-pill active">${_esc(prefix + g.name)}<button class="cp-pill-remove" onclick="CP._removeFromGroup(${g.id})" title="Remove">×</button></span>`;
+      html += `<span class="cp-pill active"${_pillStyle(g.name)}>${_esc(prefix + g.name)}<button class="cp-pill-remove" onclick="CP._removeFromGroup(${g.id})" title="Remove">×</button></span>`;
     }
     if (flat.length > 0) {
       html += `<button class="cp-group-add-btn" onclick="CP._toggleGroupDropdown()" title="Add group">+</button>`;
@@ -462,10 +473,13 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
       html += `<div class="cp-group-dropdown" id="cpGroupDropdown" style="display:${ddDisplay};">`;
       for (const g of _allGroups) {
         const checked = _contactGroupIds.has(g.id);
-        html += `<label class="cp-group-dd-item"><input type="checkbox" ${checked ? 'checked' : ''} onchange="CP._toggleGroupMembership(${g.id},this)"> ${_esc(g.name)}</label>`;
+        const color = window.GroupColors ? GroupColors.get(g.name) : null;
+        const dot = color ? _groupDot(color, 7, 1) + ' ' : '';
+        html += `<label class="cp-group-dd-item"><input type="checkbox" ${checked ? 'checked' : ''} onchange="CP._toggleGroupMembership(${g.id},this)">${dot}${_esc(g.name)}</label>`;
         for (const s of (g.subgroups || [])) {
           const sc = _contactGroupIds.has(s.id);
-          html += `<label class="cp-group-dd-item cp-group-dd-sub"><input type="checkbox" ${sc ? 'checked' : ''} onchange="CP._toggleGroupMembership(${s.id},this)"> ↳ ${_esc(s.name)}</label>`;
+          const subDot = color ? _groupDot(color, 5, 0.7) + ' ' : '';
+          html += `<label class="cp-group-dd-item cp-group-dd-sub"><input type="checkbox" ${sc ? 'checked' : ''} onchange="CP._toggleGroupMembership(${s.id},this)">${subDot}↳ ${_esc(s.name)}</label>`;
         }
       }
       html += '</div>';
