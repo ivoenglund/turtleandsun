@@ -1723,7 +1723,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
     initCalendar();
     setTimeout(resizeGraph, 250);
     switchView(_currentView);
-  } catch { window.location.href = '/login'; }
+  } catch (err) { console.error('[network] init error:', err); }
 });
 
 document.addEventListener('click', function(e) {

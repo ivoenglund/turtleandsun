@@ -598,7 +598,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
 
     const urlId = new URLSearchParams(location.search).get('id');
     if (urlId) { history.replaceState(null, '', '/account/contacts'); selectContact(+urlId); }
-  } catch { window.location.href = '/login'; }
+  } catch (err) { console.error('[contacts] init error:', err); }
 });
 
 document.addEventListener('click', function(e) {

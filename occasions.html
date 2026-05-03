@@ -543,7 +543,7 @@ NavBar.init({ requireAuth: true }).then(async (status) => {
       const c = _contacts.find(x => x.id === updated.id);
       if (c) Object.assign(c, updated);
     };
-  } catch { window.location.href = '/login'; }
+  } catch (err) { console.error('[occasions] init error:', err); }
 });
 
 document.addEventListener('click', function(e) {
