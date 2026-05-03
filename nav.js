@@ -194,7 +194,7 @@
 
       var status = null;
       try {
-        var res = await fetch('/api/auth/status');
+        var res = await fetch('/api/auth/status', { credentials: 'include' });
         status = res.ok ? await res.json() : null;
       } catch (e) {
         status = null;

@@ -132,9 +132,11 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 app.use(cookieParser());
 app.use(express.json());
 
-// Prevent caching of HTML pages so deploys take effect immediately
+// Prevent caching of HTML pages and API responses so deploys and auth changes take effect immediately
 app.use((req, res, next) => {
-  if (req.path.endsWith('.html') || req.path === '/' || (!req.path.includes('.') && !req.path.startsWith('/api/'))) {
+  const isHtml = req.path.endsWith('.html') || req.path === '/' || (!req.path.includes('.') && !req.path.startsWith('/api/'));
+  const isApi = req.path.startsWith('/api/');
+  if (isHtml || isApi) {
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
@@ -254,7 +256,9 @@ app.get('/auth/verify', async (req, res) => {
 });
 
 app.get('/api/auth/status', async (req, res) => {
+  console.log('[auth] cookies:', req.cookies, 'session token present:', !!req.cookies?.ts_session);
   const user = await getSessionUser(req);
+  console.log('[auth] resolved user:', user?.email || 'none');
   if (!user) return res.json({ loggedIn: false });
   res.json({ loggedIn: true, email: user.email, isAdmin: user.roles.includes('admin') });
 });
