@@ -425,7 +425,7 @@ app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
 
-app.get('/account/library', requireRole('admin'), (req, res) => {
+app.get('/account/library', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'library.html'));
 });
 

@@ -50,7 +50,7 @@
         '<a class="ts-nav-dd-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-dd-link ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-dd-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
-        '<a class="ts-nav-dd-link ts-pg-library ts-admin-only" href="/account/library" style="display:none">Library</a>' +
+        '<a class="ts-nav-dd-link ts-pg-library" href="/account/library">Library</a>' +
         '<div class="ts-nav-dd-sep"></div>' +
         '<a class="ts-nav-dd-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-dd-link" href="/print/labels">Print address labels</a>' +
@@ -77,7 +77,7 @@
         '<a class="ts-nav-drawer-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-drawer-link ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-drawer-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-library ts-admin-only" href="/account/library" style="display:none">Library</a>' +
+        '<a class="ts-nav-drawer-link ts-pg-library" href="/account/library">Library</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
         '<a class="ts-nav-drawer-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-drawer-link" href="/print/labels">Print address labels</a>' +
@@ -141,6 +141,7 @@
     if (p === '/account/contacts') return 'contacts';
     if (p === '/account/network') return view === 'outline' ? 'outline' : view === 'calendar' ? 'calendar' : view === 'map' ? 'map' : 'network';
     if (p === '/account/occasions') return 'occasions';
+    if (p === '/account/library') return 'library';
     if (p === '/account') return 'account';
     if (p === '/admin') return 'admin';
     return null;
@@ -220,9 +221,6 @@
           document.querySelectorAll('.ts-pg-account').forEach(function (el) {
             el.href = '/admin';
             el.textContent = 'Admin dashboard';
-          });
-          document.querySelectorAll('.ts-admin-only').forEach(function (el) {
-            el.style.display = '';
           });
         }
       }
