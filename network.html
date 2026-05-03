@@ -157,6 +157,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 #leaflet-map,.leaflet-container{z-index:0;}
 .leaflet-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-marker-pane,.leaflet-popup-pane{z-index:auto;}
 .leaflet-top,.leaflet-bottom{z-index:400;}
+.map-reset-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;background:#FFF9E6;border:1px solid rgba(28,10,0,0.18);border-radius:6px;padding:5px 10px;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,0.15);}
+.map-reset-btn:hover{background:#FFF5C8;}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
@@ -1183,9 +1185,21 @@ function _makeMarkerIcon(color) {
   });
 }
 
+function fitMapView() {
+  if (!_leafletMap) return;
+  const coords = _mapMarkers.map(m => m.getLatLng());
+  if (coords.length > 0) {
+    _leafletMap.fitBounds(coords.map(ll => [ll.lat, ll.lng]), { padding: [40, 40], maxZoom: 12 });
+  } else {
+    _leafletMap.setView([20, 0], 2);
+  }
+}
+
 function renderMap() {
   const container = document.getElementById('leaflet-map');
   if (!container) return;
+
+  const isFirstRender = !_leafletMap;
 
   if (!_leafletMap) {
     _leafletMap = L.map('leaflet-map', { zoomControl: true });
@@ -1195,6 +1209,18 @@ function renderMap() {
     }).addTo(_leafletMap);
     _markerClusterGroup = L.markerClusterGroup({ maxClusterRadius: 48, showCoverageOnHover: false });
     _leafletMap.addLayer(_markerClusterGroup);
+
+    const ResetControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd() {
+        const btn = L.DomUtil.create('button', 'map-reset-btn');
+        btn.textContent = 'Reset view';
+        L.DomEvent.disableClickPropagation(btn);
+        btn.addEventListener('click', fitMapView);
+        return btn;
+      },
+    });
+    new ResetControl().addTo(_leafletMap);
   } else {
     _markerClusterGroup.clearLayers();
     _mapMarkers = [];
@@ -1213,7 +1239,6 @@ function renderMap() {
     if (showOnlyPets && !c.is_pet) continue;
     if (_unrelatedIds.has(c.id) && !showUnrelated) continue;
 
-    // Group filter
     const relGroups = _nodeGroups[c.id];
     const memGroups = _contactGroupNames[c.id];
     if (!_unrelatedIds.has(c.id)) {
@@ -1226,7 +1251,6 @@ function renderMap() {
     pinned.push(c);
   }
 
-  const bounds = [];
   for (const c of pinned) {
     const color = _getMarkerColor(c.id);
     const icon = _makeMarkerIcon(color);
@@ -1235,19 +1259,16 @@ function renderMap() {
     marker.bindTooltip(label, { permanent: false, direction: 'top', offset: [0, -28] });
     marker.on('click', () => { forceOpenDetailPanel(c.id); });
     _mapMarkers.push(marker);
-    bounds.push([c.latitude, c.longitude]);
   }
 
   _markerClusterGroup.addLayers(_mapMarkers);
 
-  if (bounds.length > 0) {
-    _leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
-  } else if (!_leafletMap._loaded) {
-    _leafletMap.setView([20, 0], 2);
-  }
-
-  // Force Leaflet to recalculate size in case the container was hidden
-  setTimeout(() => { if (_leafletMap) _leafletMap.invalidateSize(); }, 50);
+  // invalidateSize first so Leaflet knows container dimensions, then fit view
+  setTimeout(() => {
+    if (!_leafletMap) return;
+    _leafletMap.invalidateSize();
+    if (isFirstRender) fitMapView();
+  }, 50);
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
