@@ -159,6 +159,8 @@ body{font-family:'DM Sans',sans-serif;background:linear-gradient(175deg,#FFF5A0 
 .leaflet-top,.leaflet-bottom{z-index:400;}
 .map-reset-btn{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;background:#FFF9E6;border:1px solid rgba(28,10,0,0.18);border-radius:6px;padding:5px 10px;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,0.15);}
 .map-reset-btn:hover{background:#FFF5C8;}
+.ts-map-pin{background:transparent!important;border:none!important;overflow:visible!important;}
+.ts-map-label{position:absolute;top:20px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:#1C0A00;text-shadow:0 0 4px rgba(255,249,230,1),0 0 3px rgba(255,249,230,0.95);pointer-events:none;}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
@@ -1156,32 +1158,49 @@ function switchView(view) {
 let _leafletMap = null;
 let _markerClusterGroup = null;
 let _mapMarkers = [];
+let _mapMarkersById = {};
+let _selectedMapContactId = null;
+let _mapZoomTimer = null;
 
-function _getMarkerColor(contactId) {
-  const groupNames = _contactGroupNames[contactId];
-  if (!groupNames || groupNames.size === 0) {
-    const relGroups = _nodeGroups[contactId];
-    if (relGroups && relGroups.size > 0) {
-      const first = [...relGroups][0];
-      return GROUP_COLORS[first] || '#3A6B20';
-    }
-    return '#9aa5b4';
-  }
-  const first = [...groupNames][0];
-  return GROUP_COLORS[first] || '#3A6B20';
+function _contactAge(c) {
+  const m = /\b(\d{4})\b/.exec(c.birthday || '');
+  if (!m) return null;
+  const birthYear = parseInt(m[1]);
+  if (c.died_on) return `${birthYear}–${new Date(c.died_on).getFullYear()}`;
+  return String(new Date().getFullYear() - birthYear);
 }
 
-function _makeMarkerIcon(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 22 32">
-    <path d="M11 0C4.925 0 0 4.925 0 11c0 8.25 11 21 11 21s11-12.75 11-21C22 4.925 17.075 0 11 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/>
-    <circle cx="11" cy="11" r="4.5" fill="#fff" opacity="0.85"/>
-  </svg>`;
+function _makePinIcon(c, zoom) {
+  const sel = _selectedMapContactId === c.id;
+  const dot = `<div style="width:18px;height:18px;border-radius:50%;background:#D32F2F;border:2px solid white;${
+    sel ? 'box-shadow:0 2px 8px rgba(0,0,0,0.5);transform:scale(1.3);transform-origin:center;'
+        : 'box-shadow:0 1px 4px rgba(0,0,0,0.4);'
+  }"></div>`;
+
+  if (zoom <= 5) {
+    return L.divIcon({ className: 'ts-map-pin', html: dot, iconSize: [18, 18], iconAnchor: [9, 9] });
+  }
+
+  const name = c.name || '';
+  let label = name.length > 18 ? name.slice(0, 17) + '…' : name;
+  if (zoom >= 10) {
+    const age = _contactAge(c);
+    if (age) label += `, ${age}`;
+  }
+  const lbl = `<div class="ts-map-label">${esc(label)}</div>`;
   return L.divIcon({
-    html: svg,
-    className: '',
-    iconSize: [22, 32],
-    iconAnchor: [11, 32],
-    popupAnchor: [0, -32],
+    className: 'ts-map-pin',
+    html: `<div style="position:relative;">${dot}${lbl}</div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}
+
+function _updateMapPinIcons() {
+  if (!_leafletMap) return;
+  const zoom = _leafletMap.getZoom();
+  Object.values(_mapMarkersById).forEach(({ marker, contact }) => {
+    marker.setIcon(_makePinIcon(contact, zoom));
   });
 }
 
@@ -1219,11 +1238,19 @@ function renderMap() {
       },
     });
     new ResetControl().addTo(_leafletMap);
+
+    _leafletMap.on('zoomend', () => {
+      clearTimeout(_mapZoomTimer);
+      _mapZoomTimer = setTimeout(_updateMapPinIcons, 100);
+    });
   } else {
     _markerClusterGroup.clearLayers();
     _mapMarkers = [];
+    _mapMarkersById = {};
+    _selectedMapContactId = null;
   }
 
+  const zoom = _leafletMap.getZoom();
   const active = getActiveGroups();
   const showOnlyLiving = document.getElementById('cb-living').checked;
   const showOnlyPets = document.getElementById('cb-pets') && document.getElementById('cb-pets').checked;
@@ -1249,19 +1276,21 @@ function renderMap() {
     pinned.push(c);
   }
 
-  const redIcon = L.divIcon({
-    className: 'ts-map-pin',
-    html: '<div style="width:18px;height:18px;border-radius:50%;background:#D32F2F;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-  });
-
   for (const c of pinned) {
-    const marker = L.marker([c.latitude, c.longitude], { icon: redIcon });
-    const label = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
-    marker.bindTooltip(label, { permanent: false, direction: 'top', offset: [0, -9] });
-    marker.on('click', () => { forceOpenDetailPanel(c.id); });
+    const marker = L.marker([c.latitude, c.longitude], { icon: _makePinIcon(c, zoom) });
+    const tooltipName = (c.is_pet ? '🐾 ' : '') + (c.name || 'Unnamed');
+    marker.bindTooltip(tooltipName, { permanent: false, direction: 'top', offset: [0, -9] });
+    marker.on('click', () => {
+      const prev = _selectedMapContactId;
+      _selectedMapContactId = c.id;
+      if (prev !== null && _mapMarkersById[prev]) {
+        _mapMarkersById[prev].marker.setIcon(_makePinIcon(_mapMarkersById[prev].contact, _leafletMap.getZoom()));
+      }
+      marker.setIcon(_makePinIcon(c, _leafletMap.getZoom()));
+      forceOpenDetailPanel(c.id);
+    });
     _mapMarkers.push(marker);
+    _mapMarkersById[c.id] = { marker, contact: c };
   }
 
   _markerClusterGroup.addLayers(_mapMarkers);
