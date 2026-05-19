@@ -58,9 +58,9 @@ const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PRODUCTS = {
-  image:  { name: 'Royal Portrait — Image',   amount: 1499 },
-  video:  { name: 'Royal Portrait — Video',   amount: 1999 },
-  bundle: { name: 'Royal Portrait — Bundle',  amount: 2999 },
+  image:  { name: 'Royal Portrait — Image',   amount: 14900 },
+  video:  { name: 'Royal Portrait — Video',   amount: 19900 },
+  bundle: { name: 'Royal Portrait — Bundle',  amount: 29900 },
 };
 
 const ROYAL_VIDEO_PROMPT =
@@ -866,7 +866,7 @@ app.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
-          currency: 'usd',
+          currency: 'sek',
           product_data: { name: PRODUCTS[product].name },
           unit_amount: PRODUCTS[product].amount,
         },
@@ -881,6 +881,7 @@ app.post('/create-checkout-session', async (req, res) => {
     });
     res.json({ url: session.url });
   } catch (err) {
+    console.error('Checkout session error:', err);
     res.status(500).json({ error: 'Failed to create checkout session', details: err.message });
   }
 });
