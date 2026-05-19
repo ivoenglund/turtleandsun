@@ -49,7 +49,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const app = express();
 app.set('trust proxy', true);
 app.use((req, res, next) => {
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+  if (process.env.NODE_ENV !== 'production') { return next(); } if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
     return next();
   }
   res.redirect(301, `https://${req.get('host')}${req.url}`);
@@ -973,7 +973,7 @@ async function generateVideo(portrait_url) {
     input: {
       image_url: portrait_url,
       prompt: ROYAL_VIDEO_PROMPT,
-      duration: '5',
+      duration: '10',
       enable_audio: true,
     },
   });
@@ -1048,17 +1048,6 @@ app.get('/admin/geocode-all', requireAuth, async (req, res) => {
     await new Promise(r => setTimeout(r, 1100));
   }
   res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
-});
-
-app.get('/admin/run-seed-demo', async (req, res) => {
-  try {
-    const seed = require('./seed-demo-user');
-    await seed();
-    res.send('Seed complete. Now remove this route from server.js.');
-  } catch (err) {
-    console.error('Seed error:', err);
-    res.status(500).send('Seed failed: ' + err.message);
-  }
 });
 
 initDb()
