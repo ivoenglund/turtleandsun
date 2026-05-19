@@ -102,7 +102,7 @@ function requireRole(role) {
       if (!user.roles.includes(role)) {
         return isApiRequest(req)
           ? res.status(403).json({ error: 'Forbidden' })
-          : res.status(403).send('<h2>Access denied</h2><p><a href="/login">Log in</a></p>');
+          : res.redirect('/account');
       }
       next();
     } catch (err) {

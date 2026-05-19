@@ -38,24 +38,26 @@
     '.ts-nav-drawer-link.ts-active{color:#3A6B20;font-weight:700;opacity:1;}' +
     '.ts-nav-drawer-logout{color:#c0392b!important;opacity:1!important;}' +
     '.ts-nav-drawer-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 20px;}' +
-    '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}';
+    '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}' +
+    '.ts-nav-admin-only{display:none;}' +
+    'body.ts-nav-admin .ts-nav-admin-only{display:revert;}';
 
   function buildHTML() {
     var dd =
       '<div class="ts-nav-dd" id="ts-nav-dd">' +
         '<div class="ts-nav-dd-email" id="ts-nav-dd-email"></div>' +
-        '<a class="ts-nav-dd-link ts-pg-contacts" href="/account/contacts">Contacts</a>' +
-        '<a class="ts-nav-dd-link ts-pg-network" href="/account/network?view=network">Network</a>' +
-        '<a class="ts-nav-dd-link ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
-        '<a class="ts-nav-dd-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
-        '<a class="ts-nav-dd-link ts-pg-map" href="/account/network?view=map">Map</a>' +
-        '<a class="ts-nav-dd-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-contacts" href="/account/contacts">Contacts</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-network" href="/account/network?view=network">Network</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-map" href="/account/network?view=map">Map</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<a class="ts-nav-dd-link ts-pg-library" href="/account/library">Library</a>' +
-        '<div class="ts-nav-dd-sep"></div>' +
-        '<a class="ts-nav-dd-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
-        '<a class="ts-nav-dd-link" href="/print/labels">Print address labels</a>' +
-        '<a class="ts-nav-dd-link" href="/account/occasions">Print occasion list</a>' +
-        '<a class="ts-nav-dd-link" href="/print/calendar">Print calendar</a>' +
+        '<div class="ts-nav-dd-sep ts-nav-admin-only"></div>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/print/labels">Print address labels</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/account/occasions">Print occasion list</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/print/calendar">Print calendar</a>' +
         '<div class="ts-nav-dd-sep"></div>' +
         '<a class="ts-nav-dd-link ts-pg-account" href="/account">Account settings</a>' +
         '<a class="ts-nav-dd-link ts-nav-dd-logout" href="/auth/logout">Log out</a>' +
@@ -71,18 +73,18 @@
         '<a class="ts-nav-drawer-link" href="/pricing">Pricing</a>' +
         '<a class="ts-nav-drawer-link" href="/faq">FAQ</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
-        '<a class="ts-nav-drawer-link ts-pg-contacts" href="/account/contacts">Contacts</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-network" href="/account/network?view=network">Network</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-map" href="/account/network?view=map">Map</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-occasions" href="/account/occasions">Occasions</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-contacts" href="/account/contacts">Contacts</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-network" href="/account/network?view=network">Network</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-map" href="/account/network?view=map">Map</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<a class="ts-nav-drawer-link ts-pg-library" href="/account/library">Library</a>' +
-        '<div class="ts-nav-drawer-sep"></div>' +
-        '<a class="ts-nav-drawer-link" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
-        '<a class="ts-nav-drawer-link" href="/print/labels">Print address labels</a>' +
-        '<a class="ts-nav-drawer-link" href="/account/occasions">Print occasion list</a>' +
-        '<a class="ts-nav-drawer-link" href="/print/calendar">Print calendar</a>' +
+        '<div class="ts-nav-drawer-sep ts-nav-admin-only"></div>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/print/labels">Print address labels</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/account/occasions">Print occasion list</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/print/calendar">Print calendar</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
         '<a class="ts-nav-drawer-link ts-pg-account" href="/account">Account settings</a>' +
         '<a class="ts-nav-drawer-link ts-nav-drawer-logout" href="/auth/logout">Log out</a>' +
@@ -218,6 +220,7 @@
         if (drawerEmail) drawerEmail.textContent = email;
 
         if (status.isAdmin) {
+          document.body.classList.add('ts-nav-admin');
           document.querySelectorAll('.ts-pg-account').forEach(function (el) {
             el.href = '/admin';
             el.textContent = 'Admin dashboard';

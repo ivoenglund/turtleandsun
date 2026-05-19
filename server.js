@@ -413,15 +413,15 @@ app.get('/account', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'account.html'));
 });
 
-app.get('/account/contacts', requireAuth, (req, res) => {
+app.get('/account/contacts', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'contacts.html'));
 });
 
-app.get('/account/network', requireAuth, (req, res) => {
+app.get('/account/network', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'network.html'));
 });
 
-app.get('/account/occasions', requireAuth, (req, res) => {
+app.get('/account/occasions', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
 
@@ -473,7 +473,7 @@ app.get('/print/calendar', requireAuth, (req, res) => {
 
 // ── Groups ────────────────────────────────────────────────────────────────────
 
-app.get('/api/groups', requireAuth, async (req, res) => {
+app.get('/api/groups', requireRole('admin'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
@@ -494,7 +494,7 @@ app.get('/api/groups', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/group-memberships', requireAuth, async (req, res) => {
+app.get('/api/group-memberships', requireRole('admin'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT contact_id, group_id FROM contact_group_memberships WHERE user_id = $1`, [req.user.id]
@@ -503,7 +503,7 @@ app.get('/api/group-memberships', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/groups', requireAuth, async (req, res) => {
+app.post('/api/groups', requireRole('admin'), async (req, res) => {
   const { name, parent_group_id } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
   if (parent_group_id) {
@@ -531,7 +531,7 @@ async function deleteGroupCascade(groupId, userId) {
   await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2`, [groupId, userId]);
 }
 
-app.delete('/api/groups/:id', requireAuth, async (req, res) => {
+app.delete('/api/groups/:id', requireRole('admin'), async (req, res) => {
   try {
     const check = await pool.query(`SELECT name FROM groups WHERE id=$1 AND user_id=$2`, [req.params.id, req.user.id]);
     if (!check.rows.length || check.rows[0].name === 'Family') return res.status(400).json({ error: 'Cannot delete this group.' });
@@ -542,7 +542,7 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
 
 // ── Contact group memberships ─────────────────────────────────────────────────
 
-app.get('/api/contacts/:id/groups', requireAuth, async (req, res) => {
+app.get('/api/contacts/:id/groups', requireRole('admin'), async (req, res) => {
   const result = await pool.query(
     `SELECT g.id, g.name FROM contact_group_memberships m
      JOIN groups g ON g.id = m.group_id
@@ -552,7 +552,7 @@ app.get('/api/contacts/:id/groups', requireAuth, async (req, res) => {
   res.json(result.rows);
 });
 
-app.post('/api/contacts/:id/groups', requireAuth, async (req, res) => {
+app.post('/api/contacts/:id/groups', requireRole('admin'), async (req, res) => {
   const { group_ids } = req.body;
   try {
     await pool.query(`DELETE FROM contact_group_memberships WHERE contact_id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
@@ -568,7 +568,7 @@ app.post('/api/contacts/:id/groups', requireAuth, async (req, res) => {
 
 // ── Occasions ─────────────────────────────────────────────────────────────────
 
-app.get('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
+app.get('/api/contacts/:id/occasions', requireRole('admin'), async (req, res) => {
   const result = await pool.query(
     `SELECT id, name, start_date, frequency, notes FROM occasions WHERE contact_id = $1 AND user_id = $2 ORDER BY start_date`,
     [req.params.id, req.user.id]
@@ -576,7 +576,7 @@ app.get('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
   res.json(result.rows);
 });
 
-app.post('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
+app.post('/api/contacts/:id/occasions', requireRole('admin'), async (req, res) => {
   const { name, start_date, frequency, notes } = req.body;
   try {
     const result = await pool.query(
@@ -588,14 +588,14 @@ app.post('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/occasions/:id', requireAuth, async (req, res) => {
+app.delete('/api/occasions/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.query(`DELETE FROM occasions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
+app.get('/api/occasions/upcoming', requireRole('admin'), async (req, res) => {
   try {
     const [occasions, contacts] = await Promise.all([
       pool.query(
@@ -611,7 +611,7 @@ app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/network', requireAuth, async (req, res) => {
+app.get('/api/network', requireRole('admin'), async (req, res) => {
   try {
     const contacts = await pool.query(
       `SELECT id, name, email, birthday, city, died_on, is_pet, is_me, latitude, longitude FROM contacts WHERE user_id = $1`,
@@ -651,7 +651,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
 
 // ── Contacts management API ───────────────────────────────────────────────────
 
-app.get('/api/contacts', requireAuth, async (req, res) => {
+app.get('/api/contacts', requireRole('admin'), async (req, res) => {
   try {
     const contacts = await pool.query(
       `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
@@ -664,7 +664,7 @@ app.get('/api/contacts', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
+app.post('/api/contacts/placeholder', requireRole('admin'), async (req, res) => {
   const { name } = req.body;
   try {
     const result = await pool.query(
@@ -677,7 +677,7 @@ app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
+app.get('/api/contacts/related-ids', requireRole('admin'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT DISTINCT contact_a_id AS id FROM contact_relationships WHERE user_id = $1
@@ -690,7 +690,7 @@ app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/contacts/:id', requireAuth, async (req, res) => {
+app.get('/api/contacts/:id', requireRole('admin'), async (req, res) => {
   try {
     const contact = await pool.query(
       `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
@@ -719,7 +719,7 @@ app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.put('/api/contacts/:id', requireAuth, async (req, res) => {
+app.put('/api/contacts/:id', requireRole('admin'), async (req, res) => {
   const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet } = req.body;
   try {
     await pool.query(
@@ -754,7 +754,7 @@ app.put('/api/contacts/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
+app.delete('/api/contacts/:id', requireRole('admin'), async (req, res) => {
   try {
     const id = req.params.id;
     const uid = req.user.id;
@@ -766,7 +766,7 @@ app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/relationship-types', requireAuth, async (req, res) => {
+app.get('/api/relationship-types', requireRole('admin'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT rt.id, rt.name, rt.mirror_id, g.name AS group_name
@@ -782,7 +782,7 @@ app.get('/api/relationship-types', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/contact-relationships', requireAuth, async (req, res) => {
+app.post('/api/contact-relationships', requireRole('admin'), async (req, res) => {
   const { contact_a_id, contact_b_id, relationship_type_id } = req.body;
   try {
     await pool.query(
@@ -807,7 +807,7 @@ app.post('/api/contact-relationships', requireAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/contact-relationships/:id', requireAuth, async (req, res) => {
+app.delete('/api/contact-relationships/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.query(
       `DELETE FROM contact_relationships WHERE id = $1 AND user_id = $2`,
@@ -819,7 +819,7 @@ app.delete('/api/contact-relationships/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/account/contacts', requireAuth, async (req, res) => {
+app.get('/api/account/contacts', requireRole('admin'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT id, google_id, name, email, phone, created_at FROM contacts WHERE user_id = $1 ORDER BY name ASC NULLS LAST',
@@ -1031,7 +1031,7 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
 
 
 
-app.get('/admin/geocode-all', requireAuth, async (req, res) => {
+app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   const contacts = await pool.query(
     'SELECT * FROM contacts WHERE user_id = $1 AND latitude IS NULL AND city IS NOT NULL',
     [req.user.id]
