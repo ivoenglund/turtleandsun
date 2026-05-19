@@ -463,11 +463,11 @@ app.get('/print/loveogram', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-loveogram.html'));
 });
 
-app.get('/print/labels', requireAuth, (req, res) => {
+app.get('/print/labels', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'print-labels.html'));
 });
 
-app.get('/print/calendar', requireAuth, (req, res) => {
+app.get('/print/calendar', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'print-calendar.html'));
 });
 
