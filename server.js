@@ -10,6 +10,9 @@ const { initDb, pool, seedGallery } = require('./db');
 const { uploadStream } = require('./cloudinary');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
+const cron = require('node-cron');
+const crypto = require('crypto');
+const { lookup: geoLookup } = require('./geoip');
 const {
   createMagicLink, verifyMagicLink, findOrCreateUser,
   createSession, setSessionCookie, getSessionUser,
@@ -142,6 +145,59 @@ app.use((req, res, next) => {
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
   }
+  next();
+});
+
+// ── Visitor logging ─────────────────────────────────────────────────────────
+const VISITS_ASSET_RE = /\.(?:js|css|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot|map|mmdb|txt|xml|json|webmanifest)$/i;
+
+function visitorIp(req) {
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) return String(cf).trim();
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
+  return req.ip;
+}
+
+app.use((req, res, next) => {
+  const p = req.path;
+  if (p === '/webhook' || p.startsWith('/admin/') || p.startsWith('/api/') || VISITS_ASSET_RE.test(p)) return next();
+
+  const requestId = crypto.randomUUID();
+  req.requestId = requestId;
+
+  res.on('finish', () => {
+    const ip = visitorIp(req) || 'unknown';
+    const statusCode = res.statusCode;
+    const method = req.method;
+    const reqPath = req.path; // query string intentionally dropped
+    const userAgent = req.headers['user-agent'] || null;
+    const referrer = req.headers['referer'] || req.headers['referrer'] || null;
+
+    (async () => {
+      try {
+        let userId = null;
+        try {
+          const user = await getSessionUser(req);
+          userId = user ? user.id : null;
+        } catch { /* anonymous or session error — leave null */ }
+
+        const geo = await geoLookup(ip);
+
+        await pool.query(
+          `INSERT INTO visits
+             (ip, method, path, status_code, user_agent, referrer,
+              country, region, city, lat, lng, user_id, request_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [ip, method, reqPath, statusCode, userAgent, referrer,
+           geo.country, geo.region, geo.city, geo.lat, geo.lng, userId, requestId]
+        );
+      } catch (err) {
+        console.error('[visits] insert error:', err.message);
+      }
+    })();
+  });
+
   next();
 });
 
@@ -354,6 +410,93 @@ app.get('/auth/google/callback', async (req, res) => {
 
 app.get('/admin', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/admin/visits', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'visits.html'));
+});
+
+const VISITS_MAX_ROWS = 5000;
+const UTC_DAY_START = `date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`;
+
+app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
+  try {
+    const { from, to, search, flagged_only } = req.query;
+    const where = [];
+    const params = [];
+
+    if (from) { params.push(from); where.push(`created_at >= $${params.length}`); }
+    if (to)   { params.push(to);   where.push(`created_at <= $${params.length}`); }
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(ip ILIKE $${params.length} OR path ILIKE $${params.length} OR country ILIKE $${params.length})`);
+    }
+    if (flagged_only === 'true' || flagged_only === '1') {
+      where.push(`flagged = true`);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    params.push(VISITS_MAX_ROWS);
+
+    const visitsResult = await pool.query(
+      `SELECT id, ip, created_at, method, path, status_code, user_agent,
+              referrer, country, region, city, lat, lng, user_id, request_id, flagged
+       FROM visits
+       ${whereSql}
+       ORDER BY created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    const [totals, topCountry, topPath] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
+         FROM visits WHERE created_at >= ${UTC_DAY_START}`
+      ),
+      pool.query(
+        `SELECT country, COUNT(*)::int AS c FROM visits
+         WHERE created_at >= ${UTC_DAY_START} AND country IS NOT NULL
+         GROUP BY country ORDER BY c DESC LIMIT 1`
+      ),
+      pool.query(
+        `SELECT path, COUNT(*)::int AS c FROM visits
+         WHERE created_at >= ${UTC_DAY_START}
+         GROUP BY path ORDER BY c DESC LIMIT 1`
+      ),
+    ]);
+
+    res.json({
+      visits: visitsResult.rows,
+      capped: visitsResult.rows.length >= VISITS_MAX_ROWS,
+      stats: {
+        total_today: totals.rows[0].total,
+        unique_ips_today: totals.rows[0].unique_ips,
+        top_country: topCountry.rows[0] || null,
+        top_path: topPath.rows[0] || null,
+      },
+    });
+  } catch (err) {
+    console.error('[visits] data query error:', err.message);
+    res.status(500).json({ error: 'Failed to load visits', details: err.message });
+  }
+});
+
+app.post('/admin/visits/flag', requireRole('admin'), async (req, res) => {
+  const { id, flagged } = req.body;
+  if (!Number.isInteger(id) || typeof flagged !== 'boolean') {
+    return res.status(400).json({ error: 'id (integer) and flagged (boolean) required' });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE visits SET flagged = $1 WHERE id = $2 RETURNING id, flagged`,
+      [flagged, id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Visit not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[visits] flag error:', err.message);
+    res.status(500).json({ error: 'Failed to update flag', details: err.message });
+  }
 });
 
 app.get('/api/admin/data', requireRole('admin'), async (req, res) => {
@@ -1050,6 +1193,18 @@ app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   }
   res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
 });
+
+// Daily cleanup of old, unflagged visits at 03:00 UTC
+cron.schedule('0 3 * * *', async () => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM visits WHERE created_at < NOW() - INTERVAL '90 days' AND flagged = false`
+    );
+    console.log(`[visits] daily cleanup deleted ${result.rowCount} rows older than 90 days`);
+  } catch (err) {
+    console.error('[visits] daily cleanup error:', err.message);
+  }
+}, { timezone: 'UTC' });
 
 initDb()
   .then(() => seedGallery())

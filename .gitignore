@@ -36,3 +36,6 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# GeoIP database (download separately — see README)
+geoip/*.mmdb

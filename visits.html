@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Visits — Turtle and Sun</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);color:#1C0A00;min-height:100vh;}
+.main{max-width:1200px;margin:0 auto;padding:32px 40px;}
+.page-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:24px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+.stat{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.stat-val{font-size:26px;font-weight:800;color:#3A6B20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stat-lbl{font-size:13px;color:rgba(60,20,0,0.55);margin-top:4px;}
+.filter-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.filter-bar label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.filter-bar select,.filter-bar input[type=text]{font:inherit;font-size:13px;padding:7px 10px;border:1px solid #d8d2c4;border-radius:7px;background:#fff;}
+.filter-bar input[type=text]{min-width:220px;flex:1;}
+#map{width:100%;height:400px;border-radius:10px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.loc-filter{display:none;font-size:12px;background:#fde7e7;color:#a02020;padding:6px 12px;border-radius:8px;margin-bottom:12px;align-items:center;gap:10px;}
+.loc-filter button{font:inherit;font-size:12px;border:none;background:#a02020;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;}
+.table-wrap{overflow-x:auto;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+th{background:#1C0A00;color:#FFF9E6;text-align:left;padding:10px 14px;font-weight:600;white-space:nowrap;}
+td{padding:9px 14px;border-bottom:1px solid #f0ede6;vertical-align:middle;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr.flagged td{background:#fff5f5;}
+tr:hover td{background:#fffdf5;}
+.ua{max-width:280px;overflow:hidden;text-overflow:ellipsis;}
+.ip-link{color:#2a5db0;cursor:pointer;text-decoration:underline;}
+.status-2{color:#1b5e20;font-weight:700;}
+.status-3{color:#856404;font-weight:700;}
+.status-4,.status-5{color:#a02020;font-weight:700;}
+.flag-btn{font:inherit;font-size:12px;border:1px solid #d8d2c4;background:#fff;border-radius:6px;padding:4px 9px;cursor:pointer;}
+.flag-btn.on{background:#a02020;color:#fff;border-color:#a02020;}
+.pager{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:16px;font-size:13px;}
+.pager button{font:inherit;border:1px solid #d8d2c4;background:#fff;border-radius:7px;padding:6px 14px;cursor:pointer;}
+.pager button:disabled{opacity:0.4;cursor:default;}
+.muted{color:rgba(60,20,0,0.5);font-size:13px;}
+.cap-note{font-size:12px;color:#a02020;margin-bottom:10px;display:none;}
+</style>
+<script src="/nav.js?v=20260503e"></script>
+</head>
+<body>
+<div class="main">
+  <div class="page-title">Visits</div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="st-total">—</div><div class="stat-lbl">Total visits today (UTC)</div></div>
+    <div class="stat"><div class="stat-val" id="st-ips">—</div><div class="stat-lbl">Unique IPs today</div></div>
+    <div class="stat"><div class="stat-val" id="st-country">—</div><div class="stat-lbl">Top country today</div></div>
+    <div class="stat"><div class="stat-val" id="st-path">—</div><div class="stat-lbl">Top path today</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <label>Range
+      <select id="f-range">
+        <option value="24h" selected>Last 24h</option>
+        <option value="7d">Last 7d</option>
+        <option value="30d">Last 30d</option>
+        <option value="all">All</option>
+      </select>
+    </label>
+    <input type="text" id="f-search" placeholder="Search IP, path, or country…">
+    <label><input type="checkbox" id="f-flagged"> Show flagged only</label>
+  </div>
+
+  <div class="cap-note" id="cap-note">Showing the most recent 5000 matching rows (result capped).</div>
+  <div class="loc-filter" id="loc-filter">
+    <span id="loc-filter-text"></span>
+    <button id="loc-clear">Clear location filter</button>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>IP</th><th>Country</th><th>Method</th><th>Path</th>
+          <th>Status</th><th>User-Agent</th><th>Flag</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <button id="prev">‹ Prev</button>
+    <span id="page-info" class="muted"></span>
+    <button id="next">Next ›</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const PAGE_SIZE = 50;
+let allVisits = [];
+let page = 1;
+let locFilter = null; // {lat, lng}
+let map, clusterGroup;
+
+function flagEmoji(cc) {
+  if (!cc || cc.length !== 2) return '';
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('sv-SE', { timeZone: 'UTC' }).replace(' ', ' ') + ' UTC';
+}
+function statusClass(code) {
+  if (!code) return '';
+  return 'status-' + String(code)[0];
+}
+function dotIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:13px;height:13px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.5);"></div>`,
+    iconSize: [13, 13],
+  });
+}
+
+function rangeToFrom(range) {
+  const now = Date.now();
+  const day = 86400000;
+  if (range === '24h') return new Date(now - day).toISOString();
+  if (range === '7d') return new Date(now - 7 * day).toISOString();
+  if (range === '30d') return new Date(now - 30 * day).toISOString();
+  return null; // all
+}
+
+async function fetchData() {
+  const range = document.getElementById('f-range').value;
+  const search = document.getElementById('f-search').value.trim();
+  const flaggedOnly = document.getElementById('f-flagged').checked;
+  const params = new URLSearchParams();
+  const from = rangeToFrom(range);
+  if (from) params.set('from', from);
+  if (search) params.set('search', search);
+  if (flaggedOnly) params.set('flagged_only', 'true');
+
+  const res = await fetch('/admin/visits/data?' + params.toString());
+  if (!res.ok) { alert('Failed to load visits'); return; }
+  const data = await res.json();
+  allVisits = data.visits;
+  renderStats(data.stats);
+  document.getElementById('cap-note').style.display = data.capped ? 'block' : 'none';
+  locFilter = null;
+  updateLocFilterUI();
+  page = 1;
+  renderMap();
+  renderTable();
+}
+
+function renderStats(s) {
+  document.getElementById('st-total').textContent = s.total_today;
+  document.getElementById('st-ips').textContent = s.unique_ips_today;
+  document.getElementById('st-country').textContent = s.top_country
+    ? `${flagEmoji(s.top_country.country)} ${s.top_country.country} (${s.top_country.c})` : '—';
+  document.getElementById('st-path').textContent = s.top_path
+    ? `${s.top_path.path} (${s.top_path.c})` : '—';
+}
+
+function renderMap() {
+  if (!map) {
+    map = L.map('map').setView([20, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+    clusterGroup = L.markerClusterGroup();
+    map.addLayer(clusterGroup);
+  }
+  clusterGroup.clearLayers();
+  const markers = [];
+  for (const v of allVisits) {
+    if (v.lat == null || v.lng == null) continue;
+    const m = L.marker([v.lat, v.lng], { icon: dotIcon(v.flagged ? '#d32f2f' : '#3A6B20') });
+    m.bindPopup(`${flagEmoji(v.country)} ${esc(v.city || '')} ${esc(v.country || '')}<br>${esc(v.ip)}<br>${esc(v.method)} ${esc(v.path)}`);
+    m.on('click', () => { locFilter = { lat: v.lat, lng: v.lng }; updateLocFilterUI(); page = 1; renderTable(); });
+    markers.push(m);
+  }
+  clusterGroup.addLayers(markers);
+}
+
+function updateLocFilterUI() {
+  const el = document.getElementById('loc-filter');
+  if (locFilter) {
+    el.style.display = 'flex';
+    document.getElementById('loc-filter-text').textContent =
+      `Table filtered to location ${locFilter.lat.toFixed(3)}, ${locFilter.lng.toFixed(3)}`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function visibleRows() {
+  if (!locFilter) return allVisits;
+  const R = 0.5; // ~degrees radius for "near" match
+  return allVisits.filter(v => v.lat != null && v.lng != null
+    && Math.abs(v.lat - locFilter.lat) <= R && Math.abs(v.lng - locFilter.lng) <= R);
+}
+
+function renderTable() {
+  const rows = visibleRows();
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if (page > totalPages) page = totalPages;
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = rows.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = slice.map(v => {
+    const ua = v.user_agent || '';
+    const uaShort = ua.length > 40 ? ua.slice(0, 40) + '…' : ua;
+    return `<tr class="${v.flagged ? 'flagged' : ''}">
+      <td>${esc(fmtTime(v.created_at))}</td>
+      <td><span class="ip-link" data-ip="${esc(v.ip)}">${esc(v.ip)}</span></td>
+      <td>${flagEmoji(v.country)} ${esc(v.country || '')}</td>
+      <td>${esc(v.method)}</td>
+      <td>${esc(v.path)}</td>
+      <td class="${statusClass(v.status_code)}">${esc(v.status_code ?? '')}</td>
+      <td class="ua" title="${esc(ua)}">${esc(uaShort)}</td>
+      <td><button class="flag-btn ${v.flagged ? 'on' : ''}" data-id="${v.id}" data-flagged="${v.flagged}">${v.flagged ? 'Flagged' : 'Flag'}</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px;">No visits match the current filters.</td></tr>`;
+
+  document.getElementById('page-info').textContent = `Page ${page} of ${totalPages} · ${rows.length} rows`;
+  document.getElementById('prev').disabled = page <= 1;
+  document.getElementById('next').disabled = page >= totalPages;
+
+  tbody.querySelectorAll('.ip-link').forEach(el => el.addEventListener('click', () => {
+    document.getElementById('f-search').value = el.dataset.ip;
+    fetchData();
+  }));
+  tbody.querySelectorAll('.flag-btn').forEach(el => el.addEventListener('click', () => toggleFlag(el)));
+}
+
+async function toggleFlag(btn) {
+  const id = parseInt(btn.dataset.id, 10);
+  const newVal = btn.dataset.flagged !== 'true';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/admin/visits/flag', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, flagged: newVal }),
+    });
+    if (!res.ok) throw new Error('flag failed');
+    const v = allVisits.find(x => x.id === id);
+    if (v) v.flagged = newVal;
+    renderMap();
+    renderTable();
+  } catch (e) {
+    alert('Failed to update flag');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('f-range').addEventListener('change', fetchData);
+document.getElementById('f-flagged').addEventListener('change', fetchData);
+let searchTimer;
+document.getElementById('f-search').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(fetchData, 350);
+});
+document.getElementById('prev').addEventListener('click', () => { if (page > 1) { page--; renderTable(); } });
+document.getElementById('next').addEventListener('click', () => { page++; renderTable(); });
+document.getElementById('loc-clear').addEventListener('click', () => { locFilter = null; updateLocFilterUI(); page = 1; renderTable(); });
+
+NavBar.init({ requireAuth: true }).then(status => { if (status) fetchData(); });
+</script>
+</body>
+</html>

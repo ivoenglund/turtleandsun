@@ -125,6 +125,31 @@ async function initDb() {
       notes TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS visits (
+      id SERIAL PRIMARY KEY,
+      ip TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      method TEXT NOT NULL,
+      path TEXT NOT NULL,
+      status_code INTEGER,
+      user_agent TEXT,
+      referrer TEXT,
+      country TEXT,
+      region TEXT,
+      city TEXT,
+      lat REAL,
+      lng REAL,
+      user_id INTEGER REFERENCES users(id),
+      request_id TEXT,
+      flagged BOOLEAN NOT NULL DEFAULT false
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_visits_created_at ON visits(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_visits_ip ON visits(ip);
+    CREATE INDEX IF NOT EXISTS idx_visits_flagged ON visits(flagged) WHERE flagged = true;
   `);
 
   // Migrate existing tables to add new columns
