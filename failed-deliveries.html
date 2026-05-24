@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Failed deliveries — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);color:#1C0A00;min-height:100vh;}
+.main{max-width:1200px;margin:0 auto;padding:32px 40px;}
+.page-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:24px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+.stat{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.stat-val{font-size:26px;font-weight:800;color:#c0392b;}
+.stat-lbl{font-size:13px;color:rgba(60,20,0,0.55);margin-top:4px;}
+.table-wrap{overflow-x:auto;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+th{background:#1C0A00;color:#FFF9E6;text-align:left;padding:10px 14px;font-weight:600;white-space:nowrap;}
+td{padding:9px 14px;border-bottom:1px solid #f0ede6;vertical-align:middle;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr.resolved td{opacity:0.5;}
+tr:hover td{background:#fffdf5;}
+.err{max-width:320px;overflow:hidden;text-overflow:ellipsis;color:#a02020;}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;}
+.badge-resolved{background:#c8e6c9;color:#1b5e20;}
+.badge-open{background:#fde7e7;color:#a02020;}
+.btn{font:inherit;font-size:12px;border:1px solid #d8d2c4;background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;margin-right:4px;}
+.btn-retry{border-color:#3A6B20;color:#3A6B20;}
+.btn-resolve{border-color:#856404;color:#856404;}
+.btn:disabled{opacity:0.4;cursor:default;}
+.muted{color:rgba(60,20,0,0.5);font-size:13px;}
+</style>
+<script src="/nav.js?v=20260503e"></script>
+</head>
+<body>
+<div class="main">
+  <div class="page-title">Failed deliveries</div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="st-open">—</div><div class="stat-lbl">Unresolved failures</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Created</th><th>Order ID</th><th>Email</th><th>Product</th>
+          <th>Error</th><th>Retries</th><th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let allRows = [];
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+function fmtTime(iso) {
+  return new Date(iso).toLocaleString('sv-SE', { timeZone: 'UTC' }) + ' UTC';
+}
+
+async function load() {
+  const res = await fetch('/admin/failed-deliveries/data');
+  if (!res.ok) { alert('Failed to load'); return; }
+  const data = await res.json();
+  allRows = data.rows;
+  render();
+}
+
+function render() {
+  document.getElementById('st-open').textContent = allRows.filter(r => !r.resolved).length;
+
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = allRows.map(r => {
+    const err = r.error_message || '';
+    const errShort = err.length > 50 ? err.slice(0, 50) + '…' : err;
+    return `<tr class="${r.resolved ? 'resolved' : ''}">
+      <td>${esc(fmtTime(r.created_at))}</td>
+      <td>${r.order_id ?? '—'}</td>
+      <td>${esc(r.email || '(none)')}</td>
+      <td>${esc(r.product || '')}</td>
+      <td class="err" title="${esc(err)}">${esc(errShort)}</td>
+      <td>${r.retry_count}</td>
+      <td><span class="badge ${r.resolved ? 'badge-resolved' : 'badge-open'}">${r.resolved ? 'Resolved' : 'Open'}</span></td>
+      <td>
+        <button class="btn btn-retry" data-id="${r.id}" ${r.resolved ? 'disabled' : ''}>Retry</button>
+        <button class="btn btn-resolve" data-id="${r.id}" ${r.resolved ? 'disabled' : ''}>Mark resolved</button>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px;">No failed deliveries. 🎉</td></tr>`;
+
+  tbody.querySelectorAll('.btn-retry').forEach(el => el.addEventListener('click', () => retry(el)));
+  tbody.querySelectorAll('.btn-resolve').forEach(el => el.addEventListener('click', () => resolve(el)));
+}
+
+async function retry(btn) {
+  const id = parseInt(btn.dataset.id, 10);
+  btn.disabled = true;
+  btn.textContent = 'Retrying…';
+  try {
+    const res = await fetch('/admin/failed-deliveries/retry', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'retry failed');
+    await load();
+  } catch (e) {
+    alert('Retry failed: ' + e.message);
+    await load();
+  }
+}
+
+async function resolve(btn) {
+  const id = parseInt(btn.dataset.id, 10);
+  btn.disabled = true;
+  try {
+    const res = await fetch('/admin/failed-deliveries/resolve', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) throw new Error('resolve failed');
+    await load();
+  } catch (e) {
+    alert('Failed to resolve');
+    btn.disabled = false;
+  }
+}
+
+NavBar.init({ requireAuth: true }).then(status => { if (status) load(); });
+</script>
+</body>
+</html>

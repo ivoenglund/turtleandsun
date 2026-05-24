@@ -144,12 +144,25 @@ async function initDb() {
       request_id TEXT,
       flagged BOOLEAN NOT NULL DEFAULT false
     );
+
+    CREATE TABLE IF NOT EXISTS failed_deliveries (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER REFERENCES orders(id),
+      email TEXT,
+      product TEXT,
+      portrait_url TEXT,
+      error_message TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      resolved BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_visits_created_at ON visits(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_visits_ip ON visits(ip);
     CREATE INDEX IF NOT EXISTS idx_visits_flagged ON visits(flagged) WHERE flagged = true;
+    CREATE INDEX IF NOT EXISTS idx_failed_deliveries_resolved ON failed_deliveries(resolved) WHERE resolved = false;
   `);
 
   // Migrate existing tables to add new columns

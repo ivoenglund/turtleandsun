@@ -125,9 +125,39 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
     // Deliver portrait — no re-generation needed
     console.log('Delivering for order:', orderId);
-    generateForOrder(portrait_url || image_url, product, email || '', orderId).catch(err =>
-      console.error('Delivery error for session:', session.id, err.message)
-    );
+    generateForOrder(portrait_url || image_url, product, email || '', orderId).catch(async (err) => {
+      console.error('Delivery error for session:', session.id, err.message);
+
+      // Record the failure so it can be retried from the admin panel
+      try {
+        await pool.query(
+          `INSERT INTO failed_deliveries (order_id, email, product, portrait_url, error_message)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [orderId || null, email || '', product, portrait_url || image_url, err.message]
+        );
+      } catch (dbErr) {
+        console.error('failed_deliveries insert error:', dbErr.message);
+      }
+
+      // Alert admin — own try/catch so a Resend failure can't crash the handler
+      try {
+        await resend.emails.send({
+          from: 'Turtle and Sun <noreply@turtleandsun.com>',
+          to: 'ivo.englund@gmail.com',
+          subject: `Turtleandsun: delivery failed for order #${orderId}`,
+          html: `<p>A Loveogram delivery failed and needs attention.</p>
+                 <ul>
+                   <li><strong>Order:</strong> #${orderId}</li>
+                   <li><strong>Email:</strong> ${email || '(none)'}</li>
+                   <li><strong>Product:</strong> ${product}</li>
+                   <li><strong>Error:</strong> ${err.message}</li>
+                 </ul>
+                 <p><a href="https://turtleandsun.com/admin/failed-deliveries">Open failed deliveries</a></p>`,
+        });
+      } catch (mailErr) {
+        console.error('Admin alert email error:', mailErr.message);
+      }
+    });
   }
 
   res.json({ received: true });
@@ -496,6 +526,64 @@ app.post('/admin/visits/flag', requireRole('admin'), async (req, res) => {
   } catch (err) {
     console.error('[visits] flag error:', err.message);
     res.status(500).json({ error: 'Failed to update flag', details: err.message });
+  }
+});
+
+app.get('/admin/failed-deliveries', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'failed-deliveries.html'));
+});
+
+app.get('/admin/failed-deliveries/data', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, order_id, email, product, portrait_url, error_message, retry_count, resolved, created_at
+       FROM failed_deliveries ORDER BY created_at DESC`
+    );
+    res.json({ rows: result.rows });
+  } catch (err) {
+    console.error('[failed-deliveries] data query error:', err.message);
+    res.status(500).json({ error: 'Failed to load failed deliveries', details: err.message });
+  }
+});
+
+app.post('/admin/failed-deliveries/retry', requireRole('admin'), async (req, res) => {
+  const { id } = req.body;
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'id (integer) required' });
+  try {
+    const lookup = await pool.query('SELECT * FROM failed_deliveries WHERE id = $1', [id]);
+    if (!lookup.rows.length) return res.status(404).json({ error: 'Not found' });
+    const row = lookup.rows[0];
+
+    await pool.query('UPDATE failed_deliveries SET retry_count = retry_count + 1 WHERE id = $1', [id]);
+
+    try {
+      await generateForOrder(row.portrait_url, row.product, row.email, row.order_id);
+      await pool.query('UPDATE failed_deliveries SET resolved = true WHERE id = $1', [id]);
+      res.json({ ok: true, resolved: true });
+    } catch (genErr) {
+      console.error('[failed-deliveries] retry generation error:', genErr.message);
+      await pool.query('UPDATE failed_deliveries SET error_message = $1 WHERE id = $2', [genErr.message, id]);
+      res.status(500).json({ ok: false, error: genErr.message });
+    }
+  } catch (err) {
+    console.error('[failed-deliveries] retry error:', err.message);
+    res.status(500).json({ error: 'Retry failed', details: err.message });
+  }
+});
+
+app.post('/admin/failed-deliveries/resolve', requireRole('admin'), async (req, res) => {
+  const { id } = req.body;
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'id (integer) required' });
+  try {
+    const result = await pool.query(
+      'UPDATE failed_deliveries SET resolved = true WHERE id = $1 RETURNING id, resolved',
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[failed-deliveries] resolve error:', err.message);
+    res.status(500).json({ error: 'Resolve failed', details: err.message });
   }
 });
 
