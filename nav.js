@@ -51,6 +51,8 @@
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-occasions" href="/account/occasions">Occasions</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/failed-deliveries">Failed deliveries</a>' +
         '<a class="ts-nav-dd-link ts-pg-library" href="/account/library">Library</a>' +
         '<div class="ts-nav-dd-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
@@ -78,6 +80,8 @@
         '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-occasions" href="/account/occasions">Occasions</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/failed-deliveries">Failed deliveries</a>' +
         '<a class="ts-nav-drawer-link ts-pg-library" href="/account/library">Library</a>' +
         '<div class="ts-nav-drawer-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/auth/google/contacts">↻ Sync Google contacts</a>' +

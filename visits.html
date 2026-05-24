@@ -23,6 +23,9 @@ body{font-family:Arial,sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#
 .filter-bar select,.filter-bar input[type=text]{font:inherit;font-size:13px;padding:7px 10px;border:1px solid #d8d2c4;border-radius:7px;background:#fff;}
 .filter-bar input[type=text]{min-width:220px;flex:1;}
 #map{width:100%;height:400px;border-radius:10px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+#map,.leaflet-container{z-index:0;}
+.leaflet-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-marker-pane,.leaflet-popup-pane{z-index:auto;}
+.leaflet-top,.leaflet-bottom{z-index:400;}
 .loc-filter{display:none;font-size:12px;background:#fde7e7;color:#a02020;padding:6px 12px;border-radius:8px;margin-bottom:12px;align-items:center;gap:10px;}
 .loc-filter button{font:inherit;font-size:12px;border:none;background:#a02020;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;}
 .table-wrap{overflow-x:auto;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
