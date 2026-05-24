@@ -1327,10 +1327,6 @@ app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
 });
 
-app.get('/admin/_sentry_test', requireRole('admin'), (req, res) => {
-  throw new Error('Sentry server test ' + new Date().toISOString());
-});
-
 // Sentry Express error handler — after all routes, before any catch-all handler.
 // v10 equivalent of the old Sentry.Handlers.errorHandler() middleware.
 if (process.env.SENTRY_DSN) {
