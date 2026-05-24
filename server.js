@@ -1,4 +1,17 @@
 require('dotenv').config();
+
+// Sentry must be initialized before express is required so the SDK can
+// auto-instrument incoming requests (v10 has no manual requestHandler middleware).
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.1,
+    sendDefaultPii: false,
+  });
+}
+
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -1313,6 +1326,12 @@ app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   }
   res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
 });
+
+// Sentry Express error handler — after all routes, before any catch-all handler.
+// v10 equivalent of the old Sentry.Handlers.errorHandler() middleware.
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 // Daily cleanup of old, unflagged visits at 03:00 UTC
 cron.schedule('0 3 * * *', async () => {

@@ -31,6 +31,15 @@ html,body{overflow-x:hidden;}
   window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
   plausible.init()
 </script>
+<!-- Sentry error tracking -->
+<script src="https://js-de.sentry-cdn.com/04f5b6ffcd743fad40eb6d02413a3dc2.min.js" crossorigin="anonymous"></script>
+<script>
+  Sentry.onLoad(function() {
+    Sentry.init({
+      tracesSampleRate: 0.1,
+    });
+  });
+</script>
 </head>
 <body>
 <div class="sun"></div>
