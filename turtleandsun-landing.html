@@ -84,10 +84,12 @@ html,body{overflow-x:hidden;}
   .fb,.btn-order,.btn-preview,.btn-upgrade,.btn-skip,.pkg{min-height:44px;}
 }
 .orient-group{display:flex;gap:8px;justify-content:center;margin:2px 0 8px;}
-.orient-btn{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1.5px solid rgba(0,0,0,0.18);border-radius:8px;background:rgba(255,255,255,0.6);cursor:pointer;padding:0;}
-.orient-btn.on{border-color:#3A6B20;background:rgba(58,107,32,0.12);}
-.orient-shape{display:block;border:2px solid rgba(60,20,0,0.55);border-radius:2px;}
+.orient-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:46px;height:52px;border:1.5px solid rgba(60,20,0,0.3);border-radius:8px;background:rgba(60,20,0,0.18);cursor:pointer;padding:0;}
+.orient-btn.on{border-color:#3A6B20;background:#fff;}
+.orient-shape{display:block;border:2px solid rgba(60,20,0,0.35);border-radius:2px;}
 .orient-btn.on .orient-shape{border-color:#3A6B20;}
+.orient-ratio{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;line-height:1;color:rgba(60,20,0,0.5);}
+.orient-btn.on .orient-ratio{color:#3A6B20;}
 </style>
 <script src="/nav.js?v=20260524a"></script>
 <!-- Privacy-friendly analytics by Plausible -->
@@ -154,9 +156,9 @@ html,body{overflow-x:hidden;}
       <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
       <div class="stitle">Choose style &amp; generate<br>a preview</div>
       <div class="orient-group" id="orientGroup">
-        <button type="button" class="orient-btn" data-orient="landscape" title="16:9"><span class="orient-shape" style="width:26px;height:15px;"></span></button>
-        <button type="button" class="orient-btn" data-orient="portrait" title="9:16"><span class="orient-shape" style="width:15px;height:26px;"></span></button>
-        <button type="button" class="orient-btn" data-orient="square" title="1:1"><span class="orient-shape" style="width:20px;height:20px;"></span></button>
+        <button type="button" class="orient-btn" data-orient="landscape" title="16:9"><span class="orient-shape" style="width:26px;height:15px;"></span><span class="orient-ratio">16:9</span></button>
+        <button type="button" class="orient-btn" data-orient="portrait" title="9:16"><span class="orient-shape" style="width:15px;height:26px;"></span><span class="orient-ratio">9:16</span></button>
+        <button type="button" class="orient-btn" data-orient="square" title="1:1"><span class="orient-shape" style="width:20px;height:20px;"></span><span class="orient-ratio">1:1</span></button>
       </div>
       <input type="email" id="previewEmail" placeholder="Your email" style="width:100%;padding:7px 10px;border:1.5px solid rgba(0,0,0,0.18);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;margin-bottom:6px;outline:none;background:rgba(255,255,255,0.7);" />
       <button class="btn-preview" id="btnPreview">Generate preview</button>
