@@ -39,8 +39,7 @@
     '.ts-nav-drawer-logout{color:#c0392b!important;opacity:1!important;}' +
     '.ts-nav-drawer-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 20px;}' +
     '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}' +
-    '.ts-nav-admin-only{display:none;}' +
-    'body.ts-nav-admin .ts-nav-admin-only{display:revert;}';
+    'body:not(.ts-nav-admin) .ts-nav-admin-only{display:none;}';
 
   function buildHTML() {
     var dd =

@@ -116,7 +116,7 @@ function esc(s) {
 }
 function fmtTime(iso) {
   const d = new Date(iso);
-  return d.toLocaleString('sv-SE', { timeZone: 'UTC' }).replace(' ', ' ') + ' UTC';
+  return d.toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' });
 }
 function statusClass(code) {
   if (!code) return '';
