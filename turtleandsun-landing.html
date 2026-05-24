@@ -83,6 +83,11 @@ html,body{overflow-x:hidden;}
   .sarr{display:none;}
   .fb,.btn-order,.btn-preview,.btn-upgrade,.btn-skip,.pkg{min-height:44px;}
 }
+.orient-group{display:flex;gap:8px;justify-content:center;margin:2px 0 8px;}
+.orient-btn{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1.5px solid rgba(0,0,0,0.18);border-radius:8px;background:rgba(255,255,255,0.6);cursor:pointer;padding:0;}
+.orient-btn.on{border-color:#3A6B20;background:rgba(58,107,32,0.12);}
+.orient-shape{display:block;border:2px solid rgba(60,20,0,0.55);border-radius:2px;}
+.orient-btn.on .orient-shape{border-color:#3A6B20;}
 </style>
 <script src="/nav.js?v=20260524a"></script>
 <!-- Privacy-friendly analytics by Plausible -->
@@ -148,6 +153,11 @@ html,body{overflow-x:hidden;}
       <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
       <div class="stitle">Choose style &amp; generate<br>a preview</div>
+      <div class="orient-group" id="orientGroup">
+        <button type="button" class="orient-btn" data-orient="landscape" title="16:9"><span class="orient-shape" style="width:26px;height:15px;"></span></button>
+        <button type="button" class="orient-btn" data-orient="portrait" title="9:16"><span class="orient-shape" style="width:15px;height:26px;"></span></button>
+        <button type="button" class="orient-btn" data-orient="square" title="1:1"><span class="orient-shape" style="width:20px;height:20px;"></span></button>
+      </div>
       <input type="email" id="previewEmail" placeholder="Your email" style="width:100%;padding:7px 10px;border:1.5px solid rgba(0,0,0,0.18);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;margin-bottom:6px;outline:none;background:rgba(255,255,255,0.7);" />
       <button class="btn-preview" id="btnPreview">Generate preview</button>
       <div class="spinner" id="previewSpinner"></div>
@@ -242,6 +252,8 @@ window.setF=function(cat,btn){document.querySelectorAll('.fb').forEach(b=>b.clas
 
 let cloudinaryUrl = null;
 let previewImageUrl = null;
+let orientation = 'square';
+let paywalled = false;
 
 document.getElementById('fileInput').addEventListener('change', async function(e) {
   const file = e.target.files[0];
@@ -259,6 +271,15 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     document.getElementById('uploadThumb').src = ev.target.result;
     document.getElementById('uploadThumb').style.display = 'block';
     document.getElementById('uploadIcon').style.display = 'none';
+    // Detect source orientation and preselect the closest aspect ratio
+    const img = new Image();
+    img.onload = function() {
+      let o = 'square';
+      if (img.naturalWidth > img.naturalHeight * 1.1) o = 'landscape';
+      else if (img.naturalHeight > img.naturalWidth * 1.1) o = 'portrait';
+      setOrientation(o);
+    };
+    img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 
@@ -282,6 +303,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
 });
 
 document.getElementById('btnPreview').addEventListener('click', async function() {
+  if (paywalled) { buyNow(); return; }
   if (!cloudinaryUrl) {
     alert('Please upload a photo first.');
     return;
@@ -302,11 +324,12 @@ document.getElementById('btnPreview').addEventListener('click', async function()
     const res = await fetch('/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: cloudinaryUrl, email }),
+      body: JSON.stringify({ image_url: cloudinaryUrl, email, orientation }),
     });
     if (res.status === 403) {
-      alert('You have used your 3 free previews. Purchase to continue.');
-      btn.textContent = 'Generate preview';
+      // 3 free previews used — turn the button into a direct Buy now CTA
+      paywalled = true;
+      btn.textContent = 'Buy now';
       return;
     }
     const data = await res.json();
@@ -330,6 +353,21 @@ document.getElementById('btnPreview').addEventListener('click', async function()
 });
 
 let selectedProduct = null;
+
+function setOrientation(o) {
+  orientation = o;
+  document.querySelectorAll('.orient-btn').forEach(b => b.classList.toggle('on', b.dataset.orient === o));
+}
+document.querySelectorAll('.orient-btn').forEach(b => b.addEventListener('click', () => setOrientation(b.dataset.orient)));
+setOrientation(orientation);
+
+// Paywall CTA: straight to Stripe checkout using the last preview shown.
+function buyNow() {
+  if (!cloudinaryUrl || !previewImageUrl) { alert('Please generate a preview first.'); return; }
+  const emailEl = document.getElementById('previewEmail');
+  window._orderEmail = (emailEl && emailEl.value.trim()) || window._previewEmail || '';
+  proceedToCheckout(selectedProduct || 'image');
+}
 
 window.selectPkg = function(product) {
   selectedProduct = product;
@@ -363,7 +401,7 @@ async function proceedToCheckout(productOverride) {
     const res = await fetch('/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email }),
+      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation }),
     });
     const data = await res.json();
     if (data.url) {

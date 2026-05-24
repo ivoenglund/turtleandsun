@@ -79,6 +79,8 @@ const PRODUCTS = {
   bundle: { name: 'Royal Portrait — Bundle',  amount: 19900 },
 };
 
+const ORIENTATION_ASPECT = { landscape: '16:9', portrait: '9:16', square: '1:1' };
+
 const ROYAL_VIDEO_PROMPT =
   'The royal portrait painting slowly comes to life — subtle movement in the regal robes and hair, ' +
   'dramatic candlelight flickering across the face, eyes gently alive with regal presence. ' +
@@ -1131,13 +1133,13 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 });
 
 app.post('/create-checkout-session', async (req, res) => {
-  const { product, image_url, portrait_url, email } = req.body;
+  const { product, image_url, portrait_url, email, orientation } = req.body;
   if (!PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product' });
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
 
   const origin = `${req.protocol}://${req.get('host')}`;
   try {
-    const meta = { product, image_url, portrait_url: portrait_url || '', email: email || '' };
+    const meta = { product, image_url, portrait_url: portrait_url || '', email: email || '', orientation: orientation || '' };
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
@@ -1163,7 +1165,7 @@ app.post('/create-checkout-session', async (req, res) => {
 });
 
 app.post('/preview', async (req, res) => {
-  const { image_url, email } = req.body;
+  const { image_url, email, orientation } = req.body;
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
   if (!email) return res.status(400).json({ error: 'email is required' });
 
@@ -1193,6 +1195,7 @@ app.post('/preview', async (req, res) => {
       input: {
         prompt: 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.',
         image_urls: [image_url],
+        aspect_ratio: ORIENTATION_ASPECT[orientation] || 'auto',
       },
     });
     res.json({ url: result.data.images[0].url });
