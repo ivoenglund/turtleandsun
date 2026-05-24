@@ -47,6 +47,24 @@ tr:hover td{background:#fffdf5;}
 .pager button:disabled{opacity:0.4;cursor:default;}
 .muted{color:rgba(60,20,0,0.5);font-size:13px;}
 .cap-note{font-size:12px;color:#a02020;margin-bottom:10px;display:none;}
+.ip-row{cursor:pointer;}
+.hits-high{color:#a02020;font-weight:800;}
+.flag-badge{margin-left:6px;font-size:12px;color:#a02020;}
+.expand-caret{display:inline-block;width:12px;color:rgba(60,20,0,0.5);}
+.expand-row td{padding:0!important;background:#faf8f2;}
+.nested{width:100%;border-collapse:collapse;font-size:12px;}
+.nested th{background:#3a2d10;color:#FFF9E6;text-align:left;padding:7px 12px;font-weight:600;}
+.nested td{padding:6px 12px;border-bottom:1px solid #eee;white-space:nowrap;}
+.nested tr:last-child td{border-bottom:none;}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:4px;white-space:nowrap;}
+.pill-search{background:#e3f2fd;color:#0d47a1;}
+.pill-social{background:#f3e5f5;color:#6a1b9a;}
+.pill-tool{background:#fff3cd;color:#856404;}
+.pill-bot{background:#fde7e7;color:#a02020;}
+.ip-label{display:inline-block;background:#c8e6c9;color:#1b5e20;font-size:11px;font-weight:700;padding:1px 7px;border-radius:8px;margin-top:3px;}
+.ip-email{display:block;font-size:11px;color:rgba(60,20,0,0.6);margin-top:3px;}
+.ip-edit{cursor:pointer;margin-left:6px;opacity:0.45;font-size:12px;}
+.ip-edit:hover{opacity:1;}
 </style>
 <script src="/nav.js?v=20260524a"></script>
 </head>
@@ -71,23 +89,24 @@ tr:hover td{background:#fffdf5;}
       </select>
     </label>
     <input type="text" id="f-search" placeholder="Search IP, path, or country…">
+    <label>Sort
+      <select id="f-sort">
+        <option value="last" selected>Last seen ↓</option>
+        <option value="hits">Hits ↓</option>
+      </select>
+    </label>
     <label><input type="checkbox" id="f-flagged"> Show flagged only</label>
   </div>
 
   <div class="cap-note" id="cap-note">Showing the most recent 5000 matching rows (result capped).</div>
-  <div class="loc-filter" id="loc-filter">
-    <span id="loc-filter-text"></span>
-    <button id="loc-clear">Clear location filter</button>
-  </div>
-
   <div id="map"></div>
 
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Time</th><th>IP</th><th>Country</th><th>Method</th><th>Path</th>
-          <th>Status</th><th>User-Agent</th><th>Flag</th>
+          <th>First seen</th><th>Last seen</th><th>IP</th><th>Country</th>
+          <th>Hits</th><th>Latest path</th><th>User-Agent</th><th>Flag</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -104,10 +123,11 @@ tr:hover td{background:#fffdf5;}
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 50; // IPs per page
 let allVisits = [];
 let page = 1;
-let locFilter = null; // {lat, lng}
+let expandedIp = null;
+let sortMode = 'last';
 let map, clusterGroup;
 
 function flagEmoji(cc) {
@@ -133,6 +153,21 @@ function dotIcon(color) {
   });
 }
 
+// Classify an IP by its most-recent User-Agent. Specific matches win over the
+// generic /bot/ catch-all; human is the fallback.
+function classifyUA(ua) {
+  if (!ua) return 'human';
+  if (/Googlebot|bingbot|DuckDuckBot|YandexBot|Baiduspider|AhrefsBot|SemrushBot/i.test(ua)) return 'search';
+  if (/facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|TelegramBot/i.test(ua)) return 'social';
+  if (/curl|wget|python-requests|axios|Go-http-client|HeadlessChrome|PhantomJS|Selenium/i.test(ua)) return 'tool';
+  if (/bot|crawler|spider|scrape/i.test(ua)) return 'bot';
+  return 'human';
+}
+function botBadge(cat) {
+  const map = { search: ['🔍 Search', 'pill-search'], social: ['📱 Social', 'pill-social'], tool: ['🛠 Tool', 'pill-tool'], bot: ['🤖 Bot', 'pill-bot'] };
+  return map[cat] ? `<span class="pill ${map[cat][1]}">${map[cat][0]}</span>` : '';
+}
+
 function rangeToFrom(range) {
   const now = Date.now();
   const day = 86400000;
@@ -140,6 +175,51 @@ function rangeToFrom(range) {
   if (range === '7d') return new Date(now - 7 * day).toISOString();
   if (range === '30d') return new Date(now - 30 * day).toISOString();
   return null; // all
+}
+
+// Group the flat visit list into one entry per IP (within current filters).
+function groupByIp(visits) {
+  const m = new Map();
+  for (const v of visits) {
+    if (!m.has(v.ip)) m.set(v.ip, []);
+    m.get(v.ip).push(v);
+  }
+  const groups = [];
+  for (const [ip, vs] of m) {
+    vs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // newest first
+    const latest = vs[0];
+    const earliest = vs[vs.length - 1];
+    // Marker location = earliest visit that has coordinates (first-seen location)
+    let loc = null;
+    for (let i = vs.length - 1; i >= 0; i--) {
+      if (vs[i].lat != null && vs[i].lng != null) { loc = { lat: vs[i].lat, lng: vs[i].lng }; break; }
+    }
+    groups.push({
+      ip,
+      visits: vs,
+      firstSeen: earliest.created_at,
+      lastSeen: latest.created_at,
+      hits: vs.length,
+      country: latest.country,       // most recent location for the row
+      city: latest.city,
+      latestPath: latest.path,
+      latestUA: latest.user_agent || '',
+      anyFlagged: vs.some(x => x.flagged),
+      latestId: latest.id,
+      latestFlagged: !!latest.flagged,
+      email: (vs.find(x => x.email) || {}).email || null,  // most recent visit with a known user
+      label: latest.label || null,                          // same label for every row of this IP
+      loc,
+    });
+  }
+  return groups;
+}
+
+function sortGroups(groups) {
+  if (sortMode === 'hits') {
+    return groups.sort((a, b) => b.hits - a.hits || new Date(b.lastSeen) - new Date(a.lastSeen));
+  }
+  return groups.sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
 }
 
 async function fetchData() {
@@ -158,9 +238,8 @@ async function fetchData() {
   allVisits = data.visits;
   renderStats(data.stats);
   document.getElementById('cap-note').style.display = data.capped ? 'block' : 'none';
-  locFilter = null;
-  updateLocFilterUI();
   page = 1;
+  expandedIp = null;
   renderMap();
   renderTable();
 }
@@ -185,68 +264,99 @@ function renderMap() {
   }
   clusterGroup.clearLayers();
   const markers = [];
-  for (const v of allVisits) {
-    if (v.lat == null || v.lng == null) continue;
-    const m = L.marker([v.lat, v.lng], { icon: dotIcon(v.flagged ? '#d32f2f' : '#3A6B20') });
-    m.bindPopup(`${flagEmoji(v.country)} ${esc(v.city || '')} ${esc(v.country || '')}<br>${esc(v.ip)}<br>${esc(v.method)} ${esc(v.path)}`);
-    m.on('click', () => { locFilter = { lat: v.lat, lng: v.lng }; updateLocFilterUI(); page = 1; renderTable(); });
+  for (const g of groupByIp(allVisits)) {
+    if (!g.loc) continue;
+    const m = L.marker([g.loc.lat, g.loc.lng], { icon: dotIcon(g.anyFlagged ? '#d32f2f' : '#3A6B20') });
+    m.bindPopup(`${flagEmoji(g.country)} ${esc(g.city || '')} ${esc(g.country || '')}<br>${esc(g.ip)}<br>${g.hits} hit${g.hits === 1 ? '' : 's'}`);
+    m.on('click', () => focusIp(g.ip));
     markers.push(m);
   }
   clusterGroup.addLayers(markers);
 }
 
-function updateLocFilterUI() {
-  const el = document.getElementById('loc-filter');
-  if (locFilter) {
-    el.style.display = 'flex';
-    document.getElementById('loc-filter-text').textContent =
-      `Table filtered to location ${locFilter.lat.toFixed(3)}, ${locFilter.lng.toFixed(3)}`;
-  } else {
-    el.style.display = 'none';
-  }
+// Map marker click: jump to the IP's page, expand its row, scroll into view.
+function focusIp(ip) {
+  const groups = sortGroups(groupByIp(allVisits));
+  const idx = groups.findIndex(g => g.ip === ip);
+  if (idx < 0) return;
+  page = Math.floor(idx / PAGE_SIZE) + 1;
+  expandedIp = ip;
+  renderTable();
+  const row = document.querySelector(`tr.ip-row[data-ip="${ip}"]`);
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function visibleRows() {
-  if (!locFilter) return allVisits;
-  const R = 0.5; // ~degrees radius for "near" match
-  return allVisits.filter(v => v.lat != null && v.lng != null
-    && Math.abs(v.lat - locFilter.lat) <= R && Math.abs(v.lng - locFilter.lng) <= R);
-}
-
-function renderTable() {
-  const rows = visibleRows();
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  if (page > totalPages) page = totalPages;
-  const start = (page - 1) * PAGE_SIZE;
-  const slice = rows.slice(start, start + PAGE_SIZE);
-
-  const tbody = document.getElementById('rows');
-  tbody.innerHTML = slice.map(v => {
-    const ua = v.user_agent || '';
-    const uaShort = ua.length > 40 ? ua.slice(0, 40) + '…' : ua;
-    return `<tr class="${v.flagged ? 'flagged' : ''}">
+function rowHtml(g) {
+  const uaShort = g.latestUA.length > 40 ? g.latestUA.slice(0, 40) + '…' : g.latestUA;
+  const open = expandedIp === g.ip;
+  let html = `<tr class="ip-row ${g.anyFlagged ? 'flagged' : ''}" data-ip="${esc(g.ip)}">
+    <td>${esc(fmtTime(g.firstSeen))}</td>
+    <td>${esc(fmtTime(g.lastSeen))}</td>
+    <td>
+      <span class="expand-caret">${open ? '▾' : '▸'}</span>${esc(g.ip)}
+      <span class="ip-edit" data-ip="${esc(g.ip)}" data-label="${esc(g.label || '')}" title="Edit label">✎</span>
+      ${g.label ? `<span class="ip-label">${esc(g.label)}</span>` : (g.email ? `<span class="ip-email">${esc(g.email)}</span>` : '')}
+    </td>
+    <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}</td>
+    <td class="${g.hits >= 50 ? 'hits-high' : ''}">${g.hits}</td>
+    <td>${esc(g.latestPath)}</td>
+    <td class="ua" title="${esc(g.latestUA)}">${esc(uaShort)}</td>
+    <td><button class="flag-btn ${g.latestFlagged ? 'on' : ''}" data-id="${g.latestId}" data-flagged="${g.latestFlagged}">${g.latestFlagged ? 'Flagged' : 'Flag'}</button>${g.anyFlagged ? '<span class="flag-badge" title="Has flagged visits">⚑</span>' : ''}</td>
+  </tr>`;
+  if (open) {
+    const nested = g.visits.map(v => `<tr>
       <td>${esc(fmtTime(v.created_at))}</td>
-      <td><span class="ip-link" data-ip="${esc(v.ip)}">${esc(v.ip)}</span></td>
-      <td>${flagEmoji(v.country)} ${esc(v.country || '')}</td>
       <td>${esc(v.method)}</td>
       <td>${esc(v.path)}</td>
       <td class="${statusClass(v.status_code)}">${esc(v.status_code ?? '')}</td>
-      <td class="ua" title="${esc(ua)}">${esc(uaShort)}</td>
-      <td><button class="flag-btn ${v.flagged ? 'on' : ''}" data-id="${v.id}" data-flagged="${v.flagged}">${v.flagged ? 'Flagged' : 'Flag'}</button></td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px;">No visits match the current filters.</td></tr>`;
+      <td>${esc(v.referrer || '—')}</td>
+    </tr>`).join('');
+    html += `<tr class="expand-row"><td colspan="8">
+      <table class="nested">
+        <thead><tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Referrer</th></tr></thead>
+        <tbody>${nested}</tbody>
+      </table>
+    </td></tr>`;
+  }
+  return html;
+}
 
-  document.getElementById('page-info').textContent = `Page ${page} of ${totalPages} · ${rows.length} rows`;
+function renderTable() {
+  const groups = sortGroups(groupByIp(allVisits));
+  const totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
+  if (page > totalPages) page = totalPages;
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = groups.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = slice.length
+    ? slice.map(rowHtml).join('')
+    : `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px;">No visits match the current filters.</td></tr>`;
+
+  document.getElementById('page-info').textContent = `Page ${page} of ${totalPages} · ${groups.length} IPs`;
   document.getElementById('prev').disabled = page <= 1;
   document.getElementById('next').disabled = page >= totalPages;
 
-  tbody.querySelectorAll('.ip-link').forEach(el => el.addEventListener('click', () => {
-    document.getElementById('f-search').value = el.dataset.ip;
-    fetchData();
+  tbody.querySelectorAll('.ip-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.flag-btn') || e.target.closest('.ip-edit')) return; // those handle their own clicks
+      const ip = row.dataset.ip;
+      expandedIp = (expandedIp === ip) ? null : ip;
+      renderTable();
+    });
+  });
+  tbody.querySelectorAll('.flag-btn').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFlag(btn);
   }));
-  tbody.querySelectorAll('.flag-btn').forEach(el => el.addEventListener('click', () => toggleFlag(el)));
+  tbody.querySelectorAll('.ip-edit').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    editLabel(el.dataset.ip, el.dataset.label);
+  }));
 }
 
+// Flags the IP's most-recent visit (reuses the per-visit API). The row shows a
+// ⚑ badge whenever ANY of the IP's visits are flagged.
 async function toggleFlag(btn) {
   const id = parseInt(btn.dataset.id, 10);
   const newVal = btn.dataset.flagged !== 'true';
@@ -267,8 +377,39 @@ async function toggleFlag(btn) {
   }
 }
 
+// Edit/remove the manual label for an IP. Empty string deletes it.
+async function editLabel(ip, current) {
+  const next = prompt('Label for ' + ip + ' (leave empty to remove):', current || '');
+  if (next === null) return; // cancelled
+  const trimmed = next.trim();
+  try {
+    let res;
+    if (trimmed === '') {
+      res = await fetch('/admin/visits/label', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip }),
+      });
+    } else {
+      res = await fetch('/admin/visits/label', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, label: trimmed }),
+      });
+    }
+    if (!res.ok) throw new Error('label save failed');
+    allVisits.forEach(v => { if (v.ip === ip) v.label = trimmed === '' ? null : trimmed; });
+    renderTable();
+  } catch (e) {
+    alert('Failed to save label');
+  }
+}
+
 document.getElementById('f-range').addEventListener('change', fetchData);
 document.getElementById('f-flagged').addEventListener('change', fetchData);
+document.getElementById('f-sort').addEventListener('change', () => {
+  sortMode = document.getElementById('f-sort').value;
+  page = 1;
+  renderTable();
+});
 let searchTimer;
 document.getElementById('f-search').addEventListener('input', () => {
   clearTimeout(searchTimer);
@@ -276,7 +417,6 @@ document.getElementById('f-search').addEventListener('input', () => {
 });
 document.getElementById('prev').addEventListener('click', () => { if (page > 1) { page--; renderTable(); } });
 document.getElementById('next').addEventListener('click', () => { page++; renderTable(); });
-document.getElementById('loc-clear').addEventListener('click', () => { locFilter = null; updateLocFilterUI(); page = 1; renderTable(); });
 
 NavBar.init({ requireAuth: true }).then(status => { if (status) fetchData(); });
 </script>

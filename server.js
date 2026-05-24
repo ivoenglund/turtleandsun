@@ -455,25 +455,28 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
     const where = [];
     const params = [];
 
-    if (from) { params.push(from); where.push(`created_at >= $${params.length}`); }
-    if (to)   { params.push(to);   where.push(`created_at <= $${params.length}`); }
+    if (from) { params.push(from); where.push(`v.created_at >= $${params.length}`); }
+    if (to)   { params.push(to);   where.push(`v.created_at <= $${params.length}`); }
     if (search) {
       params.push(`%${search}%`);
-      where.push(`(ip ILIKE $${params.length} OR path ILIKE $${params.length} OR country ILIKE $${params.length})`);
+      where.push(`(v.ip ILIKE $${params.length} OR v.path ILIKE $${params.length} OR v.country ILIKE $${params.length} OR l.label ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
     }
     if (flagged_only === 'true' || flagged_only === '1') {
-      where.push(`flagged = true`);
+      where.push(`v.flagged = true`);
     }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     params.push(VISITS_MAX_ROWS);
 
     const visitsResult = await pool.query(
-      `SELECT id, ip, created_at, method, path, status_code, user_agent,
-              referrer, country, region, city, lat, lng, user_id, request_id, flagged
-       FROM visits
+      `SELECT v.id, v.ip, v.created_at, v.method, v.path, v.status_code, v.user_agent,
+              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged,
+              u.email AS email, l.label AS label
+       FROM visits v
+       LEFT JOIN users u ON v.user_id = u.id
+       LEFT JOIN ip_labels l ON v.ip = l.ip
        ${whereSql}
-       ORDER BY created_at DESC
+       ORDER BY v.created_at DESC
        LIMIT $${params.length}`,
       params
     );
@@ -526,6 +529,35 @@ app.post('/admin/visits/flag', requireRole('admin'), async (req, res) => {
   } catch (err) {
     console.error('[visits] flag error:', err.message);
     res.status(500).json({ error: 'Failed to update flag', details: err.message });
+  }
+});
+
+app.post('/admin/visits/label', requireRole('admin'), async (req, res) => {
+  const { ip, label } = req.body;
+  if (!ip || typeof ip !== 'string') return res.status(400).json({ error: 'ip required' });
+  if (typeof label !== 'string' || !label.trim()) return res.status(400).json({ error: 'label required' });
+  try {
+    await pool.query(
+      `INSERT INTO ip_labels (ip, label) VALUES ($1, $2)
+       ON CONFLICT (ip) DO UPDATE SET label = $2, updated_at = NOW()`,
+      [ip, label.trim()]
+    );
+    res.json({ ok: true, ip, label: label.trim() });
+  } catch (err) {
+    console.error('[visits] label save error:', err.message);
+    res.status(500).json({ error: 'Failed to save label', details: err.message });
+  }
+});
+
+app.delete('/admin/visits/label', requireRole('admin'), async (req, res) => {
+  const { ip } = req.body;
+  if (!ip || typeof ip !== 'string') return res.status(400).json({ error: 'ip required' });
+  try {
+    await pool.query(`DELETE FROM ip_labels WHERE ip = $1`, [ip]);
+    res.json({ ok: true, ip });
+  } catch (err) {
+    console.error('[visits] label delete error:', err.message);
+    res.status(500).json({ error: 'Failed to delete label', details: err.message });
   }
 });
 
