@@ -74,10 +74,30 @@ const PORT = process.env.PORT || 8080;
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PRODUCTS = {
-  image:  { name: 'Royal Portrait — Image',   amount: 9900 },
-  video:  { name: 'Royal Portrait — Video',   amount: 14900 },
-  bundle: { name: 'Royal Portrait — Bundle',  amount: 19900 },
+  image:  { name: 'Royal Portrait — Image',  amounts: { sek: 9900,  usd: 999,  eur: 999,  gbp: 799 } },
+  video:  { name: 'Royal Portrait — Video',  amounts: { sek: 14900, usd: 1499, eur: 1399, gbp: 1199 } },
+  bundle: { name: 'Royal Portrait — Bundle', amounts: { sek: 19900, usd: 1999, eur: 1899, gbp: 1599 } },
 };
+const SUPPORTED_CURRENCIES = new Set(['sek', 'usd', 'eur', 'gbp']);
+const EU_COUNTRIES = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES']);
+
+function pickCurrency(countryCode) {
+  if (!countryCode) return 'usd';
+  const code = countryCode.toUpperCase();
+  if (code === 'SE') return 'sek';
+  if (code === 'GB') return 'gbp';
+  if (EU_COUNTRIES.has(code)) return 'eur';
+  return 'usd';
+}
+
+function formatPrice(amount, currency) {
+  const major = amount / 100;
+  if (currency === 'sek') return `${Math.round(major)} kr`;
+  if (currency === 'usd') return `$${major.toFixed(2)}`;
+  if (currency === 'eur') return `€${major.toFixed(2)}`;
+  if (currency === 'gbp') return `£${major.toFixed(2)}`;
+  return `${major}`;
+}
 
 const ORIENTATION_ASPECT = { landscape: '16:9', portrait: '9:16', square: '1:1' };
 
@@ -102,7 +122,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const { email, image_url, portrait_url, product } = session.metadata || {};
+    const { email, image_url, portrait_url, product, currency } = session.metadata || {};
 
     console.log('checkout.session.completed — email:', email, 'product:', product, 'portrait_url:', portrait_url);
 
@@ -115,8 +135,8 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     let orderId;
     try {
       const orderRes = await pool.query(
-        'INSERT INTO orders (email, style_id, product, status, amount) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [email || '', null, product, 'paid', session.amount_total / 100]
+        'INSERT INTO orders (email, style_id, product, status, amount, currency) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        [email || '', null, product, 'paid', session.amount_total / 100, currency || 'sek']
       );
       orderId = orderRes.rows[0].id;
       console.log('Order recorded, id:', orderId);
@@ -1148,21 +1168,47 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
+app.get('/api/currency', async (req, res) => {
+  let country = null;
+  try { country = (await geoLookup(visitorIp(req))).country; } catch (e) { /* geo unavailable */ }
+  const detected = pickCurrency(country);
+  const prices = {};
+  for (const cur of SUPPORTED_CURRENCIES) {
+    prices[cur] = {};
+    for (const key of Object.keys(PRODUCTS)) {
+      const amount = PRODUCTS[key].amounts[cur];
+      prices[cur][key] = { amount, display: formatPrice(amount, cur) };
+    }
+  }
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ detected, country, supported: [...SUPPORTED_CURRENCIES], prices });
+});
+
 app.post('/create-checkout-session', async (req, res) => {
   const { product, image_url, portrait_url, email, orientation } = req.body;
   if (!PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product' });
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
 
+  let currency = req.body.currency;
+  if (currency) {
+    currency = String(currency).toLowerCase();
+    if (!SUPPORTED_CURRENCIES.has(currency)) return res.status(400).json({ error: 'Unsupported currency' });
+  } else {
+    let country = null;
+    try { country = (await geoLookup(visitorIp(req))).country; } catch (e) { /* geo unavailable */ }
+    currency = pickCurrency(country);
+  }
+
   const origin = `${req.protocol}://${req.get('host')}`;
   try {
-    const meta = { product, image_url, portrait_url: portrait_url || '', email: email || '', orientation: orientation || '' };
+    const meta = { product, image_url, portrait_url: portrait_url || '', email: email || '', orientation: orientation || '', currency };
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
-          currency: 'sek',
+          currency,
           product_data: { name: PRODUCTS[product].name },
-          unit_amount: PRODUCTS[product].amount,
+          unit_amount: PRODUCTS[product].amounts[currency],
         },
         quantity: 1,
       }],

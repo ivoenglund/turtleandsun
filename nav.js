@@ -38,12 +38,23 @@
     '.ts-nav-drawer-link.ts-active{color:#3A6B20;font-weight:700;opacity:1;}' +
     '.ts-nav-drawer-logout{color:#c0392b!important;opacity:1!important;}' +
     '.ts-nav-drawer-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 20px;}' +
-    '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}' +
+    '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-cur{display:none;}.ts-nav-hamburger{display:block;}}' +
     'body:not(.ts-nav-admin) .ts-nav-admin-only{display:none;}' +
     'body:not(.ts-nav-loggedin) .ts-nav-auth{display:none;}' +
-    'body.ts-nav-loggedin .ts-nav-guest{display:none;}';
+    'body.ts-nav-loggedin .ts-nav-guest{display:none;}' +
+    '.ts-nav-cur{font-family:\'Plus Jakarta Sans\',sans-serif;font-size:13px;color:#1C0A00;background:transparent;border:1px solid rgba(28,10,0,0.22);border-radius:6px;padding:4px 6px;cursor:pointer;opacity:0.75;}' +
+    '.ts-nav-cur:hover{opacity:1;}' +
+    '.ts-nav-cur-drawer{display:block;width:calc(100% - 40px);margin:0 20px 10px;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;color:#1C0A00;background:#fff;border:1px solid rgba(28,10,0,0.22);border-radius:8px;padding:8px 10px;cursor:pointer;}';
 
   function buildHTML() {
+    var curOptions =
+      '<option value="sek">SEK · kr</option>' +
+      '<option value="usd">USD · $</option>' +
+      '<option value="eur">EUR · €</option>' +
+      '<option value="gbp">GBP · £</option>';
+    var navCur = window.tsCurrency ? '<select class="ts-nav-cur" id="ts-nav-cur" aria-label="Currency">' + curOptions + '</select>' : '';
+    var drawerCur = window.tsCurrency ? '<select class="ts-nav-cur-drawer" id="ts-nav-cur-drawer" aria-label="Currency">' + curOptions + '</select>' : '';
+
     var dd =
       '<div class="ts-nav-dd" id="ts-nav-dd">' +
         '<div class="ts-nav-dd-email ts-nav-auth" id="ts-nav-dd-email"></div>' +
@@ -73,6 +84,7 @@
           '<span class="ts-nav-drawer-email" id="ts-nav-drawer-email"></span>' +
           '<button class="ts-nav-drawer-close" id="ts-nav-drawer-close">&times;</button>' +
         '</div>' +
+        drawerCur +
         '<a class="ts-nav-drawer-link" href="/">Home</a>' +
         '<a class="ts-nav-drawer-link" href="/pricing">Pricing</a>' +
         '<a class="ts-nav-drawer-link" href="/faq">FAQ</a>' +
@@ -108,6 +120,7 @@
               '<a href="/" class="ts-nav-link">Home</a>' +
               '<a href="/pricing" class="ts-nav-link">Pricing</a>' +
               '<a href="/faq" class="ts-nav-link">FAQ</a>' +
+              navCur +
               '<div class="ts-nav-account-wrap">' +
                 '<button class="ts-nav-account-btn" id="ts-nav-account-btn">Account</button>' +
                 dd +
@@ -196,6 +209,18 @@
     drawerClose.addEventListener('click', closeDrawer);
   }
 
+  function setupCurrency() {
+    if (!window.tsCurrency) return;
+    var selects = [document.getElementById('ts-nav-cur'), document.getElementById('ts-nav-cur-drawer')].filter(Boolean);
+    if (!selects.length) return;
+    function sync(code) { selects.forEach(function (s) { if (s.value !== code) s.value = code; }); }
+    sync(window.tsCurrency.code);
+    selects.forEach(function (s) {
+      s.addEventListener('change', function () { window.tsCurrency.setCurrency(s.value); });
+    });
+    window.tsCurrency.onChange(sync);
+  }
+
   window.NavBar = {
     init: async function (opts) {
       var requireAuth = opts && opts.requireAuth;
@@ -203,6 +228,7 @@
       injectHTML();
       highlightActivePage();
       setupEvents();
+      setupCurrency();
 
       var status = null;
       try {

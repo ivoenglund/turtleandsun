@@ -176,6 +176,7 @@ async function initDb() {
   await pool.query(`
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS result_url TEXT;
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS result_video_url TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'sek';
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS style_name VARCHAR(255);
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS description TEXT;
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS example_image_url TEXT;

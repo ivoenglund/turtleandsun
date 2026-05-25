@@ -50,7 +50,8 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 html,body{overflow-x:hidden;}
 @media(max-width:480px){.pricing-card .btn-card{padding:14px;}}
 </style>
-<script src="/nav.js?v=20260524a"></script>
+<script src="/currency.js?v=20260525a"></script>
+<script src="/nav.js?v=20260525a"></script>
 <!-- Privacy-friendly analytics by Plausible -->
 <script async src="https://plausible.io/js/pa-iZoFmqC3_GaKfFkY6F6IQ.js"></script>
 <script>
@@ -78,7 +79,7 @@ html,body{overflow-x:hidden;}
 
       <div class="pricing-card">
         <div class="pricing-name">Image</div>
-        <div class="pricing-price">99 kr</div>
+        <div class="pricing-price" id="pp-image">99 kr</div>
         <p class="pricing-desc">Your AI portrait as a high-resolution image file, delivered straight to your inbox.</p>
         <ul class="pricing-features">
           <li>Full-resolution portrait image</li>
@@ -91,7 +92,7 @@ html,body{overflow-x:hidden;}
 
       <div class="pricing-card">
         <div class="pricing-name">Video</div>
-        <div class="pricing-price">149 kr</div>
+        <div class="pricing-price" id="pp-video">149 kr</div>
         <p class="pricing-desc">Your portrait animated into a 10-second cinematic film with dramatic lighting and movement.</p>
         <ul class="pricing-features">
           <li>10-second cinematic video</li>
@@ -105,13 +106,13 @@ html,body{overflow-x:hidden;}
       <div class="pricing-card featured">
         <span class="featured-badge">BEST VALUE</span>
         <div class="pricing-name">Bundle</div>
-        <div class="pricing-price">199 kr</div>
-        <p class="pricing-desc">AI portrait image plus a 10-second cinematic video. Save 49 kr compared to buying separately.</p>
+        <div class="pricing-price" id="pp-bundle">199 kr</div>
+        <p class="pricing-desc">AI portrait image plus a 10-second cinematic video. Save <span id="pp-save-desc">49 kr</span> compared to buying separately.</p>
         <ul class="pricing-features">
           <li>Full-resolution portrait image</li>
           <li>10-second cinematic video</li>
           <li>Both delivered by email</li>
-          <li>Best value — save 49 kr</li>
+          <li>Best value — save <span id="pp-save-feat">49 kr</span></li>
         </ul>
         <a href="/" class="btn-card">Get started →</a>
       </div>
@@ -125,6 +126,18 @@ html,body{overflow-x:hidden;}
   </div>
 </div>
 <script>
+function renderPrices() {
+  var c = window.tsCurrency;
+  if (!c || !c.data) return;
+  var set = function (id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('pp-image', c.format('image'));
+  set('pp-video', c.format('video'));
+  set('pp-bundle', c.format('bundle'));
+  var saveStr = c.formatAmount((c.amount('image') || 0) + (c.amount('video') || 0) - (c.amount('bundle') || 0));
+  set('pp-save-desc', saveStr);
+  set('pp-save-feat', saveStr);
+}
+if (window.tsCurrency) { window.tsCurrency.onChange(renderPrices); renderPrices(); }
 NavBar.init({ requireAuth: false });
 </script>
 <footer style="text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;">

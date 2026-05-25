@@ -107,7 +107,8 @@ html,body{overflow-x:hidden;}
 .orient-ratio{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;line-height:1;color:rgba(60,20,0,0.5);}
 .orient-btn.on .orient-ratio{color:#3A6B20;}
 </style>
-<script src="/nav.js?v=20260524a"></script>
+<script src="/currency.js?v=20260525a"></script>
+<script src="/nav.js?v=20260525a"></script>
 <!-- Privacy-friendly analytics by Plausible -->
 <script async src="https://plausible.io/js/pa-iZoFmqC3_GaKfFkY6F6IQ.js"></script>
 <script>
@@ -185,9 +186,9 @@ html,body{overflow-x:hidden;}
       <div class="snum">3</div>
       <div class="stitle" style="margin-bottom:4px;">Choose product &amp; order</div>
       <div class="pkg-list">
-        <div class="pkg" id="pkg-image" onclick="selectPkg('image')" style="cursor:pointer;"><div class="pcheck" id="pcheck-image"></div><div class="pname">Image</div><div class="pprice">99 kr</div></div>
-        <div class="pkg" id="pkg-video" onclick="selectPkg('video')" style="cursor:pointer;"><div class="pcheck" id="pcheck-video"></div><div class="pname">Video</div><div class="pprice">149 kr</div></div>
-        <div class="pkg" id="pkg-bundle" onclick="selectPkg('bundle')" style="cursor:pointer;"><div class="pcheck" id="pcheck-bundle"></div><div class="pname">Bundle <span class="pkg-save">save 49 kr</span></div><div class="pprice">199 kr</div></div>
+        <div class="pkg" id="pkg-image" onclick="selectPkg('image')" style="cursor:pointer;"><div class="pcheck" id="pcheck-image"></div><div class="pname">Image</div><div class="pprice" id="price-image">99 kr</div></div>
+        <div class="pkg" id="pkg-video" onclick="selectPkg('video')" style="cursor:pointer;"><div class="pcheck" id="pcheck-video"></div><div class="pname">Video</div><div class="pprice" id="price-video">149 kr</div></div>
+        <div class="pkg" id="pkg-bundle" onclick="selectPkg('bundle')" style="cursor:pointer;"><div class="pcheck" id="pcheck-bundle"></div><div class="pname">Bundle <span class="pkg-save" id="bundle-save">save 49 kr</span></div><div class="pprice" id="price-bundle">199 kr</div></div>
       </div>
       <div class="pay-row">
         <img loading="lazy" src="/assets/visa.svg" height="21" alt="Visa" style="border-radius:3px;">
@@ -439,7 +440,7 @@ async function proceedToCheckout(productOverride) {
     const res = await fetch('/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation }),
+      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation, currency: window.tsCurrency && window.tsCurrency.code }),
     });
     const data = await res.json();
     if (data.url) {
@@ -487,6 +488,22 @@ async function loadGallery(category) {
   fill('g2', pals.slice(4, 8));
   fill('g3', pals.slice(8, 12));
 }
+// Multi-currency price rendering
+function renderPrices() {
+  var c = window.tsCurrency;
+  if (!c || !c.data) return;
+  var set = function (id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('price-image', c.format('image'));
+  set('price-video', c.format('video'));
+  set('price-bundle', c.format('bundle'));
+  var saveAmt = (c.amount('image') || 0) + (c.amount('video') || 0) - (c.amount('bundle') || 0);
+  var saveStr = c.formatAmount(saveAmt);
+  set('bundle-save', 'save ' + saveStr);
+  set('upsell-save', 'Save ' + saveStr + ' vs buying separately');
+  set('btnUpgradeBundle', 'Upgrade to Bundle — ' + c.format('bundle'));
+}
+if (window.tsCurrency) { window.tsCurrency.onChange(renderPrices); renderPrices(); }
+
 loadGallery('all');
 
 // Restore progress if the user navigated back from Stripe checkout
@@ -527,7 +544,7 @@ loadGallery('all');
     <div class="upsell-badge">LIMITED OFFER</div>
     <div class="upsell-title">Upgrade to Bundle</div>
     <div class="upsell-sub">Get your royal portrait as both a <strong>full image</strong> and a <strong>cinematic video</strong> — together for one great price.</div>
-    <div class="upsell-save">Save 49 kr vs buying separately</div>
+    <div class="upsell-save" id="upsell-save">Save 49 kr vs buying separately</div>
     <button class="btn-upgrade" id="btnUpgradeBundle">Upgrade to Bundle — 199 kr</button>
     <button class="btn-skip" id="btnContinueSelection">Continue with my selection</button>
   </div>
