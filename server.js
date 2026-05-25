@@ -246,6 +246,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Block direct-by-filename access to non-public *.html (route handlers use
+// res.sendFile and bypass this URL-path check, so gated pages still render).
+const PUBLIC_HTML = new Set([
+  '/turtleandsun-landing.html',
+  '/pricing.html',
+  '/faq.html',
+  '/login.html',
+]);
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') && !PUBLIC_HTML.has(req.path)) {
+    return res.status(404).send('Not found');
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'turtleandsun-landing.html')));
