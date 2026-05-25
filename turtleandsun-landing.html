@@ -32,6 +32,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .pcheck{width:14px;height:14px;border:1.5px solid rgba(0,0,0,0.28);border-radius:3px;background:rgba(255,255,255,0.5);flex-shrink:0;}
 .pname{flex:1;text-align:left;}
 .pprice{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:13px;}
+.pkg-save{display:inline-block;font-size:10px;font-weight:700;color:#3A6B20;background:rgba(58,107,32,0.14);border-radius:6px;padding:1px 5px;margin-left:4px;vertical-align:middle;}
 .pay-row{display:flex;gap:5px;justify-content:center;align-items:center;}
 .stripe-lbl{font-size:11px;color:rgba(60,20,0,0.5);}
 .stripe-lbl b{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:13px;color:#1C0A00;}
@@ -171,9 +172,10 @@ html,body{overflow-x:hidden;}
       <div class="pkg-list">
         <div class="pkg" id="pkg-image" onclick="selectPkg('image')" style="cursor:pointer;"><div class="pcheck" id="pcheck-image"></div><div class="pname">Image</div><div class="pprice">99 kr</div></div>
         <div class="pkg" id="pkg-video" onclick="selectPkg('video')" style="cursor:pointer;"><div class="pcheck" id="pcheck-video"></div><div class="pname">Video</div><div class="pprice">149 kr</div></div>
+        <div class="pkg" id="pkg-bundle" onclick="selectPkg('bundle')" style="cursor:pointer;"><div class="pcheck" id="pcheck-bundle"></div><div class="pname">Bundle <span class="pkg-save">save 49 kr</span></div><div class="pprice">199 kr</div></div>
       </div>
       <div class="pay-row">
-        <img loading="lazy" src="/assets/visa.svg" height="22" alt="Visa" style="border-radius:3px;">
+        <img loading="lazy" src="/assets/visa.svg" height="21" alt="Visa" style="border-radius:3px;">
         <img loading="lazy" src="/assets/mastercard.svg" height="22" alt="Mastercard" style="border-radius:3px;">
         <img loading="lazy" src="/assets/applepay.svg" height="22" alt="Apple Pay" style="border-radius:3px;">
       </div>
@@ -384,11 +386,13 @@ window.selectPkg = function(product) {
 window.placeOrder = function() {
   if (!cloudinaryUrl) { alert('Please upload a photo first.'); return; }
   if (!previewImageUrl) { alert('Please generate a preview first.'); return; }
-  if (!selectedProduct) { alert('Please select Image or Video.'); return; }
+  if (!selectedProduct) { alert('Please select a product.'); return; }
   const emailEl = document.getElementById('previewEmail');
   const email = (emailEl && emailEl.value.trim()) || window._previewEmail || '';
   if (!email) { alert('Please enter your email address.'); return; }
   window._orderEmail = email;
+  // Bundle already chosen — skip the upgrade-to-bundle upsell, go straight to checkout
+  if (selectedProduct === 'bundle') { proceedToCheckout('bundle'); return; }
   document.getElementById('upsellModal').classList.add('open');
 };
 
