@@ -293,6 +293,7 @@ app.post('/auth/request-link', async (req, res) => {
           <p style="color:#3C2000;margin-bottom:24px;">Click the button below to log in. This link expires in 15 minutes and can only be used once.</p>
           <a href="${link}" style="display:inline-block;padding:12px 28px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Log in</a>
           <p style="margin-top:24px;font-size:13px;color:#888;">If you didn't request this, you can ignore this email.</p>
+          <p style="margin-top:8px;font-size:13px;color:#888;">Questions? This inbox isn't monitored &#8212; write to <a href="mailto:hello@turtleandsun.com" style="color:#3A6B20;">hello@turtleandsun.com</a> and we'll reply.</p>
         </div>
       `,
     });
@@ -1309,7 +1310,7 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
       ${imageUrl ? `<p style="margin:16px 0;"><a href="${imageUrl}" style="display:inline-block;padding:12px 24px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download your Loveogram</a></p>` : ''}
       ${videoUrl ? `<p style="margin:16px 0;"><a href="${videoUrl}" style="display:inline-block;padding:12px 24px;background:#1C2A14;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download your Loveogram Video</a></p>` : ''}
       <hr style="border:none;border-top:1px solid rgba(0,0,0,0.1);margin:32px 0 16px;" />
-      <p style="font-size:13px;color:#888;margin:0;">Reply to this email if you need any help.</p>
+      <p style="font-size:13px;color:#888;margin:0;">Questions? This inbox isn't monitored &#8212; write to <a href="mailto:hello@turtleandsun.com" style="color:#3A6B20;">hello@turtleandsun.com</a> and we'll reply.</p>
       <p style="font-size:13px;color:#888;margin-top:8px;">&#8212; Turtle and Sun</p>
     </div>
   `;
