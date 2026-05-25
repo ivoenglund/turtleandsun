@@ -31,6 +31,7 @@ const {
   createSession, setSessionCookie, getSessionUser,
   requireAuth, requireRole,
 } = require('./auth');
+const { sendDailyDigest } = require('./digest');
 
 async function geocodeContact(contact) {
   const parts = [contact.street, contact.city, contact.region, contact.country].filter(Boolean);
@@ -1392,6 +1393,15 @@ app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
 });
 
+app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
+  try {
+    await sendDailyDigest();
+    res.send('Sent');
+  } catch (err) {
+    res.status(500).send('Failed: ' + err.message);
+  }
+});
+
 // Sentry Express error handler — after all routes, before any catch-all handler.
 // v10 equivalent of the old Sentry.Handlers.errorHandler() middleware.
 if (process.env.SENTRY_DSN) {
@@ -1409,6 +1419,9 @@ cron.schedule('0 3 * * *', async () => {
     console.error('[visits] daily cleanup error:', err.message);
   }
 }, { timezone: 'UTC' });
+
+// Daily operational digest email to admin at 06:00 UTC (07:00/08:00 CET)
+cron.schedule('0 6 * * *', () => sendDailyDigest().catch((err) => console.error('[digest] cron error:', err.message)), { timezone: 'UTC' });
 
 initDb()
   .then(() => seedGallery())
