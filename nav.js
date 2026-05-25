@@ -39,12 +39,14 @@
     '.ts-nav-drawer-logout{color:#c0392b!important;opacity:1!important;}' +
     '.ts-nav-drawer-sep{height:1px;background:rgba(28,10,0,0.08);margin:6px 20px;}' +
     '@media(max-width:1000px){.ts-nav-panel-spacer{display:none;}.ts-nav-links .ts-nav-link{display:none;}.ts-nav-account-wrap{display:none;}.ts-nav-hamburger{display:block;}}' +
-    'body:not(.ts-nav-admin) .ts-nav-admin-only{display:none;}';
+    'body:not(.ts-nav-admin) .ts-nav-admin-only{display:none;}' +
+    'body:not(.ts-nav-loggedin) .ts-nav-auth{display:none;}' +
+    'body.ts-nav-loggedin .ts-nav-guest{display:none;}';
 
   function buildHTML() {
     var dd =
       '<div class="ts-nav-dd" id="ts-nav-dd">' +
-        '<div class="ts-nav-dd-email" id="ts-nav-dd-email"></div>' +
+        '<div class="ts-nav-dd-email ts-nav-auth" id="ts-nav-dd-email"></div>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
@@ -53,15 +55,16 @@
         '<a class="ts-nav-dd-link ts-nav-admin-only ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/failed-deliveries">Failed deliveries</a>' +
-        '<a class="ts-nav-dd-link ts-pg-library" href="/account/library">Library</a>' +
+        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-library" href="/account/library">Library</a>' +
         '<div class="ts-nav-dd-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/print/labels">Print address labels</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/account/occasions">Print occasion list</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/print/calendar">Print calendar</a>' +
-        '<div class="ts-nav-dd-sep"></div>' +
-        '<a class="ts-nav-dd-link ts-pg-account" href="/account">Account settings</a>' +
-        '<a class="ts-nav-dd-link ts-nav-dd-logout" href="/auth/logout">Log out</a>' +
+        '<div class="ts-nav-dd-sep ts-nav-auth"></div>' +
+        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-account" href="/account">Account settings</a>' +
+        '<a class="ts-nav-dd-link ts-nav-auth ts-nav-dd-logout" href="/auth/logout">Log out</a>' +
+        '<a class="ts-nav-dd-link ts-nav-guest" href="/login">Log in</a>' +
       '</div>';
 
     var drawer =
@@ -82,15 +85,16 @@
         '<a class="ts-nav-drawer-link ts-nav-admin-only ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/failed-deliveries">Failed deliveries</a>' +
-        '<a class="ts-nav-drawer-link ts-pg-library" href="/account/library">Library</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-library" href="/account/library">Library</a>' +
         '<div class="ts-nav-drawer-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/print/labels">Print address labels</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/account/occasions">Print occasion list</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/print/calendar">Print calendar</a>' +
-        '<div class="ts-nav-drawer-sep"></div>' +
-        '<a class="ts-nav-drawer-link ts-pg-account" href="/account">Account settings</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-drawer-logout" href="/auth/logout">Log out</a>' +
+        '<div class="ts-nav-drawer-sep ts-nav-auth"></div>' +
+        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-account" href="/account">Account settings</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-auth ts-nav-drawer-logout" href="/auth/logout">Log out</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-guest" href="/login">Log in</a>' +
       '</div>';
 
     return (
@@ -216,6 +220,7 @@
       }
 
       if (status && status.loggedIn) {
+        document.body.classList.add('ts-nav-loggedin');
         var email = status.email || '';
         var ddEmail = document.getElementById('ts-nav-dd-email');
         if (ddEmail) ddEmail.textContent = email;
