@@ -491,7 +491,65 @@ app.get('/auth/google/callback', async (req, res) => {
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 app.get('/admin', requireRole('admin'), (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin.html'));
+  const card = (title, desc, href, external) => {
+    const ext = external ? ' target="_blank" rel="noopener"' : '';
+    return `<a class="admin-card" href="${href}"${ext}>
+      <div class="admin-card-title">${escapeHtml(title)}${external ? ' ↗' : ''}</div>
+      <div class="admin-card-desc">${escapeHtml(desc)}</div>
+    </a>`;
+  };
+  const section = (heading, cards) =>
+    `<h2 class="admin-section">${heading}</h2><div class="admin-grid">${cards}</div>`;
+
+  const digestCard = `<div class="admin-card">
+      <div class="admin-card-title">Trigger daily digest</div>
+      <div class="admin-card-desc">Send the daily ops email now.</div>
+      <div style="margin-top:8px;"><button type="button" class="btn small" id="btnDigest" onclick="sendDigest()">Send now</button>
+        <span id="digestStatus" class="muted" style="margin-left:8px;"></span></div>
+    </div>`;
+
+  const body = `
+    <h1>Admin dashboard</h1>
+    <style>
+      .admin-section{font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#1C0A00;margin:28px 0 12px;}
+      .admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+      .admin-card{display:block;background:#fff;border:1px solid #eee;border-radius:10px;padding:14px 16px;text-decoration:none;color:#1C0A00;transition:box-shadow 0.15s,transform 0.15s;}
+      .admin-card:hover{box-shadow:0 6px 20px rgba(0,0,0,0.08);transform:translateY(-1px);}
+      .admin-card-title{font-weight:700;font-size:14px;margin-bottom:4px;}
+      .admin-card-desc{font-size:12px;color:#888;line-height:1.4;}
+    </style>
+    ${section('\u{1F4CA} Analytics',
+      card('Visits & visitor map', 'Traffic log, geo map, and IP labels.', '/admin/visits') +
+      card('Failed deliveries', 'Orders that failed generation or email.', '/admin/failed-deliveries') +
+      digestCard +
+      card('Sentry', 'Error tracking and alerts.', 'https://turtle-and-sun.sentry.io/', true) +
+      card('Plausible', 'Privacy-friendly traffic analytics.', 'https://plausible.io/turtleandsun.com', true) +
+      card('Google Search Console', 'Search indexing and performance.', 'https://search.google.com/search-console', true)
+    )}
+    ${section('\u{1F3A8} Content',
+      card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
+      card('Add new concept', 'Create a new style concept.', '/admin/concepts/new')
+    )}
+    ${section('\u{1F4B3} Payments',
+      card('Stripe dashboard', 'Payments, payouts, and customers.', 'https://dashboard.stripe.com', true)
+    )}
+    ${section('\u{1F6E0}️ Integrations',
+      card('fal.ai', 'AI generation credits and usage.', 'https://fal.ai/dashboard', true) +
+      card('Resend', 'Transactional email delivery.', 'https://resend.com/emails', true) +
+      card('Cloudinary', 'Media storage and uploads.', 'https://cloudinary.com/console', true) +
+      card('ImprovMX', 'Inbound email forwarding.', 'https://app.improvmx.com/', true) +
+      card('Railway', 'App hosting and deploys.', 'https://railway.app/', true)
+    )}
+    <script>
+      async function sendDigest(){
+        var b=document.getElementById('btnDigest'); var s=document.getElementById('digestStatus');
+        b.disabled=true; s.textContent='Sending…';
+        try { var r=await fetch('/admin/_digest_test'); if(!r.ok) throw new Error('HTTP '+r.status); s.textContent='Sent ✓'; }
+        catch(e){ s.textContent='Failed: '+e.message; }
+        b.disabled=false;
+      }
+    </script>`;
+  res.send(conceptAdminPage('Admin dashboard', body));
 });
 
 app.get('/admin/visits', requireRole('admin'), (req, res) => {
@@ -728,15 +786,15 @@ app.get('/account', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'account.html'));
 });
 
-app.get('/account/contacts', requireRole('admin'), (req, res) => {
+app.get('/account/contacts', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'contacts.html'));
 });
 
-app.get('/account/network', requireRole('admin'), (req, res) => {
+app.get('/account/network', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'network.html'));
 });
 
-app.get('/account/occasions', requireRole('admin'), (req, res) => {
+app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
 
@@ -778,17 +836,17 @@ app.get('/print/loveogram', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-loveogram.html'));
 });
 
-app.get('/print/labels', requireRole('admin'), (req, res) => {
+app.get('/print/labels', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-labels.html'));
 });
 
-app.get('/print/calendar', requireRole('admin'), (req, res) => {
+app.get('/print/calendar', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-calendar.html'));
 });
 
 // ── Groups ────────────────────────────────────────────────────────────────────
 
-app.get('/api/groups', requireRole('admin'), async (req, res) => {
+app.get('/api/groups', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
@@ -809,7 +867,7 @@ app.get('/api/groups', requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/group-memberships', requireRole('admin'), async (req, res) => {
+app.get('/api/group-memberships', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT contact_id, group_id FROM contact_group_memberships WHERE user_id = $1`, [req.user.id]
@@ -818,7 +876,7 @@ app.get('/api/group-memberships', requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/groups', requireRole('admin'), async (req, res) => {
+app.post('/api/groups', requireAuth, async (req, res) => {
   const { name, parent_group_id } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
   if (parent_group_id) {
@@ -846,7 +904,7 @@ async function deleteGroupCascade(groupId, userId) {
   await pool.query(`DELETE FROM groups WHERE id = $1 AND user_id = $2`, [groupId, userId]);
 }
 
-app.delete('/api/groups/:id', requireRole('admin'), async (req, res) => {
+app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   try {
     const check = await pool.query(`SELECT name FROM groups WHERE id=$1 AND user_id=$2`, [req.params.id, req.user.id]);
     if (!check.rows.length || check.rows[0].name === 'Family') return res.status(400).json({ error: 'Cannot delete this group.' });
@@ -857,7 +915,7 @@ app.delete('/api/groups/:id', requireRole('admin'), async (req, res) => {
 
 // ── Contact group memberships ─────────────────────────────────────────────────
 
-app.get('/api/contacts/:id/groups', requireRole('admin'), async (req, res) => {
+app.get('/api/contacts/:id/groups', requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT g.id, g.name FROM contact_group_memberships m
      JOIN groups g ON g.id = m.group_id
@@ -867,7 +925,7 @@ app.get('/api/contacts/:id/groups', requireRole('admin'), async (req, res) => {
   res.json(result.rows);
 });
 
-app.post('/api/contacts/:id/groups', requireRole('admin'), async (req, res) => {
+app.post('/api/contacts/:id/groups', requireAuth, async (req, res) => {
   const { group_ids } = req.body;
   try {
     await pool.query(`DELETE FROM contact_group_memberships WHERE contact_id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
@@ -883,7 +941,7 @@ app.post('/api/contacts/:id/groups', requireRole('admin'), async (req, res) => {
 
 // ── Occasions ─────────────────────────────────────────────────────────────────
 
-app.get('/api/contacts/:id/occasions', requireRole('admin'), async (req, res) => {
+app.get('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT id, name, start_date, frequency, notes FROM occasions WHERE contact_id = $1 AND user_id = $2 ORDER BY start_date`,
     [req.params.id, req.user.id]
@@ -891,7 +949,7 @@ app.get('/api/contacts/:id/occasions', requireRole('admin'), async (req, res) =>
   res.json(result.rows);
 });
 
-app.post('/api/contacts/:id/occasions', requireRole('admin'), async (req, res) => {
+app.post('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
   const { name, start_date, frequency, notes } = req.body;
   try {
     const result = await pool.query(
@@ -903,14 +961,14 @@ app.post('/api/contacts/:id/occasions', requireRole('admin'), async (req, res) =
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/occasions/:id', requireRole('admin'), async (req, res) => {
+app.delete('/api/occasions/:id', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM occasions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/occasions/upcoming', requireRole('admin'), async (req, res) => {
+app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
   try {
     const [occasions, contacts] = await Promise.all([
       pool.query(
@@ -926,7 +984,7 @@ app.get('/api/occasions/upcoming', requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/network', requireRole('admin'), async (req, res) => {
+app.get('/api/network', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
       `SELECT id, name, email, birthday, city, died_on, is_pet, is_me, latitude, longitude FROM contacts WHERE user_id = $1`,
@@ -950,9 +1008,6 @@ app.get('/api/network', requireRole('admin'), async (req, res) => {
     const groups = await pool.query(
       `SELECT id, name, parent_group_id FROM groups WHERE user_id = $1 ORDER BY name`, [req.user.id]
     );
-    const dbGroups = await pool.query(`SELECT id, name, user_id FROM groups ORDER BY user_id, name`);
-    console.log('[api/network] req.user.id:', req.user.id, '| groups returned by query:', groups.rows.length);
-    console.log('[api/network] all groups in DB:', dbGroups.rows.map(g => `${g.id}:${g.name}(uid=${g.user_id})`));
     res.json({
       contacts: contacts.rows,
       relationships: relationships.rows,
@@ -966,7 +1021,7 @@ app.get('/api/network', requireRole('admin'), async (req, res) => {
 
 // ── Contacts management API ───────────────────────────────────────────────────
 
-app.get('/api/contacts', requireRole('admin'), async (req, res) => {
+app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
       `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
@@ -979,7 +1034,7 @@ app.get('/api/contacts', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.post('/api/contacts/placeholder', requireRole('admin'), async (req, res) => {
+app.post('/api/contacts/placeholder', requireAuth, async (req, res) => {
   const { name } = req.body;
   try {
     const result = await pool.query(
@@ -992,7 +1047,7 @@ app.post('/api/contacts/placeholder', requireRole('admin'), async (req, res) => 
   }
 });
 
-app.get('/api/contacts/related-ids', requireRole('admin'), async (req, res) => {
+app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT DISTINCT contact_a_id AS id FROM contact_relationships WHERE user_id = $1
@@ -1005,7 +1060,7 @@ app.get('/api/contacts/related-ids', requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/contacts/:id', requireRole('admin'), async (req, res) => {
+app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(
       `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
@@ -1034,7 +1089,7 @@ app.get('/api/contacts/:id', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.put('/api/contacts/:id', requireRole('admin'), async (req, res) => {
+app.put('/api/contacts/:id', requireAuth, async (req, res) => {
   const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet } = req.body;
   try {
     await pool.query(
@@ -1069,7 +1124,7 @@ app.put('/api/contacts/:id', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.delete('/api/contacts/:id', requireRole('admin'), async (req, res) => {
+app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const id = req.params.id;
     const uid = req.user.id;
@@ -1081,7 +1136,7 @@ app.delete('/api/contacts/:id', requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/relationship-types', requireRole('admin'), async (req, res) => {
+app.get('/api/relationship-types', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT rt.id, rt.name, rt.mirror_id, g.name AS group_name
@@ -1097,7 +1152,7 @@ app.get('/api/relationship-types', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.post('/api/contact-relationships', requireRole('admin'), async (req, res) => {
+app.post('/api/contact-relationships', requireAuth, async (req, res) => {
   const { contact_a_id, contact_b_id, relationship_type_id } = req.body;
   try {
     await pool.query(
@@ -1122,7 +1177,7 @@ app.post('/api/contact-relationships', requireRole('admin'), async (req, res) =>
   }
 });
 
-app.delete('/api/contact-relationships/:id', requireRole('admin'), async (req, res) => {
+app.delete('/api/contact-relationships/:id', requireAuth, async (req, res) => {
   try {
     await pool.query(
       `DELETE FROM contact_relationships WHERE id = $1 AND user_id = $2`,
@@ -1134,7 +1189,7 @@ app.delete('/api/contact-relationships/:id', requireRole('admin'), async (req, r
   }
 });
 
-app.get('/api/account/contacts', requireRole('admin'), async (req, res) => {
+app.get('/api/account/contacts', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT id, google_id, name, email, phone, created_at FROM contacts WHERE user_id = $1 ORDER BY name ASC NULLS LAST',
