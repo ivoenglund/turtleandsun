@@ -7,10 +7,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-function uploadStream(buffer) {
+function uploadStream(buffer, options = {}) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: 'turtleandsun' },
+      { folder: 'turtleandsun', ...options },
       (error, result) => (error ? reject(error) : resolve(result))
     );
     Readable.from(buffer).pipe(stream);

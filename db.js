@@ -163,6 +163,31 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS concepts (
+      id SERIAL PRIMARY KEY,
+      slug VARCHAR(64) UNIQUE NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      filter_category VARCHAR(64) NOT NULL,
+      input_type VARCHAR(20) NOT NULL DEFAULT 'image_video',
+      before_image_url TEXT,
+      after_image_url TEXT,
+      example_video_url TEXT,
+      image_prompt TEXT NOT NULL,
+      video_prompt TEXT,
+      fal_image_model VARCHAR(255) DEFAULT 'fal-ai/kling-image/o1',
+      fal_video_model VARCHAR(255) DEFAULT 'fal-ai/kling-video/v3/pro/image-to-video',
+      social_caption TEXT,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      user_input_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      user_input_label VARCHAR(255),
+      user_input_placeholder VARCHAR(255),
+      user_input_variable VARCHAR(64),
+      user_input_max_length INTEGER DEFAULT 50,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
 
   await pool.query(`
@@ -170,6 +195,7 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_visits_ip ON visits(ip);
     CREATE INDEX IF NOT EXISTS idx_visits_flagged ON visits(flagged) WHERE flagged = true;
     CREATE INDEX IF NOT EXISTS idx_failed_deliveries_resolved ON failed_deliveries(resolved) WHERE resolved = false;
+    CREATE INDEX IF NOT EXISTS concepts_active_sort_idx ON concepts(active, sort_order);
   `);
 
   // Migrate existing tables to add new columns
@@ -198,6 +224,11 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_label VARCHAR(255);
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_placeholder VARCHAR(255);
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_variable VARCHAR(64);
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_max_length INTEGER DEFAULT 50;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support
@@ -217,6 +248,31 @@ async function initDb() {
       SELECT 1 FROM contacts c WHERE c.user_id = u.id AND c.is_me = TRUE
     )
   `);
+
+  // Seed the original Royal Portrait concept if the concepts table is empty.
+  // Prompts are copied verbatim from the hardcoded values in server.js
+  // (the /preview image prompt and ROYAL_VIDEO_PROMPT).
+  const conceptCount = await pool.query(`SELECT COUNT(*)::int AS n FROM concepts`);
+  if (conceptCount.rows[0].n === 0) {
+    await pool.query(
+      `INSERT INTO concepts (slug, name, filter_category, input_type, image_prompt, video_prompt, active, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        'royal-portrait',
+        'Royal Portrait',
+        'royal',
+        'image_video',
+        'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.',
+        'The royal portrait painting slowly comes to life — subtle movement in the regal robes and hair, ' +
+          'dramatic candlelight flickering across the face, eyes gently alive with regal presence. ' +
+          'Cinematic depth of field, atmospheric palace setting with soft volumetric light. ' +
+          'Painterly and majestic, museum-quality motion. Preserve the exact face and identity of the subject.',
+        true,
+        1,
+      ]
+    );
+    console.log('Seeded Royal Portrait concept');
+  }
 
   console.log('Database tables ready');
 }

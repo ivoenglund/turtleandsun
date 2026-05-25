@@ -1393,6 +1393,486 @@ app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   res.send(`Geocoded ${geocoded} of ${contacts.rows.length} contacts`);
 });
 
+// ----- Concept admin tool -----
+
+const CONCEPT_INPUT_TYPES = ['image_video', 'image', 'video'];
+const TEST_COST_IMAGE = '$0.04';
+const TEST_COST_VIDEO = '$0.25';
+
+// Substitutes the customer's text into a prompt's {variable} token after sanitizing it.
+// Shared by the admin test endpoints and (later) the live generation path.
+function applyUserInput(prompt, concept, userInputValue) {
+  if (!concept.user_input_enabled || !userInputValue) return prompt;
+  if (!concept.user_input_variable) return prompt;
+  let v = String(userInputValue).trim();
+  v = v.replace(/[\u0000-\u001F\u007F]/g, ''); // strip control chars (incl. CR/LF/tab)
+  v = v.replace(/["'`]/g, ''); // strip quote chars
+  v = v.slice(0, concept.user_input_max_length || 50);
+  if (!v) return prompt;
+  const token = '{' + concept.user_input_variable + '}';
+  return prompt.split(token).join(v);
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function conceptAdminPage(title, body) {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;color:#1C0A00;background:#FFF9E6;margin:0;padding:32px;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  h1{font-size:24px;margin:0 0 20px;}
+  a{color:#3A6B20;}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #eee;font-size:14px;vertical-align:middle;}
+  th{background:#FFF3C4;text-transform:uppercase;font-size:11px;letter-spacing:0.04em;}
+  img.thumb{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f3f3f3;}
+  .btn{display:inline-block;padding:9px 16px;background:#3A6B20;color:#FFF9E6;border:none;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;}
+  .btn.secondary{background:#1C0A00;}
+  .btn.danger{background:#a12a1a;}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .flash{padding:12px 16px;border-radius:8px;margin-bottom:18px;font-size:14px;}
+  .flash.ok{background:#e3f3d8;color:#2c5016;}
+  .flash.err{background:#f7d9d4;color:#7a2114;}
+  form.inline{display:inline;margin:0;}
+  .field{margin-bottom:16px;}
+  label{display:block;font-weight:700;font-size:13px;margin-bottom:6px;}
+  input[type=text],input[type=number],textarea,select{width:100%;padding:9px 11px;border:1px solid #ccc;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;}
+  textarea{min-height:90px;resize:vertical;}
+  .row{display:flex;gap:18px;flex-wrap:wrap;}
+  .row .field{flex:1;min-width:220px;}
+  .preview{margin-top:6px;}
+  .preview img,.preview video{max-width:160px;max-height:120px;border-radius:6px;border:1px solid #ddd;display:block;}
+  .muted{color:#888;font-size:12px;}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+</style></head><body><div class="wrap">${body}</div></body></html>`;
+}
+
+app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, slug, name, filter_category, input_type, before_image_url, after_image_url,
+              example_video_url, active, sort_order
+       FROM concepts ORDER BY sort_order ASC, id ASC`
+    );
+    let flash = '';
+    if (req.query.saved) flash = `<div class="flash ok">Concept saved.</div>`;
+    else if (req.query.deleted) flash = `<div class="flash ok">Concept deleted.</div>`;
+    else if (req.query.error) flash = `<div class="flash err">${escapeHtml(req.query.error)}</div>`;
+    if (req.query.warn) flash += `<div class="flash err">${escapeHtml(req.query.warn)}</div>`;
+
+    const tableRows = rows.map((c) => {
+      const before = c.before_image_url
+        ? `<img class="thumb" src="${escapeHtml(c.before_image_url)}" alt="before">` : '<span class="muted">—</span>';
+      const after = c.after_image_url
+        ? `<img class="thumb" src="${escapeHtml(c.after_image_url)}" alt="after">` : '<span class="muted">—</span>';
+      return `<tr>
+        <td>${c.sort_order}</td>
+        <td>${before}</td>
+        <td>${after}</td>
+        <td><strong>${escapeHtml(c.name)}</strong><br><span class="muted">${escapeHtml(c.slug)}</span></td>
+        <td>${escapeHtml(c.filter_category)}</td>
+        <td>${escapeHtml(c.input_type)}</td>
+        <td>
+          <form class="inline" method="POST" action="/admin/concepts/toggle/${c.id}">
+            <button class="btn small ${c.active ? '' : 'secondary'}" type="submit">${c.active ? 'Active' : 'Inactive'}</button>
+          </form>
+        </td>
+        <td>
+          <a class="btn small" href="/admin/concepts/edit/${c.id}">Edit</a>
+          <form class="inline" method="POST" action="/admin/concepts/delete/${c.id}" onsubmit="return confirm('Delete concept &quot;${escapeHtml(c.name)}&quot;? This cannot be undone.');">
+            <button class="btn small danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>`;
+    }).join('');
+
+    const body = `
+      <div class="top">
+        <h1>Concepts</h1>
+        <a class="btn" href="/admin/concepts/new">+ Add new concept</a>
+      </div>
+      ${flash}
+      <table>
+        <thead><tr>
+          <th>Sort</th><th>Before</th><th>After</th><th>Name</th><th>Category</th>
+          <th>Input</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody>${tableRows || '<tr><td colspan="8" class="muted">No concepts yet.</td></tr>'}</tbody>
+      </table>`;
+    res.send(conceptAdminPage('Concepts', body));
+  } catch (err) {
+    console.error('[concepts] list error:', err.message);
+    res.status(500).send('Failed to load concepts: ' + escapeHtml(err.message));
+  }
+});
+
+function conceptFormBody(concept, errorMsg) {
+  const c = concept || {};
+  const isEdit = !!c.id;
+  const v = (key) => escapeHtml(c[key] == null ? '' : c[key]);
+  const inputTypeOptions = CONCEPT_INPUT_TYPES.map((t) =>
+    `<option value="${t}"${(c.input_type || 'image_video') === t ? ' selected' : ''}>${t}</option>`
+  ).join('');
+  const mediaPreview = (url, kind) => {
+    if (!url) return '';
+    if (kind === 'video') return `<div class="preview"><video src="${escapeHtml(url)}" controls muted></video></div>`;
+    return `<div class="preview"><img src="${escapeHtml(url)}" alt="current"></div>`;
+  };
+  const falImage = c.fal_image_model || 'fal-ai/kling-image/o1';
+  const falVideo = c.fal_video_model || 'fal-ai/kling-video/v3/pro/image-to-video';
+  const activeChecked = (isEdit ? c.active : true) ? ' checked' : '';
+  const uiEnabledChecked = c.user_input_enabled ? ' checked' : '';
+
+  return `
+    <div class="top"><h1>${isEdit ? 'Edit concept' : 'New concept'}</h1><a href="/admin/concepts">&larr; Back to list</a></div>
+    ${errorMsg ? `<div class="flash err">${escapeHtml(errorMsg)}</div>` : ''}
+    <form method="POST" action="/admin/concepts/save" enctype="multipart/form-data">
+      ${isEdit ? `<input type="hidden" name="id" value="${c.id}">` : ''}
+      <input type="hidden" name="current_before_image_url" value="${v('before_image_url')}">
+      <input type="hidden" name="current_after_image_url" value="${v('after_image_url')}">
+      <input type="hidden" name="current_example_video_url" value="${v('example_video_url')}">
+      <div class="row">
+        <div class="field"><label>Name *</label><input type="text" name="name" value="${v('name')}" required></div>
+        <div class="field"><label>Slug *</label><input type="text" name="slug" value="${v('slug')}" required>
+          <span class="muted">Lowercase, no spaces — e.g. royal-portrait</span></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Filter category *</label><input type="text" name="filter_category" value="${v('filter_category')}" required></div>
+        <div class="field"><label>Input type</label><select name="input_type">${inputTypeOptions}</select></div>
+        <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${c.sort_order == null ? 0 : escapeHtml(c.sort_order)}"></div>
+      </div>
+      <div class="field"><label>Image prompt *</label><textarea name="image_prompt" required>${v('image_prompt')}</textarea></div>
+      <div class="field"><label>Video prompt</label><textarea name="video_prompt">${v('video_prompt')}</textarea></div>
+      <div class="row">
+        <div class="field"><label>fal image model</label><input type="text" name="fal_image_model" value="${escapeHtml(falImage)}"></div>
+        <div class="field"><label>fal video model</label><input type="text" name="fal_video_model" value="${escapeHtml(falVideo)}"></div>
+      </div>
+      <div class="field"><label>Social caption</label><textarea name="social_caption">${v('social_caption')}</textarea></div>
+      <div class="field" style="border-top:1px solid #eee;padding-top:16px;">
+        <label><input type="checkbox" name="user_input_enabled" id="uiEnabled" value="on"${uiEnabledChecked} onchange="toggleUserInput()"> Enable customer text input (optional)</label>
+      </div>
+      <div id="uiFields" style="${uiEnabledChecked ? '' : 'display:none;'}">
+        <div class="row">
+          <div class="field"><label>Label</label><input type="text" name="user_input_label" value="${v('user_input_label')}" placeholder="Recipient's name"></div>
+          <div class="field"><label>Placeholder</label><input type="text" name="user_input_placeholder" value="${v('user_input_placeholder')}" placeholder="Anna"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Variable name</label><input type="text" name="user_input_variable" value="${v('user_input_variable')}" placeholder="name" pattern="[a-z_][a-z0-9_]*"></div>
+          <div class="field"><label>Max length</label><input type="number" name="user_input_max_length" value="${c.user_input_max_length == null ? 50 : escapeHtml(c.user_input_max_length)}"></div>
+        </div>
+        <p class="muted">Use {variable_name} in your prompts where the customer's text should appear. Example: variable 'name' + prompt containing '{name}' → customer types 'Anna' → prompt becomes 'Anna' at that position.</p>
+      </div>
+      <div class="row">
+        <div class="field"><label>Before image</label><input type="file" name="before_image" accept="image/*">${mediaPreview(c.before_image_url, 'image')}</div>
+        <div class="field"><label>After image</label><input type="file" name="after_image" accept="image/*">${mediaPreview(c.after_image_url, 'image')}</div>
+        <div class="field"><label>Example video</label><input type="file" name="example_video" accept="video/*">${mediaPreview(c.example_video_url, 'video')}</div>
+      </div>
+      <div class="field"><label><input type="checkbox" name="active" value="on"${activeChecked}> Active</label></div>
+      <button class="btn" type="submit">${isEdit ? 'Save changes' : 'Create concept'}</button>
+    </form>
+
+    <div style="border-top:1px solid #eee;margin-top:28px;padding-top:18px;">
+      <h2 style="font-size:18px;margin:0 0 6px;">Test this concept</h2>
+      <p class="muted" style="margin:0 0 14px;">Generates with the current (even unsaved) form values — no checkout, no email, no preview limit. Admin pays the fal.ai cost. Cost: ≈ ${TEST_COST_IMAGE} image / ≈ ${TEST_COST_VIDEO} video.</p>
+      <div class="field"><label>Test photo</label><input type="file" id="testPhoto" accept="image/*"></div>
+      <div class="field" id="testInputWrap" style="display:none;"><label id="testInputLabel">Customer text</label><input type="text" id="testUserInput"></div>
+      <button type="button" class="btn secondary" id="btnTestImage" onclick="runTestImage()">Test image</button>
+      <button type="button" class="btn secondary" id="btnTestVideo" onclick="runTestVideo()" disabled>Test video</button>
+      <div id="testStatus" class="muted" style="margin-top:12px;"></div>
+      <div id="testResult" style="margin-top:14px;"></div>
+    </div>
+
+    <script>
+      function escJs(s){ var d=document.createElement('div'); d.textContent = (s==null?'':s); return d.innerHTML; }
+      function toggleUserInput(){
+        var on = document.getElementById('uiEnabled').checked;
+        document.getElementById('uiFields').style.display = on ? '' : 'none';
+        syncTestInput();
+      }
+      function syncTestInput(){
+        var on = document.getElementById('uiEnabled').checked;
+        var wrap = document.getElementById('testInputWrap');
+        if(!wrap) return;
+        wrap.style.display = on ? '' : 'none';
+        document.getElementById('testInputLabel').textContent = (document.querySelector('[name=user_input_label]').value || 'Customer text');
+        var ml = parseInt(document.querySelector('[name=user_input_max_length]').value, 10);
+        var inp = document.getElementById('testUserInput');
+        if(ml > 0) inp.maxLength = ml;
+        inp.placeholder = (document.querySelector('[name=user_input_placeholder]').value || '');
+      }
+      function formVals(){
+        var q = function(n){ var el=document.querySelector('[name='+n+']'); return el ? el.value : ''; };
+        return {
+          slug: q('slug'),
+          image_prompt: q('image_prompt'),
+          video_prompt: q('video_prompt'),
+          fal_image_model: q('fal_image_model'),
+          fal_video_model: q('fal_video_model'),
+          user_input_variable: q('user_input_variable'),
+          user_input_max_length: q('user_input_max_length'),
+          user_input_enabled: document.getElementById('uiEnabled').checked
+        };
+      }
+      function setStatus(m){ document.getElementById('testStatus').textContent = m || ''; }
+      function setBusy(busy){
+        document.getElementById('btnTestImage').disabled = busy;
+        document.getElementById('testPhoto').disabled = busy;
+        document.getElementById('btnTestVideo').disabled = busy || !window.__testImageUrl;
+      }
+      async function runTestImage(){
+        var f = document.getElementById('testPhoto').files[0];
+        if(!f){ setStatus('Choose a test photo first.'); return; }
+        setBusy(true); setStatus('Uploading photo…');
+        try {
+          var fd = new FormData(); fd.append('image', f);
+          var up = await fetch('/upload', { method:'POST', body: fd });
+          var upj = await up.json();
+          if(!up.ok) throw new Error(upj.error || 'Upload failed');
+          setStatus('Generating image…');
+          var v = formVals();
+          var body = {
+            image_url: upj.url,
+            image_prompt: v.image_prompt,
+            fal_image_model: v.fal_image_model,
+            user_input_variable: v.user_input_enabled ? v.user_input_variable : '',
+            user_input_value: document.getElementById('testUserInput').value,
+            user_input_max_length: v.user_input_max_length,
+            concept_slug: v.slug
+          };
+          var r = await fetch('/admin/concepts/test-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+          var j = await r.json();
+          if(!r.ok) throw new Error(j.error || 'Image test failed');
+          window.__testImageUrl = j.url;
+          document.getElementById('testResult').innerHTML =
+            '<img src="'+j.url+'" style="max-width:320px;border-radius:8px;display:block;margin-bottom:8px;">' +
+            '<div class="muted">Image prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>';
+          setStatus('');
+        } catch(e){ setStatus('Error: '+e.message); }
+        setBusy(false);
+      }
+      async function runTestVideo(){
+        if(!window.__testImageUrl){ setStatus('Generate a test image first.'); return; }
+        setBusy(true); setStatus('Generating video… this can take a minute.');
+        try {
+          var v = formVals();
+          var body = {
+            portrait_url: window.__testImageUrl,
+            video_prompt: v.video_prompt,
+            fal_video_model: v.fal_video_model,
+            user_input_variable: v.user_input_enabled ? v.user_input_variable : '',
+            user_input_value: document.getElementById('testUserInput').value,
+            user_input_max_length: v.user_input_max_length,
+            concept_slug: v.slug
+          };
+          var r = await fetch('/admin/concepts/test-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+          var j = await r.json();
+          if(!r.ok) throw new Error(j.error || 'Video test failed');
+          document.getElementById('testResult').innerHTML +=
+            '<video src="'+j.url+'" controls style="max-width:320px;border-radius:8px;display:block;margin-top:12px;"></video>' +
+            '<div class="muted">Video prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>';
+          setStatus('');
+        } catch(e){ setStatus('Error: '+e.message); }
+        setBusy(false);
+      }
+      ['user_input_label','user_input_placeholder','user_input_max_length'].forEach(function(n){
+        var el=document.querySelector('[name='+n+']'); if(el) el.addEventListener('input', syncTestInput);
+      });
+      syncTestInput();
+    </script>`;
+}
+
+app.get('/admin/concepts/new', requireRole('admin'), (req, res) => {
+  res.send(conceptAdminPage('New concept', conceptFormBody(null, req.query.error)));
+});
+
+app.get('/admin/concepts/edit/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM concepts WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.redirect('/admin/concepts?error=' + encodeURIComponent('Concept not found'));
+    res.send(conceptAdminPage('Edit concept', conceptFormBody(rows[0], req.query.error)));
+  } catch (err) {
+    console.error('[concepts] edit load error:', err.message);
+    res.status(500).send('Failed to load concept: ' + escapeHtml(err.message));
+  }
+});
+
+const conceptUploadFields = upload.fields([
+  { name: 'before_image', maxCount: 1 },
+  { name: 'after_image', maxCount: 1 },
+  { name: 'example_video', maxCount: 1 },
+]);
+
+app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, async (req, res) => {
+  const editId = req.body.id ? parseInt(req.body.id, 10) : null;
+  const backTo = editId ? `/admin/concepts/edit/${editId}` : '/admin/concepts/new';
+  const fail = (msg) => res.redirect(`${backTo}?error=` + encodeURIComponent(msg));
+
+  try {
+    const name = (req.body.name || '').trim();
+    const slug = (req.body.slug || '').trim();
+    const filterCategory = (req.body.filter_category || '').trim();
+    const imagePrompt = (req.body.image_prompt || '').trim();
+    const videoPrompt = (req.body.video_prompt || '').trim() || null;
+    const socialCaption = (req.body.social_caption || '').trim() || null;
+    let inputType = (req.body.input_type || 'image_video').trim();
+    if (!CONCEPT_INPUT_TYPES.includes(inputType)) inputType = 'image_video';
+    const falImage = (req.body.fal_image_model || '').trim() || 'fal-ai/kling-image/o1';
+    const falVideo = (req.body.fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video';
+    const sortOrder = parseInt(req.body.sort_order, 10) || 0;
+    const active = req.body.active === 'on' || req.body.active === 'true' || req.body.active === '1';
+
+    const userInputEnabled = req.body.user_input_enabled === 'on' || req.body.user_input_enabled === 'true' || req.body.user_input_enabled === '1';
+    const userInputLabel = (req.body.user_input_label || '').trim() || null;
+    const userInputPlaceholder = (req.body.user_input_placeholder || '').trim() || null;
+    const userInputVariable = (req.body.user_input_variable || '').trim() || null;
+    let userInputMaxLength = parseInt(req.body.user_input_max_length, 10);
+    if (!Number.isInteger(userInputMaxLength) || userInputMaxLength <= 0) userInputMaxLength = 50;
+
+    if (!name) return fail('Name is required.');
+    if (!slug) return fail('Slug is required.');
+    if (!filterCategory) return fail('Filter category is required.');
+    if (!imagePrompt) return fail('Image prompt is required.');
+
+    if (userInputEnabled) {
+      if (!userInputLabel) return fail('Label is required when customer text input is enabled.');
+      if (!userInputVariable) return fail('Variable name is required when customer text input is enabled.');
+      if (!/^[a-z_][a-z0-9_]*$/.test(userInputVariable)) {
+        return fail('Variable name must be lowercase letters, digits, or underscores and start with a letter or underscore.');
+      }
+    }
+
+    let warn = '';
+    if (userInputEnabled && userInputVariable) {
+      const token = '{' + userInputVariable + '}';
+      if (!imagePrompt.includes(token) && !(videoPrompt || '').includes(token)) {
+        warn = `Heads up: the placeholder ${token} doesn't appear in the image or video prompt, so customer input won't be substituted.`;
+      }
+    }
+
+    const dup = await pool.query('SELECT id FROM concepts WHERE slug = $1 AND id <> $2', [slug, editId || 0]);
+    if (dup.rows.length) return fail('A concept with that slug already exists.');
+
+    const uploadField = async (field, resourceType) => {
+      const f = req.files && req.files[field] && req.files[field][0];
+      if (!f) return null;
+      const opts = resourceType ? { resource_type: resourceType } : {};
+      const result = await uploadStream(f.buffer, opts);
+      return result.secure_url;
+    };
+
+    const beforeUrl = (await uploadField('before_image')) || req.body.current_before_image_url || null;
+    const afterUrl = (await uploadField('after_image')) || req.body.current_after_image_url || null;
+    const videoUrl = (await uploadField('example_video', 'video')) || req.body.current_example_video_url || null;
+
+    if (editId) {
+      await pool.query(
+        `UPDATE concepts SET
+           slug = $1, name = $2, filter_category = $3, input_type = $4,
+           before_image_url = $5, after_image_url = $6, example_video_url = $7,
+           image_prompt = $8, video_prompt = $9, fal_image_model = $10, fal_video_model = $11,
+           social_caption = $12, active = $13, sort_order = $14,
+           user_input_enabled = $15, user_input_label = $16, user_input_placeholder = $17,
+           user_input_variable = $18, user_input_max_length = $19, updated_at = NOW()
+         WHERE id = $20`,
+        [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
+         imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
+         userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength, editId]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO concepts
+           (slug, name, filter_category, input_type, before_image_url, after_image_url, example_video_url,
+            image_prompt, video_prompt, fal_image_model, fal_video_model, social_caption, active, sort_order,
+            user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+        [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
+         imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
+         userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength]
+      );
+    }
+    res.redirect('/admin/concepts?saved=1' + (warn ? '&warn=' + encodeURIComponent(warn) : ''));
+  } catch (err) {
+    console.error('[concepts] save error:', err.message);
+    return fail('Save failed: ' + err.message);
+  }
+});
+
+app.post('/admin/concepts/toggle/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query('UPDATE concepts SET active = NOT active, updated_at = NOW() WHERE id = $1', [req.params.id]);
+    res.redirect('/admin/concepts');
+  } catch (err) {
+    console.error('[concepts] toggle error:', err.message);
+    res.redirect('/admin/concepts?error=' + encodeURIComponent('Toggle failed: ' + err.message));
+  }
+});
+
+app.post('/admin/concepts/delete/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM concepts WHERE id = $1', [req.params.id]);
+    res.redirect('/admin/concepts?deleted=1');
+  } catch (err) {
+    console.error('[concepts] delete error:', err.message);
+    res.redirect('/admin/concepts?error=' + encodeURIComponent('Delete failed: ' + err.message));
+  }
+});
+
+// Builds a concept-shaped object for applyUserInput from raw test-form fields.
+function testConcept(body) {
+  const variable = (body.user_input_variable || '').trim();
+  return {
+    user_input_enabled: !!variable,
+    user_input_variable: variable,
+    user_input_max_length: parseInt(body.user_input_max_length, 10) || 50,
+  };
+}
+
+// Admin-only stateless test generation. Does NOT touch preview_count, orders, or email.
+app.post('/admin/concepts/test-image', requireRole('admin'), async (req, res) => {
+  try {
+    const { image_url, image_prompt, fal_image_model, user_input_value, concept_slug } = req.body;
+    if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+    if (!image_prompt || !String(image_prompt).trim()) return res.status(400).json({ error: 'image_prompt is required' });
+    const model = (fal_image_model || '').trim() || 'fal-ai/kling-image/o1';
+    const finalPrompt = applyUserInput(image_prompt, testConcept(req.body), user_input_value);
+    console.log('[admin-test] image —', { concept_slug: concept_slug || null, prompt_used: finalPrompt, cost_estimate: TEST_COST_IMAGE });
+    const result = await fal.subscribe(model, {
+      input: { prompt: finalPrompt, image_urls: [image_url], aspect_ratio: 'auto' },
+    });
+    res.json({ url: result.data.images[0].url, prompt_used: finalPrompt });
+  } catch (err) {
+    console.error('[admin-test] image error:', err.message);
+    res.status(500).json({ error: 'Test image failed', details: err.message });
+  }
+});
+
+app.post('/admin/concepts/test-video', requireRole('admin'), async (req, res) => {
+  try {
+    const { portrait_url, video_prompt, fal_video_model, user_input_value, concept_slug } = req.body;
+    if (!portrait_url) return res.status(400).json({ error: 'portrait_url is required' });
+    if (!video_prompt || !String(video_prompt).trim()) return res.status(400).json({ error: 'video_prompt is required' });
+    const model = (fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video';
+    const finalPrompt = applyUserInput(video_prompt, testConcept(req.body), user_input_value);
+    console.log('[admin-test] video —', { concept_slug: concept_slug || null, prompt_used: finalPrompt, cost_estimate: TEST_COST_VIDEO });
+    const result = await fal.subscribe(model, {
+      input: { image_url: portrait_url, prompt: finalPrompt, duration: '10', enable_audio: true },
+    });
+    res.json({ url: result.data.video.url, prompt_used: finalPrompt });
+  } catch (err) {
+    console.error('[admin-test] video error:', err.message);
+    res.status(500).json({ error: 'Test video failed', details: err.message });
+  }
+});
+
 app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
   try {
     await sendDailyDigest();
