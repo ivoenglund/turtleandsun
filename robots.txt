@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /account/
+Disallow: /login
+Disallow: /api/
+Sitemap: https://turtleandsun.com/sitemap.xml
