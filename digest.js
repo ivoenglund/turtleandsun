@@ -84,23 +84,33 @@ async function sendDailyDigest() {
   // 3) VISITORS (last 24h)
   let visitorsHtml;
   try {
-    const tot = await pool.query(`SELECT COUNT(*)::int AS n FROM visits WHERE created_at >= NOW() - INTERVAL '24 hours'`);
+    const tot = await pool.query(`SELECT COUNT(DISTINCT ip)::int AS n FROM visits WHERE created_at >= NOW() - INTERVAL '24 hours'`);
     const top = await pool.query(
-      `SELECT country, COUNT(*)::int AS n FROM visits
+      `SELECT country, COUNT(DISTINCT ip)::int AS n FROM visits
        WHERE created_at >= NOW() - INTERVAL '24 hours' AND country IS NOT NULL
        GROUP BY country ORDER BY n DESC LIMIT 10`
+    );
+    const susp = await pool.query(
+      `SELECT ip, country, COUNT(*)::int AS hits FROM visits
+       WHERE created_at >= NOW() - INTERVAL '24 hours'
+       GROUP BY ip, country HAVING COUNT(*) > 30 ORDER BY hits DESC LIMIT 5`
     );
     const list = top.rows.length
       ? top.rows.map(r => `${r.country}: ${r.n}`).join('<br>')
       : 'No country data.';
-    visitorsHtml = `<strong>${tot.rows[0].n}</strong> visits<br><br><span style="color:#888;">Top countries</span><br>${list}`;
+    const suspList = susp.rows.length
+      ? susp.rows.map(r => `${r.ip} · ${r.country || '?'} · ${r.hits} hits`).join('<br>')
+      : 'None.';
+    visitorsHtml = `<strong>${tot.rows[0].n}</strong> unique visitors<br><br>` +
+      `<span style="color:#888;">Top countries</span><br>${list}<br><br>` +
+      `<span style="color:#888;">Suspicious activity (IPs with &gt; 30 visits in 24h)</span><br>${suspList}`;
   } catch (e) { console.error('[digest] visitors error:', e.message); visitorsHtml = '(error)'; }
 
   // 4) CURRENCY SUGGESTIONS (last 24h)
   let suggestionsHtml;
   try {
     const r = await pool.query(
-      `SELECT country, COUNT(*)::int AS n FROM visits
+      `SELECT country, COUNT(DISTINCT ip)::int AS n FROM visits
        WHERE created_at >= NOW() - INTERVAL '24 hours' AND country IS NOT NULL GROUP BY country`
     );
     const byCurrency = {}; // currency -> { count, countries: [] }
