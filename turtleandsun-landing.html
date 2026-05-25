@@ -51,6 +51,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .ti{font-size:12px;color:rgba(60,20,0,0.55);display:flex;align-items:center;gap:5px;}
 .step-upload{cursor:pointer;transition:border-color 0.15s,background 0.15s;}
 .step-upload:hover{border-color:rgba(0,0,0,0.35);background:rgba(255,220,60,0.7);}
+.step-upload.drag-over{border-color:rgba(0,0,0,0.5);background:rgba(255,220,60,0.85);}
 #uploadThumb{width:100%;max-height:160px;border-radius:8px;object-fit:contain;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.18);}
 #uploadIcon{transition:opacity 0.2s;}
 .btn-preview{width:100%;padding:9px;background:#3A6B20;color:white;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background 0.18s;margin-top:2px;}
@@ -259,8 +260,7 @@ let previewImageUrl = null;
 let orientation = 'square';
 let paywalled = false;
 
-document.getElementById('fileInput').addEventListener('change', async function(e) {
-  const file = e.target.files[0];
+async function handleFile(file) {
   if (!file) return;
 
   // Reset state for new upload
@@ -304,6 +304,18 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     document.getElementById('uploadSub').textContent = 'Upload failed';
     console.error('Upload error:', err);
   }
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) { handleFile(e.target.files[0]); });
+
+// Drag-and-drop onto the Step 1 drop zone
+const dropZone = document.getElementById('step1');
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 
 document.getElementById('btnPreview').addEventListener('click', async function() {
@@ -403,6 +415,12 @@ async function proceedToCheckout(productOverride) {
   const btn = document.querySelector('.btn-order');
   btn.disabled = true;
   btn.textContent = 'Redirecting…';
+  // Persist state so a browser back from Stripe restores the user's progress
+  try {
+    sessionStorage.setItem('ts_state', JSON.stringify({
+      cloudinaryUrl, previewImageUrl, selectedProduct: product, orientation, email, ts: Date.now()
+    }));
+  } catch (e) {}
   try {
     const res = await fetch('/create-checkout-session', {
       method: 'POST',
@@ -456,6 +474,38 @@ async function loadGallery(category) {
   fill('g3', pals.slice(8, 12));
 }
 loadGallery('all');
+
+// Restore progress if the user navigated back from Stripe checkout
+(function restoreState() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('order') === 'success') { try { sessionStorage.removeItem('ts_state'); } catch (e) {} return; }
+  let saved;
+  try { saved = JSON.parse(sessionStorage.getItem('ts_state') || 'null'); } catch (e) { return; }
+  if (!saved || !saved.ts || Date.now() - saved.ts > 2 * 60 * 60 * 1000) return;
+
+  if (saved.cloudinaryUrl) {
+    cloudinaryUrl = saved.cloudinaryUrl;
+    const thumb = document.getElementById('uploadThumb');
+    thumb.src = saved.cloudinaryUrl;
+    thumb.style.display = 'block';
+    document.getElementById('uploadIcon').style.display = 'none';
+    document.getElementById('uploadSub').textContent = 'Uploaded ✓';
+  }
+  if (saved.previewImageUrl) {
+    previewImageUrl = saved.previewImageUrl;
+    document.getElementById('previewImg').src = saved.previewImageUrl;
+    document.getElementById('previewResult').style.display = 'block';
+    document.getElementById('step2Grid').style.display = 'none';
+    document.getElementById('btnPreview').textContent = 'Regenerate';
+  }
+  if (saved.orientation) setOrientation(saved.orientation);
+  if (saved.selectedProduct) selectPkg(saved.selectedProduct);
+  if (saved.email) {
+    const emailEl = document.getElementById('previewEmail');
+    if (emailEl) emailEl.value = saved.email;
+    window._previewEmail = saved.email;
+  }
+})();
 </script>
 
 <div id="upsellModal">
