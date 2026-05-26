@@ -178,7 +178,7 @@ html,body{overflow-x:hidden;}
       <div class="snum">2</div>
       <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
-      <div class="stitle">Choose style &amp; generate<br>a preview</div>
+      <div class="stitle" id="step2Title">Choose style &amp; generate<br>a preview</div>
       <div class="orient-group" id="orientGroup">
         <button type="button" class="orient-btn" data-orient="landscape" title="16:9"><span class="orient-shape" style="width:26px;height:15px;"></span><span class="orient-ratio">16:9</span></button>
         <button type="button" class="orient-btn" data-orient="portrait" title="9:16"><span class="orient-shape" style="width:15px;height:26px;"></span><span class="orient-ratio">9:16</span></button>
@@ -336,34 +336,90 @@ window.setF = function(cat, btn) {
 };
 
 // Click-to-select behaviour for gallery cards. Marks the card visually
-// selected, highlights the matching filter chip (the card's concept's
-// first filter category), and shows that concept's text in the panel above.
+// selected, highlights the matching filter chip, updates the description
+// panel above the gallery, and pushes the selected style into step 2 of
+// the customer flow (replacing the four placeholder thumbs with a preview
+// of the selected gallery item and changing the step-2 title).
 function selectCard(card, item) {
   document.querySelectorAll('.g-card.is-selected').forEach(function(c){
     c.classList.remove('is-selected');
   });
   card.classList.add('is-selected');
 
-  // Promote this item's concept into the panel even if "All" stays the active filter
-  if (item && item.concept_id) {
-    var concept = (window.tsGalleryConcepts || []).find(function(c){ return c.id === item.concept_id; });
-    if (concept) {
-      var firstCat = String(concept.filter_category || '').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean)[0];
-      var titleEl = document.getElementById('styleDescTitle');
-      var textEl  = document.getElementById('styleDescText');
-      var panel   = document.getElementById('styleDesc');
-      if (titleEl && textEl && panel) {
-        titleEl.innerHTML = '<span style="opacity:0.55;font-weight:600;">Style ·</span> ' + escHtml(concept.name);
-        textEl.innerHTML  = concept.description ? escHtml(concept.description) : '';
-        panel.style.display = 'flex';
-      }
-      if (firstCat) {
-        // Highlight the matching filter chip without changing the rendered grid
-        document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
-        var chip = document.querySelector('.fb[data-filter="' + firstCat + '"]');
-        if (chip) chip.classList.add('on');
-      }
+  if (!item || !item.concept_id) return;
+
+  var concept = (window.tsGalleryConcepts || []).find(function(c){ return c.id === item.concept_id; });
+  if (!concept) return;
+
+  // Save the user-facing selection so step 2 / checkout can read it later
+  window.tsSelectedConcept = { concept: concept, item: item };
+  try { localStorage.setItem('tsSelectedConceptId', String(concept.id)); } catch (e) {}
+
+  // 1) Description panel above the gallery
+  var titleEl = document.getElementById('styleDescTitle');
+  var textEl  = document.getElementById('styleDescText');
+  var panel   = document.getElementById('styleDesc');
+  if (titleEl && textEl && panel) {
+    titleEl.innerHTML = '<span style="opacity:0.55;font-weight:600;">Style ·</span> ' + escHtml(concept.name);
+    textEl.innerHTML  = concept.description ? escHtml(concept.description) : '';
+    panel.style.display = 'flex';
+  }
+
+  // 2) Filter chip highlight
+  var firstCat = String(concept.filter_category || '').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean)[0];
+  if (firstCat) {
+    document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
+    var chip = document.querySelector('.fb[data-filter="' + firstCat + '"]');
+    if (chip) chip.classList.add('on');
+  }
+
+  // 3) Step 2 — title + preview thumb
+  var step2Title = document.getElementById('step2Title');
+  if (step2Title) {
+    step2Title.innerHTML = '<span style="opacity:0.6;font-weight:600;">Style ·</span> ' + escHtml(concept.name);
+  }
+  var step2Grid = document.getElementById('step2Grid');
+  if (step2Grid) {
+    // Replace the four placeholder sthumbs with one large preview of the selected item
+    step2Grid.innerHTML = '';
+    step2Grid.style.display = 'grid';
+    step2Grid.style.gridTemplateColumns = '1fr';
+    var thumb = document.createElement('div');
+    thumb.className = 'sthumb';
+    thumb.style.cssText = 'aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#1A0C04;width:100%;';
+    var t;
+    if (item.kind === 'video') {
+      t = document.createElement('video');
+      t.src = item.url;
+      t.muted = true;
+      t.autoplay = true;
+      t.loop = true;
+      t.playsInline = true;
+      if (item.thumbnail_url) t.poster = item.thumbnail_url;
+    } else {
+      t = document.createElement('img');
+      t.src = item.thumbnail_url || item.url;
+      t.alt = concept.name || '';
+      t.loading = 'lazy';
     }
+    t.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
+    thumb.appendChild(t);
+    step2Grid.appendChild(thumb);
+  }
+}
+
+// Resets step 2 to its placeholder state when the gallery is cleared / no
+// selection. Called by the "All" filter to revert step 2.
+function resetStep2() {
+  window.tsSelectedConcept = null;
+  try { localStorage.removeItem('tsSelectedConceptId'); } catch (e) {}
+  var step2Title = document.getElementById('step2Title');
+  if (step2Title) step2Title.innerHTML = 'Choose style &amp; generate<br>a preview';
+  var step2Grid = document.getElementById('step2Grid');
+  if (step2Grid) {
+    step2Grid.innerHTML = '<div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div>';
+    step2Grid.style.display = '';
+    step2Grid.style.gridTemplateColumns = '';
   }
 }
 
