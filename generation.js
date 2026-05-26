@@ -273,6 +273,10 @@ function buildFalInput(model, { photoUrl, prompt, orientation }, inputExtras) {
 // ---------------------------------------------------------------------------
 // Public API.
 // ---------------------------------------------------------------------------
+// Tell fal to keep generated outputs forever instead of expiring after 7 days.
+// Critical: customer-delivered URLs would otherwise die a week after purchase.
+const FAL_STORAGE_NEVER_EXPIRES = { expiresIn: 'never' };
+
 async function generateImage({ provider = 'fal', modelId, prompt, photoUrl, orientation, inputExtras }) {
   if (provider !== 'fal') throw new Error(`Unsupported provider: ${provider}`);
   const model = getModel(modelId);
@@ -280,7 +284,7 @@ async function generateImage({ provider = 'fal', modelId, prompt, photoUrl, orie
   if (model.kind !== 'image') throw new Error(`Model ${modelId} is not an image model`);
 
   const input = buildFalInput(model, { photoUrl, prompt, orientation }, inputExtras);
-  const result = await fal.subscribe(modelId, { input });
+  const result = await fal.subscribe(modelId, { input, storageSettings: FAL_STORAGE_NEVER_EXPIRES });
   const url = result?.data?.images?.[0]?.url;
   if (!url) throw new Error('Image generation returned no URL');
   return { url, input, raw: result.data };
@@ -293,7 +297,7 @@ async function generateVideo({ provider = 'fal', modelId, prompt, photoUrl, orie
   if (model.kind !== 'video') throw new Error(`Model ${modelId} is not a video model`);
 
   const input = buildFalInput(model, { photoUrl, prompt, orientation }, inputExtras);
-  const result = await fal.subscribe(modelId, { input });
+  const result = await fal.subscribe(modelId, { input, storageSettings: FAL_STORAGE_NEVER_EXPIRES });
   const url = result?.data?.video?.url;
   if (!url) throw new Error('Video generation returned no URL');
   return { url, input, raw: result.data };

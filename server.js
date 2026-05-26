@@ -20,7 +20,7 @@ const { fal } = require('@fal-ai/client');
 const Stripe = require('stripe');
 const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
-const { uploadStream } = require('./cloudinary');
+const { uploadStream } = require('./storage');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
 const generation = require('./generation');
@@ -1218,7 +1218,11 @@ app.get('/api/account/data', requireAuth, async (req, res) => {
 app.post('/upload', upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
   try {
-    const result = await uploadStream(req.file.buffer);
+    const result = await uploadStream(req.file.buffer, {
+      kind: 'upload',
+      contentType: req.file.mimetype,
+      originalName: req.file.originalname,
+    });
     res.json({ url: result.secure_url, public_id: result.public_id });
   } catch (err) {
     res.status(500).json({ error: 'Upload failed', details: err.message });
@@ -1316,6 +1320,7 @@ app.post('/preview', async (req, res) => {
         image_urls: [image_url],
         aspect_ratio: ORIENTATION_ASPECT[orientation] || 'auto',
       },
+      storageSettings: { expiresIn: 'never' },
     });
     res.json({ url: result.data.images[0].url });
   } catch (err) {
@@ -1375,6 +1380,7 @@ async function generateVideo(portrait_url) {
       duration: '10',
       enable_audio: true,
     },
+    storageSettings: { expiresIn: 'never' },
   });
   return result.data.video.url;
 }
@@ -2096,7 +2102,12 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
     const uploadField = async (field, resourceType) => {
       const f = req.files && req.files[field] && req.files[field][0];
       if (!f) return null;
-      const opts = resourceType ? { resource_type: resourceType } : {};
+      const opts = {
+        kind: 'concept_media',
+        contentType: f.mimetype,
+        originalName: f.originalname,
+        ...(resourceType ? { resource_type: resourceType } : {}),
+      };
       const result = await uploadStream(f.buffer, opts);
       return result.secure_url;
     };
@@ -2184,7 +2195,12 @@ app.post('/admin/concepts/:id/media', requireRole('admin'), upload.single('media
     let url = urlOverride;
     if (req.file && req.file.buffer) {
       const resourceType = kind === 'video' ? 'video' : 'image';
-      const result = await uploadStream(req.file.buffer, { resource_type: resourceType });
+      const result = await uploadStream(req.file.buffer, {
+        kind: 'gallery',
+        contentType: req.file.mimetype,
+        originalName: req.file.originalname,
+        resource_type: resourceType,
+      });
       url = result.secure_url;
     }
     if (!url) return res.redirect(`${back}?error=` + encodeURIComponent('Provide a file or a URL'));
@@ -2400,7 +2416,12 @@ app.post('/admin/gallery/new', requireRole('admin'), upload.single('media'), asy
     let url = urlOverride;
     if (req.file && req.file.buffer) {
       const resourceType = kind === 'video' ? 'video' : 'image';
-      const result = await uploadStream(req.file.buffer, { resource_type: resourceType });
+      const result = await uploadStream(req.file.buffer, {
+        kind: 'gallery',
+        contentType: req.file.mimetype,
+        originalName: req.file.originalname,
+        resource_type: resourceType,
+      });
       url = result.secure_url;
     }
     if (!url) return res.redirect(`${back}?error=` + encodeURIComponent('Provide a file or a URL'));
