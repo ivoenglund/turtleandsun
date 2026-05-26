@@ -1622,7 +1622,8 @@ function conceptFormBody(concept, errorMsg) {
       <div class="row">
         <div class="field"><label>Filter category *</label><input type="text" name="filter_category" value="${v('filter_category')}" required>
           <span class="muted">Comma-separated, e.g. <code>royal, pets</code>. Each value becomes a separate filter chip on the landing gallery.</span></div>
-        <div class="field"><label>Input type</label><select name="input_type">${inputTypeOptions}</select></div>
+        <div class="field"><label>Input type</label><select name="input_type" id="inputTypeSelect" onchange="applyInputType(this.value)">${inputTypeOptions}</select>
+          <span class="muted">Controls which tabs are visible: image_video = both, image = only Image tab, video = only Video tab.</span></div>
         <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${c.sort_order == null ? 0 : escapeHtml(c.sort_order)}"></div>
       </div>
       <div class="field"><label>Description</label><textarea name="description" rows="3" placeholder="One short paragraph shown above the gallery tiles on the landing page.">${v('description')}</textarea></div>
@@ -1865,6 +1866,22 @@ function conceptFormBody(concept, errorMsg) {
           document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === name);
         }
       }
+      // Reflect the input_type setting in the tab visibility.
+      // image_video = both tabs visible; image = only Image; video = only Video.
+      function applyInputType(val) {
+        var showImage = (val === 'image_video' || val === 'image');
+        var showVideo = (val === 'image_video' || val === 'video');
+        document.getElementById('tabBtnImage').style.display = showImage ? '' : 'none';
+        document.getElementById('tabBtnVideo').style.display = showVideo ? '' : 'none';
+        if (!showImage) document.getElementById('tabImage').classList.remove('active');
+        if (!showVideo) document.getElementById('tabVideo').classList.remove('active');
+        // If the currently active tab got hidden, pop the visible one open
+        var imageActive = document.getElementById('tabImage').classList.contains('active');
+        var videoActive = document.getElementById('tabVideo').classList.contains('active');
+        if (!imageActive && !videoActive) {
+          showTab(showImage ? 'image' : 'video');
+        }
+      }
       function setStatus(kind, m){
         var el = document.getElementById('test' + (kind === 'image' ? 'Image' : 'Video') + 'Status');
         if (el) el.textContent = m || '';
@@ -1948,6 +1965,7 @@ function conceptFormBody(concept, errorMsg) {
       syncTestInput();
       renderModelFields('image');
       renderModelFields('video');
+      applyInputType(document.getElementById('inputTypeSelect').value);
     </script>`;
 }
 
