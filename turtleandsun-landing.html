@@ -469,6 +469,7 @@ async function loadGallery(category) {
         const card = document.createElement('div');
         card.className = 'g-card';
         card.style.position = 'relative';
+        card.style.cursor = 'zoom-in';
         let media;
         if (item.kind === 'video') {
           media = document.createElement('video');
@@ -478,6 +479,27 @@ async function loadGallery(category) {
           media.loop = true;
           media.playsInline = true;
           if (item.thumbnail_url) media.poster = item.thumbnail_url;
+          // Per-video sound toggle button (top-right corner)
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.setAttribute('aria-label', 'Toggle sound');
+          btn.style.cssText = 'position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:2;';
+          btn.textContent = '🔇';
+          btn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            const goingUnmuted = media.muted;
+            // Mute every other video first
+            document.querySelectorAll('.g-card video').forEach(function(v) {
+              if (v !== media) v.muted = true;
+            });
+            document.querySelectorAll('.g-card button[data-sound]').forEach(function(b) {
+              if (b !== btn) b.textContent = '🔇';
+            });
+            media.muted = !goingUnmuted ? true : false;
+            btn.textContent = media.muted ? '🔇' : '🔊';
+          });
+          btn.setAttribute('data-sound', '1');
+          card.appendChild(btn);
         } else {
           media = document.createElement('img');
           media.src = item.thumbnail_url || item.url;
@@ -486,10 +508,11 @@ async function loadGallery(category) {
         }
         media.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
         const label = document.createElement('div');
-        label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;';
+        label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;pointer-events:none;';
         label.textContent = item.concept_name || '';
         card.appendChild(media);
         card.appendChild(label);
+        card.addEventListener('click', function() { openLightbox(item); });
         const target = grids[Math.min(Math.floor(i / 4), 2)];
         if (target) target.appendChild(card);
       });
@@ -499,6 +522,83 @@ async function loadGallery(category) {
   fill('g1', pals.slice(0, 4));
   fill('g2', pals.slice(4, 8));
   fill('g3', pals.slice(8, 12));
+}
+
+// ----- Lightbox for gallery items -----
+function openLightbox(item) {
+  // Pause and mute all gallery videos behind the lightbox
+  document.querySelectorAll('.g-card video').forEach(function(v) { v.pause(); });
+
+  var overlay = document.getElementById('ts-lightbox');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'ts-lightbox';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:40px;cursor:zoom-out;';
+    overlay.addEventListener('click', function(ev) {
+      if (ev.target === overlay) closeLightbox();
+    });
+    document.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Escape') closeLightbox();
+    });
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = '';
+  overlay.style.display = 'flex';
+
+  var close = document.createElement('button');
+  close.type = 'button';
+  close.textContent = '×';
+  close.setAttribute('aria-label', 'Close');
+  close.style.cssText = 'position:absolute;top:18px;right:24px;background:none;border:none;color:#fff;font-size:36px;cursor:pointer;line-height:1;padding:0;';
+  close.addEventListener('click', closeLightbox);
+  overlay.appendChild(close);
+
+  var inner = document.createElement('div');
+  inner.style.cssText = 'max-width:min(90vw,1100px);max-height:88vh;display:flex;flex-direction:column;align-items:center;gap:12px;';
+
+  var mediaEl;
+  if (item.kind === 'video') {
+    mediaEl = document.createElement('video');
+    mediaEl.src = item.url;
+    mediaEl.controls = true;
+    mediaEl.autoplay = true;
+    mediaEl.loop = true;
+    mediaEl.muted = false;
+    mediaEl.playsInline = true;
+    mediaEl.style.cssText = 'max-width:100%;max-height:80vh;border-radius:10px;display:block;';
+  } else {
+    mediaEl = document.createElement('img');
+    mediaEl.src = item.url;
+    mediaEl.alt = item.concept_name || '';
+    mediaEl.style.cssText = 'max-width:100%;max-height:80vh;border-radius:10px;display:block;';
+  }
+  inner.appendChild(mediaEl);
+
+  if (item.concept_name) {
+    var caption = document.createElement('div');
+    caption.style.cssText = 'color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:15px;font-weight:600;text-align:center;';
+    caption.textContent = item.concept_name;
+    if (item.concept_description) {
+      var desc = document.createElement('div');
+      desc.style.cssText = 'font-weight:400;opacity:0.85;font-size:13px;margin-top:4px;max-width:600px;';
+      desc.textContent = item.concept_description;
+      caption.appendChild(desc);
+    }
+    inner.appendChild(caption);
+  }
+  overlay.appendChild(inner);
+}
+function closeLightbox() {
+  var overlay = document.getElementById('ts-lightbox');
+  if (overlay) {
+    overlay.innerHTML = '';
+    overlay.style.display = 'none';
+  }
+  // Resume the muted-autoplay tiles
+  document.querySelectorAll('.g-card video').forEach(function(v) {
+    var p = v.play();
+    if (p && p.catch) p.catch(function() {});
+  });
 }
 // Multi-currency price rendering
 function renderPrices() {

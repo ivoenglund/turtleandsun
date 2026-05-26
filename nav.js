@@ -59,6 +59,10 @@
       '<div class="ts-nav-dd" id="ts-nav-dd">' +
         '<div class="ts-nav-dd-email ts-nav-auth" id="ts-nav-dd-email"></div>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin">Admin dashboard</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/concepts">↳ Concepts</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/gallery">↳ Gallery</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/visits">↳ Visits</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/failed-deliveries">↳ Deliveries</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
@@ -89,6 +93,10 @@
         '<a class="ts-nav-drawer-link" href="/faq">FAQ</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin">Admin dashboard</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/concepts">↳ Concepts</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/gallery">↳ Gallery</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">↳ Visits</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/failed-deliveries">↳ Deliveries</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +

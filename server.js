@@ -1496,18 +1496,14 @@ function conceptAdminPage(title, body) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;color:#1C0A00;background:#FFF9E6;margin:0;padding:0;}
-  .ts-adminbar{display:flex;align-items:center;gap:18px;padding:10px 24px;background:#1C0A00;color:#FFF9E6;}
-  .ts-adminbar a{color:#FFF9E6;text-decoration:none;font-size:13px;font-weight:600;padding:6px 10px;border-radius:6px;}
-  .ts-adminbar a:hover{background:rgba(255,249,230,0.12);}
-  .ts-adminbar .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;letter-spacing:0.02em;}
-  .ts-adminbar .logo img{height:28px;width:auto;display:block;}
-  .ts-adminbar .nav{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
-  .ts-adminbar .spacer{flex:1;}
-  .ts-adminbar .sep{width:1px;height:18px;background:rgba(255,249,230,0.25);margin:0 4px;}
-  .ts-adminbar .pill{background:#FFF3C4;color:#1C0A00;}
-  .wrap{max-width:1000px;margin:0 auto;padding:28px 24px 48px;}
+  body{font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#1C0A00;margin:0;padding:0;min-height:100vh;display:flex;flex-direction:column;}
+  .wrap{max-width:1100px;margin:0 auto;padding:8px 24px 48px;width:100%;box-sizing:border-box;position:relative;z-index:1;flex:1;}
+  .wrap > h1:first-child, .wrap > .top:first-child{margin-top:0;}
+  footer.ts-footer{text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;position:relative;z-index:1;}
   h1{font-size:24px;margin:0 0 20px;}
   a{color:#3A6B20;}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;}
@@ -1532,25 +1528,16 @@ function conceptAdminPage(title, body) {
   .preview img,.preview video{max-width:160px;max-height:120px;border-radius:6px;border:1px solid #ddd;display:block;}
   .muted{color:#888;font-size:12px;}
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
-</style></head><body>
-<div class="ts-adminbar">
-  <a href="/" class="logo"><img src="/logo.png" alt="Turtle and Sun"> Turtle and Sun</a>
-  <div class="sep"></div>
-  <nav class="nav">
-    <a href="/admin">Dashboard</a>
-    <a href="/admin/concepts">Concepts</a>
-    <a href="/admin/gallery">Gallery</a>
-    <a href="/admin/visits">Visits</a>
-    <a href="/admin/failed-deliveries">Deliveries</a>
-  </nav>
-  <div class="spacer"></div>
-  <nav class="nav">
-    <a href="/">View site</a>
-    <a href="/account">Account</a>
-    <a href="/logout" class="pill">Logout</a>
-  </nav>
-</div>
-<div class="wrap">${body}</div></body></html>`;
+</style></head><body class="ts-nav-loggedin ts-nav-admin">
+<div class="sun"></div>
+<script src="/currency.js?v=20260526a"></script>
+<script src="/nav.js?v=20260526b"></script>
+<div class="wrap">${body}</div>
+<footer class="ts-footer">
+  <p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
+  <p>Turtle and Sun is a service by 3doc AB · Org.nr 556723-1864 · Fleminggatan 15, 112 26 Stockholm</p>
+</footer>
+</body></html>`;
 }
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
