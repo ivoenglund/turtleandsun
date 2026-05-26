@@ -1625,27 +1625,62 @@ function conceptFormBody(concept, errorMsg) {
         <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${c.sort_order == null ? 0 : escapeHtml(c.sort_order)}"></div>
       </div>
 
-      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:8px;">
-        <h2 style="font-size:18px;margin:0 0 8px;">Image generation</h2>
-        <label>Image model</label>
-        <select name="fal_image_model" id="imageModelSelect" onchange="renderModelFields('image')">${imageOptions}</select>
-        <p class="muted" id="imageModelDesc" style="margin:6px 0 0;"></p>
-      </div>
-      <div class="field"><label>Image prompt *</label><textarea name="image_prompt" required>${v('image_prompt')}</textarea>
-        <span class="muted">Reference the customer photo as @Image1. Use {variable_name} for customer-supplied text.</span></div>
-      <div id="imageFields"></div>
+      <style>
+        .ts-tabs{display:flex;gap:4px;border-bottom:2px solid #eee;margin:18px 0 0;}
+        .ts-tab-btn{background:none;border:none;padding:10px 18px;font-size:15px;font-weight:600;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;}
+        .ts-tab-btn.active{color:#3A6B20;border-bottom-color:#3A6B20;}
+        .ts-tab{display:none;padding-top:18px;}
+        .ts-tab.active{display:block;}
+        .ts-test{margin-top:24px;padding-top:18px;border-top:1px solid #eee;}
+      </style>
 
-      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:8px;">
-        <h2 style="font-size:18px;margin:0 0 8px;">Video generation</h2>
-        <label>Video model</label>
-        <select name="fal_video_model" id="videoModelSelect" onchange="renderModelFields('video')">${videoOptions}</select>
-        <p class="muted" id="videoModelDesc" style="margin:6px 0 0;"></p>
+      <div class="ts-tabs">
+        <button type="button" class="ts-tab-btn active" id="tabBtnImage" onclick="showTab('image')">1. Image</button>
+        <button type="button" class="ts-tab-btn" id="tabBtnVideo" onclick="showTab('video')">2. Video</button>
       </div>
-      <div class="field"><label>Video prompt</label><textarea name="video_prompt">${v('video_prompt')}</textarea>
-        <span class="muted">Empty = no video produced. Reference the generated portrait as @Image1.</span></div>
-      <div id="videoFields"></div>
 
-      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:8px;"><label>Social caption</label><textarea name="social_caption">${v('social_caption')}</textarea></div>
+      <div class="ts-tab active" id="tabImage">
+        <div class="field">
+          <label>Image model</label>
+          <select name="fal_image_model" id="imageModelSelect" onchange="renderModelFields('image')">${imageOptions}</select>
+          <p class="muted" id="imageModelDesc" style="margin:6px 0 0;"></p>
+        </div>
+        <div class="field"><label>Image prompt *</label><textarea name="image_prompt" required>${v('image_prompt')}</textarea>
+          <span class="muted">Reference the customer photo as @Image1. Use {variable_name} for customer-supplied text.</span></div>
+        <div id="imageFields"></div>
+
+        <div class="ts-test">
+          <h2 style="font-size:18px;margin:0 0 6px;">Test image</h2>
+          <p class="muted" style="margin:0 0 14px;">Generates with the current (unsaved) values. Admin pays the fal.ai cost (≈ ${TEST_COST_IMAGE}).</p>
+          <div class="field"><label>Test photo</label><input type="file" id="testPhoto" accept="image/*"></div>
+          <div class="field" id="testInputWrap" style="display:none;"><label id="testInputLabel">Customer text</label><input type="text" id="testUserInput"></div>
+          <button type="button" class="btn secondary" id="btnTestImage" onclick="runTestImage()">Test image</button>
+          <div id="testImageStatus" class="muted" style="margin-top:12px;"></div>
+          <div id="testImageResult" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <div class="ts-tab" id="tabVideo">
+        <div class="field">
+          <label>Video model</label>
+          <select name="fal_video_model" id="videoModelSelect" onchange="renderModelFields('video')">${videoOptions}</select>
+          <p class="muted" id="videoModelDesc" style="margin:6px 0 0;"></p>
+        </div>
+        <div class="field"><label>Video prompt</label><textarea name="video_prompt">${v('video_prompt')}</textarea>
+          <span class="muted">Empty = no video produced. Reference the generated portrait as @Image1.</span></div>
+        <div id="videoFields"></div>
+
+        <div class="ts-test">
+          <h2 style="font-size:18px;margin:0 0 6px;">Test video</h2>
+          <p class="muted" style="margin:0 0 14px;">Uses the image generated in the Image tab. Admin pays the fal.ai cost (≈ ${TEST_COST_VIDEO}).</p>
+          <div id="videoTestHint" class="muted" style="margin-bottom:10px;">Generate a test image in the Image tab first.</div>
+          <button type="button" class="btn secondary" id="btnTestVideo" onclick="runTestVideo()" disabled>Test video</button>
+          <div id="testVideoStatus" class="muted" style="margin-top:12px;"></div>
+          <div id="testVideoResult" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:24px;"><label>Social caption</label><textarea name="social_caption">${v('social_caption')}</textarea></div>
       <div class="field" style="border-top:1px solid #eee;padding-top:16px;">
         <label><input type="checkbox" name="user_input_enabled" id="uiEnabled" value="on"${uiEnabledChecked} onchange="toggleUserInput()"> Enable customer text input (optional)</label>
       </div>
@@ -1668,17 +1703,6 @@ function conceptFormBody(concept, errorMsg) {
       <div class="field"><label><input type="checkbox" name="active" value="on"${activeChecked}> Active</label></div>
       <button class="btn" type="submit">${isEdit ? 'Save changes' : 'Create concept'}</button>
     </form>
-
-    <div style="border-top:1px solid #eee;margin-top:28px;padding-top:18px;">
-      <h2 style="font-size:18px;margin:0 0 6px;">Test this concept</h2>
-      <p class="muted" style="margin:0 0 14px;">Generates with the current (even unsaved) form values — no checkout, no email, no preview limit. Admin pays the fal.ai cost. Cost: ≈ ${TEST_COST_IMAGE} image / ≈ ${TEST_COST_VIDEO} video.</p>
-      <div class="field"><label>Test photo</label><input type="file" id="testPhoto" accept="image/*"></div>
-      <div class="field" id="testInputWrap" style="display:none;"><label id="testInputLabel">Customer text</label><input type="text" id="testUserInput"></div>
-      <button type="button" class="btn secondary" id="btnTestImage" onclick="runTestImage()">Test image</button>
-      <button type="button" class="btn secondary" id="btnTestVideo" onclick="runTestVideo()" disabled>Test video</button>
-      <div id="testStatus" class="muted" style="margin-top:12px;"></div>
-      <div id="testResult" style="margin-top:14px;"></div>
-    </div>
 
     <script>
       var MODELS_IMAGE = ${imageModelsJson};
@@ -1831,22 +1855,37 @@ function conceptFormBody(concept, errorMsg) {
           user_input_enabled: document.getElementById('uiEnabled').checked
         };
       }
-      function setStatus(m){ document.getElementById('testStatus').textContent = m || ''; }
-      function setBusy(busy){
-        document.getElementById('btnTestImage').disabled = busy;
-        document.getElementById('testPhoto').disabled = busy;
-        document.getElementById('btnTestVideo').disabled = busy || !window.__testImageUrl;
+      function showTab(name) {
+        var tabs = ['image','video'];
+        for (var i = 0; i < tabs.length; i++) {
+          var t = tabs[i];
+          document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === name);
+          document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === name);
+        }
+      }
+      function setStatus(kind, m){
+        var el = document.getElementById('test' + (kind === 'image' ? 'Image' : 'Video') + 'Status');
+        if (el) el.textContent = m || '';
+      }
+      function setBusy(kind, busy){
+        if (kind === 'image') {
+          document.getElementById('btnTestImage').disabled = busy;
+          document.getElementById('testPhoto').disabled = busy;
+          document.getElementById('btnTestVideo').disabled = busy || !window.__testImageUrl;
+        } else {
+          document.getElementById('btnTestVideo').disabled = busy;
+        }
       }
       async function runTestImage(){
         var f = document.getElementById('testPhoto').files[0];
-        if(!f){ setStatus('Choose a test photo first.'); return; }
-        setBusy(true); setStatus('Uploading photo…');
+        if(!f){ setStatus('image', 'Choose a test photo first.'); return; }
+        setBusy('image', true); setStatus('image', 'Uploading photo…');
         try {
           var fd = new FormData(); fd.append('image', f);
           var up = await fetch('/upload', { method:'POST', body: fd });
           var upj = await up.json();
           if(!up.ok) throw new Error(upj.error || 'Upload failed');
-          setStatus('Generating image…');
+          setStatus('image', 'Generating image…');
           var v = formVals();
           var body = {
             image_url: upj.url,
@@ -1863,17 +1902,20 @@ function conceptFormBody(concept, errorMsg) {
           if(!r.ok) throw new Error(j.error || 'Image test failed');
           window.__testImageUrl = j.url;
           var inputDump = j.input_used ? '<div class="muted" style="margin-top:8px;">fal input used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;font-size:11px;">'+escJs(JSON.stringify(j.input_used, null, 2))+'</pre>' : '';
-          document.getElementById('testResult').innerHTML =
+          document.getElementById('testImageResult').innerHTML =
             '<img src="'+j.url+'" style="max-width:320px;border-radius:8px;display:block;margin-bottom:8px;">' +
             '<div class="muted">Image prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
             inputDump;
-          setStatus('');
-        } catch(e){ setStatus('Error: '+e.message); }
-        setBusy(false);
+          setStatus('image', '');
+          // Unlock the Test video button now that we have an image
+          var hint = document.getElementById('videoTestHint');
+          if (hint) hint.textContent = 'Image ready. Switch to the Video tab and click Test video.';
+        } catch(e){ setStatus('image', 'Error: '+e.message); }
+        setBusy('image', false);
       }
       async function runTestVideo(){
-        if(!window.__testImageUrl){ setStatus('Generate a test image first.'); return; }
-        setBusy(true); setStatus('Generating video… this can take a minute.');
+        if(!window.__testImageUrl){ setStatus('video', 'Generate a test image in the Image tab first.'); return; }
+        setBusy('video', true); setStatus('video', 'Generating video… this can take a minute.');
         try {
           var v = formVals();
           var body = {
@@ -1890,13 +1932,13 @@ function conceptFormBody(concept, errorMsg) {
           var j = await r.json();
           if(!r.ok) throw new Error(j.error || 'Video test failed');
           var inputDump2 = j.input_used ? '<div class="muted" style="margin-top:8px;">fal input used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;font-size:11px;">'+escJs(JSON.stringify(j.input_used, null, 2))+'</pre>' : '';
-          document.getElementById('testResult').innerHTML +=
+          document.getElementById('testVideoResult').innerHTML =
             '<video src="'+j.url+'" controls style="max-width:320px;border-radius:8px;display:block;margin-top:12px;"></video>' +
             '<div class="muted">Video prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
             inputDump2;
-          setStatus('');
-        } catch(e){ setStatus('Error: '+e.message); }
-        setBusy(false);
+          setStatus('video', '');
+        } catch(e){ setStatus('video', 'Error: '+e.message); }
+        setBusy('video', false);
       }
       ['user_input_label','user_input_placeholder','user_input_max_length'].forEach(function(n){
         var el=document.querySelector('[name='+n+']'); if(el) el.addEventListener('input', syncTestInput);
