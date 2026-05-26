@@ -529,7 +529,7 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     )}
     ${section('\u{1F3A8} Content',
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
-      card('Add new concept', 'Create a new style concept.', '/admin/concepts/new')
+      card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery')
     )}
     ${section('\u{1F4B3} Payments',
       card('Stripe dashboard', 'Payments, payouts, and customers.', 'https://dashboard.stripe.com', true)
@@ -1640,7 +1640,6 @@ function conceptFormBody(concept, errorMsg) {
       <div class="ts-tabs">
         <button type="button" class="ts-tab-btn active" id="tabBtnImage" onclick="showTab('image')">1. Image</button>
         <button type="button" class="ts-tab-btn" id="tabBtnVideo" onclick="showTab('video')">2. Video</button>
-        ${isEdit ? `<button type="button" class="ts-tab-btn" id="tabBtnGallery" onclick="showTab('gallery')">3. Gallery${c.media && c.media.length ? ` (${c.media.length})` : ''}</button>` : ''}
       </div>
 
       <div class="ts-tab active" id="tabImage">
@@ -1707,56 +1706,7 @@ function conceptFormBody(concept, errorMsg) {
       <div class="field"><label><input type="checkbox" name="active" value="on"${activeChecked}> Active</label></div>
       <button class="btn" type="submit">${isEdit ? 'Save changes' : 'Create concept'}</button>
     </form>
-
-    ${isEdit ? `
-    <div class="ts-tab" id="tabGallery">
-      <h2 style="font-size:18px;margin:0 0 6px;">Gallery items</h2>
-      <p class="muted" style="margin:0 0 14px;">Items shown on the public landing-page gallery. Each can be an image, video, card, or book mockup.</p>
-
-      ${(c.media && c.media.length) ? `
-        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
-          ${c.media.map((m) => {
-            const isVideo = m.kind === 'video';
-            const thumb = isVideo
-              ? `<video src="${escapeHtml(m.url)}" muted style="max-width:140px;max-height:100px;border-radius:6px;background:#000;"></video>`
-              : `<img src="${escapeHtml(m.url)}" alt="" style="max-width:140px;max-height:100px;border-radius:6px;object-fit:cover;">`;
-            const kindOpts = CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}"${k === m.kind ? ' selected' : ''}>${k}</option>`).join('');
-            return `
-              <div style="display:flex;gap:14px;align-items:flex-start;border:1px solid #eee;border-radius:8px;padding:12px;background:#fafafa;">
-                <div style="flex-shrink:0;">${thumb}</div>
-                <form method="POST" action="/admin/media/${m.id}/update" style="flex:1;display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:8px;align-items:center;">
-                  <label style="font-weight:normal;">Kind</label>
-                  <select name="kind">${kindOpts}</select>
-                  <label style="font-weight:normal;">Sort</label>
-                  <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;">
-                  <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
-                  <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
-                  <label style="grid-column:1;font-weight:normal;">Caption</label>
-                  <input type="text" name="caption" value="${escapeHtml(m.caption || '')}" placeholder="Optional caption" style="grid-column:2 / span 5;">
-                  <button type="submit" class="btn secondary" style="grid-column:1 / span 6;justify-self:start;margin-top:6px;">Save</button>
-                </form>
-                <form method="POST" action="/admin/media/${m.id}/delete" onsubmit="return confirm('Delete this gallery item?');" style="flex-shrink:0;">
-                  <button type="submit" class="btn secondary" style="background:#fff;border-color:#c33;color:#c33;">Delete</button>
-                </form>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      ` : '<p class="muted">No gallery items yet. Add one below.</p>'}
-
-      <h3 style="font-size:16px;margin:18px 0 8px;">Add new gallery item</h3>
-      <form method="POST" action="/admin/concepts/${c.id}/media" enctype="multipart/form-data" style="border:1px solid #eee;border-radius:8px;padding:14px;background:#fafafa;">
-        <div class="row">
-          <div class="field"><label>Kind</label><select name="kind">${CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}">${k}</option>`).join('')}</select></div>
-          <div class="field"><label>Caption (optional)</label><input type="text" name="caption" placeholder="e.g. Anna and her dog Max"></div>
-          <div class="field" style="display:flex;align-items:center;"><label style="font-weight:normal;display:flex;align-items:center;gap:6px;"><input type="checkbox" name="is_primary"> Make this the primary item</label></div>
-        </div>
-        <div class="field"><label>Upload file</label><input type="file" name="media" accept="image/*,video/*"></div>
-        <div class="field"><label>— or paste a URL</label><input type="url" name="url_override" placeholder="https://..."></div>
-        <button type="submit" class="btn">Add to gallery</button>
-      </form>
-    </div>
-    ` : ''}
+    ${isEdit ? `<p class="muted" style="margin-top:18px;">Gallery items for this concept are managed under <a href="/admin/gallery?concept=${c.id}">Gallery</a>.</p>` : ''}
 
     <script>
       var MODELS_IMAGE = ${imageModelsJson};
@@ -1910,18 +1860,15 @@ function conceptFormBody(concept, errorMsg) {
         };
       }
       function showTab(name) {
-        var tabs = ['image','video','gallery'];
+        var tabs = ['image','video'];
         for (var i = 0; i < tabs.length; i++) {
           var t = tabs[i];
-          var tabEl = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
-          var btnEl = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
-          if (tabEl) tabEl.classList.toggle('active', t === name);
-          if (btnEl) btnEl.classList.toggle('active', t === name);
+          document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === name);
+          document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === name);
         }
       }
       // Reflect the input_type setting in the tab visibility.
-      // image_video = both Image+Video tabs; image = only Image; video = only Video.
-      // The Gallery tab is always visible when present (only exists for saved concepts).
+      // image_video = both tabs; image = only Image; video = only Video.
       function applyInputType(val) {
         var showImage = (val === 'image_video' || val === 'image');
         var showVideo = (val === 'image_video' || val === 'video');
@@ -1931,10 +1878,8 @@ function conceptFormBody(concept, errorMsg) {
         if (!showVideo) document.getElementById('tabVideo').classList.remove('active');
         var imageActive = document.getElementById('tabImage').classList.contains('active');
         var videoActive = document.getElementById('tabVideo').classList.contains('active');
-        var galleryEl = document.getElementById('tabGallery');
-        var galleryActive = galleryEl && galleryEl.classList.contains('active');
-        if (!imageActive && !videoActive && !galleryActive) {
-          showTab(showImage ? 'image' : (showVideo ? 'video' : 'gallery'));
+        if (!imageActive && !videoActive) {
+          showTab(showImage ? 'image' : 'video');
         }
       }
       function setStatus(kind, m){
@@ -2032,12 +1977,7 @@ app.get('/admin/concepts/edit/:id', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM concepts WHERE id = $1', [req.params.id]);
     if (!rows.length) return res.redirect('/admin/concepts?error=' + encodeURIComponent('Concept not found'));
-    const mediaRes = await pool.query(
-      'SELECT * FROM concept_media WHERE concept_id = $1 ORDER BY sort_order, id',
-      [req.params.id]
-    );
-    const concept = { ...rows[0], media: mediaRes.rows };
-    res.send(conceptAdminPage('Edit concept', conceptFormBody(concept, req.query.error)));
+    res.send(conceptAdminPage('Edit concept', conceptFormBody(rows[0], req.query.error)));
   } catch (err) {
     console.error('[concepts] edit load error:', err.message);
     res.status(500).send('Failed to load concept: ' + escapeHtml(err.message));
@@ -2315,14 +2255,174 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
 app.post('/admin/media/:id/delete', requireRole('admin'), async (req, res) => {
   const mediaId = parseInt(req.params.id, 10);
   try {
-    const row = await pool.query(`SELECT concept_id FROM concept_media WHERE id = $1`, [mediaId]);
-    if (!row.rows.length) return res.redirect('/admin/concepts');
-    const conceptId = row.rows[0].concept_id;
     await pool.query(`DELETE FROM concept_media WHERE id = $1`, [mediaId]);
-    res.redirect(`/admin/concepts/edit/${conceptId}?saved_media=1`);
+    res.redirect(req.body.return_to || '/admin/gallery?deleted=1');
   } catch (err) {
     console.error('[concept-media] delete error:', err.message);
-    res.redirect('/admin/concepts?error=' + encodeURIComponent('Delete media failed: ' + err.message));
+    res.redirect('/admin/gallery?error=' + encodeURIComponent('Delete media failed: ' + err.message));
+  }
+});
+
+// ----- /admin/gallery — list + add page -----
+
+app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
+  try {
+    const filterConcept = req.query.concept ? parseInt(req.query.concept, 10) : null;
+    const filterKind = req.query.kind && CONCEPT_MEDIA_KINDS.includes(req.query.kind) ? req.query.kind : null;
+    const filterActive = req.query.active; // 'true' | 'false' | undefined
+
+    const where = [];
+    const params = [];
+    if (filterConcept) { params.push(filterConcept); where.push(`cm.concept_id = $${params.length}`); }
+    if (filterKind)    { params.push(filterKind);    where.push(`cm.kind = $${params.length}`); }
+    if (filterActive === 'true')  where.push(`cm.active = TRUE`);
+    if (filterActive === 'false') where.push(`cm.active = FALSE`);
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const { rows: items } = await pool.query(
+      `SELECT cm.*, c.name AS concept_name, c.slug AS concept_slug
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       ${whereSql}
+       ORDER BY cm.created_at DESC, cm.id DESC`,
+      params
+    );
+
+    const concepts = (await pool.query(`SELECT id, name FROM concepts ORDER BY name ASC`)).rows;
+    const conceptOpts = `<option value="">All concepts</option>` + concepts.map((c) =>
+      `<option value="${c.id}"${filterConcept === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+    ).join('');
+    const kindOpts = `<option value="">All kinds</option>` + CONCEPT_MEDIA_KINDS.map((k) =>
+      `<option value="${k}"${filterKind === k ? ' selected' : ''}>${k}</option>`
+    ).join('');
+    const activeOpts =
+      `<option value=""${!filterActive ? ' selected' : ''}>All</option>` +
+      `<option value="true"${filterActive === 'true' ? ' selected' : ''}>Active</option>` +
+      `<option value="false"${filterActive === 'false' ? ' selected' : ''}>Inactive</option>`;
+
+    const rowHtml = items.map((m) => {
+      const isVideo = m.kind === 'video';
+      const thumb = isVideo
+        ? `<video src="${escapeHtml(m.url)}" muted style="width:96px;height:64px;object-fit:cover;border-radius:4px;background:#000;"></video>`
+        : `<img src="${escapeHtml(m.url)}" alt="" style="width:96px;height:64px;object-fit:cover;border-radius:4px;">`;
+      const kindOptsRow = CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}"${k === m.kind ? ' selected' : ''}>${k}</option>`).join('');
+      return `
+        <tr>
+          <td>${thumb}</td>
+          <td><a href="/admin/concepts/edit/${m.concept_id}">${escapeHtml(m.concept_name)}</a></td>
+          <td>
+            <form method="POST" action="/admin/media/${m.id}/update" class="inline" style="display:inline-flex;gap:6px;align-items:center;">
+              <input type="hidden" name="return_to" value="/admin/gallery${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}">
+              <select name="kind">${kindOptsRow}</select>
+              <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;">
+              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
+              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
+              <button type="submit" class="btn small">Save</button>
+            </form>
+          </td>
+          <td class="muted" style="font-size:12px;">${new Date(m.created_at).toISOString().slice(0,10)}</td>
+          <td>
+            <form method="POST" action="/admin/media/${m.id}/delete" class="inline" onsubmit="return confirm('Delete this gallery item?');">
+              <input type="hidden" name="return_to" value="/admin/gallery${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}">
+              <button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;">Delete</button>
+            </form>
+          </td>
+        </tr>`;
+    }).join('');
+
+    const body = `
+      <div class="top">
+        <h1>Gallery</h1>
+        <a class="btn" href="/admin/gallery/new${filterConcept ? `?concept=${filterConcept}` : ''}">+ Add gallery item</a>
+      </div>
+      <form method="GET" action="/admin/gallery" style="display:flex;gap:10px;align-items:end;margin:14px 0 18px;flex-wrap:wrap;">
+        <div class="field" style="margin:0;"><label>Concept</label><select name="concept">${conceptOpts}</select></div>
+        <div class="field" style="margin:0;"><label>Kind</label><select name="kind">${kindOpts}</select></div>
+        <div class="field" style="margin:0;"><label>Active</label><select name="active">${activeOpts}</select></div>
+        <button type="submit" class="btn secondary">Filter</button>
+        <a href="/admin/gallery" class="muted" style="align-self:center;">Reset</a>
+      </form>
+      ${req.query.saved_media ? '<div class="flash">Saved.</div>' : ''}
+      ${req.query.deleted ? '<div class="flash">Deleted.</div>' : ''}
+      ${req.query.error ? `<div class="flash err">${escapeHtml(req.query.error)}</div>` : ''}
+      <table class="admin-table">
+        <thead><tr><th>Preview</th><th>Concept</th><th>Settings</th><th>Created</th><th></th></tr></thead>
+        <tbody>${rowHtml || '<tr><td colspan="5" class="muted">No gallery items yet.</td></tr>'}</tbody>
+      </table>`;
+
+    res.send(conceptAdminPage('Gallery', body));
+  } catch (err) {
+    console.error('[gallery] list error:', err.message);
+    res.status(500).send('Failed to load gallery: ' + escapeHtml(err.message));
+  }
+});
+
+app.get('/admin/gallery/new', requireRole('admin'), async (req, res) => {
+  try {
+    const concepts = (await pool.query(`SELECT id, name FROM concepts ORDER BY name ASC`)).rows;
+    const preselect = req.query.concept ? parseInt(req.query.concept, 10) : null;
+    const conceptOpts = concepts.map((c) =>
+      `<option value="${c.id}"${preselect === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+    ).join('');
+    const kindOpts = CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}">${k}</option>`).join('');
+
+    const body = `
+      <div class="top"><h1>Add gallery item</h1><a href="/admin/gallery">&larr; Back to gallery</a></div>
+      ${req.query.error ? `<div class="flash err">${escapeHtml(req.query.error)}</div>` : ''}
+      <form method="POST" action="/admin/gallery/new" enctype="multipart/form-data">
+        <div class="row">
+          <div class="field"><label>Concept *</label><select name="concept_id" required>${conceptOpts}</select>
+            <span class="muted">Every gallery item must belong to a concept.</span></div>
+          <div class="field"><label>Kind *</label><select name="kind" required>${kindOpts}</select></div>
+          <div class="field" style="display:flex;align-items:center;"><label style="font-weight:normal;display:flex;align-items:center;gap:6px;"><input type="checkbox" name="is_primary"> Mark as primary for this concept</label></div>
+        </div>
+        <div class="field"><label>Upload file</label><input type="file" name="media" accept="image/*,video/*"></div>
+        <div class="field"><label>— or paste a URL</label><input type="url" name="url_override" placeholder="https://..."></div>
+        <button type="submit" class="btn">Add to gallery</button>
+      </form>`;
+    res.send(conceptAdminPage('Add gallery item', body));
+  } catch (err) {
+    console.error('[gallery] new load error:', err.message);
+    res.status(500).send('Failed: ' + escapeHtml(err.message));
+  }
+});
+
+app.post('/admin/gallery/new', requireRole('admin'), upload.single('media'), async (req, res) => {
+  const back = '/admin/gallery/new';
+  try {
+    const conceptId = parseInt(req.body.concept_id, 10);
+    if (!conceptId) return res.redirect(`${back}?error=` + encodeURIComponent('Pick a concept'));
+    const kind = (req.body.kind || '').trim();
+    if (!CONCEPT_MEDIA_KINDS.includes(kind)) return res.redirect(`${back}?error=` + encodeURIComponent('Invalid kind'));
+    const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
+    const urlOverride = (req.body.url_override || '').trim();
+
+    let url = urlOverride;
+    if (req.file && req.file.buffer) {
+      const resourceType = kind === 'video' ? 'video' : 'image';
+      const result = await uploadStream(req.file.buffer, { resource_type: resourceType });
+      url = result.secure_url;
+    }
+    if (!url) return res.redirect(`${back}?error=` + encodeURIComponent('Provide a file or a URL'));
+
+    const maxRes = await pool.query(
+      `SELECT COALESCE(MAX(sort_order), 0) AS m FROM concept_media WHERE concept_id = $1`,
+      [conceptId]
+    );
+    const sortOrder = (maxRes.rows[0].m || 0) + 1;
+
+    if (isPrimary) {
+      await pool.query(`UPDATE concept_media SET is_primary = FALSE WHERE concept_id = $1`, [conceptId]);
+    }
+    await pool.query(
+      `INSERT INTO concept_media (concept_id, kind, url, sort_order, is_primary)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [conceptId, kind, url, sortOrder, isPrimary]
+    );
+    res.redirect(`/admin/gallery?saved_media=1&concept=${conceptId}`);
+  } catch (err) {
+    console.error('[gallery] add error:', err.message);
+    res.redirect(`${back}?error=` + encodeURIComponent('Add failed: ' + err.message));
   }
 });
 
