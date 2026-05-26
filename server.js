@@ -1588,6 +1588,24 @@ function conceptFormBody(concept, errorMsg) {
   const activeChecked = (isEdit ? c.active : true) ? ' checked' : '';
   const uiEnabledChecked = c.user_input_enabled ? ' checked' : '';
 
+  // Image and video models, embedded so the client-side renderer can build
+  // the dynamic field UI without an extra round-trip.
+  const imageModelsJson = JSON.stringify(generation.listModels('image').reduce((acc, m) => {
+    acc[m.id] = { ...generation.getModel(m.id), label: m.label };
+    return acc;
+  }, {}));
+  const videoModelsJson = JSON.stringify(generation.listModels('video').reduce((acc, m) => {
+    acc[m.id] = { ...generation.getModel(m.id), label: m.label };
+    return acc;
+  }, {}));
+  const imageExtrasJson = JSON.stringify(c.image_input_extras || {});
+  const videoExtrasJson = JSON.stringify(c.video_input_extras || {});
+
+  const modelOption = (id, model, selected) =>
+    `<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(model.label)}</option>`;
+  const imageOptions = generation.listModels('image').map((m) => modelOption(m.id, generation.getModel(m.id), falImage)).join('');
+  const videoOptions = generation.listModels('video').map((m) => modelOption(m.id, generation.getModel(m.id), falVideo)).join('');
+
   return `
     <div class="top"><h1>${isEdit ? 'Edit concept' : 'New concept'}</h1><a href="/admin/concepts">&larr; Back to list</a></div>
     ${errorMsg ? `<div class="flash err">${escapeHtml(errorMsg)}</div>` : ''}
@@ -1606,13 +1624,28 @@ function conceptFormBody(concept, errorMsg) {
         <div class="field"><label>Input type</label><select name="input_type">${inputTypeOptions}</select></div>
         <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${c.sort_order == null ? 0 : escapeHtml(c.sort_order)}"></div>
       </div>
-      <div class="field"><label>Image prompt *</label><textarea name="image_prompt" required>${v('image_prompt')}</textarea></div>
-      <div class="field"><label>Video prompt</label><textarea name="video_prompt">${v('video_prompt')}</textarea></div>
-      <div class="row">
-        <div class="field"><label>fal image model</label><input type="text" name="fal_image_model" value="${escapeHtml(falImage)}"></div>
-        <div class="field"><label>fal video model</label><input type="text" name="fal_video_model" value="${escapeHtml(falVideo)}"></div>
+
+      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:8px;">
+        <h2 style="font-size:18px;margin:0 0 8px;">Image generation</h2>
+        <label>Image model</label>
+        <select name="fal_image_model" id="imageModelSelect" onchange="renderModelFields('image')">${imageOptions}</select>
+        <p class="muted" id="imageModelDesc" style="margin:6px 0 0;"></p>
       </div>
-      <div class="field"><label>Social caption</label><textarea name="social_caption">${v('social_caption')}</textarea></div>
+      <div class="field"><label>Image prompt *</label><textarea name="image_prompt" required>${v('image_prompt')}</textarea>
+        <span class="muted">Reference the customer photo as @Image1. Use {variable_name} for customer-supplied text.</span></div>
+      <div id="imageFields"></div>
+
+      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:8px;">
+        <h2 style="font-size:18px;margin:0 0 8px;">Video generation</h2>
+        <label>Video model</label>
+        <select name="fal_video_model" id="videoModelSelect" onchange="renderModelFields('video')">${videoOptions}</select>
+        <p class="muted" id="videoModelDesc" style="margin:6px 0 0;"></p>
+      </div>
+      <div class="field"><label>Video prompt</label><textarea name="video_prompt">${v('video_prompt')}</textarea>
+        <span class="muted">Empty = no video produced. Reference the generated portrait as @Image1.</span></div>
+      <div id="videoFields"></div>
+
+      <div class="field" style="border-top:1px solid #eee;padding-top:16px;margin-top:8px;"><label>Social caption</label><textarea name="social_caption">${v('social_caption')}</textarea></div>
       <div class="field" style="border-top:1px solid #eee;padding-top:16px;">
         <label><input type="checkbox" name="user_input_enabled" id="uiEnabled" value="on"${uiEnabledChecked} onchange="toggleUserInput()"> Enable customer text input (optional)</label>
       </div>
@@ -1648,7 +1681,90 @@ function conceptFormBody(concept, errorMsg) {
     </div>
 
     <script>
+      var MODELS_IMAGE = ${imageModelsJson};
+      var MODELS_VIDEO = ${videoModelsJson};
+      var SAVED_IMAGE_EXTRAS = ${imageExtrasJson};
+      var SAVED_VIDEO_EXTRAS = ${videoExtrasJson};
+
       function escJs(s){ var d=document.createElement('div'); d.textContent = (s==null?'':s); return d.innerHTML; }
+      function escAttr(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+      // Render one field as HTML for the dynamic area.
+      function fieldHtml(field, kind, saved) {
+        var name = kind + '_extra__' + field.name;
+        var val = (saved !== undefined && saved !== null) ? saved : (field.default !== undefined ? field.default : '');
+        var label = '<label>' + escJs(field.label) + (field.required ? ' *' : '') + '</label>';
+        var help  = field.help ? '<span class="muted">' + escJs(field.help) + '</span>' : '';
+        var w = '';
+        switch (field.type) {
+          case 'text':
+            w = '<input type="text" name="' + name + '" value="' + escAttr(val) + '">';
+            break;
+          case 'textarea':
+            w = '<textarea name="' + name + '">' + escAttr(val) + '</textarea>';
+            break;
+          case 'number':
+            w = '<input type="number" step="1" name="' + name + '" value="' + escAttr(val) + '">';
+            break;
+          case 'float':
+            w = '<input type="number" step="0.01" name="' + name + '" value="' + escAttr(val) + '">';
+            break;
+          case 'boolean':
+            w = '<label style="font-weight:normal;display:flex;align-items:center;gap:8px;">' +
+                '<input type="checkbox" name="' + name + '" value="on"' + (val ? ' checked' : '') + '> ' +
+                'Enabled</label>';
+            break;
+          case 'enum':
+            var opts = (field.options || []).map(function(o){
+              return '<option value="' + escAttr(o) + '"' + (String(o) === String(val) ? ' selected' : '') + '>' + escJs(o) + '</option>';
+            }).join('');
+            w = '<select name="' + name + '">' + opts + '</select>';
+            break;
+          case 'image_url':
+          case 'video_url':
+            w = '<input type="url" placeholder="https://..." name="' + name + '" value="' + escAttr(val) + '">';
+            break;
+          case 'image_urls':
+            var joined = Array.isArray(val) ? val.join('\\n') : (typeof val === 'string' ? val : '');
+            w = '<textarea placeholder="One URL per line — customer photo is added automatically as the first" name="' + name + '">' + escAttr(joined) + '</textarea>';
+            break;
+          case 'elements_v3':
+            var elJson = (Array.isArray(val) ? JSON.stringify(val, null, 2) : '');
+            w = '<textarea placeholder=\\'[{"frontal_image_url": "https://...", "reference_image_urls": ["https://..."]}, {"video_url": "https://..."}]\\' name="' + name + '">' + escAttr(elJson) + '</textarea>';
+            break;
+          case 'multi_prompt':
+            var mpJson = (Array.isArray(val) ? JSON.stringify(val, null, 2) : '');
+            w = '<textarea placeholder=\\'[{"prompt": "Shot 1...", "duration": "5"}, {"prompt": "Shot 2...", "duration": "5"}]\\' name="' + name + '">' + escAttr(mpJson) + '</textarea>';
+            break;
+          default:
+            w = '<input type="text" name="' + name + '" value="' + escAttr(val) + '">';
+        }
+        return '<div class="field">' + label + w + help + '</div>';
+      }
+
+      function renderModelFields(kind) {
+        var sel = document.getElementById(kind + 'ModelSelect');
+        var container = document.getElementById(kind + 'Fields');
+        var desc = document.getElementById(kind + 'ModelDesc');
+        var registry = kind === 'image' ? MODELS_IMAGE : MODELS_VIDEO;
+        var saved = kind === 'image' ? SAVED_IMAGE_EXTRAS : SAVED_VIDEO_EXTRAS;
+        var model = registry[sel.value];
+        if (!model) { container.innerHTML = ''; desc.textContent = ''; return; }
+        desc.textContent = model.description || '';
+        var html = '';
+        for (var i = 0; i < model.fields.length; i++) {
+          var f = model.fields[i];
+          if (f.source === 'prompt') continue;       // handled by dedicated prompt textarea
+          if (f.source === 'photo') {
+            html += '<div class="field"><label>' + escJs(f.label) + ' (bound to customer photo at runtime)</label>' +
+                    '<p class="muted" style="margin:4px 0 0;">' + escJs(f.help || '') + '</p></div>';
+            continue;
+          }
+          html += fieldHtml(f, kind, saved[f.name]);
+        }
+        container.innerHTML = html;
+      }
+
       function toggleUserInput(){
         var on = document.getElementById('uiEnabled').checked;
         document.getElementById('uiFields').style.display = on ? '' : 'none';
@@ -1665,6 +1781,41 @@ function conceptFormBody(concept, errorMsg) {
         if(ml > 0) inp.maxLength = ml;
         inp.placeholder = (document.querySelector('[name=user_input_placeholder]').value || '');
       }
+
+      // Build an extras object from the dynamic-field area, coercing each
+      // field to the right type per its registry definition.
+      function collectExtrasJs(kind) {
+        var sel = document.getElementById(kind + 'ModelSelect');
+        var registry = kind === 'image' ? MODELS_IMAGE : MODELS_VIDEO;
+        var model = registry[sel.value];
+        if (!model) return {};
+        var out = {};
+        for (var i = 0; i < model.fields.length; i++) {
+          var f = model.fields[i];
+          if (f.source) continue;
+          var name = kind + '_extra__' + f.name;
+          var el = document.querySelector('[name="' + name + '"]');
+          if (!el) continue;
+          if (f.type === 'boolean') { out[f.name] = el.checked; continue; }
+          var raw = el.value;
+          if (raw === '' || raw == null) continue;
+          if (f.type === 'number') { var n = parseInt(raw, 10); if (!isNaN(n)) out[f.name] = n; continue; }
+          if (f.type === 'float')  { var fl = parseFloat(raw); if (!isNaN(fl)) out[f.name] = fl; continue; }
+          if (f.type === 'image_urls') {
+            var t = raw.trim();
+            if (t.charAt(0) === '[') { try { out[f.name] = JSON.parse(t); } catch(e){} }
+            else { out[f.name] = t.split(/\\r?\\n/).map(function(s){return s.trim();}).filter(Boolean); }
+            continue;
+          }
+          if (f.type === 'elements_v3' || f.type === 'multi_prompt') {
+            try { var p = JSON.parse(raw); if (Array.isArray(p) && p.length) out[f.name] = p; } catch(e){}
+            continue;
+          }
+          out[f.name] = raw;
+        }
+        return out;
+      }
+
       function formVals(){
         var q = function(n){ var el=document.querySelector('[name='+n+']'); return el ? el.value : ''; };
         return {
@@ -1673,6 +1824,8 @@ function conceptFormBody(concept, errorMsg) {
           video_prompt: q('video_prompt'),
           fal_image_model: q('fal_image_model'),
           fal_video_model: q('fal_video_model'),
+          image_input_extras: collectExtrasJs('image'),
+          video_input_extras: collectExtrasJs('video'),
           user_input_variable: q('user_input_variable'),
           user_input_max_length: q('user_input_max_length'),
           user_input_enabled: document.getElementById('uiEnabled').checked
@@ -1699,6 +1852,7 @@ function conceptFormBody(concept, errorMsg) {
             image_url: upj.url,
             image_prompt: v.image_prompt,
             fal_image_model: v.fal_image_model,
+            image_input_extras: v.image_input_extras,
             user_input_variable: v.user_input_enabled ? v.user_input_variable : '',
             user_input_value: document.getElementById('testUserInput').value,
             user_input_max_length: v.user_input_max_length,
@@ -1708,9 +1862,11 @@ function conceptFormBody(concept, errorMsg) {
           var j = await r.json();
           if(!r.ok) throw new Error(j.error || 'Image test failed');
           window.__testImageUrl = j.url;
+          var inputDump = j.input_used ? '<div class="muted" style="margin-top:8px;">fal input used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;font-size:11px;">'+escJs(JSON.stringify(j.input_used, null, 2))+'</pre>' : '';
           document.getElementById('testResult').innerHTML =
             '<img src="'+j.url+'" style="max-width:320px;border-radius:8px;display:block;margin-bottom:8px;">' +
-            '<div class="muted">Image prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>';
+            '<div class="muted">Image prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
+            inputDump;
           setStatus('');
         } catch(e){ setStatus('Error: '+e.message); }
         setBusy(false);
@@ -1724,6 +1880,7 @@ function conceptFormBody(concept, errorMsg) {
             portrait_url: window.__testImageUrl,
             video_prompt: v.video_prompt,
             fal_video_model: v.fal_video_model,
+            video_input_extras: v.video_input_extras,
             user_input_variable: v.user_input_enabled ? v.user_input_variable : '',
             user_input_value: document.getElementById('testUserInput').value,
             user_input_max_length: v.user_input_max_length,
@@ -1732,9 +1889,11 @@ function conceptFormBody(concept, errorMsg) {
           var r = await fetch('/admin/concepts/test-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
           var j = await r.json();
           if(!r.ok) throw new Error(j.error || 'Video test failed');
+          var inputDump2 = j.input_used ? '<div class="muted" style="margin-top:8px;">fal input used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;font-size:11px;">'+escJs(JSON.stringify(j.input_used, null, 2))+'</pre>' : '';
           document.getElementById('testResult').innerHTML +=
             '<video src="'+j.url+'" controls style="max-width:320px;border-radius:8px;display:block;margin-top:12px;"></video>' +
-            '<div class="muted">Video prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>';
+            '<div class="muted">Video prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
+            inputDump2;
           setStatus('');
         } catch(e){ setStatus('Error: '+e.message); }
         setBusy(false);
@@ -1743,6 +1902,8 @@ function conceptFormBody(concept, errorMsg) {
         var el=document.querySelector('[name='+n+']'); if(el) el.addEventListener('input', syncTestInput);
       });
       syncTestInput();
+      renderModelFields('image');
+      renderModelFields('video');
     </script>`;
 }
 
@@ -1767,6 +1928,56 @@ const conceptUploadFields = upload.fields([
   { name: 'example_video', maxCount: 1 },
 ]);
 
+// Collects per-model input-extra fields from a posted form. Each non-source
+// field of the chosen model is read at `<prefix>__<field.name>` and coerced
+// to the right type before being merged into the JSONB column.
+function collectInputExtras(body, prefix, modelId) {
+  const model = generation.getModel(modelId);
+  if (!model) return {};
+  const out = {};
+  for (const f of model.fields) {
+    if (f.source) continue; // 'photo' and 'prompt' are bound at runtime, not stored as extras
+    const key = `${prefix}__${f.name}`;
+    const raw = body[key];
+
+    if (f.type === 'boolean') {
+      out[f.name] = raw === 'on' || raw === 'true' || raw === '1';
+      continue;
+    }
+    if (raw === undefined || raw === null || raw === '') continue;
+
+    if (f.type === 'number') {
+      const n = parseInt(raw, 10);
+      if (!Number.isNaN(n)) out[f.name] = n;
+      continue;
+    }
+    if (f.type === 'float') {
+      const n = parseFloat(raw);
+      if (!Number.isNaN(n)) out[f.name] = n;
+      continue;
+    }
+    if (f.type === 'image_urls') {
+      const trimmed = String(raw).trim();
+      if (trimmed.startsWith('[')) {
+        try { const parsed = JSON.parse(trimmed); if (Array.isArray(parsed)) out[f.name] = parsed; } catch {}
+      } else {
+        const lines = trimmed.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        if (lines.length) out[f.name] = lines;
+      }
+      continue;
+    }
+    if (f.type === 'elements_v3' || f.type === 'multi_prompt') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) out[f.name] = parsed;
+      } catch {}
+      continue;
+    }
+    out[f.name] = raw;
+  }
+  return out;
+}
+
 app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, async (req, res) => {
   const editId = req.body.id ? parseInt(req.body.id, 10) : null;
   const backTo = editId ? `/admin/concepts/edit/${editId}` : '/admin/concepts/new';
@@ -1783,6 +1994,8 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
     if (!CONCEPT_INPUT_TYPES.includes(inputType)) inputType = 'image_video';
     const falImage = (req.body.fal_image_model || '').trim() || 'fal-ai/kling-image/o1';
     const falVideo = (req.body.fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video';
+    const imageInputExtras = collectInputExtras(req.body, 'image_extra', falImage);
+    const videoInputExtras = collectInputExtras(req.body, 'video_extra', falVideo);
     const sortOrder = parseInt(req.body.sort_order, 10) || 0;
     const active = req.body.active === 'on' || req.body.active === 'true' || req.body.active === '1';
 
@@ -1837,22 +2050,27 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            image_prompt = $8, video_prompt = $9, fal_image_model = $10, fal_video_model = $11,
            social_caption = $12, active = $13, sort_order = $14,
            user_input_enabled = $15, user_input_label = $16, user_input_placeholder = $17,
-           user_input_variable = $18, user_input_max_length = $19, updated_at = NOW()
-         WHERE id = $20`,
+           user_input_variable = $18, user_input_max_length = $19,
+           image_input_extras = $20, video_input_extras = $21,
+           updated_at = NOW()
+         WHERE id = $22`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
-         userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength, editId]
+         userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
+         imageInputExtras, videoInputExtras, editId]
       );
     } else {
       await pool.query(
         `INSERT INTO concepts
            (slug, name, filter_category, input_type, before_image_url, after_image_url, example_video_url,
             image_prompt, video_prompt, fal_image_model, fal_video_model, social_caption, active, sort_order,
-            user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+            user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length,
+            image_input_extras, video_input_extras)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
-         userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength]
+         userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
+         imageInputExtras, videoInputExtras]
       );
     }
     res.redirect('/admin/concepts?saved=1' + (warn ? '&warn=' + encodeURIComponent(warn) : ''));
