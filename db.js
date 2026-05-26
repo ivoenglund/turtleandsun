@@ -164,6 +164,19 @@ async function initDb() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS concept_media (
+      id SERIAL PRIMARY KEY,
+      concept_id INTEGER NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+      kind VARCHAR(20) NOT NULL CHECK (kind IN ('image', 'video', 'card', 'book')),
+      url TEXT NOT NULL,
+      thumbnail_url TEXT,
+      caption TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS concepts (
       id SERIAL PRIMARY KEY,
       slug VARCHAR(64) UNIQUE NOT NULL,
@@ -196,6 +209,8 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_visits_flagged ON visits(flagged) WHERE flagged = true;
     CREATE INDEX IF NOT EXISTS idx_failed_deliveries_resolved ON failed_deliveries(resolved) WHERE resolved = false;
     CREATE INDEX IF NOT EXISTS concepts_active_sort_idx ON concepts(active, sort_order);
+    CREATE INDEX IF NOT EXISTS concept_media_concept_idx ON concept_media(concept_id, sort_order);
+    CREATE INDEX IF NOT EXISTS concept_media_kind_active_idx ON concept_media(kind, active);
   `);
 
   // Migrate existing tables to add new columns
