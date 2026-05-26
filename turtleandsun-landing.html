@@ -60,8 +60,13 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .g-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;}
 .g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:5px solid transparent;outline-offset:0;position:relative;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
-.g-card.is-selected{outline-color:#d23030;box-shadow:0 12px 36px rgba(210,48,48,0.45);transform:translateY(-4px);}
-.g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:#d23030;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;z-index:2;}
+.g-card.is-selected{outline-color:#3A6B20;box-shadow:0 12px 36px rgba(58,107,32,0.45);transform:translateY(-4px);}
+.g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:#3A6B20;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;z-index:2;}
+.g-card .g-action{position:absolute;bottom:10px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;cursor:pointer;font-size:16px;line-height:1;display:none;align-items:center;justify-content:center;z-index:3;}
+.g-card .g-action:hover{background:rgba(0,0,0,0.85);}
+.g-card .g-action[data-action="sound"]{right:10px;}
+.g-card .g-action[data-action="max"]{left:10px;}
+.g-card.is-selected .g-action{display:flex;}
 .g-card canvas{display:block;width:100%;height:100%;}
 .trust{display:flex;justify-content:space-between;padding:14px 0;flex-wrap:wrap;gap:8px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;}
 .ti{font-size:12px;color:rgba(60,20,0,0.55);display:flex;align-items:center;gap:5px;}
@@ -605,6 +610,7 @@ async function loadGallery(category) {
         card.dataset.conceptId = item.concept_id;
         card.dataset.itemId = item.id;
         let media;
+        let soundBtn = null;
         if (item.kind === 'video') {
           media = document.createElement('video');
           media.src = item.url;
@@ -616,26 +622,25 @@ async function loadGallery(category) {
           media.disablePictureInPicture = true;
           media.setAttribute('oncontextmenu', 'return false;');
           if (item.thumbnail_url) media.poster = item.thumbnail_url;
-          // Per-video sound toggle button (top-right corner)
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.setAttribute('aria-label', 'Toggle sound');
-          btn.style.cssText = 'position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:2;';
-          btn.textContent = '🔇';
-          btn.addEventListener('click', function(ev) {
+          // Sound toggle — bottom-right, only visible when card is selected
+          soundBtn = document.createElement('button');
+          soundBtn.type = 'button';
+          soundBtn.className = 'g-action';
+          soundBtn.setAttribute('data-action', 'sound');
+          soundBtn.setAttribute('aria-label', 'Toggle sound');
+          soundBtn.textContent = '🔇';
+          soundBtn.addEventListener('click', function(ev) {
             ev.stopPropagation();
             const goingUnmuted = media.muted;
             document.querySelectorAll('.g-card video').forEach(function(v) {
               if (v !== media) v.muted = true;
             });
-            document.querySelectorAll('.g-card button[data-sound]').forEach(function(b) {
-              if (b !== btn) b.textContent = '🔇';
+            document.querySelectorAll('.g-action[data-action="sound"]').forEach(function(b) {
+              if (b !== soundBtn) b.textContent = '🔇';
             });
             media.muted = !goingUnmuted ? true : false;
-            btn.textContent = media.muted ? '🔇' : '🔊';
+            soundBtn.textContent = media.muted ? '🔇' : '🔊';
           });
-          btn.setAttribute('data-sound', '1');
-          card.appendChild(btn);
         } else {
           media = document.createElement('img');
           media.src = item.thumbnail_url || item.url;
@@ -645,14 +650,30 @@ async function loadGallery(category) {
           media.draggable = false;
         }
         media.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
+
+        // Maximize button — bottom-left, only visible when card is selected
+        const maxBtn = document.createElement('button');
+        maxBtn.type = 'button';
+        maxBtn.className = 'g-action';
+        maxBtn.setAttribute('data-action', 'max');
+        maxBtn.setAttribute('aria-label', 'Open full size');
+        maxBtn.textContent = '⛶';
+        maxBtn.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          openLightbox(item);
+        });
+
         const label = document.createElement('div');
-        label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;pointer-events:none;';
+        label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px 8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;pointer-events:none;text-align:center;';
         label.textContent = item.concept_name || '';
         card.appendChild(media);
         card.appendChild(label);
+        if (soundBtn) card.appendChild(soundBtn);
+        card.appendChild(maxBtn);
+        // Click anywhere on the card (except the action buttons) just selects it.
+        // The maximize button opens the lightbox.
         card.addEventListener('click', function() {
           selectCard(card, item);
-          openLightbox(item);
         });
         const target = grids[Math.min(Math.floor(i / 4), 2)];
         if (target) target.appendChild(card);
