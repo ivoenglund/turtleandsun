@@ -58,8 +58,10 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .fb:hover{border-color:rgba(0,0,0,0.35);color:#1C0A00;}
 .fb.on{background:#1C2A14;border-color:#1C2A14;color:white;}
 .g-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
-.g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;background:#1A0C04;}
+.g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:3px solid transparent;outline-offset:2px;position:relative;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
+.g-card.is-selected{outline-color:#3A6B20;box-shadow:0 12px 36px rgba(0,0,0,0.22);transform:translateY(-4px);}
+.g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;background:#3A6B20;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;z-index:2;}
 .g-card canvas{display:block;width:100%;height:100%;}
 .trust{display:flex;justify-content:space-between;padding:14px 0;flex-wrap:wrap;gap:8px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;}
 .ti{font-size:12px;color:rgba(60,20,0,0.55);display:flex;align-items:center;gap:5px;}
@@ -317,25 +319,71 @@ window.showDesc = function(cat) {
 
 window.setF = function(cat, btn) {
   document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
-  if (btn) btn.classList.add('on');
+  if (btn) {
+    btn.classList.add('on');
+  } else {
+    // Find and highlight the matching chip when called programmatically
+    var match = document.querySelector('.fb[data-filter="' + cat + '"]');
+    if (match) match.classList.add('on');
+  }
   window.showDesc(cat);
   loadGallery(cat);
 };
 
+// Click-to-select behaviour for gallery cards. Marks the card visually
+// selected, highlights the matching filter chip (the card's concept's
+// first filter category), and shows that concept's text in the panel above.
+function selectCard(card, item) {
+  document.querySelectorAll('.g-card.is-selected').forEach(function(c){
+    c.classList.remove('is-selected');
+  });
+  card.classList.add('is-selected');
+
+  // Promote this item's concept into the panel even if "All" stays the active filter
+  if (item && item.concept_id) {
+    var concept = (window.tsGalleryConcepts || []).find(function(c){ return c.id === item.concept_id; });
+    if (concept) {
+      var firstCat = String(concept.filter_category || '').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean)[0];
+      var titleEl = document.getElementById('styleDescTitle');
+      var textEl  = document.getElementById('styleDescText');
+      var panel   = document.getElementById('styleDesc');
+      if (titleEl && textEl && panel) {
+        titleEl.innerHTML = '<span style="opacity:0.55;font-weight:600;">Style ·</span> ' + escHtml(concept.name);
+        textEl.innerHTML  = concept.description ? escHtml(concept.description) : '';
+        panel.style.display = 'flex';
+      }
+      if (firstCat) {
+        // Highlight the matching filter chip without changing the rendered grid
+        document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
+        var chip = document.querySelector('.fb[data-filter="' + firstCat + '"]');
+        if (chip) chip.classList.add('on');
+      }
+    }
+  }
+}
+
+// Wire the static "All" button immediately so the filter always works, even
+// if /gallery/meta fails or hasn't responded yet.
+(function wireAllChip(){
+  var allBtn = document.querySelector('.fb[data-filter="all"]');
+  if (allBtn && !allBtn._wired) {
+    allBtn.addEventListener('click', function(){ window.setF('all', allBtn); });
+    allBtn._wired = true;
+  }
+})();
+
 async function loadGalleryMeta() {
   try {
     const res = await fetch('/gallery/meta');
-    if (!res.ok) return;
+    if (!res.ok) { console.warn('[gallery] meta failed:', res.status); return; }
     const data = await res.json();
     window.tsGalleryConcepts = data.concepts || [];
 
     const bar = document.getElementById('galleryBar');
     if (!bar) return;
-    // Remove existing dynamic filter buttons (keep label + "All")
     bar.querySelectorAll('.fb[data-filter]').forEach(function(b){
       if (b.getAttribute('data-filter') !== 'all') b.remove();
     });
-    // Append a chip for each distinct filter category we have data for
     (data.filters || []).forEach(function(cat){
       const b = document.createElement('button');
       b.type = 'button';
@@ -346,19 +394,12 @@ async function loadGalleryMeta() {
       bar.appendChild(b);
     });
 
-    // Wire the "All" chip too (kept in the static markup)
-    const allBtn = bar.querySelector('.fb[data-filter="all"]');
-    if (allBtn && !allBtn._wired) {
-      allBtn.addEventListener('click', function(){ window.setF('all', allBtn); });
-      allBtn._wired = true;
-    }
-
     // Refresh the panel copy now that we know the concept list
     var active = bar.querySelector('.fb.on');
     var activeCat = active ? active.getAttribute('data-filter') : 'all';
     window.showDesc(activeCat);
   } catch (e) {
-    // Silent — landing page still works without meta
+    console.warn('[gallery] meta error:', e);
   }
 }
 loadGalleryMeta();
@@ -561,8 +602,8 @@ async function loadGallery(category) {
       items.forEach(function(item, i) {
         const card = document.createElement('div');
         card.className = 'g-card';
-        card.style.position = 'relative';
-        card.style.cursor = 'zoom-in';
+        card.dataset.conceptId = item.concept_id;
+        card.dataset.itemId = item.id;
         let media;
         if (item.kind === 'video') {
           media = document.createElement('video');
@@ -571,6 +612,9 @@ async function loadGallery(category) {
           media.autoplay = true;
           media.loop = true;
           media.playsInline = true;
+          media.controlsList = 'nodownload noremoteplayback';
+          media.disablePictureInPicture = true;
+          media.setAttribute('oncontextmenu', 'return false;');
           if (item.thumbnail_url) media.poster = item.thumbnail_url;
           // Per-video sound toggle button (top-right corner)
           const btn = document.createElement('button');
@@ -581,7 +625,6 @@ async function loadGallery(category) {
           btn.addEventListener('click', function(ev) {
             ev.stopPropagation();
             const goingUnmuted = media.muted;
-            // Mute every other video first
             document.querySelectorAll('.g-card video').forEach(function(v) {
               if (v !== media) v.muted = true;
             });
@@ -598,6 +641,8 @@ async function loadGallery(category) {
           media.src = item.thumbnail_url || item.url;
           media.alt = item.concept_name || '';
           media.loading = 'lazy';
+          media.setAttribute('oncontextmenu', 'return false;');
+          media.draggable = false;
         }
         media.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
         const label = document.createElement('div');
@@ -605,7 +650,10 @@ async function loadGallery(category) {
         label.textContent = item.concept_name || '';
         card.appendChild(media);
         card.appendChild(label);
-        card.addEventListener('click', function() { openLightbox(item); });
+        card.addEventListener('click', function() {
+          selectCard(card, item);
+          openLightbox(item);
+        });
         const target = grids[Math.min(Math.floor(i / 4), 2)];
         if (target) target.appendChild(card);
       });
@@ -658,11 +706,16 @@ function openLightbox(item) {
     mediaEl.loop = true;
     mediaEl.muted = false;
     mediaEl.playsInline = true;
+    mediaEl.controlsList = 'nodownload noremoteplayback noplaybackrate';
+    mediaEl.disablePictureInPicture = true;
+    mediaEl.setAttribute('oncontextmenu', 'return false;');
     mediaEl.style.cssText = 'max-width:100%;max-height:80vh;border-radius:10px;display:block;';
   } else {
     mediaEl = document.createElement('img');
     mediaEl.src = item.url;
     mediaEl.alt = item.concept_name || '';
+    mediaEl.draggable = false;
+    mediaEl.setAttribute('oncontextmenu', 'return false;');
     mediaEl.style.cssText = 'max-width:100%;max-height:80vh;border-radius:10px;display:block;';
   }
   inner.appendChild(mediaEl);
