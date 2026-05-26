@@ -1354,6 +1354,36 @@ app.post('/generate-video', async (req, res) => {
   }
 });
 
+// Returns filter chip data + the concepts behind it for the landing gallery.
+// Filters are derived from active concepts' comma-separated `filter_category`
+// values, but only concepts that actually have at least one active media item
+// are included so empty chips don't appear.
+app.get('/gallery/meta', async (req, res) => {
+  try {
+    const conceptsRes = await pool.query(
+      `SELECT DISTINCT c.id, c.slug, c.name, c.description, c.filter_category
+       FROM concepts c
+       JOIN concept_media cm ON cm.concept_id = c.id
+       WHERE c.active = TRUE AND cm.active = TRUE
+       ORDER BY c.sort_order ASC, c.name ASC`
+    );
+    const concepts = conceptsRes.rows;
+    // Distinct comma-split categories across the surviving concepts
+    const filterSet = new Set();
+    concepts.forEach((c) => {
+      String(c.filter_category || '').split(',').forEach((part) => {
+        const t = part.trim().toLowerCase();
+        if (t) filterSet.add(t);
+      });
+    });
+    const filters = Array.from(filterSet).sort();
+    res.json({ filters, concepts });
+  } catch (err) {
+    console.error('[gallery/meta] error:', err.message);
+    res.status(500).json({ error: 'Failed to load gallery meta', details: err.message });
+  }
+});
+
 app.get('/gallery', async (req, res) => {
   const { category } = req.query;
   try {

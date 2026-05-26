@@ -58,7 +58,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .fb:hover{border-color:rgba(0,0,0,0.35);color:#1C0A00;}
 .fb.on{background:#1C2A14;border-color:#1C2A14;color:white;}
 .g-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
-.g-card{aspect-ratio:3/4;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;}
+.g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;background:#1A0C04;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
 .g-card canvas{display:block;width:100%;height:100%;}
 .trust{display:flex;justify-content:space-between;padding:14px 0;flex-wrap:wrap;gap:8px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;}
@@ -205,14 +205,9 @@ html,body{overflow-x:hidden;}
     <div id="styleDescText" style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(60,20,0,0.8);line-height:1.5;"></div>
   </div>
 
-  <div class="gallery-bar">
+  <div class="gallery-bar" id="galleryBar">
     <span class="glabel" style="font-size:16px;font-weight:700;white-space:nowrap;">Gallery</span>
-    <button class="fb on" onclick="setF('all',this)">All</button>
-    <button class="fb" onclick="setF('people',this)">People</button>
-    <button class="fb" onclick="setF('pets',this)">Pets</button>
-    <button class="fb" onclick="setF('couples',this)">Couples</button>
-    <button class="fb" onclick="setF('families',this)">Families</button>
-    <button class="fb" onclick="setF('prints',this)">Prints</button>
+    <button class="fb on" data-filter="all">All</button>
   </div>
   <div class="g-grid" id="g1"></div>
   <div class="g-grid" id="g2"></div>
@@ -258,17 +253,115 @@ const styleDescriptions = {
   }
 };
 
+// Live registry of concepts that have at least one active gallery item.
+// Populated by loadGalleryMeta() on first paint.
+window.tsGalleryConcepts = [];
+
+function escHtml(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 window.showDesc = function(cat) {
-  const desc = styleDescriptions[cat];
   const panel = document.getElementById('styleDesc');
-  if (desc) {
-    document.getElementById('styleDescTitle').textContent = desc.title;
-    document.getElementById('styleDescText').textContent = desc.text;
+  const titleEl = document.getElementById('styleDescTitle');
+  const textEl = document.getElementById('styleDescText');
+  if (!panel || !titleEl || !textEl) return;
+
+  if (!cat || cat === 'all') {
+    // Generic copy when no filter is active. If we know the concept list,
+    // tease the available styles.
+    titleEl.innerHTML = '';
+    let intro = 'Browse the gallery below. Click any style to see what we can create from your photo.';
+    if (window.tsGalleryConcepts && window.tsGalleryConcepts.length) {
+      const names = window.tsGalleryConcepts.map(c => c.name).join(' · ');
+      intro = 'Browse our styles: ' + names;
+    }
+    textEl.innerHTML = escHtml(intro);
     panel.style.display = 'flex';
+    return;
   }
+
+  // Concepts whose comma-separated filter_category contains this token
+  const matching = (window.tsGalleryConcepts || []).filter(function(c) {
+    return String(c.filter_category || '')
+      .split(',').map(function(s){return s.trim().toLowerCase();})
+      .indexOf(cat.toLowerCase()) !== -1;
+  });
+
+  if (matching.length === 0) {
+    // Fallback to legacy hardcoded copy if it exists
+    const desc = styleDescriptions[cat];
+    if (desc) {
+      titleEl.innerHTML = desc.title ? '<span style="opacity:0.55;font-weight:600;">Style ·</span> ' + escHtml(desc.title) : '';
+      textEl.innerHTML = escHtml(desc.text);
+    } else {
+      titleEl.innerHTML = '';
+      textEl.innerHTML = 'No styles in this category yet.';
+    }
+    panel.style.display = 'flex';
+    return;
+  }
+
+  // Render one or more matching concepts in the panel
+  const titleHtml = matching.map(function(c) {
+    return '<span style="opacity:0.55;font-weight:600;">Style ·</span> ' + escHtml(c.name);
+  }).join('<span style="opacity:0.4;margin:0 6px;">·</span>');
+  const textHtml = matching.map(function(c) {
+    return c.description ? escHtml(c.description) : '';
+  }).filter(Boolean).join('<br><br>') || 'Browse the items below.';
+  titleEl.innerHTML = titleHtml;
+  textEl.innerHTML = textHtml;
+  panel.style.display = 'flex';
 };
 
-window.setF=function(cat,btn){document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');window.showDesc(cat);loadGallery(cat);};
+window.setF = function(cat, btn) {
+  document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
+  window.showDesc(cat);
+  loadGallery(cat);
+};
+
+async function loadGalleryMeta() {
+  try {
+    const res = await fetch('/gallery/meta');
+    if (!res.ok) return;
+    const data = await res.json();
+    window.tsGalleryConcepts = data.concepts || [];
+
+    const bar = document.getElementById('galleryBar');
+    if (!bar) return;
+    // Remove existing dynamic filter buttons (keep label + "All")
+    bar.querySelectorAll('.fb[data-filter]').forEach(function(b){
+      if (b.getAttribute('data-filter') !== 'all') b.remove();
+    });
+    // Append a chip for each distinct filter category we have data for
+    (data.filters || []).forEach(function(cat){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fb';
+      b.setAttribute('data-filter', cat);
+      b.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+      b.addEventListener('click', function(){ window.setF(cat, b); });
+      bar.appendChild(b);
+    });
+
+    // Wire the "All" chip too (kept in the static markup)
+    const allBtn = bar.querySelector('.fb[data-filter="all"]');
+    if (allBtn && !allBtn._wired) {
+      allBtn.addEventListener('click', function(){ window.setF('all', allBtn); });
+      allBtn._wired = true;
+    }
+
+    // Refresh the panel copy now that we know the concept list
+    var active = bar.querySelector('.fb.on');
+    var activeCat = active ? active.getAttribute('data-filter') : 'all';
+    window.showDesc(activeCat);
+  } catch (e) {
+    // Silent — landing page still works without meta
+  }
+}
+loadGalleryMeta();
 
 let cloudinaryUrl = null;
 let previewImageUrl = null;
