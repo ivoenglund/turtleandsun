@@ -23,6 +23,7 @@ const { initDb, pool, seedGallery } = require('./db');
 const { uploadStream } = require('./cloudinary');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
+const generation = require('./generation');
 const cron = require('node-cron');
 const crypto = require('crypto');
 const { lookup: geoLookup } = require('./geoip');
@@ -1892,18 +1893,31 @@ function testConcept(body) {
 }
 
 // Admin-only stateless test generation. Does NOT touch preview_count, orders, or email.
+// Routes through generation.js so any registered model in the registry works
+// with the right field shape. input_extras (JSON object or JSON string) is
+// merged on top of the model's defaults.
+function parseExtras(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch { return {}; }
+}
+
 app.post('/admin/concepts/test-image', requireRole('admin'), async (req, res) => {
   try {
-    const { image_url, image_prompt, fal_image_model, user_input_value, concept_slug } = req.body;
+    const { image_url, image_prompt, fal_image_model, user_input_value, concept_slug, image_input_extras, orientation } = req.body;
     if (!image_url) return res.status(400).json({ error: 'image_url is required' });
     if (!image_prompt || !String(image_prompt).trim()) return res.status(400).json({ error: 'image_prompt is required' });
-    const model = (fal_image_model || '').trim() || 'fal-ai/kling-image/o1';
+    const modelId = (fal_image_model || '').trim() || 'fal-ai/kling-image/o1';
     const finalPrompt = applyUserInput(image_prompt, testConcept(req.body), user_input_value);
-    console.log('[admin-test] image —', { concept_slug: concept_slug || null, prompt_used: finalPrompt, cost_estimate: TEST_COST_IMAGE });
-    const result = await fal.subscribe(model, {
-      input: { prompt: finalPrompt, image_urls: [image_url], aspect_ratio: 'auto' },
+    console.log('[admin-test] image —', { model: modelId, concept_slug: concept_slug || null, prompt_used: finalPrompt, cost_estimate: TEST_COST_IMAGE });
+    const { url, input } = await generation.generateImage({
+      modelId,
+      prompt: finalPrompt,
+      photoUrl: image_url,
+      orientation: orientation || null,
+      inputExtras: parseExtras(image_input_extras),
     });
-    res.json({ url: result.data.images[0].url, prompt_used: finalPrompt });
+    res.json({ url, prompt_used: finalPrompt, input_used: input });
   } catch (err) {
     console.error('[admin-test] image error:', err.message);
     res.status(500).json({ error: 'Test image failed', details: err.message });
@@ -1912,16 +1926,20 @@ app.post('/admin/concepts/test-image', requireRole('admin'), async (req, res) =>
 
 app.post('/admin/concepts/test-video', requireRole('admin'), async (req, res) => {
   try {
-    const { portrait_url, video_prompt, fal_video_model, user_input_value, concept_slug } = req.body;
+    const { portrait_url, video_prompt, fal_video_model, user_input_value, concept_slug, video_input_extras, orientation } = req.body;
     if (!portrait_url) return res.status(400).json({ error: 'portrait_url is required' });
     if (!video_prompt || !String(video_prompt).trim()) return res.status(400).json({ error: 'video_prompt is required' });
-    const model = (fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video';
+    const modelId = (fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video';
     const finalPrompt = applyUserInput(video_prompt, testConcept(req.body), user_input_value);
-    console.log('[admin-test] video —', { concept_slug: concept_slug || null, prompt_used: finalPrompt, cost_estimate: TEST_COST_VIDEO });
-    const result = await fal.subscribe(model, {
-      input: { image_url: portrait_url, prompt: finalPrompt, duration: '10', enable_audio: true },
+    console.log('[admin-test] video —', { model: modelId, concept_slug: concept_slug || null, prompt_used: finalPrompt, cost_estimate: TEST_COST_VIDEO });
+    const { url, input } = await generation.generateVideo({
+      modelId,
+      prompt: finalPrompt,
+      photoUrl: portrait_url,
+      orientation: orientation || null,
+      inputExtras: parseExtras(video_input_extras),
     });
-    res.json({ url: result.data.video.url, prompt_used: finalPrompt });
+    res.json({ url, prompt_used: finalPrompt, input_used: input });
   } catch (err) {
     console.error('[admin-test] video error:', err.message);
     res.status(500).json({ error: 'Test video failed', details: err.message });

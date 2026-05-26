@@ -229,6 +229,9 @@ async function initDb() {
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_placeholder VARCHAR(255);
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_variable VARCHAR(64);
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_max_length INTEGER DEFAULT 50;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS provider VARCHAR(32) NOT NULL DEFAULT 'fal';
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS image_input_extras JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS video_input_extras JSONB NOT NULL DEFAULT '{}'::jsonb;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support
