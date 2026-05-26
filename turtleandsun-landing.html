@@ -57,11 +57,11 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .fb{padding:6px 12px;border:1.5px solid rgba(0,0,0,0.14);border-radius:22px;background:transparent;color:rgba(60,20,0,0.6);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;}
 .fb:hover{border-color:rgba(0,0,0,0.35);color:#1C0A00;}
 .fb.on{background:#1C2A14;border-color:#1C2A14;color:white;}
-.g-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
-.g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:3px solid transparent;outline-offset:2px;position:relative;}
+.g-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;}
+.g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:5px solid transparent;outline-offset:0;position:relative;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
-.g-card.is-selected{outline-color:#3A6B20;box-shadow:0 12px 36px rgba(0,0,0,0.22);transform:translateY(-4px);}
-.g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;background:#3A6B20;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;z-index:2;}
+.g-card.is-selected{outline-color:#d23030;box-shadow:0 12px 36px rgba(210,48,48,0.45);transform:translateY(-4px);}
+.g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:#d23030;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;z-index:2;}
 .g-card canvas{display:block;width:100%;height:100%;}
 .trust{display:flex;justify-content:space-between;padding:14px 0;flex-wrap:wrap;gap:8px;border-top:1px solid rgba(0,0,0,0.08);margin-top:6px;}
 .ti{font-size:12px;color:rgba(60,20,0,0.55);display:flex;align-items:center;gap:5px;}

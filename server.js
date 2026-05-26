@@ -1361,7 +1361,7 @@ app.post('/generate-video', async (req, res) => {
 app.get('/gallery/meta', async (req, res) => {
   try {
     const conceptsRes = await pool.query(
-      `SELECT DISTINCT c.id, c.slug, c.name, c.description, c.filter_category
+      `SELECT DISTINCT c.id, c.slug, c.name, c.description, c.filter_category, c.sort_order
        FROM concepts c
        JOIN concept_media cm ON cm.concept_id = c.id
        WHERE c.active = TRUE AND cm.active = TRUE
