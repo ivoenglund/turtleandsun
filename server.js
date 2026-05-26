@@ -1357,15 +1357,23 @@ app.post('/generate-video', async (req, res) => {
 app.get('/gallery', async (req, res) => {
   const { category } = req.query;
   try {
-    let query, params;
+    const params = [];
+    let where = `WHERE cm.active = TRUE AND c.active = TRUE`;
     if (category && category !== 'all') {
-      query = 'SELECT style_id, style_name, description, example_image_url, category FROM prompts WHERE LOWER(category) = LOWER($1) ORDER BY id';
-      params = [category];
-    } else {
-      query = 'SELECT style_id, style_name, description, example_image_url, category FROM prompts ORDER BY id';
-      params = [];
+      params.push(`%${category}%`);
+      // filter_category is a comma-separated string; match if any token matches
+      where += ` AND c.filter_category ILIKE $${params.length}`;
     }
-    const result = await pool.query(query, params);
+    const result = await pool.query(
+      `SELECT cm.id, cm.kind, cm.url, cm.thumbnail_url, cm.caption, cm.sort_order, cm.is_primary,
+              c.id AS concept_id, c.slug AS concept_slug, c.name AS concept_name,
+              c.description AS concept_description, c.filter_category
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       ${where}
+       ORDER BY cm.is_primary DESC, cm.sort_order ASC, cm.created_at DESC`,
+      params
+    );
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch gallery', details: err.message });
@@ -1489,8 +1497,17 @@ function conceptAdminPage(title, body) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;color:#1C0A00;background:#FFF9E6;margin:0;padding:32px;}
-  .wrap{max-width:1000px;margin:0 auto;}
+  body{font-family:Arial,Helvetica,sans-serif;color:#1C0A00;background:#FFF9E6;margin:0;padding:0;}
+  .ts-adminbar{display:flex;align-items:center;gap:18px;padding:10px 24px;background:#1C0A00;color:#FFF9E6;}
+  .ts-adminbar a{color:#FFF9E6;text-decoration:none;font-size:13px;font-weight:600;padding:6px 10px;border-radius:6px;}
+  .ts-adminbar a:hover{background:rgba(255,249,230,0.12);}
+  .ts-adminbar .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;letter-spacing:0.02em;}
+  .ts-adminbar .logo img{height:28px;width:auto;display:block;}
+  .ts-adminbar .nav{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+  .ts-adminbar .spacer{flex:1;}
+  .ts-adminbar .sep{width:1px;height:18px;background:rgba(255,249,230,0.25);margin:0 4px;}
+  .ts-adminbar .pill{background:#FFF3C4;color:#1C0A00;}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 24px 48px;}
   h1{font-size:24px;margin:0 0 20px;}
   a{color:#3A6B20;}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;}
@@ -1515,7 +1532,25 @@ function conceptAdminPage(title, body) {
   .preview img,.preview video{max-width:160px;max-height:120px;border-radius:6px;border:1px solid #ddd;display:block;}
   .muted{color:#888;font-size:12px;}
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
-</style></head><body><div class="wrap">${body}</div></body></html>`;
+</style></head><body>
+<div class="ts-adminbar">
+  <a href="/" class="logo"><img src="/logo.png" alt="Turtle and Sun"> Turtle and Sun</a>
+  <div class="sep"></div>
+  <nav class="nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/concepts">Concepts</a>
+    <a href="/admin/gallery">Gallery</a>
+    <a href="/admin/visits">Visits</a>
+    <a href="/admin/failed-deliveries">Deliveries</a>
+  </nav>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="/">View site</a>
+    <a href="/account">Account</a>
+    <a href="/logout" class="pill">Logout</a>
+  </nav>
+</div>
+<div class="wrap">${body}</div></body></html>`;
 }
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {

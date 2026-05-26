@@ -461,22 +461,34 @@ async function loadGallery(category) {
   const url = (category && category !== 'all') ? '/gallery?category=' + encodeURIComponent(category) : '/gallery';
   try {
     const res = await fetch(url);
-    const styles = await res.json();
-    if (styles && styles.length > 0) {
+    const items = await res.json();
+    if (items && items.length > 0) {
       const grids = [document.getElementById('g1'), document.getElementById('g2'), document.getElementById('g3')];
       grids.forEach(function(g) { if (g) g.innerHTML = ''; });
-      styles.forEach(function(style, i) {
+      items.forEach(function(item, i) {
         const card = document.createElement('div');
         card.className = 'g-card';
         card.style.position = 'relative';
-        const img = document.createElement('img');
-        img.src = style.example_image_url;
-        img.alt = style.style_name;
-        img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
+        let media;
+        if (item.kind === 'video') {
+          media = document.createElement('video');
+          media.src = item.url;
+          media.muted = true;
+          media.autoplay = true;
+          media.loop = true;
+          media.playsInline = true;
+          if (item.thumbnail_url) media.poster = item.thumbnail_url;
+        } else {
+          media = document.createElement('img');
+          media.src = item.thumbnail_url || item.url;
+          media.alt = item.concept_name || '';
+          media.loading = 'lazy';
+        }
+        media.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
         const label = document.createElement('div');
         label.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:600;line-height:1.3;';
-        label.textContent = style.style_name;
-        card.appendChild(img);
+        label.textContent = item.concept_name || '';
+        card.appendChild(media);
         card.appendChild(label);
         const target = grids[Math.min(Math.floor(i / 4), 2)];
         if (target) target.appendChild(card);
