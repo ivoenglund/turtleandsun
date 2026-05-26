@@ -232,6 +232,8 @@ async function initDb() {
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS provider VARCHAR(32) NOT NULL DEFAULT 'fal';
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS image_input_extras JSONB NOT NULL DEFAULT '{}'::jsonb;
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS video_input_extras JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS description TEXT;
+    ALTER TABLE concepts ALTER COLUMN filter_category TYPE TEXT;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support

@@ -1620,10 +1620,12 @@ function conceptFormBody(concept, errorMsg) {
           <span class="muted">Lowercase, no spaces — e.g. royal-portrait</span></div>
       </div>
       <div class="row">
-        <div class="field"><label>Filter category *</label><input type="text" name="filter_category" value="${v('filter_category')}" required></div>
+        <div class="field"><label>Filter category *</label><input type="text" name="filter_category" value="${v('filter_category')}" required>
+          <span class="muted">Comma-separated, e.g. <code>royal, pets</code>. Each value becomes a separate filter chip on the landing gallery.</span></div>
         <div class="field"><label>Input type</label><select name="input_type">${inputTypeOptions}</select></div>
         <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${c.sort_order == null ? 0 : escapeHtml(c.sort_order)}"></div>
       </div>
+      <div class="field"><label>Description</label><textarea name="description" rows="3" placeholder="One short paragraph shown above the gallery tiles on the landing page.">${v('description')}</textarea></div>
 
       <style>
         .ts-tabs{display:flex;gap:4px;border-bottom:2px solid #eee;margin:18px 0 0;}
@@ -2032,6 +2034,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
     const imagePrompt = (req.body.image_prompt || '').trim();
     const videoPrompt = (req.body.video_prompt || '').trim() || null;
     const socialCaption = (req.body.social_caption || '').trim() || null;
+    const description = (req.body.description || '').trim() || null;
     let inputType = (req.body.input_type || 'image_video').trim();
     if (!CONCEPT_INPUT_TYPES.includes(inputType)) inputType = 'image_video';
     const falImage = (req.body.fal_image_model || '').trim() || 'fal-ai/kling-image/o1';
@@ -2093,13 +2096,13 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            social_caption = $12, active = $13, sort_order = $14,
            user_input_enabled = $15, user_input_label = $16, user_input_placeholder = $17,
            user_input_variable = $18, user_input_max_length = $19,
-           image_input_extras = $20, video_input_extras = $21,
+           image_input_extras = $20, video_input_extras = $21, description = $22,
            updated_at = NOW()
-         WHERE id = $22`,
+         WHERE id = $23`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
-         imageInputExtras, videoInputExtras, editId]
+         imageInputExtras, videoInputExtras, description, editId]
       );
     } else {
       await pool.query(
@@ -2107,12 +2110,12 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            (slug, name, filter_category, input_type, before_image_url, after_image_url, example_video_url,
             image_prompt, video_prompt, fal_image_model, fal_video_model, social_caption, active, sort_order,
             user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length,
-            image_input_extras, video_input_extras)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+            image_input_extras, video_input_extras, description)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
-         imageInputExtras, videoInputExtras]
+         imageInputExtras, videoInputExtras, description]
       );
     }
     res.redirect('/admin/concepts?saved=1' + (warn ? '&warn=' + encodeURIComponent(warn) : ''));
