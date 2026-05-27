@@ -608,6 +608,13 @@ document.getElementById('btnPreview').addEventListener('click', async function()
     alert('Please upload a photo first.');
     return;
   }
+  if (!window.tsSelectedConcept && (window.tsGalleryConcepts || []).length > 0) {
+    alert('Please pick a style from the gallery below.');
+    // Bring the gallery into view so the user knows where to look
+    var gal = document.getElementById('g1');
+    if (gal && gal.scrollIntoView) gal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   const email = window._previewEmail || document.getElementById('previewEmail').value.trim();
   if (!email) {
     alert('Please enter your email to generate a preview.');
@@ -838,6 +845,14 @@ async function loadGallery(category, kind) {
         // The maximize button opens the lightbox.
         card.addEventListener('click', function() {
           selectCard(card, item);
+        });
+        // Double-click = shortcut to opening the lightbox (same as the
+        // maximize button). The single-click selection still fires on the
+        // first click; double-click adds the maximize action on top.
+        card.addEventListener('dblclick', function(ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openLightbox(item);
         });
         // Upgrade the card's aspect-ratio CSS variable once the media's real
         // dimensions are known. Defaults to 9/16 until then.
