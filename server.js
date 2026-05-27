@@ -1387,7 +1387,15 @@ app.get('/gallery/meta', async (req, res) => {
     );
     itemsRes.rows.forEach((row) => accumulate(row.filter_category));
     const filters = Array.from(filterSet).sort();
-    res.json({ filters, concepts });
+
+    const kindsRes = await pool.query(
+      `SELECT DISTINCT cm.kind
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       WHERE cm.active = TRUE AND c.active = TRUE`
+    );
+    const kinds = kindsRes.rows.map((r) => r.kind).sort();
+    res.json({ filters, concepts, kinds });
   } catch (err) {
     console.error('[gallery/meta] error:', err.message);
     res.status(500).json({ error: 'Failed to load gallery meta', details: err.message });
@@ -1395,7 +1403,7 @@ app.get('/gallery/meta', async (req, res) => {
 });
 
 app.get('/gallery', async (req, res) => {
-  const { category } = req.query;
+  const { category, kind } = req.query;
   try {
     const params = [];
     let where = `WHERE cm.active = TRUE AND c.active = TRUE`;
@@ -1404,6 +1412,10 @@ app.get('/gallery', async (req, res) => {
       // filter_category is comma-separated on both the concept and the item.
       // An item matches if EITHER its own categories OR its concept's contain the term.
       where += ` AND (c.filter_category ILIKE $${params.length} OR cm.filter_category ILIKE $${params.length})`;
+    }
+    if (kind && kind !== 'all' && CONCEPT_MEDIA_KINDS.includes(kind)) {
+      params.push(kind);
+      where += ` AND cm.kind = $${params.length}`;
     }
     const result = await pool.query(
       `SELECT cm.id, cm.kind, cm.url, cm.thumbnail_url, cm.caption, cm.sort_order, cm.is_primary,

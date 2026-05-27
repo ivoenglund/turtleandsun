@@ -215,8 +215,12 @@ html,body{overflow-x:hidden;}
     <div id="styleDescText" style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(60,20,0,0.8);line-height:1.5;"></div>
   </div>
 
+  <div class="gallery-bar" id="galleryKindBar" style="margin-bottom:8px;">
+    <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Type</span>
+    <button class="fb on" data-kind="all">All</button>
+  </div>
   <div class="gallery-bar" id="galleryBar">
-    <span class="glabel" style="font-size:16px;font-weight:700;white-space:nowrap;">Gallery</span>
+    <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Style</span>
     <button class="fb on" data-filter="all">All</button>
   </div>
   <div class="g-grid" id="g1"></div>
@@ -326,16 +330,22 @@ window.showDesc = function(cat) {
 };
 
 window.setF = function(cat, btn) {
-  document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
+  // Only toggle chips in the STYLE bar — the type bar has its own state
+  document.querySelectorAll('#galleryBar .fb').forEach(function(b){ b.classList.remove('on'); });
   if (btn) {
     btn.classList.add('on');
   } else {
-    // Find and highlight the matching chip when called programmatically
-    var match = document.querySelector('.fb[data-filter="' + cat + '"]');
+    var match = document.querySelector('#galleryBar .fb[data-filter="' + cat + '"]');
     if (match) match.classList.add('on');
   }
   window.showDesc(cat);
-  loadGallery(cat);
+  loadGallery(cat, undefined);
+};
+
+window.setK = function(kind, btn) {
+  document.querySelectorAll('#galleryKindBar .fb').forEach(function(b){ b.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
+  loadGallery(undefined, kind);
 };
 
 // Click-to-select behaviour for gallery cards. Marks the card visually
@@ -455,15 +465,30 @@ function resetStep2() {
   }
 }
 
-// Wire the static "All" button immediately so the filter always works, even
-// if /gallery/meta fails or hasn't responded yet.
-(function wireAllChip(){
-  var allBtn = document.querySelector('.fb[data-filter="all"]');
-  if (allBtn && !allBtn._wired) {
-    allBtn.addEventListener('click', function(){ window.setF('all', allBtn); });
-    allBtn._wired = true;
+// Wire the static "All" buttons in both filter rows immediately so they work
+// even if /gallery/meta fails or hasn't responded yet.
+(function wireAllChips(){
+  var allStyle = document.querySelector('#galleryBar .fb[data-filter="all"]');
+  if (allStyle && !allStyle._wired) {
+    allStyle.addEventListener('click', function(){ window.setF('all', allStyle); });
+    allStyle._wired = true;
+  }
+  var allKind = document.querySelector('#galleryKindBar .fb[data-kind="all"]');
+  if (allKind && !allKind._wired) {
+    allKind.addEventListener('click', function(){ window.setK('all', allKind); });
+    allKind._wired = true;
   }
 })();
+
+function prettyKindLabel(k) {
+  switch (k) {
+    case 'image': return 'Images';
+    case 'video': return 'Videos';
+    case 'card':  return 'Cards';
+    case 'book':  return 'Books';
+    default:      return k.charAt(0).toUpperCase() + k.slice(1);
+  }
+}
 
 async function loadGalleryMeta() {
   try {
@@ -486,6 +511,23 @@ async function loadGalleryMeta() {
       b.addEventListener('click', function(){ window.setF(cat, b); });
       bar.appendChild(b);
     });
+
+    // Kind chips — dynamic from the kinds actually present in the data
+    const kindBar = document.getElementById('galleryKindBar');
+    if (kindBar) {
+      kindBar.querySelectorAll('.fb[data-kind]').forEach(function(b){
+        if (b.getAttribute('data-kind') !== 'all') b.remove();
+      });
+      (data.kinds || []).forEach(function(k){
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'fb';
+        b.setAttribute('data-kind', k);
+        b.textContent = prettyKindLabel(k);
+        b.addEventListener('click', function(){ window.setK(k, b); });
+        kindBar.appendChild(b);
+      });
+    }
 
     // Refresh the panel copy now that we know the concept list
     var active = bar.querySelector('.fb.on');
@@ -684,8 +726,34 @@ async function proceedToCheckout(productOverride) {
   }
 }
 
-async function loadGallery(category) {
-  const url = (category && category !== 'all') ? '/gallery?category=' + encodeURIComponent(category) : '/gallery';
+// Singleton IntersectionObserver — only plays videos that are visibly on
+// screen so we don't melt the user's CPU when the gallery has 10+ videos.
+// Threshold 0.4 means a video must be ~40% in view before it starts playing.
+window._tsVideoObserver = window._tsVideoObserver || new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    var v = entry.target;
+    if (entry.intersectionRatio >= 0.4) {
+      if (v.paused) {
+        var p = v.play();
+        if (p && p.catch) p.catch(function(){});
+      }
+    } else {
+      if (!v.paused) v.pause();
+    }
+  });
+}, { threshold: [0, 0.4, 1] });
+
+// Current filter selections — driven by chips, both axes can be combined.
+window.tsGalleryFilter = { category: 'all', kind: 'all' };
+
+async function loadGallery(category, kind) {
+  if (typeof category === 'string') window.tsGalleryFilter.category = category;
+  if (typeof kind === 'string')     window.tsGalleryFilter.kind = kind;
+  const cur = window.tsGalleryFilter;
+  const qs = [];
+  if (cur.category && cur.category !== 'all') qs.push('category=' + encodeURIComponent(cur.category));
+  if (cur.kind && cur.kind !== 'all')         qs.push('kind=' + encodeURIComponent(cur.kind));
+  const url = qs.length ? '/gallery?' + qs.join('&') : '/gallery';
   try {
     const res = await fetch(url);
     const items = await res.json();
@@ -709,13 +777,15 @@ async function loadGallery(category) {
           media = document.createElement('video');
           media.src = item.url;
           media.muted = true;
-          media.autoplay = true;
           media.loop = true;
           media.playsInline = true;
+          media.preload = 'metadata';
           media.controlsList = 'nodownload noremoteplayback';
           media.disablePictureInPicture = true;
           media.setAttribute('oncontextmenu', 'return false;');
           if (item.thumbnail_url) media.poster = item.thumbnail_url;
+          // Hand off play/pause to the viewport observer
+          window._tsVideoObserver.observe(media);
           // Sound toggle — bottom-right, only visible when card is selected
           soundBtn = document.createElement('button');
           soundBtn.type = 'button';
@@ -875,11 +945,7 @@ function closeLightbox() {
     overlay.innerHTML = '';
     overlay.style.display = 'none';
   }
-  // Resume the muted-autoplay tiles
-  document.querySelectorAll('.g-card video').forEach(function(v) {
-    var p = v.play();
-    if (p && p.catch) p.catch(function() {});
-  });
+  // The IntersectionObserver will restart any video that's still in view.
 }
 // Multi-currency price rendering
 function renderPrices() {
