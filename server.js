@@ -610,7 +610,7 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
       params
     );
 
-    const [totals, topCountry, topPath] = await Promise.all([
+    const [totals, topCountry, topPath, salesByEmailRes, salesTotalRes] = await Promise.all([
       pool.query(
         `SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
          FROM visits WHERE created_at >= ${UTC_DAY_START}`
@@ -625,7 +625,32 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
          WHERE created_at >= ${UTC_DAY_START}
          GROUP BY path ORDER BY c DESC LIMIT 1`
       ),
+      // Paid spend per customer email (across the same time range as the
+      // visit filter, when one is provided — otherwise lifetime)
+      pool.query(
+        from
+          ? `SELECT email, SUM(amount)::float AS total, COUNT(*)::int AS orders, MAX(currency) AS currency
+             FROM orders WHERE status = 'paid' AND created_at >= $1
+             GROUP BY email`
+          : `SELECT email, SUM(amount)::float AS total, COUNT(*)::int AS orders, MAX(currency) AS currency
+             FROM orders WHERE status = 'paid'
+             GROUP BY email`,
+        from ? [from] : []
+      ),
+      pool.query(
+        from
+          ? `SELECT COALESCE(SUM(amount), 0)::float AS total, COUNT(*)::int AS orders
+             FROM orders WHERE status = 'paid' AND created_at >= $1`
+          : `SELECT COALESCE(SUM(amount), 0)::float AS total, COUNT(*)::int AS orders
+             FROM orders WHERE status = 'paid'`,
+        from ? [from] : []
+      ),
     ]);
+
+    const salesByEmail = {};
+    salesByEmailRes.rows.forEach((r) => {
+      if (r.email) salesByEmail[r.email] = { total: r.total, orders: r.orders, currency: r.currency };
+    });
 
     res.json({
       visits: visitsResult.rows,
@@ -635,7 +660,10 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
         unique_ips_today: totals.rows[0].unique_ips,
         top_country: topCountry.rows[0] || null,
         top_path: topPath.rows[0] || null,
+        sales_total: salesTotalRes.rows[0].total,
+        sales_orders: salesTotalRes.rows[0].orders,
       },
+      salesByEmail,
     });
   } catch (err) {
     console.error('[visits] data query error:', err.message);

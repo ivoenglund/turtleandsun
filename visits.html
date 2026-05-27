@@ -85,6 +85,7 @@ tr:hover td{background:#fffdf5;}
     <div class="stat"><div class="stat-val" id="st-ips">—</div><div class="stat-lbl">Unique IPs today</div></div>
     <div class="stat"><div class="stat-val" id="st-country">—</div><div class="stat-lbl">Top country today</div></div>
     <div class="stat"><div class="stat-val" id="st-path">—</div><div class="stat-lbl">Top path today</div></div>
+    <div class="stat"><div class="stat-val" id="st-sales">—</div><div class="stat-lbl">Sales (in range)</div></div>
   </div>
 
   <div class="filter-bar">
@@ -115,7 +116,7 @@ tr:hover td{background:#fffdf5;}
       <thead>
         <tr>
           <th>First seen</th><th>Last seen</th><th>IP</th><th>Country</th>
-          <th>Hits</th><th>Latest path</th><th>User-Agent</th><th>Flag</th>
+          <th>Hits</th><th>Session</th><th>Spent</th><th>Latest path</th><th>User-Agent</th><th>Flag</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -203,13 +204,16 @@ function groupByIp(visits) {
     for (let i = vs.length - 1; i >= 0; i--) {
       if (vs[i].lat != null && vs[i].lng != null) { loc = { lat: vs[i].lat, lng: vs[i].lng }; break; }
     }
+    const emailForIp = (vs.find(x => x.email) || {}).email || null;
+    const sales = (emailForIp && window._salesByEmail && window._salesByEmail[emailForIp]) || null;
     groups.push({
       ip,
       visits: vs,
       firstSeen: earliest.created_at,
       lastSeen: latest.created_at,
       hits: vs.length,
-      country: latest.country,       // most recent location for the row
+      sessionDuration: fmtDuration(earliest.created_at, latest.created_at),
+      country: latest.country,
       city: latest.city,
       latestPath: latest.path,
       latestUA: latest.user_agent || '',
@@ -217,9 +221,12 @@ function groupByIp(visits) {
       anyEngaged: vs.some(x => x.engaged),
       latestId: latest.id,
       latestFlagged: !!latest.flagged,
-      email: (vs.find(x => x.email) || {}).email || null,  // most recent visit with a known user
-      label: latest.label || null,                          // same label for every row of this IP
+      email: emailForIp,
+      label: latest.label || null,
       loc,
+      spent: sales ? sales.total : 0,
+      ordersCount: sales ? sales.orders : 0,
+      spentCurrency: sales ? sales.currency : null,
     });
   }
   return groups;
@@ -253,6 +260,7 @@ async function fetchData() {
     data.visits = (data.visits || []).filter((v) => engagedIps.has(v.ip));
   }
   allVisits = data.visits;
+  window._salesByEmail = data.salesByEmail || {};
   renderStats(data.stats);
   document.getElementById('cap-note').style.display = data.capped ? 'block' : 'none';
   page = 1;
@@ -268,20 +276,45 @@ function renderStats(s) {
     ? `${flagEmoji(s.top_country.country)} ${s.top_country.country} (${s.top_country.c})` : '—';
   document.getElementById('st-path').textContent = s.top_path
     ? `${s.top_path.path} (${s.top_path.c})` : '—';
+  document.getElementById('st-sales').textContent = (s.sales_total > 0 || s.sales_orders > 0)
+    ? `${Math.round(s.sales_total)} kr (${s.sales_orders})`
+    : '—';
+}
+
+// Human-readable duration between two ISO timestamps.
+function fmtDuration(startISO, endISO) {
+  if (!startISO || !endISO) return '';
+  const start = new Date(startISO).getTime();
+  const end = new Date(endISO).getTime();
+  let sec = Math.max(0, Math.round((end - start) / 1000));
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return s ? `${m}m ${s}s` : `${m}m`;
+  }
+  if (sec < 86400) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  return h ? `${d}d ${h}h` : `${d}d`;
 }
 
 let plainGroup = null;
 let clusterEnabled = true; // toggled by the on-map Cluster button
 
+let canvasRenderer = null;
+
 function renderMap() {
   if (!map) {
-    map = L.map('map').setView([20, 0], 2);
+    map = L.map('map', { preferCanvas: true }).setView([20, 0], 2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
-    // chunkedLoading + disableClusteringAtZoom + spiderfyOnMaxZoom:false
-    // are the standard set of options people use to mitigate the Leaflet
-    // markercluster "disappearing markers" bug.
+    canvasRenderer = L.canvas({ padding: 0.5 });
     clusterGroup = L.markerClusterGroup({
       chunkedLoading: true,
       disableClusteringAtZoom: 13,
@@ -292,8 +325,6 @@ function renderMap() {
     plainGroup = L.layerGroup();
     map.addLayer(clusterEnabled ? clusterGroup : plainGroup);
     addMapControls();
-    // Belt + braces against Leaflet's marker-vanishing bug (#2824, #886):
-    // refresh on every transition event. Cheap because markers are in memory.
     ['zoom', 'zoomend', 'moveend', 'resize'].forEach(function (ev) {
       map.on(ev, refreshMapMarkers);
     });
@@ -309,30 +340,42 @@ function renderMap() {
   for (const g of groups) {
     if (!g.loc) continue;
     const dotColor = g.anyFlagged ? '#d32f2f' : (g.anyEngaged ? '#3A6B20' : '#FFD000');
-    const m = L.marker([g.loc.lat, g.loc.lng], { icon: dotIcon(dotColor) });
-    m.bindPopup(`${flagEmoji(g.country)} ${esc(g.city || '')} ${esc(g.country || '')}<br>${esc(g.ip)}<br>${g.hits} hit${g.hits === 1 ? '' : 's'}`);
-    m.on('click', () => focusIp(g.ip));
-    markers.push(m);
+    const popupHtml = `${flagEmoji(g.country)} ${esc(g.city || '')} ${esc(g.country || '')}<br>${esc(g.ip)}<br>${g.hits} hit${g.hits === 1 ? '' : 's'}`;
+
+    // Plain (unclustered) layer uses a Canvas-rendered CircleMarker.
+    // Canvas redraws every frame so the long-running Leaflet divIcon
+    // disappear-on-zoom bug (issue #2824, #886) doesn't apply here.
+    const cm = L.circleMarker([g.loc.lat, g.loc.lng], {
+      radius: 7,
+      color: '#fff',
+      weight: 2,
+      fillColor: dotColor,
+      fillOpacity: 1,
+      renderer: canvasRenderer,
+    });
+    cm.bindPopup(popupHtml);
+    cm.on('click', () => focusIp(g.ip));
+    plainGroup.addLayer(cm);
+
+    // Cluster layer still uses divIcon Markers because markerCluster only
+    // accepts L.Marker subclasses (not CircleMarker).
+    const dm = L.marker([g.loc.lat, g.loc.lng], { icon: dotIcon(dotColor) });
+    dm.bindPopup(popupHtml);
+    dm.on('click', () => focusIp(g.ip));
+    clusterGroup.addLayer(dm);
+    markers.push(dm);
   }
-  clusterGroup.addLayers(markers);
-  markers.forEach((m) => plainGroup.addLayer(m));
   _lastMarkers = markers;
 }
 
-// Workaround for the long-running Leaflet bug where some markers fail to
-// render after a zoom. We rebuild the active layer's marker set on each
-// zoomend/moveend. Cheap because the markers are already in memory.
+// Workaround for the long-running Leaflet markercluster bug where some
+// markers fail to render after a zoom. Only needed for the cluster layer —
+// the plain layer is Canvas-rendered and doesn't have the issue.
 let _lastMarkers = [];
 function refreshMapMarkers() {
-  const active = clusterEnabled ? clusterGroup : plainGroup;
-  if (!active || !_lastMarkers.length) return;
-  if (clusterEnabled) {
-    clusterGroup.clearLayers();
-    clusterGroup.addLayers(_lastMarkers);
-  } else {
-    plainGroup.clearLayers();
-    _lastMarkers.forEach((m) => plainGroup.addLayer(m));
-  }
+  if (!clusterEnabled || !clusterGroup || !_lastMarkers.length) return;
+  clusterGroup.clearLayers();
+  clusterGroup.addLayers(_lastMarkers);
 }
 
 function addMapControls() {
@@ -408,6 +451,8 @@ function rowHtml(g) {
     </td>
     <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}</td>
     <td class="${g.hits >= 50 ? 'hits-high' : ''}">${g.hits}</td>
+    <td>${esc(g.sessionDuration)}</td>
+    <td>${g.spent > 0 ? `${Math.round(g.spent)} ${esc((g.spentCurrency || 'sek').toUpperCase())}${g.ordersCount > 1 ? ` <span class="muted">(${g.ordersCount} orders)</span>` : ''}` : '—'}</td>
     <td>${esc(g.latestPath)}</td>
     <td class="ua" title="${esc(g.latestUA)}">${esc(uaShort)}</td>
     <td><button class="flag-btn ${g.latestFlagged ? 'on' : ''}" data-id="${g.latestId}" data-flagged="${g.latestFlagged}">${g.latestFlagged ? 'Flagged' : 'Flag'}</button>${g.anyFlagged ? '<span class="flag-badge" title="Has flagged visits">⚑</span>' : ''}</td>
@@ -420,7 +465,7 @@ function rowHtml(g) {
       <td class="${statusClass(v.status_code)}">${esc(v.status_code ?? '')}</td>
       <td>${esc(v.referrer || '—')}</td>
     </tr>`).join('');
-    html += `<tr class="expand-row"><td colspan="8">
+    html += `<tr class="expand-row"><td colspan="10">
       <table class="nested">
         <thead><tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Referrer</th></tr></thead>
         <tbody>${nested}</tbody>
