@@ -78,7 +78,7 @@ tr:hover td{background:#fffdf5;}
 </head>
 <body>
 <div class="main">
-  <div class="page-title">Visits and visitors map</div>
+  <div class="page-title">Visits &amp; visitors map</div>
 
   <div class="stats">
     <div class="stat"><div class="stat-val" id="st-total">—</div><div class="stat-lbl">Total visits today (UTC)</div></div>
@@ -279,21 +279,36 @@ function renderMap() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
-    clusterGroup = L.markerClusterGroup();
+    // chunkedLoading + disableClusteringAtZoom + spiderfyOnMaxZoom:false
+    // are the standard set of options people use to mitigate the Leaflet
+    // markercluster "disappearing markers" bug.
+    clusterGroup = L.markerClusterGroup({
+      chunkedLoading: true,
+      disableClusteringAtZoom: 13,
+      spiderfyOnMaxZoom: false,
+      showCoverageOnHover: false,
+      removeOutsideVisibleBounds: false,
+    });
     plainGroup = L.layerGroup();
     map.addLayer(clusterEnabled ? clusterGroup : plainGroup);
     addMapControls();
-    // Known Leaflet bug (#2824, #886): some markers disappear after zoom.
-    // Workaround: force the active layer to re-render its markers on zoomend.
-    map.on('zoomend', refreshMapMarkers);
-    map.on('moveend', refreshMapMarkers);
+    // Belt + braces against Leaflet's marker-vanishing bug (#2824, #886):
+    // refresh on every transition event. Cheap because markers are in memory.
+    ['zoom', 'zoomend', 'moveend', 'resize'].forEach(function (ev) {
+      map.on(ev, refreshMapMarkers);
+    });
   }
   clusterGroup.clearLayers();
   plainGroup.clearLayers();
+  // If a single IP is "expanded" in the table below, narrow the map to just
+  // that IP's marker so the user can see exactly where their selection is.
+  const groups = expandedIp
+    ? groupByIp(allVisits).filter(g => g.ip === expandedIp)
+    : groupByIp(allVisits);
   const markers = [];
-  for (const g of groupByIp(allVisits)) {
+  for (const g of groups) {
     if (!g.loc) continue;
-    const dotColor = g.anyFlagged ? '#d32f2f' : (g.anyEngaged ? '#3A6B20' : '#e89c2a');
+    const dotColor = g.anyFlagged ? '#d32f2f' : (g.anyEngaged ? '#3A6B20' : '#FFD000');
     const m = L.marker([g.loc.lat, g.loc.lng], { icon: dotIcon(dotColor) });
     m.bindPopup(`${flagEmoji(g.country)} ${esc(g.city || '')} ${esc(g.country || '')}<br>${esc(g.ip)}<br>${g.hits} hit${g.hits === 1 ? '' : 's'}`);
     m.on('click', () => focusIp(g.ip));
@@ -365,13 +380,16 @@ function toggleMapFullscreen() {
 }
 
 // Map marker click: jump to the IP's page, expand its row, scroll into view.
+// Also narrows the map to show only this IP's dot.
 function focusIp(ip) {
   const groups = sortGroups(groupByIp(allVisits));
   const idx = groups.findIndex(g => g.ip === ip);
   if (idx < 0) return;
   page = Math.floor(idx / PAGE_SIZE) + 1;
-  expandedIp = ip;
+  // Toggle behavior: clicking the same row again clears the selection
+  expandedIp = (expandedIp === ip) ? null : ip;
   renderTable();
+  renderMap();
   const row = document.querySelector(`tr.ip-row[data-ip="${ip}"]`);
   if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }

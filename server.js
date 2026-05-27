@@ -538,7 +538,7 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       .admin-card-desc{font-size:12px;color:#888;line-height:1.4;}
     </style>
     ${section('\u{1F4CA} Analytics',
-      card('Visits & visitor map', 'Traffic log, geo map, and IP labels.', '/admin/visits') +
+      card('Visits & visitors map', 'Traffic log, geo map, and IP labels.', '/admin/visits') +
       card('Failed deliveries', 'Orders that failed generation or email.', '/admin/failed-deliveries') +
       digestCard +
       card('Sentry', 'Error tracking and alerts.', 'https://turtle-and-sun.sentry.io/', true) +
