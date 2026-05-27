@@ -37,7 +37,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .step{background:rgba(255,220,60,0.5);border:2px dashed rgba(0,0,0,0.18);border-radius:12px;padding:22px 14px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;text-align:center;min-height:165px;}
 .step2-preview-row{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;margin:4px 0;}
 .snum{position:absolute;top:-13px;left:50%;transform:translateX(-50%);width:26px;height:26px;background:#1C2A14;color:white;border-radius:50%;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
-.sarr{position:absolute;right:-18px;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;}
+.sarr{position:absolute;right:-22px;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;width:42px;height:42px;border-radius:50%;background:#1C2A14;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,0.18);}
 .stitle{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;line-height:1.4;}
 .ssub{font-size:11px;color:rgba(60,20,0,0.55);line-height:1.5;}
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:60px;margin:2px 0;}
@@ -170,7 +170,7 @@ html,body{overflow-x:hidden;}
     <div class="step step-upload" id="step1" onclick="document.getElementById('fileInput').click()">
       <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display:none">
       <div class="snum">1</div>
-      <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <svg id="uploadIcon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="1.5" style="margin-top:4px;"><path d="M12 16V8m0 0l-3 3m3-3l3 3M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1"/></svg>
       <img id="uploadThumb" src="" alt="Uploaded photo">
       <div class="stitle" id="uploadLabel">Drop image here or<br>click to upload</div>
@@ -178,7 +178,7 @@ html,body{overflow-x:hidden;}
     </div>
     <div class="step" id="step2">
       <div class="snum">2</div>
-      <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="stitle" id="step2Title">Choose style &amp; generate<br>a preview</div>
       <div class="step2-preview-row">
         <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
