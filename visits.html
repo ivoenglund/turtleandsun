@@ -385,7 +385,7 @@ function rowHtml(g) {
     <td>
       <span class="expand-caret">${open ? '▾' : '▸'}</span>${esc(g.ip)}
       <span class="ip-edit" data-ip="${esc(g.ip)}" data-label="${esc(g.label || '')}" title="Edit label">✎</span>
-      ${g.anyEngaged ? '<span class="human-badge" title="Did something a bot wouldn\\'t (clicked gallery, uploaded, paid, etc.)">Human</span>' : ''}
+      ${g.anyEngaged ? '<span class="human-badge" title="Did something a bot would not (clicked gallery, uploaded, paid, etc.)">Human</span>' : ''}
       ${g.label ? `<span class="ip-label">${esc(g.label)}</span>` : (g.email ? `<span class="ip-email">${esc(g.email)}</span>` : '')}
     </td>
     <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}</td>
