@@ -339,7 +339,7 @@ function renderMap() {
   const markers = [];
   for (const g of groups) {
     if (!g.loc) continue;
-    const dotColor = g.anyFlagged ? '#d32f2f' : (g.anyEngaged ? '#3A6B20' : '#FFD000');
+    const dotColor = g.anyFlagged ? '#7a0000' : (g.anyEngaged ? '#3A6B20' : '#FF0000');
     const popupHtml = `${flagEmoji(g.country)} ${esc(g.city || '')} ${esc(g.country || '')}<br>${esc(g.ip)}<br>${g.hits} hit${g.hits === 1 ? '' : 's'}`;
 
     // Plain (unclustered) layer uses a Canvas-rendered CircleMarker.
