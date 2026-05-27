@@ -227,6 +227,23 @@ function visitorIp(req) {
   return req.ip;
 }
 
+// Mark the current visitor's recent visit rows as engaged (i.e. a human
+// did something a bot wouldn't — clicked the gallery, uploaded a photo,
+// paid, etc.). Applies to all visits in the last 30 minutes from this IP
+// so the entire session is highlighted in the admin view.
+async function markEngaged(req) {
+  const ip = visitorIp(req) || 'unknown';
+  try {
+    await pool.query(
+      `UPDATE visits SET engaged = TRUE
+       WHERE ip = $1 AND created_at > NOW() - INTERVAL '30 minutes'`,
+      [ip]
+    );
+  } catch (err) {
+    console.error('[engage] mark error:', err.message);
+  }
+}
+
 app.use((req, res, next) => {
   const p = req.path;
   if (p === '/webhook' || p.startsWith('/admin/') || p.startsWith('/api/') || VISITS_ASSET_RE.test(p)) return next();
@@ -1224,10 +1241,19 @@ app.post('/upload', upload.single('image'), async (req, res) => {
       contentType: req.file.mimetype,
       originalName: req.file.originalname,
     });
+    markEngaged(req); // uploading a photo is high-confidence human signal
     res.json({ url: result.secure_url, public_id: result.public_id });
   } catch (err) {
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
+});
+
+// Lightweight beacon endpoint — fired from the landing page when the user
+// does something a bot wouldn't (gallery card click, lightbox open, etc).
+// Marks the session as engaged so it stands out in /admin/visits.
+app.post('/api/engage', async (req, res) => {
+  markEngaged(req);
+  res.json({ ok: true });
 });
 
 app.get('/api/currency', async (req, res) => {
@@ -1250,6 +1276,7 @@ app.post('/create-checkout-session', async (req, res) => {
   const { product, image_url, portrait_url, email, orientation } = req.body;
   if (!PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product' });
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
+  markEngaged(req); // hitting checkout is a high-confidence human signal
 
   let currency = req.body.currency;
   if (currency) {
@@ -1292,6 +1319,7 @@ app.post('/preview', async (req, res) => {
   const { image_url, email, orientation } = req.body;
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
   if (!email) return res.status(400).json({ error: 'email is required' });
+  markEngaged(req); // generating a preview is a high-confidence human signal
 
   try {
     const result = await pool.query(

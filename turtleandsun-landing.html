@@ -348,6 +348,13 @@ window.setK = function(kind, btn) {
   loadGallery(undefined, kind);
 };
 
+// Tiny beacon — tells the server "a human did something." Fired from
+// interactions a bot wouldn't do (gallery click, lightbox open, sound toggle).
+// Server marks the visitor's session engaged for the visits admin highlight.
+function tsBeacon() {
+  try { fetch('/api/engage', { method: 'POST', keepalive: true }).catch(function(){}); } catch (e) {}
+}
+
 // Click-to-select behaviour for gallery cards. Marks the card visually
 // selected, highlights the matching filter chip, updates the description
 // panel above the gallery, and pushes the selected style into step 2 of
@@ -358,6 +365,7 @@ function selectCard(card, item) {
     c.classList.remove('is-selected');
   });
   card.classList.add('is-selected');
+  tsBeacon();
 
   if (!item || !item.concept_id) return;
 
@@ -887,6 +895,7 @@ async function loadGallery(category, kind) {
 
 // ----- Lightbox for gallery items -----
 function openLightbox(item) {
+  tsBeacon();
   // Pause and mute all gallery videos behind the lightbox
   document.querySelectorAll('.g-card video').forEach(function(v) { v.pause(); });
 
