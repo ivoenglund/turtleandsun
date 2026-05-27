@@ -2325,7 +2325,9 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
     );
 
     if (req.headers.accept === 'application/json' || req.xhr) return res.json({ ok: true });
-    res.redirect(`/admin/concepts/edit/${conceptId}?saved_media=1`);
+    const returnTo = req.body.return_to || `/admin/gallery?saved_media=1`;
+    const sep = returnTo.includes('?') ? '&' : '?';
+    res.redirect(returnTo + sep + 'saved_media=1');
   } catch (err) {
     console.error('[concept-media] update error:', err.message);
     res.status(500).json({ error: 'Update failed', details: err.message });
@@ -2393,11 +2395,11 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
           <td>
             <form method="POST" action="/admin/media/${m.id}/update" class="inline" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
               <input type="hidden" name="return_to" value="/admin/gallery${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}">
-              <select name="kind">${kindOptsRow}</select>
-              <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="filters e.g. pet, royal" style="width:160px;">
-              <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;">
-              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
-              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
+              <select name="kind" style="width:90px;padding:6px 8px;">${kindOptsRow}</select>
+              <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="filters e.g. pet, royal" style="width:180px;padding:6px 8px;">
+              <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;padding:6px 8px;">
+              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
+              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
               <button type="submit" class="btn small">Save</button>
             </form>
           </td>
