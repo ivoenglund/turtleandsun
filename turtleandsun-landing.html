@@ -34,7 +34,8 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .hi-lbl{text-align:center;font-size:14px;font-weight:500;color:rgba(60,20,0,0.75);line-height:1.4;font-family:'Plus Jakarta Sans',sans-serif;}
 .hi-lbl strong{display:block;font-weight:500;color:rgba(60,20,0,0.95);font-size:15px;font-family:'Plus Jakarta Sans',sans-serif;}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;}
-.step{background:rgba(255,220,60,0.5);border:2px dashed rgba(0,0,0,0.18);border-radius:12px;padding:22px 14px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;text-align:center;aspect-ratio:9/16;}
+.step{background:rgba(255,220,60,0.5);border:2px dashed rgba(0,0,0,0.18);border-radius:12px;padding:22px 14px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;text-align:center;min-height:165px;}
+.step2-preview-row{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;margin:4px 0;}
 .snum{position:absolute;top:-13px;left:50%;transform:translateX(-50%);width:26px;height:26px;background:#1C2A14;color:white;border-radius:50%;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 .sarr{position:absolute;right:-18px;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;}
 .stitle{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;line-height:1.4;}
@@ -177,12 +178,14 @@ html,body{overflow-x:hidden;}
     <div class="step" id="step2">
       <div class="snum">2</div>
       <div class="sarr"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="rgba(0,0,0,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
       <div class="stitle" id="step2Title">Choose style &amp; generate<br>a preview</div>
-      <div class="orient-group" id="orientGroup">
-        <button type="button" class="orient-btn" data-orient="landscape" title="16:9"><span class="orient-shape" style="width:26px;height:15px;"></span><span class="orient-ratio">16:9</span></button>
-        <button type="button" class="orient-btn" data-orient="portrait" title="9:16"><span class="orient-shape" style="width:15px;height:26px;"></span><span class="orient-ratio">9:16</span></button>
-        <button type="button" class="orient-btn" data-orient="square" title="1:1"><span class="orient-shape" style="width:20px;height:20px;"></span><span class="orient-ratio">1:1</span></button>
+      <div class="step2-preview-row">
+        <div class="sgrid" id="step2Grid"><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div><div class="sthumb"></div></div>
+        <div class="orient-group" id="orientGroup">
+          <button type="button" class="orient-btn" data-orient="landscape" title="16:9"><span class="orient-shape" style="width:26px;height:15px;"></span><span class="orient-ratio">16:9</span></button>
+          <button type="button" class="orient-btn" data-orient="portrait" title="9:16"><span class="orient-shape" style="width:15px;height:26px;"></span><span class="orient-ratio">9:16</span></button>
+          <button type="button" class="orient-btn" data-orient="square" title="1:1"><span class="orient-shape" style="width:20px;height:20px;"></span><span class="orient-ratio">1:1</span></button>
+        </div>
       </div>
       <input type="email" id="previewEmail" placeholder="Your email" style="width:100%;padding:7px 10px;border:1.5px solid rgba(0,0,0,0.18);border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;margin-bottom:6px;outline:none;background:rgba(255,255,255,0.7);" />
       <button class="btn-preview" id="btnPreview">Generate preview</button>
