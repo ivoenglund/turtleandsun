@@ -202,6 +202,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
 app.use(cookieParser());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Prevent caching of HTML pages and API responses so deploys and auth changes take effect immediately
 app.use((req, res, next) => {
@@ -1572,6 +1573,7 @@ function conceptAdminPage(title, body) {
 <div class="sun"></div>
 <script src="/currency.js?v=20260526a"></script>
 <script src="/nav.js?v=20260526b"></script>
+<script>NavBar.init({ requireAuth: true });</script>
 <div class="wrap">${body}</div>
 <footer class="ts-footer">
   <p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
