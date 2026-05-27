@@ -33,6 +33,8 @@ const {
   requireAuth, requireRole,
 } = require('./auth');
 const { sendDailyDigest } = require('./digest');
+const pricing = require('./pricing');
+const { scheduleFxRefresh } = require('./fx_cron');
 
 async function geocodeContact(contact) {
   const parts = [contact.street, contact.city, contact.region, contact.country].filter(Boolean);
@@ -145,6 +147,49 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
     } catch (err) {
       console.error('Order insert error:', err.message);
     }
+
+    // ---------------------------------------------------------------
+    // Infrastructure foundation: write order_line_items row alongside
+    // the legacy orders insert. Additive audit trail — failure here
+    // must NOT break delivery, so wrapped in try/catch.
+    // For pre-foundation orders the legacy `orders.product/amount` is
+    // still the source of truth; line items are the new shape.
+    // ---------------------------------------------------------------
+    if (orderId) {
+      try {
+        const amountMinor = session.amount_total;  // already in minor units
+        const cur = (currency || 'sek').toLowerCase();
+        // SEK total: convert back from display via fx rate if non-SEK
+        let sekMinor = amountMinor;
+        if (cur !== 'sek') {
+          try {
+            const rates = await pricing.getFxRates();
+            const rate = pricing.getFxRateSync(rates, cur);
+            if (rate > 0) sekMinor = Math.round(amountMinor / rate);
+          } catch (e) { /* fall back to display amount as SEK */ }
+        }
+        await pool.query(
+          `INSERT INTO order_line_items (
+             order_id, product_key, quantity,
+             unit_price_sek_minor, total_sek_minor,
+             display_currency, display_price_minor, fx_rate_used
+           ) VALUES ($1, $2, 1, $3, $3, $4, $5, $6)
+           ON CONFLICT DO NOTHING`,
+          [
+            orderId,
+            product,
+            sekMinor,
+            cur,
+            amountMinor,
+            cur === 'sek' ? 1.0 : (amountMinor > 0 ? amountMinor / sekMinor : 1.0),
+          ]
+        );
+        console.log('[line_items] recorded for order', orderId);
+      } catch (err) {
+        console.error('[line_items] insert error (non-fatal):', err.message);
+      }
+    }
+
 
     // Mark user as purchased and reset preview counter
     if (email) {
@@ -735,6 +780,64 @@ app.get('/admin/failed-deliveries/data', requireRole('admin'), async (req, res) 
   }
 });
 
+
+// ---------------------------------------------------------------------------
+// Admin: pricing preview. Read-only sanity-check of the pricing engine.
+// GET /admin/api/pricing/preview?concept_id=12&currency=usd&quantity=1
+// Returns: { concept, resolved, base_tier, fx_rate_used, charm_ladder }
+// No customer impact — admin-only, used to verify FX + charm + tier math
+// against real concepts in production.
+// ---------------------------------------------------------------------------
+app.get('/admin/api/pricing/preview', requireRole('admin'), async (req, res) => {
+  try {
+    const conceptId = parseInt(req.query.concept_id, 10);
+    const currency = (req.query.currency || 'sek').toLowerCase();
+    const quantity = Math.max(1, parseInt(req.query.quantity, 10) || 1);
+    const modifiers = req.query.modifiers ? JSON.parse(req.query.modifiers) : {};
+    const recipients = req.query.recipients ? JSON.parse(req.query.recipients) : [];
+
+    if (!Number.isInteger(conceptId)) {
+      return res.status(400).json({ error: 'concept_id (integer) required' });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id, slug, name, input_type, price_tier, unit_price_sek_minor, pricing_rules
+       FROM concepts WHERE id = $1`,
+      [conceptId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Concept not found' });
+
+    const concept = rows[0];
+    const resolved = await pricing.priceLineItem(
+      { concept, quantity, modifiers, recipients },
+      currency
+    );
+
+    const tier = concept.price_tier || pricing.defaultTierFor(concept.input_type);
+    const tierBase = pricing.PRICE_TIERS[tier] || null;
+
+    res.json({
+      concept: {
+        id: concept.id,
+        slug: concept.slug,
+        name: concept.name,
+        input_type: concept.input_type,
+        price_tier: concept.price_tier,
+        unit_price_sek_minor: concept.unit_price_sek_minor,
+        pricing_rules: concept.pricing_rules,
+      },
+      resolved,
+      tier_used: tier,
+      tier_base_sek_minor: tierBase ? tierBase.sek_minor : null,
+      display_human: pricing.formatDisplay(resolved.display_price_minor, resolved.display_currency),
+      sek_human: pricing.formatDisplay(resolved.total_sek_minor, 'sek'),
+    });
+  } catch (err) {
+    console.error('[admin pricing preview] error:', err.message);
+    res.status(500).json({ error: 'Pricing preview failed', details: err.message });
+  }
+});
+
 app.post('/admin/failed-deliveries/retry', requireRole('admin'), async (req, res) => {
   const { id } = req.body;
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'id (integer) required' });
@@ -1288,23 +1391,49 @@ app.get('/api/currency', async (req, res) => {
   let country = null;
   try { country = (await geoLookup(visitorIp(req))).country; } catch (e) { /* geo unavailable */ }
   const detected = pickCurrency(country);
-  const prices = {};
-  for (const cur of SUPPORTED_CURRENCIES) {
-    prices[cur] = {};
-    for (const key of Object.keys(PRODUCTS)) {
-      const amount = PRODUCTS[key].amounts[cur];
-      prices[cur][key] = { amount, display: formatPrice(amount, cur) };
+
+  // Source prices from the pricing engine (FX-converted + charm-rounded
+  // from a single SEK base) when fx_rates is populated. Falls back to the
+  // legacy PRODUCTS hardcoded amounts if the engine is unreachable.
+  let prices = {};
+  let usedEngine = false;
+  try {
+    const rates = await pricing.getFxRates();
+    for (const cur of SUPPORTED_CURRENCIES) {
+      prices[cur] = {};
+      for (const key of Object.keys(PRODUCTS)) {
+        // Map legacy product key to a tier; bundle stays bundle, image/video map straight.
+        const tier = key === 'bundle' ? 'bundle' : key;
+        const tierEntry = pricing.PRICE_TIERS[tier];
+        const sekMinor = tierEntry ? tierEntry.sek_minor : PRODUCTS[key].amounts.sek;
+        const amount = pricing.convertAndCharm(sekMinor, cur, rates);
+        prices[cur][key] = { amount, display: pricing.formatDisplay(amount, cur) };
+      }
+    }
+    usedEngine = true;
+  } catch (err) {
+    // Fall back to hardcoded PRODUCTS amounts
+    console.warn('[api/currency] pricing engine unavailable, using legacy amounts:', err.message);
+    prices = {};
+    for (const cur of SUPPORTED_CURRENCIES) {
+      prices[cur] = {};
+      for (const key of Object.keys(PRODUCTS)) {
+        const amount = PRODUCTS[key].amounts[cur];
+        prices[cur][key] = { amount, display: formatPrice(amount, cur) };
+      }
     }
   }
+
   res.set('Cache-Control', 'public, max-age=300');
-  res.json({ detected, country, supported: [...SUPPORTED_CURRENCIES], prices });
+  res.json({ detected, country, supported: [...SUPPORTED_CURRENCIES], prices, source: usedEngine ? 'engine' : 'legacy' });
 });
 
 app.post('/create-checkout-session', async (req, res) => {
-  const { product, image_url, portrait_url, email, orientation } = req.body;
-  if (!PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product' });
+  const { product, image_url, portrait_url, email, orientation, concept_id, quantity, modifiers, recipients, customer_name } = req.body;
+  // Either a concept_id OR a legacy product key is required.
+  if (!concept_id && !PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product (no concept_id or known product key)' });
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
-  markEngaged(req); // hitting checkout is a high-confidence human signal
+  markEngaged(req);
 
   let currency = req.body.currency;
   if (currency) {
@@ -1316,16 +1445,56 @@ app.post('/create-checkout-session', async (req, res) => {
     currency = pickCurrency(country);
   }
 
+  // ---- Resolve price -----------------------------------------------------
+  // Path A: concept_id present → use the pricing engine + line items.
+  // Path B: legacy product key → use PRODUCTS hardcoded amounts.
+  let displayName = null;
+  let unitAmount = null;
+  let conceptRow = null;
+  let priced = null;
+  try {
+    if (concept_id) {
+      const { rows } = await pool.query(
+        `SELECT id, slug, name, input_type, price_tier, unit_price_sek_minor, pricing_rules
+         FROM concepts WHERE id = $1`,
+        [parseInt(concept_id, 10)]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Concept not found' });
+      conceptRow = rows[0];
+      priced = await pricing.priceLineItem(
+        { concept: conceptRow, quantity: Math.max(1, parseInt(quantity, 10) || 1), modifiers: modifiers || {}, recipients: recipients || [] },
+        currency
+      );
+      displayName = conceptRow.name;
+      unitAmount = priced.display_price_minor;
+    } else {
+      displayName = PRODUCTS[product].name;
+      unitAmount = PRODUCTS[product].amounts[currency];
+    }
+  } catch (err) {
+    console.error('[checkout] price resolution error:', err.message);
+    return res.status(500).json({ error: 'Failed to resolve price', details: err.message });
+  }
+
   const origin = `${req.protocol}://${req.get('host')}`;
   try {
-    const meta = { product, image_url, portrait_url: portrait_url || '', email: email || '', orientation: orientation || '', currency };
+    const meta = {
+      product: product || (conceptRow ? `concept:${conceptRow.slug}` : ''),
+      concept_id: conceptRow ? String(conceptRow.id) : '',
+      customer_name: customer_name || '',
+      image_url,
+      portrait_url: portrait_url || '',
+      email: email || '',
+      orientation: orientation || '',
+      currency,
+    };
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
           currency,
-          product_data: { name: PRODUCTS[product].name },
-          unit_amount: PRODUCTS[product].amounts[currency],
+          product_data: { name: displayName },
+          unit_amount: unitAmount,
         },
         quantity: 1,
       }],
@@ -1336,7 +1505,7 @@ app.post('/create-checkout-session', async (req, res) => {
       success_url: `${origin}/?order=success`,
       cancel_url: `${origin}/?order=cancelled`,
     });
-    res.json({ url: session.url });
+    res.json({ url: session.url, priced: priced ? { display_currency: priced.display_currency, display_price_minor: priced.display_price_minor } : null });
   } catch (err) {
     console.error('Checkout session error:', err);
     res.status(500).json({ error: 'Failed to create checkout session', details: err.message });
@@ -1344,11 +1513,12 @@ app.post('/create-checkout-session', async (req, res) => {
 });
 
 app.post('/preview', async (req, res) => {
-  const { image_url, email, orientation } = req.body;
+  const { image_url, email, orientation, concept_id, customer_name } = req.body;
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
   if (!email) return res.status(400).json({ error: 'email is required' });
-  markEngaged(req); // generating a preview is a high-confidence human signal
+  markEngaged(req);
 
+  // Preview quota
   try {
     const result = await pool.query(
       `INSERT INTO users (email, preview_count)
@@ -1358,11 +1528,10 @@ app.post('/preview', async (req, res) => {
            WHEN users.has_purchased = TRUE THEN users.preview_count
            ELSE users.preview_count + 1
          END
-       RETURNING preview_count, has_purchased`,
+       RETURNING id, preview_count, has_purchased`,
       [email]
     );
     const { preview_count, has_purchased } = result.rows[0];
-
     if (!has_purchased && preview_count > 3) {
       return res.status(403).json({ error: 'Preview limit reached. Purchase to continue.' });
     }
@@ -1370,18 +1539,65 @@ app.post('/preview', async (req, res) => {
     console.error('Preview user upsert error:', err.message);
   }
 
+  // Resolve user id for audit log (best-effort).
+  let userId = null;
   try {
-    const result = await fal.subscribe('fal-ai/kling-image/o1', {
-      input: {
-        prompt: 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.',
-        image_urls: [image_url],
-        aspect_ratio: ORIENTATION_ASPECT[orientation] || 'auto',
-      },
-      storageSettings: { expiresIn: 'never' },
+    const u = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    userId = u.rows[0]?.id || null;
+  } catch (e) { /* non-fatal */ }
+
+  // Look up concept if concept_id provided.
+  let concept = null;
+  if (concept_id) {
+    try {
+      const c = await pool.query(
+        `SELECT id, slug, name, input_type, image_prompt, video_prompt, fal_image_model, fal_video_model,
+                talking_model, speech_text, voice_ids, reference_image_urls,
+                image_input_extras, video_input_extras, user_input_variable
+         FROM concepts WHERE id = $1 AND active = TRUE`,
+        [parseInt(concept_id, 10)]
+      );
+      concept = c.rows[0] || null;
+    } catch (e) { console.warn('[preview] concept lookup failed:', e.message); }
+  }
+
+  // Decide which model + prompt to use.
+  // - If concept is present and is talking type, dispatch through generateTalking (still returns an image preview via the underlying i2v's first frame is impractical, so for talking we fall through to image preview using the concept's image_prompt as a stand-in).
+  // - If concept is present (image/image_video), dispatch through generateImage with concept's stored model + prompt.
+  // - Otherwise, hardcoded Royal Portrait (legacy).
+  const useConcept = !!concept;
+  const modelId = useConcept ? (concept.fal_image_model || 'fal-ai/kling-image/o1') : 'fal-ai/kling-image/o1';
+  const promptText = useConcept
+    ? (concept.image_prompt || 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.')
+    : 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.';
+  const inputExtras = useConcept ? (concept.image_input_extras || {}) : {};
+
+  // Log the attempt before firing.
+  const logged = await generation.logGenerationStart({
+    conceptId: concept ? concept.id : null,
+    modelId,
+    inputPayload: { image_url, orientation, prompt: promptText },
+    sourceType: 'preview',
+    userId,
+  });
+
+  try {
+    const result = await generation.generateImage({
+      provider: 'fal',
+      modelId,
+      prompt: promptText,
+      photoUrl: image_url,
+      orientation,
+      inputExtras,
     });
-    res.json({ url: result.data.images[0].url });
+    await generation.logGenerationFinish(logged.id, {
+      outputUrl: null, // R2 rehosting happens at delivery time, not preview
+      falOutputUrl: result.url,
+    });
+    res.json({ url: result.url });
   } catch (err) {
     console.error('Preview error:', JSON.stringify(err, null, 2));
+    await generation.logGenerationFailure(logged.id, err.message);
     res.status(500).json({ error: 'Preview generation failed', details: err.message, body: err.body ?? null });
   }
 });
@@ -2680,6 +2896,10 @@ cron.schedule('0 3 * * *', async () => {
 
 // Daily operational digest email to admin at 06:00 UTC (07:00/08:00 CET)
 cron.schedule('0 6 * * *', () => sendDailyDigest().catch((err) => console.error('[digest] cron error:', err.message)), { timezone: 'UTC' });
+
+// FX rates refresh — fires once at boot and daily at 04:00 UTC.
+// Implementation in fx_cron.js. Pricing engine (pricing.js) reads from fx_rates.
+scheduleFxRefresh(cron);
 
 initDb()
   .then(() => seedGallery())

@@ -253,6 +253,124 @@ async function initDb() {
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS engaged BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
+  // ====================================================================
+  // Infrastructure Foundation migration (2026-05-27).
+  // Adds talking-pet support, multi-image refs, per-concept pricing,
+  // FX rates, line-item orders, generation audit log, voice clones,
+  // test subjects for the Lab. All additive, all idempotent.
+  // See Claude_Workspace/03_Turtleandsun/01_Context/_INFRASTRUCTURE_FOUNDATION.md
+  // ====================================================================
+  await pool.query(`
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS talking_model VARCHAR(255);
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS speech_text TEXT;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS voice_ids TEXT[];
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS reference_image_urls TEXT[];
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS talking_input_extras JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS price_tier VARCHAR(32);
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS unit_price_sek_minor INTEGER;
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS pricing_rules JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+    CREATE TABLE IF NOT EXISTS test_subjects (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      photo_url TEXT NOT NULL,
+      notes TEXT,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS voice_clones (
+      id SERIAL PRIMARY KEY,
+      voice_id TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      source_audio_url TEXT NOT NULL,
+      source_type TEXT NOT NULL CHECK (source_type IN ('admin', 'customer')),
+      user_id INTEGER REFERENCES users(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS generations (
+      id SERIAL PRIMARY KEY,
+      concept_id INTEGER REFERENCES concepts(id),
+      model_id TEXT NOT NULL,
+      input_payload JSONB NOT NULL,
+      output_url TEXT,
+      fal_output_url TEXT,
+      cost_usd NUMERIC(10, 4),
+      source_type TEXT NOT NULL CHECK (source_type IN ('admin_test', 'customer_order', 'lab_batch', 'preview')),
+      user_id INTEGER REFERENCES users(id),
+      order_id INTEGER REFERENCES orders(id),
+      test_subject_id INTEGER REFERENCES test_subjects(id),
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed')),
+      error_message TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS fx_rates (
+      base_currency TEXT NOT NULL,
+      target_currency TEXT NOT NULL,
+      rate NUMERIC(14, 8) NOT NULL,
+      fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      source TEXT,
+      PRIMARY KEY (base_currency, target_currency, fetched_at)
+    );
+
+    CREATE TABLE IF NOT EXISTS order_line_items (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      concept_id INTEGER REFERENCES concepts(id),
+      product_key VARCHAR(64),
+      quantity INTEGER NOT NULL DEFAULT 1,
+      recipients JSONB,
+      modifiers JSONB,
+      unit_price_sek_minor INTEGER NOT NULL,
+      total_sek_minor INTEGER NOT NULL,
+      display_currency VARCHAR(3) NOT NULL,
+      display_price_minor INTEGER NOT NULL,
+      fx_rate_used NUMERIC(14, 8) NOT NULL DEFAULT 1.0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_generations_concept ON generations (concept_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_generations_user ON generations (user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_generations_order ON generations (order_id);
+    CREATE INDEX IF NOT EXISTS idx_generations_source ON generations (source_type, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_generations_status ON generations (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_fx_latest ON fx_rates (base_currency, target_currency, fetched_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_line_items_order ON order_line_items (order_id);
+    CREATE INDEX IF NOT EXISTS idx_voice_clones_user ON voice_clones (user_id);
+  `);
+
+  // Backfill: every existing order without line items gets one synthetic line
+  // item matching its current product + amount. Idempotent (guarded by
+  // NOT EXISTS on order_line_items.order_id).
+  await pool.query(`
+    INSERT INTO order_line_items (
+      order_id, product_key, quantity,
+      unit_price_sek_minor, total_sek_minor,
+      display_currency, display_price_minor, fx_rate_used, created_at
+    )
+    SELECT
+      o.id,
+      o.product,
+      1,
+      COALESCE(ROUND(o.amount * 100)::INT, 0),
+      COALESCE(ROUND(o.amount * 100)::INT, 0),
+      COALESCE(o.currency, 'sek'),
+      COALESCE(ROUND(o.amount * 100)::INT, 0),
+      1.0,
+      o.created_at
+    FROM orders o
+    WHERE NOT EXISTS (
+      SELECT 1 FROM order_line_items li WHERE li.order_id = o.id
+    )
+      AND o.product IS NOT NULL
+  `);
+
   // Unique index on prompts.style_id for ON CONFLICT support
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS prompts_style_id_unique ON prompts (style_id);
@@ -294,6 +412,55 @@ async function initDb() {
       ]
     );
     console.log('Seeded Royal Portrait concept');
+  }
+
+  // Seed the first talking-pet concept (Birthday template) if it doesn't
+  // exist yet. The 2026-05-27 infrastructure foundation introduced talking
+  // concepts; this seed provides the first row so admin + customer flows
+  // can be tested end-to-end. Kling v3 Pro, English script with {name}
+  // placeholder, 149 kr (default 'talking' tier — falls back to PRICE_TIERS
+  // since price_tier is NULL).
+  const talkingExists = await pool.query(
+    `SELECT 1 FROM concepts WHERE slug = 'talking-pet-birthday' LIMIT 1`
+  );
+  if (talkingExists.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO concepts (
+         slug, name, filter_category, input_type,
+         image_prompt, video_prompt,
+         fal_video_model, talking_model, speech_text,
+         price_tier, active, sort_order, description
+       ) VALUES (
+         $1, $2, $3, $4,
+         $5, $6,
+         $7, $8, $9,
+         $10, $11, $12, $13
+       )`,
+      [
+        'talking-pet-birthday',
+        'Talking Pet — Birthday',
+        'pets,celebration,talking',
+        'talking',
+        // image_prompt: not used for talking but column is NOT NULL — keep a
+        // sensible default so the row is valid.
+        'A warm portrait of @Image1 looking gently at the camera.',
+        // video_prompt: visual scene description, combined with speech_text
+        // at runtime by generation.js composeTalkingPrompt().
+        'A friendly pet looks directly at the camera with bright, expressive eyes and a gentle, joyful expression. Warm soft light, shallow depth of field, cinematic atmosphere.',
+        'fal-ai/kling-video/v3/pro/image-to-video',
+        'fal-ai/kling-video/v3/pro/image-to-video__talking',
+        // speech_text: customer-typed name substitutes for {name}; if blank,
+        // the leading ",{name}" is stripped cleanly by applyNamePlaceholder.
+        "Happy birthday, {name}! You're my favourite human in the whole world. Many more years together.",
+        // price_tier NULL means "use default for input_type" — talking maps
+        // to PRICE_TIERS.talking (149 kr).
+        null,
+        false  /* seeded inactive until Friday flow wiring */ ,
+        2,
+        'Make your pet sing happy birthday. Personalize with a name.',
+      ]
+    );
+    console.log('Seeded Talking Pet — Birthday concept');
   }
 
   console.log('Database tables ready');

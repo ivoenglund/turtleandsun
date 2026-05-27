@@ -39,3 +39,8 @@ temp/
 
 # GeoIP database (download separately — see README)
 geoip/*.mmdb
+
+# Claude Code local files
+.claude/agents/
+PROJECT_CONTEXT.md
+_probe.txt
