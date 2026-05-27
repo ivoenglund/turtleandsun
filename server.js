@@ -599,7 +599,7 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
 
     const visitsResult = await pool.query(
       `SELECT v.id, v.ip, v.created_at, v.method, v.path, v.status_code, v.user_agent,
-              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged,
+              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged,
               u.email AS email, l.label AS label
        FROM visits v
        LEFT JOIN users u ON v.user_id = u.id

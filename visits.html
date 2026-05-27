@@ -78,7 +78,7 @@ tr:hover td{background:#fffdf5;}
 </head>
 <body>
 <div class="main">
-  <div class="page-title">Visits</div>
+  <div class="page-title">Visits and visitors map</div>
 
   <div class="stats">
     <div class="stat"><div class="stat-val" id="st-total">—</div><div class="stat-lbl">Total visits today (UTC)</div></div>
@@ -293,7 +293,7 @@ function renderMap() {
   const markers = [];
   for (const g of groupByIp(allVisits)) {
     if (!g.loc) continue;
-    const dotColor = g.anyFlagged ? '#d32f2f' : (g.anyEngaged ? '#3A6B20' : '#9a9a9a');
+    const dotColor = g.anyFlagged ? '#d32f2f' : (g.anyEngaged ? '#3A6B20' : '#e89c2a');
     const m = L.marker([g.loc.lat, g.loc.lng], { icon: dotIcon(dotColor) });
     m.bindPopup(`${flagEmoji(g.country)} ${esc(g.city || '')} ${esc(g.country || '')}<br>${esc(g.ip)}<br>${g.hits} hit${g.hits === 1 ? '' : 's'}`);
     m.on('click', () => focusIp(g.ip));
