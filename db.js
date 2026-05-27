@@ -249,6 +249,7 @@ async function initDb() {
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS video_input_extras JSONB NOT NULL DEFAULT '{}'::jsonb;
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS description TEXT;
     ALTER TABLE concepts ALTER COLUMN filter_category TYPE TEXT;
+    ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS filter_category TEXT;
   `);
 
   // Unique index on prompts.style_id for ON CONFLICT support

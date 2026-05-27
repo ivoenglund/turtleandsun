@@ -1368,14 +1368,23 @@ app.get('/gallery/meta', async (req, res) => {
        ORDER BY c.sort_order ASC, c.name ASC`
     );
     const concepts = conceptsRes.rows;
-    // Distinct comma-split categories across the surviving concepts
+    // Pull every distinct filter token, from BOTH the concept-level
+    // filter_category and the per-item filter_category on concept_media.
     const filterSet = new Set();
-    concepts.forEach((c) => {
-      String(c.filter_category || '').split(',').forEach((part) => {
+    const accumulate = (str) => {
+      String(str || '').split(',').forEach((part) => {
         const t = part.trim().toLowerCase();
         if (t) filterSet.add(t);
       });
-    });
+    };
+    concepts.forEach((c) => accumulate(c.filter_category));
+    const itemsRes = await pool.query(
+      `SELECT DISTINCT cm.filter_category
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       WHERE cm.active = TRUE AND c.active = TRUE AND cm.filter_category IS NOT NULL`
+    );
+    itemsRes.rows.forEach((row) => accumulate(row.filter_category));
     const filters = Array.from(filterSet).sort();
     res.json({ filters, concepts });
   } catch (err) {
@@ -1391,8 +1400,9 @@ app.get('/gallery', async (req, res) => {
     let where = `WHERE cm.active = TRUE AND c.active = TRUE`;
     if (category && category !== 'all') {
       params.push(`%${category}%`);
-      // filter_category is a comma-separated string; match if any token matches
-      where += ` AND c.filter_category ILIKE $${params.length}`;
+      // filter_category is comma-separated on both the concept and the item.
+      // An item matches if EITHER its own categories OR its concept's contain the term.
+      where += ` AND (c.filter_category ILIKE $${params.length} OR cm.filter_category ILIKE $${params.length})`;
     }
     const result = await pool.query(
       `SELECT cm.id, cm.kind, cm.url, cm.thumbnail_url, cm.caption, cm.sort_order, cm.is_primary,
@@ -2241,6 +2251,7 @@ app.post('/admin/concepts/:id/media', requireRole('admin'), upload.single('media
       return res.redirect(`${back}?error=` + encodeURIComponent('Invalid media kind'));
     }
     const caption = (req.body.caption || '').trim() || null;
+    const filterCategory = (req.body.filter_category || '').trim() || null;
     const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
     const urlOverride = (req.body.url_override || '').trim();
 
@@ -2257,7 +2268,6 @@ app.post('/admin/concepts/:id/media', requireRole('admin'), upload.single('media
     }
     if (!url) return res.redirect(`${back}?error=` + encodeURIComponent('Provide a file or a URL'));
 
-    // Next sort_order = max + 1 within this concept
     const maxRes = await pool.query(
       `SELECT COALESCE(MAX(sort_order), 0) AS m FROM concept_media WHERE concept_id = $1`,
       [conceptId]
@@ -2269,9 +2279,9 @@ app.post('/admin/concepts/:id/media', requireRole('admin'), upload.single('media
     }
 
     await pool.query(
-      `INSERT INTO concept_media (concept_id, kind, url, caption, sort_order, is_primary)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [conceptId, kind, url, caption, sortOrder, isPrimary]
+      `INSERT INTO concept_media (concept_id, kind, url, caption, sort_order, is_primary, filter_category)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [conceptId, kind, url, caption, sortOrder, isPrimary, filterCategory]
     );
     res.redirect(`${back}?saved_media=1`);
   } catch (err) {
@@ -2296,6 +2306,7 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
     const sortOrder = req.body.sort_order != null ? parseInt(req.body.sort_order, 10) : null;
     const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
     const active = !(req.body.active === 'false' || req.body.active === '0' || req.body.active === 'off');
+    const filterCategory = req.body.filter_category == null ? null : (String(req.body.filter_category).trim() || null);
 
     if (isPrimary) {
       await pool.query(`UPDATE concept_media SET is_primary = FALSE WHERE concept_id = $1`, [conceptId]);
@@ -2307,9 +2318,10 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
          kind = COALESCE(NULLIF($2, ''), kind),
          sort_order = COALESCE($3, sort_order),
          is_primary = $4,
-         active = $5
-       WHERE id = $6`,
-      [caption, kind, sortOrder, isPrimary, active, mediaId]
+         active = $5,
+         filter_category = $6
+       WHERE id = $7`,
+      [caption, kind, sortOrder, isPrimary, active, filterCategory, mediaId]
     );
 
     if (req.headers.accept === 'application/json' || req.xhr) return res.json({ ok: true });
@@ -2379,9 +2391,10 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
           <td>${thumb}</td>
           <td><a href="/admin/concepts/edit/${m.concept_id}">${escapeHtml(m.concept_name)}</a></td>
           <td>
-            <form method="POST" action="/admin/media/${m.id}/update" class="inline" style="display:inline-flex;gap:6px;align-items:center;">
+            <form method="POST" action="/admin/media/${m.id}/update" class="inline" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
               <input type="hidden" name="return_to" value="/admin/gallery${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}">
               <select name="kind">${kindOptsRow}</select>
+              <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="filters e.g. pet, royal" style="width:160px;">
               <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;">
               <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
               <label style="font-weight:normal;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
@@ -2444,6 +2457,8 @@ app.get('/admin/gallery/new', requireRole('admin'), async (req, res) => {
           <div class="field"><label>Kind *</label><select name="kind" required>${kindOpts}</select></div>
           <div class="field" style="display:flex;align-items:center;"><label style="font-weight:normal;display:flex;align-items:center;gap:6px;"><input type="checkbox" name="is_primary"> Mark as primary for this concept</label></div>
         </div>
+        <div class="field"><label>Item filters</label><input type="text" name="filter_category" placeholder="Comma-separated, e.g. pet, royal">
+          <span class="muted">Item-level filters in addition to the concept's filters. Use to tag this specific item (e.g. "pet" when the underlying photo is of a dog, even though the concept "Royal Portrait" also takes people).</span></div>
         <div class="field"><label>Upload file</label><input type="file" name="media" accept="image/*,video/*"></div>
         <div class="field"><label>— or paste a URL</label><input type="url" name="url_override" placeholder="https://..."></div>
         <button type="submit" class="btn">Add to gallery</button>
@@ -2463,6 +2478,7 @@ app.post('/admin/gallery/new', requireRole('admin'), upload.single('media'), asy
     const kind = (req.body.kind || '').trim();
     if (!CONCEPT_MEDIA_KINDS.includes(kind)) return res.redirect(`${back}?error=` + encodeURIComponent('Invalid kind'));
     const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
+    const filterCategory = (req.body.filter_category || '').trim() || null;
     const urlOverride = (req.body.url_override || '').trim();
 
     let url = urlOverride;
@@ -2488,9 +2504,9 @@ app.post('/admin/gallery/new', requireRole('admin'), upload.single('media'), asy
       await pool.query(`UPDATE concept_media SET is_primary = FALSE WHERE concept_id = $1`, [conceptId]);
     }
     await pool.query(
-      `INSERT INTO concept_media (concept_id, kind, url, sort_order, is_primary)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [conceptId, kind, url, sortOrder, isPrimary]
+      `INSERT INTO concept_media (concept_id, kind, url, sort_order, is_primary, filter_category)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [conceptId, kind, url, sortOrder, isPrimary, filterCategory]
     );
     res.redirect(`/admin/gallery?saved_media=1&concept=${conceptId}`);
   } catch (err) {
