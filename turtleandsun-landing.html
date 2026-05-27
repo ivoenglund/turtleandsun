@@ -58,8 +58,9 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .fb{padding:6px 12px;border:1.5px solid rgba(0,0,0,0.14);border-radius:22px;background:transparent;color:rgba(60,20,0,0.6);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;}
 .fb:hover{border-color:rgba(0,0,0,0.35);color:#1C0A00;}
 .fb.on{background:#1C2A14;border-color:#1C2A14;color:white;}
-.g-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;}
-.g-card{aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:5px solid transparent;outline-offset:0;position:relative;}
+.g-grid{display:block;columns:5;column-gap:10px;margin-bottom:0;}
+.g-grid.g-grid-empty{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;columns:auto;}
+.g-card{aspect-ratio:var(--ratio,9/16);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:5px solid transparent;outline-offset:0;position:relative;break-inside:avoid;margin-bottom:10px;display:block;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
 .g-card.is-selected{outline-color:#3A6B20;box-shadow:0 12px 36px rgba(58,107,32,0.45);transform:translateY(-4px);}
 .g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:#3A6B20;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;z-index:2;}
@@ -380,14 +381,21 @@ function selectCard(card, item) {
   var step2Title = document.getElementById('step2Title');
   if (step2Title) {
     step2Title.innerHTML = '<span style="opacity:0.6;font-weight:600;">Style ·</span> ' + escHtml(concept.name);
+    step2Title.style.textAlign = 'center';
+    step2Title.style.width = '100%';
+    step2Title.style.fontSize = '13px';
+    step2Title.style.marginBottom = '2px';
   }
   var step2Grid = document.getElementById('step2Grid');
   if (step2Grid) {
-    // Replace the four placeholder sthumbs with one large preview of the selected item
+    // Replace the four placeholder sthumbs with one preview sized to match
+    // the height of the orientation-button column on the right (~3 buttons
+    // of 52px each plus 6px gaps = ~168px). At 9:16 aspect that's ~95px wide.
     step2Grid.innerHTML = '';
     step2Grid.style.display = 'block';
-    step2Grid.style.width = '130px';
-    step2Grid.style.maxWidth = '60%';
+    step2Grid.style.width = '95px';
+    step2Grid.style.maxWidth = '40%';
+    step2Grid.style.flexShrink = '0';
     var thumb = document.createElement('div');
     thumb.className = 'sthumb';
     thumb.style.cssText = 'aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#1A0C04;width:100%;height:auto;border:none;';
@@ -683,8 +691,14 @@ async function loadGallery(category) {
     const res = await fetch(url);
     const items = await res.json();
     if (items && items.length > 0) {
-      const grids = [document.getElementById('g1'), document.getElementById('g2'), document.getElementById('g3')];
-      grids.forEach(function(g) { if (g) g.innerHTML = ''; });
+      const g1 = document.getElementById('g1');
+      const g2 = document.getElementById('g2');
+      const g3 = document.getElementById('g3');
+      // Masonry: all items flow into a single grid (g1). Hide the two legacy
+      // overflow grids that the placeholder layout still uses.
+      if (g1) { g1.innerHTML = ''; g1.classList.remove('g-grid-empty'); }
+      if (g2) { g2.innerHTML = ''; g2.style.display = 'none'; }
+      if (g3) { g3.innerHTML = ''; g3.style.display = 'none'; }
       items.forEach(function(item, i) {
         const card = document.createElement('div');
         card.className = 'g-card';
@@ -756,12 +770,32 @@ async function loadGallery(category) {
         card.addEventListener('click', function() {
           selectCard(card, item);
         });
-        const target = grids[Math.min(Math.floor(i / 4), 2)];
-        if (target) target.appendChild(card);
+        // Upgrade the card's aspect-ratio CSS variable once the media's real
+        // dimensions are known. Defaults to 9/16 until then.
+        if (item.kind === 'video') {
+          media.addEventListener('loadedmetadata', function(){
+            if (media.videoWidth && media.videoHeight) {
+              card.style.setProperty('--ratio', media.videoWidth + '/' + media.videoHeight);
+            }
+          });
+        } else {
+          media.addEventListener('load', function(){
+            if (media.naturalWidth && media.naturalHeight) {
+              card.style.setProperty('--ratio', media.naturalWidth + '/' + media.naturalHeight);
+            }
+          });
+        }
+        if (g1) g1.appendChild(card);
       });
       return;
     }
   } catch (e) {}
+  // Fallback to placeholder swatches if /gallery returns nothing or errors.
+  // Use the uniform grid layout (not masonry) for the placeholders.
+  ['g1','g2','g3'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('g-grid-empty'); el.style.display = ''; }
+  });
   fill('g1', pals.slice(0, 4));
   fill('g2', pals.slice(4, 8));
   fill('g3', pals.slice(8, 12));
