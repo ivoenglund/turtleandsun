@@ -34,7 +34,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .hi-lbl{text-align:center;font-size:14px;font-weight:500;color:rgba(60,20,0,0.75);line-height:1.4;font-family:'Plus Jakarta Sans',sans-serif;}
 .hi-lbl strong{display:block;font-weight:500;color:rgba(60,20,0,0.95);font-size:15px;font-family:'Plus Jakarta Sans',sans-serif;}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;}
-.step{background:rgba(255,220,60,0.5);border:2px dashed rgba(0,0,0,0.18);border-radius:12px;padding:22px 14px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;text-align:center;min-height:165px;}
+.step{background:rgba(255,220,60,0.5);border:2px dashed rgba(0,0,0,0.18);border-radius:12px;padding:22px 14px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative;text-align:center;aspect-ratio:9/16;}
 .snum{position:absolute;top:-13px;left:50%;transform:translateX(-50%);width:26px;height:26px;background:#1C2A14;color:white;border-radius:50%;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 .sarr{position:absolute;right:-18px;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;}
 .stitle{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;color:#1C0A00;line-height:1.4;}
@@ -106,7 +106,7 @@ html,body{overflow-x:hidden;}
   .sarr{display:none;}
   .fb,.btn-order,.btn-preview,.btn-upgrade,.btn-skip,.pkg{min-height:44px;}
 }
-.orient-group{display:flex;gap:8px;justify-content:center;margin:2px 0 8px;}
+.orient-group{display:flex;flex-direction:column;gap:6px;align-items:center;margin:6px 0 10px;}
 .orient-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:46px;height:52px;border:1.5px solid rgba(60,20,0,0.3);border-radius:8px;background:rgba(60,20,0,0.18);cursor:pointer;padding:0;}
 .orient-btn.on{border-color:#3A6B20;background:#fff;}
 .orient-shape{display:block;border:2px solid rgba(60,20,0,0.35);border-radius:2px;}
@@ -382,11 +382,12 @@ function selectCard(card, item) {
   if (step2Grid) {
     // Replace the four placeholder sthumbs with one large preview of the selected item
     step2Grid.innerHTML = '';
-    step2Grid.style.display = 'grid';
-    step2Grid.style.gridTemplateColumns = '1fr';
+    step2Grid.style.display = 'block';
+    step2Grid.style.width = '130px';
+    step2Grid.style.maxWidth = '60%';
     var thumb = document.createElement('div');
     thumb.className = 'sthumb';
-    thumb.style.cssText = 'aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#1A0C04;width:100%;';
+    thumb.style.cssText = 'aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#1A0C04;width:100%;height:auto;border:none;';
     var t;
     if (item.kind === 'video') {
       t = document.createElement('video');
@@ -396,15 +397,36 @@ function selectCard(card, item) {
       t.loop = true;
       t.playsInline = true;
       if (item.thumbnail_url) t.poster = item.thumbnail_url;
+      t.addEventListener('loadedmetadata', function(){
+        autoOrient(t.videoWidth, t.videoHeight);
+      });
     } else {
       t = document.createElement('img');
       t.src = item.thumbnail_url || item.url;
       t.alt = concept.name || '';
       t.loading = 'lazy';
+      t.addEventListener('load', function(){
+        autoOrient(t.naturalWidth, t.naturalHeight);
+      });
     }
     t.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;';
     thumb.appendChild(t);
     step2Grid.appendChild(thumb);
+  }
+}
+
+// Map raw media dimensions to one of our three orientation buttons and
+// trigger the existing setOrientation() helper so the right chip is
+// preselected when the user picks a style.
+function autoOrient(w, h) {
+  if (!w || !h) return;
+  var ratio = w / h;
+  var target;
+  if (ratio > 1.2) target = 'landscape';
+  else if (ratio < 0.8) target = 'portrait';
+  else target = 'square';
+  if (typeof setOrientation === 'function') {
+    try { setOrientation(target); } catch (e) {}
   }
 }
 
