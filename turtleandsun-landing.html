@@ -896,6 +896,13 @@ async function loadGallery(category, kind) {
           media.disablePictureInPicture = true;
           media.setAttribute('oncontextmenu', 'return false;');
           if (item.thumbnail_url) media.poster = item.thumbnail_url;
+          // Force the browser to paint the first frame as a still poster
+          // (otherwise videos without a thumbnail_url show as black tiles
+          // until the user hovers and they start playing).
+          media.addEventListener('loadedmetadata', function once() {
+            media.removeEventListener('loadedmetadata', once);
+            try { media.currentTime = 0.1; } catch (e) {}
+          });
           // Out-of-viewport pause only (does not auto-play).
           window._tsVideoObserver.observe(media);
           // Intent-driven activation: hover (desktop) or tap (mobile) starts
