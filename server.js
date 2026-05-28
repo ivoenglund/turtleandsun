@@ -595,7 +595,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery')
     )}
     ${section('\u{1F4B3} Payments',
-      card('Stripe dashboard', 'Payments, payouts, and customers.', 'https://dashboard.stripe.com', true)
+      card('Stripe dashboard', 'Payments, payouts, and customers.', 'https://dashboard.stripe.com', true) +
+      card('Currencies & FX', 'Live FX rates, supported currencies, manual refresh.', '/admin/currencies')
     )}
     ${section('\u{1F6E0}️ Integrations',
       card('fal.ai', 'AI generation credits and usage.', 'https://fal.ai/dashboard', true) +
@@ -1962,6 +1963,104 @@ function conceptAdminPage(title, body) {
 </footer>
 </body></html>`;
 }
+
+
+// ---------------------------------------------------------------------------
+// Admin: Currencies page. Shows live FX rates, last refresh time, supported
+// currencies + their charm ladder size, and a "Refresh now" button to force
+// the ECB fetch on demand.
+// ---------------------------------------------------------------------------
+app.get('/admin/currencies', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT ON (target_currency)
+        target_currency, rate, fetched_at, source
+      FROM fx_rates
+      WHERE base_currency = 'sek'
+      ORDER BY target_currency, fetched_at DESC
+    `);
+
+    const supported = Object.keys(pricing.CHARM_LADDERS);
+    const rateMap = {};
+    for (const r of rows) rateMap[r.target_currency] = r;
+
+    const fmtDate = (d) => d ? new Date(d).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '<span class="muted">—</span>';
+
+    const renderRow = (cur) => {
+      const r = rateMap[cur];
+      const fallback = pricing.FALLBACK_RATES[cur];
+      const ladderLen = (pricing.CHARM_LADDERS[cur] || []).length;
+      const liveRate = r
+        ? Number(r.rate).toFixed(8)
+        : '<em class="muted">using fallback ' + fallback + '</em>';
+      const exampleSek = 14900;
+      const rateMapForExample = r ? { [cur]: Number(r.rate), sek: 1 } : pricing.FALLBACK_RATES;
+      const exampleMinor = pricing.convertAndCharm(exampleSek, cur, rateMapForExample);
+      const examplePretty = pricing.formatDisplay(exampleMinor, cur);
+      return '<tr>' +
+        '<td><strong>' + cur.toUpperCase() + '</strong></td>' +
+        '<td>' + liveRate + '</td>' +
+        '<td>' + (r ? escapeHtml(r.source || '') : '<span class="muted">—</span>') + '</td>' +
+        '<td>' + fmtDate(r ? r.fetched_at : null) + '</td>' +
+        '<td>' + ladderLen + '</td>' +
+        '<td>149 kr → <strong>' + examplePretty + '</strong></td>' +
+      '</tr>';
+    };
+
+    let flash = '';
+    if (req.query.refreshed) flash = '<div class="flash ok">FX rates refreshed.</div>';
+    else if (req.query.error) flash = '<div class="flash err">' + escapeHtml(req.query.error) + '</div>';
+
+    const body = `
+      <div class="top">
+        <h1>Currencies & FX rates</h1>
+        <a href="/admin">← Back to admin</a>
+      </div>
+      ${flash}
+      <p class="muted">FX rates are fetched daily from the ECB reference feed (04:00 UTC) and cached in the <code>fx_rates</code> table. SEK is the base currency. Charm ladders live in <code>pricing.js</code>.</p>
+
+      <form method="POST" action="/admin/currencies/refresh" style="margin:18px 0;">
+        <button type="submit" class="btn">Refresh now (force ECB fetch)</button>
+        <span class="muted" style="margin-left:12px;">Use after an ECB outage or for ad-hoc updates.</span>
+      </form>
+
+      <table style="margin-top:8px;">
+        <thead><tr>
+          <th>Currency</th><th>SEK → X rate</th><th>Source</th><th>Fetched at</th><th>Ladder size</th><th>149 kr example</th>
+        </tr></thead>
+        <tbody>
+          ${supported.map(renderRow).join('')}
+        </tbody>
+      </table>
+
+      <h2 style="margin-top:32px;font-size:18px;">Adding a new currency</h2>
+      <ol class="muted" style="margin-top:8px;">
+        <li>Append a charm ladder to <code>CHARM_LADDERS</code> in <code>pricing.js</code>.</li>
+        <li>Add a fallback rate to <code>FALLBACK_RATES</code> in <code>pricing.js</code>.</li>
+        <li>Add the currency code to the ECB cron's <code>TARGETS</code> in <code>fx_cron.js</code>.</li>
+        <li>Add it to <code>SUPPORTED_CURRENCIES</code> in <code>server.js</code> (and to <code>pickCurrency()</code> if there's a country mapping).</li>
+        <li>Deploy. The cron fires on boot, populating <code>fx_rates</code>.</li>
+      </ol>
+      <p class="muted">Currencies live in code, not the DB — keeps prod safe from accidental edits.</p>
+    `;
+    res.send(conceptAdminPage('Currencies', body));
+  } catch (err) {
+    console.error('[admin currencies] error:', err.message);
+    res.status(500).send('Failed to load currencies: ' + escapeHtml(err.message));
+  }
+});
+
+app.post('/admin/currencies/refresh', requireRole('admin'), async (req, res) => {
+  try {
+    const { refreshFxRates } = require('./fx_cron');
+    const result = await refreshFxRates();
+    if (!result) return res.redirect('/admin/currencies?error=' + encodeURIComponent('ECB fetch failed — see Railway logs.'));
+    res.redirect('/admin/currencies?refreshed=1');
+  } catch (err) {
+    res.redirect('/admin/currencies?error=' + encodeURIComponent('Refresh error: ' + err.message));
+  }
+});
+
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
   try {
