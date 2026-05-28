@@ -829,7 +829,9 @@ function setGalleryColumns(count) {
   const g = document.getElementById('g1');
   if (!g) return;
   const vw = Math.max(window.innerWidth || 0, 320);
-  const maxCols = Math.max(1, Math.floor(vw / 200));
+  // Cap at 7 columns on desktop even on ultra-wide screens — beyond that
+  // tiles get too small relative to the page chrome and feel cramped.
+  const maxCols = Math.min(7, Math.max(1, Math.floor(vw / 200)));
   // Desktop floor: never go below 3 columns on viewports ≥768px so a single
   // tile doesn't blow up to fill the entire gallery width. Mobile (≤767px)
   // can still drop to 1-2 columns naturally.
@@ -1150,7 +1152,7 @@ NavBar.init({ requireAuth: false }).then(status => {
 });
 </script>
 <footer style="text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;">
-  <p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
+<p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
   <p>Turtle and Sun is a service by 3doc AB · Org.nr 556723-1864 · Fleminggatan 15, 112 26 Stockholm</p>
 </footer>
 </body>
