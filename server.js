@@ -126,7 +126,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const { email, image_url, portrait_url, product, currency } = session.metadata || {};
+    const { email, image_url, portrait_url, product, currency, concept_id, customer_name } = session.metadata || {};
 
     console.log('checkout.session.completed — email:', email, 'product:', product, 'portrait_url:', portrait_url);
 
@@ -207,7 +207,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
     // Deliver portrait — no re-generation needed
     console.log('Delivering for order:', orderId);
-    generateForOrder(portrait_url || image_url, product, email || '', orderId).catch(async (err) => {
+    generateForOrder(portrait_url || image_url, product, email || '', orderId, concept_id, customer_name).catch(async (err) => {
       console.error('Delivery error for session:', session.id, err.message);
 
       // Record the failure so it can be retried from the admin panel
@@ -849,7 +849,7 @@ app.post('/admin/failed-deliveries/retry', requireRole('admin'), async (req, res
     await pool.query('UPDATE failed_deliveries SET retry_count = retry_count + 1 WHERE id = $1', [id]);
 
     try {
-      await generateForOrder(row.portrait_url, row.product, row.email, row.order_id);
+      await generateForOrder(row.portrait_url, row.product, row.email, row.order_id, null, null);
       await pool.query('UPDATE failed_deliveries SET resolved = true WHERE id = $1', [id]);
       res.json({ ok: true, resolved: true });
     } catch (genErr) {
@@ -1718,12 +1718,46 @@ async function generateVideo(portrait_url) {
   return result.data.video.url;
 }
 
-// portrait_url is the already-generated preview image — no re-generation needed for image product
-async function generateForOrder(portrait_url, product, email, orderId) {
+// portrait_url is the already-generated preview image — no re-generation needed for image product.
+// Now concept-aware: if conceptId is provided, the function dispatches via the registry
+// (generation.generateTalking / generation.generateVideo) using the concept's stored fields.
+// Legacy orders without conceptId continue to use the hardcoded local generateVideo(portrait_url).
+async function generateForOrder(portrait_url, product, email, orderId, conceptId, customerName) {
   let imageUrl = null;
   let videoUrl = null;
+  let concept = null;
 
-  if (product === 'image' || product === 'bundle') {
+  // Load the concept if conceptId was passed through (new path).
+  if (conceptId) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, slug, name, input_type, image_prompt, video_prompt,
+                fal_image_model, fal_video_model, talking_model,
+                speech_text, voice_ids, reference_image_urls,
+                image_input_extras, video_input_extras
+         FROM concepts WHERE id = $1`,
+        [parseInt(conceptId, 10)]
+      );
+      concept = rows[0] || null;
+    } catch (err) {
+      console.warn('[generateForOrder] concept lookup failed (falling back to legacy path):', err.message);
+    }
+  }
+
+  // Resolve user id for audit log (best-effort).
+  let userId = null;
+  if (email) {
+    try {
+      const u = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+      userId = u.rows[0]?.id || null;
+    } catch (e) { /* non-fatal */ }
+  }
+
+  // Image side — only for image / image_video / bundle products.
+  // The preview portrait the customer already accepted IS the deliverable.
+  const wantsImage = (product === 'image' || product === 'bundle' ||
+                      (concept && (concept.input_type === 'image' || concept.input_type === 'image_video')));
+  if (wantsImage) {
     imageUrl = portrait_url;
     console.log('Using preview portrait as final image:', imageUrl);
     if (orderId) {
@@ -1731,8 +1765,70 @@ async function generateForOrder(portrait_url, product, email, orderId) {
     }
   }
 
-  if (product === 'video' || product === 'bundle') {
-    videoUrl = await generateVideo(portrait_url);
+  // Video side — dispatch through the concept type when present.
+  const wantsTalking = !!(concept && concept.input_type === 'talking');
+  const wantsVideo  = (product === 'video' || product === 'bundle' ||
+                       (concept && (concept.input_type === 'image_video' || concept.input_type === 'video'))) && !wantsTalking;
+
+  if (wantsTalking) {
+    const modelId = concept.talking_model || 'fal-ai/kling-video/v3/pro/image-to-video__talking';
+    const logged = await generation.logGenerationStart({
+      conceptId: concept.id,
+      modelId,
+      inputPayload: { photoUrl: portrait_url, speech: concept.speech_text, name: customerName },
+      sourceType: 'customer_order',
+      userId, orderId,
+    });
+    try {
+      const result = await generation.generateTalking({
+        modelId,
+        photoUrl: portrait_url,
+        visualPrompt: concept.video_prompt || concept.image_prompt,
+        speechText: concept.speech_text,
+        customerName,
+        inputExtras: concept.video_input_extras || {},
+        voiceIds: concept.voice_ids || [],
+      });
+      videoUrl = result.url;
+      await generation.logGenerationFinish(logged.id, { falOutputUrl: videoUrl });
+      console.log('[generateForOrder] talking video generated:', videoUrl);
+      if (orderId) {
+        await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
+      }
+    } catch (err) {
+      await generation.logGenerationFailure(logged.id, err.message);
+      throw err;
+    }
+  } else if (wantsVideo) {
+    // For concept-aware video orders, route through the registry. For legacy
+    // orders (no concept), fall back to the hardcoded local generateVideo().
+    const modelId = concept && concept.fal_video_model ? concept.fal_video_model : null;
+    if (concept && modelId) {
+      const logged = await generation.logGenerationStart({
+        conceptId: concept.id,
+        modelId,
+        inputPayload: { photoUrl: portrait_url, prompt: concept.video_prompt },
+        sourceType: 'customer_order',
+        userId, orderId,
+      });
+      try {
+        const result = await generation.generateVideo({
+          provider: 'fal',
+          modelId,
+          prompt: concept.video_prompt,
+          photoUrl: portrait_url,
+          inputExtras: concept.video_input_extras || {},
+        });
+        videoUrl = result.url;
+        await generation.logGenerationFinish(logged.id, { falOutputUrl: videoUrl });
+      } catch (err) {
+        await generation.logGenerationFailure(logged.id, err.message);
+        throw err;
+      }
+    } else {
+      // Legacy hardcoded path — Royal Portrait video.
+      videoUrl = await generateVideo(portrait_url);
+    }
     console.log('Generated video:', videoUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
@@ -1740,7 +1836,8 @@ async function generateForOrder(portrait_url, product, email, orderId) {
   }
 
   if (email) {
-    await sendResultEmail(email, product, imageUrl, videoUrl);
+    // Deliver via email — for talking, we surface the video alongside the still preview.
+    await sendResultEmail(email, wantsTalking ? 'talking' : product, imageUrl, videoUrl);
   }
 }
 
