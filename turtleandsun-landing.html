@@ -634,10 +634,11 @@ document.getElementById('btnPreview').addEventListener('click', async function()
   spinner.style.display = 'block';
   result.style.display = 'none';
   try {
+    const conceptId = window.tsSelectedConcept ? window.tsSelectedConcept.id : null;
     const res = await fetch('/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: cloudinaryUrl, email, orientation }),
+      body: JSON.stringify({ image_url: cloudinaryUrl, email, orientation, concept_id: conceptId }),
     });
     if (res.status === 403) {
       // 3 free previews used — turn the button into a direct Buy now CTA
@@ -713,16 +714,17 @@ async function proceedToCheckout(productOverride) {
   btn.disabled = true;
   btn.textContent = 'Redirecting…';
   // Persist state so a browser back from Stripe restores the user's progress
+  const conceptId = window.tsSelectedConcept ? window.tsSelectedConcept.id : null;
   try {
     sessionStorage.setItem('ts_state', JSON.stringify({
-      cloudinaryUrl, previewImageUrl, selectedProduct: product, orientation, email, ts: Date.now()
+      cloudinaryUrl, previewImageUrl, selectedProduct: product, orientation, email, conceptId, ts: Date.now()
     }));
   } catch (e) {}
   try {
     const res = await fetch('/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation, currency: window.tsCurrency && window.tsCurrency.code }),
+      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation, currency: window.tsCurrency && window.tsCurrency.code, concept_id: conceptId }),
     });
     const data = await res.json();
     if (data.url) {
