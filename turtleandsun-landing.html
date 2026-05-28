@@ -837,13 +837,9 @@ function setGalleryColumns(count) {
   // can still drop to 1-2 columns naturally.
   const isDesktop = vw >= 768;
   const desktopFloor = isDesktop ? 3 : 1;
-  let desired;
-  if (count <= 1)       desired = 1;
-  else if (count === 2) desired = 2;
-  else if (count <= 3)  desired = 3;
-  else if (count <= 8)  desired = 4;
-  else if (count <= 20) desired = 5;
-  else                  desired = maxCols;   // many items → use viewport max
+  // Aim for one column per item up to the viewport max (capped at 7 above).
+  // Floors at desktopFloor (3 on desktop) so a 1-item gallery still looks normal.
+  const desired = count <= 0 ? 1 : count;
   const cols = Math.min(maxCols, Math.max(desktopFloor, desired));
   g.style.columnWidth = 'auto';
   g.style.columns = String(cols);
