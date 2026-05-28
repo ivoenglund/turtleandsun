@@ -58,8 +58,13 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .fb{padding:6px 12px;border:1.5px solid rgba(0,0,0,0.14);border-radius:22px;background:transparent;color:rgba(60,20,0,0.6);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;}
 .fb:hover{border-color:rgba(0,0,0,0.35);color:#1C0A00;}
 .fb.on{background:#1C2A14;border-color:#1C2A14;color:white;}
-.g-grid{display:block;columns:5;column-gap:10px;margin-bottom:0;}
-.g-grid.g-grid-empty{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;columns:auto;}
+.g-grid{display:block;column-width:200px;columns:auto;column-gap:10px;margin-bottom:0;
+  /* Break out of the 1100px .wrap to use the full viewport width minus a comfortable side margin.
+     Column count auto-fills based on column-width: ~3 cols at 700px, 6 at 1200px, 8 at 1600px, 11 at 2200px. */
+  margin-left:calc(560px - 50vw);margin-right:calc(560px - 50vw);
+  padding-left:20px;padding-right:20px;}
+.g-grid.g-grid-empty{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;columns:auto;}
+@media(max-width:1180px){.g-grid{margin-left:0;margin-right:0;padding-left:0;padding-right:0;}}
 .g-card{aspect-ratio:var(--ratio,9/16);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:5px solid transparent;outline-offset:0;position:relative;break-inside:avoid;margin-bottom:10px;display:block;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
 .g-card.is-selected{outline-color:#3A6B20;box-shadow:0 12px 36px rgba(58,107,32,0.45);transform:translateY(-4px);}
@@ -84,7 +89,7 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 #previewResult img{max-width:260px;width:100%;display:block;border-radius:8px;margin:0 auto;pointer-events:none;-webkit-user-drag:none;user-select:none;}
 .spinner{width:20px;height:20px;border:2.5px solid rgba(0,0,0,0.15);border-top-color:#3A6B20;border-radius:50%;animation:spin 0.7s linear infinite;display:none;margin:2px auto;}
 @keyframes spin{to{transform:rotate(360deg);}}
-@media(max-width:700px){.wrap{padding:0 16px;}.hero-imgs{grid-template-columns:1fr 1fr;}.steps{grid-template-columns:1fr 1fr;}.g-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:700px){.wrap{padding:0 16px;}.hero-imgs{grid-template-columns:1fr 1fr;}.steps{grid-template-columns:1fr 1fr;}.g-grid{column-width:auto;columns:2;}}
 #upsellModal{display:none;position:fixed;inset:0;background:rgba(28,10,0,0.6);z-index:1000;align-items:center;justify-content:center;}
 #upsellModal.open{display:flex;}
 .upsell-card{background:#FFF9E6;border-radius:20px;padding:36px 28px 28px;max-width:400px;width:calc(100% - 48px);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.4);}
@@ -741,22 +746,66 @@ async function proceedToCheckout(productOverride) {
   }
 }
 
-// Singleton IntersectionObserver — only plays videos that are visibly on
-// screen so we don't melt the user's CPU when the gallery has 10+ videos.
-// Threshold 0.4 means a video must be ~40% in view before it starts playing.
+// Video activation controller.
+// Behavior:
+//   - At most ONE video plays at a time across the whole gallery (saves CPU
+//     when the user has 30+ tiles open on a wide screen).
+//   - Activation triggers: mouseenter (desktop), touchstart (mobile/tablet).
+//   - Out-of-viewport pause: a separate IntersectionObserver pauses any
+//     playing video that leaves the screen, so scrolling away frees resources.
+//   - Selection (click) and lightbox (double-click) are unchanged.
+window._tsActiveVideo = null;
+window._tsPlayVideo = function(v) {
+  if (!v || v === window._tsActiveVideo) return;
+  // Pause whoever was playing
+  if (window._tsActiveVideo && !window._tsActiveVideo.paused) {
+    try { window._tsActiveVideo.pause(); } catch (e) {}
+  }
+  window._tsActiveVideo = v;
+  var p = v.play();
+  if (p && p.catch) p.catch(function(){});
+};
+window._tsPauseVideo = function(v) {
+  if (!v) return;
+  if (!v.paused) { try { v.pause(); } catch (e) {} }
+  if (window._tsActiveVideo === v) window._tsActiveVideo = null;
+};
+
+// Singleton IntersectionObserver — does NOT auto-play, only pauses anything
+// playing once it leaves the viewport. Play is intent-driven (hover/tap).
 window._tsVideoObserver = window._tsVideoObserver || new IntersectionObserver(function(entries) {
   entries.forEach(function(entry) {
-    var v = entry.target;
-    if (entry.intersectionRatio >= 0.4) {
-      if (v.paused) {
-        var p = v.play();
-        if (p && p.catch) p.catch(function(){});
-      }
-    } else {
-      if (!v.paused) v.pause();
+    if (entry.intersectionRatio < 0.2) {
+      window._tsPauseVideo(entry.target);
     }
   });
-}, { threshold: [0, 0.4, 1] });
+}, { threshold: [0, 0.2, 1] });
+
+// Wire hover (desktop) + tap (mobile) on every video card. Idempotent — safe
+// to call repeatedly when gallery re-renders.
+window._tsAttachVideoActivators = function(cardEl, videoEl) {
+  if (!cardEl || !videoEl || cardEl._tsActivatorsAttached) return;
+  cardEl._tsActivatorsAttached = true;
+
+  // Desktop: hover plays, mouseleave pauses (with a tiny grace so brushing
+  // past doesn't thrash play/pause).
+  var leaveTimer = null;
+  cardEl.addEventListener('mouseenter', function() {
+    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+    window._tsPlayVideo(videoEl);
+  });
+  cardEl.addEventListener('mouseleave', function() {
+    leaveTimer = setTimeout(function() { window._tsPauseVideo(videoEl); }, 120);
+  });
+
+  // Mobile: tap plays. The card's existing click handler still fires for
+  // selection. We attach `touchstart` (not click) so the video starts
+  // immediately, not after the click-vs-tap heuristic delay. Tapping a
+  // different card automatically pauses the previous one via _tsPlayVideo.
+  cardEl.addEventListener('touchstart', function() {
+    window._tsPlayVideo(videoEl);
+  }, { passive: true });
+};
 
 // Current filter selections — driven by chips, both axes can be combined.
 window.tsGalleryFilter = { category: 'all', kind: 'all' };
@@ -799,8 +848,12 @@ async function loadGallery(category, kind) {
           media.disablePictureInPicture = true;
           media.setAttribute('oncontextmenu', 'return false;');
           if (item.thumbnail_url) media.poster = item.thumbnail_url;
-          // Hand off play/pause to the viewport observer
+          // Out-of-viewport pause only (does not auto-play).
           window._tsVideoObserver.observe(media);
+          // Intent-driven activation: hover (desktop) or tap (mobile) starts
+          // playback, and only one video plays at a time globally.
+          // Deferred so the card element exists when the activator wires up.
+          setTimeout(function() { window._tsAttachVideoActivators(card, media); }, 0);
           // Sound toggle — bottom-right, only visible when card is selected
           soundBtn = document.createElement('button');
           soundBtn.type = 'button';
