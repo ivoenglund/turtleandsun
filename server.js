@@ -2055,6 +2055,12 @@ function conceptFormBody(concept, errorMsg) {
   const modelOption = (id, model, selected) =>
     `<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(model.label)}</option>`;
   const imageOptions = generation.listModels('image').map((m) => modelOption(m.id, generation.getModel(m.id), falImage)).join('');
+  // Pre-serialize pricing_rules JSONB for the textarea.
+  if (c && c.pricing_rules != null && typeof c.pricing_rules === 'object') {
+    c.pricing_rules_json = Object.keys(c.pricing_rules).length === 0 ? '' : JSON.stringify(c.pricing_rules, null, 2);
+  } else {
+    c.pricing_rules_json = '';
+  }
   const videoOptions = generation.listModels('video').map((m) => modelOption(m.id, generation.getModel(m.id), falVideo)).join('');
 
   return `
@@ -2154,6 +2160,38 @@ function conceptFormBody(concept, errorMsg) {
         <div class="field"><label>After image</label><input type="file" name="after_image" accept="image/*">${mediaPreview(c.after_image_url, 'image')}</div>
         <div class="field"><label>Example video</label><input type="file" name="example_video" accept="video/*">${mediaPreview(c.example_video_url, 'video')}</div>
       </div>
+
+      <div style="margin:24px 0 8px;padding:18px;background:#FFF9E6;border-radius:10px;border:1px solid rgba(0,0,0,0.08);">
+        <h2 style="font-size:18px;margin:0 0 6px;">Pricing</h2>
+        <p class="muted" style="margin:0 0 14px;">Per-concept pricing. Tier picks a baseline; SEK override forces a specific SEK price; rules JSONB handles quantity breaks, modifiers, recipient fees. Leave all blank to inherit the default tier for this concept's input_type.</p>
+        <div class="row">
+          <div class="field">
+            <label>Price tier</label>
+            <select name="price_tier">
+              <option value=""${v('price_tier') ? '' : ' selected'}>(use default for input_type)</option>
+              <option value="image"${v('price_tier') === 'image' ? ' selected' : ''}>image — 99 kr</option>
+              <option value="video"${v('price_tier') === 'video' ? ' selected' : ''}>video — 149 kr</option>
+              <option value="talking"${v('price_tier') === 'talking' ? ' selected' : ''}>talking — 149 kr</option>
+              <option value="bundle"${v('price_tier') === 'bundle' ? ' selected' : ''}>bundle — 199 kr</option>
+              <option value="premium"${v('price_tier') === 'premium' ? ' selected' : ''}>premium — 399 kr (Family Portrait)</option>
+              <option value="premium_video"${v('price_tier') === 'premium_video' ? ' selected' : ''}>premium_video — 899 kr (Talking ancestor)</option>
+            </select>
+            <span class="muted">Overrides the input_type default. NULL = derived from input_type at runtime.</span>
+          </div>
+          <div class="field">
+            <label>SEK override (minor units / öre)</label>
+            <input type="number" name="unit_price_sek_minor" value="${c.unit_price_sek_minor == null ? '' : escapeHtml(c.unit_price_sek_minor)}" placeholder="e.g. 12900 = 129 kr">
+            <span class="muted">Optional. Bypasses the tier entirely. 12900 öre = 129 kr. Leave blank to use tier.</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Pricing rules (JSON, advanced)</label>
+          <textarea name="pricing_rules" rows="4" placeholder='{"min_quantity":1,"quantity_breaks":[{"min":1,"unit_price_sek_minor":9900},{"min":5,"unit_price_sek_minor":8900}],"per_recipient_fee_sek_minor":1000,"modifiers":{"resolution_4K":{"type":"flat","add_sek_minor":5000}}}'>${v('pricing_rules_json')}</textarea>
+          <span class="muted">JSONB. Powers quantity breaks, per-recipient fees, modifiers (4K, A3, rush). Schema: {min_quantity, max_quantity, quantity_breaks[], per_recipient_fee_sek_minor, modifiers{}}. Leave empty for simple unit pricing.</span>
+        </div>
+        <p class="muted" style="margin:10px 0 0;">Preview the resolved price: <a href="/admin/api/pricing/preview?concept_id=${c.id || ''}&currency=sek" target="_blank">SEK</a> · <a href="/admin/api/pricing/preview?concept_id=${c.id || ''}&currency=usd" target="_blank">USD</a> · <a href="/admin/api/pricing/preview?concept_id=${c.id || ''}&currency=eur" target="_blank">EUR</a> · <a href="/admin/api/pricing/preview?concept_id=${c.id || ''}&currency=gbp" target="_blank">GBP</a> (after save).</p>
+      </div>
+
       <div class="field"><label><input type="checkbox" name="active" value="on"${activeChecked}> Active</label></div>
       <button class="btn" type="submit">${isEdit ? 'Save changes' : 'Create concept'}</button>
     </form>
@@ -2513,7 +2551,27 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
     const sortOrder = parseInt(req.body.sort_order, 10) || 0;
     const active = req.body.active === 'on' || req.body.active === 'true' || req.body.active === '1';
 
-    const userInputEnabled = req.body.user_input_enabled === 'on' || req.body.user_input_enabled === 'true' || req.body.user_input_enabled === '1';
+    // Pricing fields.
+    const priceTier = (req.body.price_tier || '').trim() || null;
+    const validTiers = new Set(['image','video','talking','bundle','premium','premium_video']);
+    if (priceTier && !validTiers.has(priceTier)) {
+      return fail('Invalid price_tier.');
+    }
+    let unitPriceSekMinor = null;
+    if (req.body.unit_price_sek_minor != null && String(req.body.unit_price_sek_minor).trim() !== '') {
+      const n = parseInt(req.body.unit_price_sek_minor, 10);
+      if (!Number.isInteger(n) || n < 0) return fail('SEK price override must be a non-negative integer (minor units / öre).');
+      unitPriceSekMinor = n;
+    }
+    let pricingRules = {};
+    const pricingRulesRaw = (req.body.pricing_rules || '').trim();
+    if (pricingRulesRaw) {
+      try { pricingRules = JSON.parse(pricingRulesRaw); }
+      catch (e) { return fail('Pricing rules must be valid JSON: ' + e.message); }
+      if (typeof pricingRules !== 'object' || Array.isArray(pricingRules)) return fail('Pricing rules must be a JSON object {...}.');
+    }
+
+        const userInputEnabled = req.body.user_input_enabled === 'on' || req.body.user_input_enabled === 'true' || req.body.user_input_enabled === '1';
     const userInputLabel = (req.body.user_input_label || '').trim() || null;
     const userInputPlaceholder = (req.body.user_input_placeholder || '').trim() || null;
     const userInputVariable = (req.body.user_input_variable || '').trim() || null;
@@ -2571,12 +2629,15 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            user_input_enabled = $15, user_input_label = $16, user_input_placeholder = $17,
            user_input_variable = $18, user_input_max_length = $19,
            image_input_extras = $20, video_input_extras = $21, description = $22,
+           price_tier = $23, unit_price_sek_minor = $24, pricing_rules = $25,
            updated_at = NOW()
-         WHERE id = $23`,
+         WHERE id = $26`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
-         imageInputExtras, videoInputExtras, description, editId]
+         imageInputExtras, videoInputExtras, description,
+         priceTier, unitPriceSekMinor, pricingRules,
+         editId]
       );
     } else {
       await pool.query(
@@ -2584,12 +2645,14 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            (slug, name, filter_category, input_type, before_image_url, after_image_url, example_video_url,
             image_prompt, video_prompt, fal_image_model, fal_video_model, social_caption, active, sort_order,
             user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length,
-            image_input_extras, video_input_extras, description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+            image_input_extras, video_input_extras, description,
+            price_tier, unit_price_sek_minor, pricing_rules)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
-         imageInputExtras, videoInputExtras, description]
+         imageInputExtras, videoInputExtras, description,
+         priceTier, unitPriceSekMinor, pricingRules]
       );
     }
     res.redirect('/admin/concepts?saved=1' + (warn ? '&warn=' + encodeURIComponent(warn) : ''));
