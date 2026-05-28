@@ -4,19 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Turtle and Sun — The family photo you could never take</title>
-<meta name="description" content="Turn your pet or family photo into a stunning royal portrait, video, or printed card. Delivered to your inbox in minutes. From 99 kr.">
+<meta name="description" content="Turn your pet or family photo into a stunning royal portrait or cinematic video. Delivered to your inbox in minutes. From 99 kr.">
 <link rel="canonical" href="https://turtleandsun.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Turtle and Sun">
 <meta property="og:title" content="Turtle and Sun — The family photo you could never take">
-<meta property="og:description" content="Turn your pet or family photo into a stunning royal portrait, video, or printed card. Delivered to your inbox in minutes. From 99 kr.">
+<meta property="og:description" content="Turn your pet or family photo into a stunning royal portrait or cinematic video. Delivered to your inbox in minutes. From 99 kr.">
 <meta property="og:image" content="https://turtleandsun.com/assets/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://turtleandsun.com/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Turtle and Sun — The family photo you could never take">
-<meta name="twitter:description" content="Turn your pet or family photo into a stunning royal portrait, video, or printed card. Delivered to your inbox in minutes. From 99 kr.">
+<meta name="twitter:description" content="Turn your pet or family photo into a stunning royal portrait or cinematic video. Delivered to your inbox in minutes. From 99 kr.">
 <meta name="twitter:image" content="https://turtleandsun.com/assets/og-card.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@300;400&display=swap');
@@ -157,7 +157,8 @@ html,body{overflow-x:hidden;}
       </div>
       <div class="hi-lbl"><strong>a cinematic video</strong></div>
     </div>
-    <div class="hi" style="margin-top:-8px;">
+    <!-- Printed card hidden for v1 launch — print/Gelato is Phase 1.5. -->
+    <div class="hi" style="margin-top:-8px;display:none;">
       <div class="hi-box" style="aspect-ratio:991/1587;">
         <img src="/assets/hero-4.jpg" alt="Print">
       </div>
@@ -243,24 +244,21 @@ document.getElementById('styleDescText').textContent = 'Browse the gallery below
 const styleDescriptions = {
   'people': {
     title: 'A portrait of you or someone you love',
-    text: 'Upload a photo of a person and we transform it into a stunning AI portrait. Choose your style from the gallery — oil painting, watercolour, cinematic, and more. Available as a digital image, a short video, or a printed card sent straight to their door.'
+    text: 'Upload a photo of a person and we transform it into a stunning AI portrait. Choose your style from the gallery — oil painting, watercolour, cinematic, and more. Available as a digital image or a short cinematic video.'
   },
   'pets': {
     title: 'Your pet, reimagined',
-    text: 'Upload a photo of your cat, dog or any pet and we turn it into a beautiful AI portrait. Pick any style you see in the gallery. You can get a still portrait, a short cinematic video of your pet coming to life, or a printed card posted anywhere in the world.'
+    text: 'Upload a photo of your cat, dog or any pet and we turn it into a beautiful AI portrait. Pick any style you see in the gallery. You can get a still portrait or a short cinematic video of your pet coming to life.'
   },
   'couples': {
     title: 'A portrait for two',
-    text: 'Upload a photo of you and your partner and we create a stunning couples portrait in any style you choose. Perfect for anniversaries, weddings, or just because. Available as a digital image, video, or printed card.'
+    text: 'Upload a photo of you and your partner and we create a stunning couples portrait in any style you choose. Perfect for anniversaries, weddings, or just because. Available as a digital image or video.'
   },
   'families': {
     title: 'The whole family together',
-    text: 'Upload a family photo — or even combine photos of family members who live far apart — and we create a portrait of everyone together. The family photo you could never take. Available as image, video, or printed card.'
+    text: 'Upload a family photo — or even combine photos of family members who live far apart — and we create a portrait of everyone together. The family photo you could never take. Available as image or video.'
   },
-  'prints': {
-    title: 'A printed card, posted to their door',
-    text: 'We print your AI portrait on premium card and post it anywhere in the world. Add a personal message on the back. Perfect for birthdays, anniversaries, Christmas, or any occasion. Ships worldwide.'
-  },
+  // 'prints' category hidden for v1 launch — print/Gelato is Phase 1.5.
   'all': {
     title: '',
     text: 'Browse the gallery below. Click any style to see what we can create from your photo.'
