@@ -574,11 +574,14 @@ app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
   if (!cloudinaryUrl) return res.status(400).json({ error: 'cloudinaryUrl required' });
   if (!product)       return res.status(400).json({ error: 'product required' });
   try {
+    // The `orders` table columns are minimal — image/portrait/concept aren't
+    // persisted there; they're passed directly to generateForOrder() (same as
+    // what the Stripe webhook does after reading them from session.metadata).
     const ins = await pool.query(
-      `INSERT INTO orders (email, product, amount, currency, status, image_url, portrait_url, concept_id, customer_name, created_at)
-       VALUES ($1, $2, 0, 'sek', 'paid', $3, $3, $4, $5, NOW())
+      `INSERT INTO orders (email, style_id, product, status, amount, currency)
+       VALUES ($1, NULL, $2, 'paid', 0, 'sek')
        RETURNING id`,
-      [email || 'dev@turtleandsun.com', product, cloudinaryUrl, conceptId || null, customerName || null]
+      [email || 'dev@turtleandsun.com', product]
     );
     const orderId = ins.rows[0].id;
     console.log('[dev-skip-checkout] order', orderId, 'product', product, 'concept', conceptId);
