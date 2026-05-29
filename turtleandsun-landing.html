@@ -234,11 +234,12 @@ html,body{overflow-x:hidden;}
 .ts-frame-sound{left:10px;}
 .ts-demo:not(.is-order) .ts-output .ts-frame-action{display:flex;}
 
-/* Global rolling-demo sound toggle — top-right of the demo area */
-.ts-demo-sound{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:18px;line-height:1;display:none;align-items:center;justify-content:center;z-index:6;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-demo-sound:hover{background:rgba(0,0,0,0.88);transform:scale(1.08);}
-.ts-demo-sound.is-on{background:#FFE800;color:#1C0A00;}
-.ts-demo:not(.is-order) .ts-demo-sound{display:flex;}
+/* Global rolling-demo controls (pause + sound) — top-right of the demo area */
+.ts-demo-ctrls{position:absolute;top:8px;right:8px;display:none;gap:6px;z-index:6;}
+.ts-demo:not(.is-order) .ts-demo-ctrls{display:flex;}
+.ts-demo-ctrl{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
+.ts-demo-ctrl:hover{background:rgba(0,0,0,0.88);transform:scale(1.08);}
+.ts-demo-ctrl.is-on{background:#FFE800;color:#1C0A00;}
 
 /* Under-frame label — morphs to Buy button after first preview */
 .ts-under{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px;flex-wrap:wrap;border:1.5px solid transparent;background:transparent;color:inherit;font:inherit;cursor:default;padding:6px 14px;border-radius:10px;width:100%;transition:background 0.3s,border-color 0.3s,padding 0.3s,box-shadow 0.3s,transform 0.15s;pointer-events:none;}
@@ -368,9 +369,13 @@ html,body{overflow-x:hidden;}
     </div>
 
     <div class="ts-demo" id="ts-demo">
-      <!-- Global sound toggle for the rolling demo. When ON, every rolling
-           video plays with audio; when OFF (default), all videos are muted. -->
-      <button type="button" class="ts-demo-sound" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound">🔇</button>
+      <!-- Top-right controls for the rolling demo:
+             1. Rolling on/off (⏸/▶) — also toggled by clicking the demo frames.
+             2. Sound on/off (🔇/🔊) — applies to whichever rolling video is showing. -->
+      <div class="ts-demo-ctrls">
+        <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo">⏸</button>
+        <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound">🔇</button>
+      </div>
       <!-- 1. SOURCE -->
       <div class="ts-col ts-source" id="ts-source">
         <div class="ts-mobile-step"><span class="ts-ms-num">1</span><span class="ts-ms-text">Upload a photo</span></div>
@@ -1901,7 +1906,53 @@ NavBar.init({ requireAuth: false }).then(status => {
   // Global rolling-demo sound. When `true`, every cycled video plays unmuted;
   // when `false` (default — required for autoplay to start) videos are muted.
   let globalSoundOn = false;
+  // When `true`, the rolling demo is paused: no auto-advance, current video stops.
+  let cyclePaused = false;
   const demoSoundBtn = document.getElementById('ts-demo-sound');
+  const demoPauseBtn = document.getElementById('ts-demo-pause');
+
+  function setPaused(p){
+    cyclePaused = !!p;
+    if (cyclePaused) {
+      if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
+      var v = videos[current];
+      if (v && typeof v.pause === 'function') { try { v.pause(); } catch (e) {} }
+    } else {
+      var v2 = videos[current];
+      if (v2 && typeof v2.play === 'function') {
+        try { var p2 = v2.play(); if (p2 && p2.catch) p2.catch(function(){}); } catch (e) {}
+      }
+      scheduleNext();
+    }
+    if (demoPauseBtn) {
+      demoPauseBtn.textContent = cyclePaused ? '▶' : '⏸';
+      demoPauseBtn.classList.toggle('is-on', cyclePaused);
+      demoPauseBtn.title = cyclePaused ? 'Resume rolling demo' : 'Pause rolling demo';
+    }
+  }
+
+  if (demoPauseBtn) {
+    demoPauseBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      setPaused(!cyclePaused);
+    });
+  }
+
+  // Click anywhere on the still / video output frames to pause / resume the
+  // demo so visitors can browse the gallery below without the carousel cycling.
+  // We attach to the frames (not the whole demo) so the source-frame upload
+  // click and the chip clicks keep their existing behaviour.
+  function attachClickToPause(el){
+    if (!el) return;
+    el.addEventListener('click', function(e){
+      if (mode !== 'demo') return;
+      // Ignore clicks on the maximise / sound buttons inside the frame.
+      if (e.target.closest('.ts-frame-action')) return;
+      setPaused(!cyclePaused);
+    });
+  }
+  attachClickToPause(stillEl);
+  attachClickToPause(videoEl);
 
   // Apply the global sound state to the currently-visible video. Other videos
   // stay muted so we never have two audio sources at once.
@@ -1961,6 +2012,7 @@ NavBar.init({ requireAuth: false }).then(status => {
       _endedHandlerOn = null;
     }
     if (mode !== 'demo' || !concepts.length) return;
+    if (cyclePaused) return; // user has paused the rolling demo
 
     var v = videos[current];
     var t = activeTriplet(concepts[current]);
