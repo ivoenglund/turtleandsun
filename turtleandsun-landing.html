@@ -1490,7 +1490,20 @@ NavBar.init({ requireAuth: false }).then(status => {
     }
   }
 
+  // Only restore when the customer actually returned from Stripe — either via the browser
+  // back button (navigation type "back_forward") or via Stripe's cancel redirect (referrer = stripe.com).
+  // A plain refresh or a fresh visit should NOT auto-restore.
+  function shouldRestore() {
+    try {
+      const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || null;
+      if (nav && nav.type === 'back_forward') return true;
+    } catch (e) {}
+    if (document.referrer && /(^|\.)stripe\.com/i.test(new URL(document.referrer).hostname || '')) return true;
+    return false;
+  }
+
   function restoreFromSession() {
+    if (!shouldRestore()) return false;
     let saved;
     try { saved = JSON.parse(sessionStorage.getItem('ts_state') || 'null'); } catch (e) { return false; }
     if (!saved || !saved.ts || Date.now() - saved.ts > 2 * 60 * 60 * 1000) return false;
