@@ -86,21 +86,16 @@ const SUPPORTED_CURRENCIES = new Set(['sek', 'usd', 'eur', 'gbp']);
 const EU_COUNTRIES = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES']);
 
 function pickCurrency(countryCode) {
-  if (!countryCode) return 'usd';
-  const code = countryCode.toUpperCase();
-  if (code === 'SE') return 'sek';
-  if (code === 'GB') return 'gbp';
-  if (EU_COUNTRIES.has(code)) return 'eur';
-  return 'usd';
+  // DB-driven: country→currency mapping lives in currencies.country_codes,
+  // loaded by pricing.js at boot.
+  return pricing.pickCurrencyByCountry(countryCode);
 }
 
 function formatPrice(amount, currency) {
-  const major = amount / 100;
-  if (currency === 'sek') return `${Math.round(major)} kr`;
-  if (currency === 'usd') return `$${major.toFixed(2)}`;
-  if (currency === 'eur') return `€${major.toFixed(2)}`;
-  if (currency === 'gbp') return `£${major.toFixed(2)}`;
-  return `${major}`;
+  // DB-aware: delegates to pricing.formatDisplay so new currencies render
+  // correctly without code edits. Falls back to hardcoded switch if
+  // CURRENCY_META is unloaded.
+  return pricing.formatDisplay(amount, currency);
 }
 
 const ORIENTATION_ASPECT = { landscape: '16:9', portrait: '9:16', square: '1:1' };
@@ -1400,13 +1395,13 @@ app.get('/api/currency', async (req, res) => {
   let usedEngine = false;
   try {
     const rates = await pricing.getFxRates();
-    for (const cur of SUPPORTED_CURRENCIES) {
+    for (const cur of getSupportedCurrenciesArray()) {
       prices[cur] = {};
       for (const key of Object.keys(PRODUCTS)) {
-        // Map legacy product key to a tier; bundle stays bundle, image/video map straight.
         const tier = key === 'bundle' ? 'bundle' : key;
         const tierEntry = pricing.PRICE_TIERS[tier];
-        const sekMinor = tierEntry ? tierEntry.sek_minor : PRODUCTS[key].amounts.sek;
+        const sekMinor = tierEntry ? tierEntry.sek_minor : (PRODUCTS[key].amounts && PRODUCTS[key].amounts.sek);
+        if (sekMinor == null) continue;
         const amount = pricing.convertAndCharm(sekMinor, cur, rates);
         prices[cur][key] = { amount, display: pricing.formatDisplay(amount, cur) };
       }
@@ -1416,17 +1411,17 @@ app.get('/api/currency', async (req, res) => {
     // Fall back to hardcoded PRODUCTS amounts
     console.warn('[api/currency] pricing engine unavailable, using legacy amounts:', err.message);
     prices = {};
-    for (const cur of SUPPORTED_CURRENCIES) {
+    for (const cur of getSupportedCurrenciesArray()) {
       prices[cur] = {};
       for (const key of Object.keys(PRODUCTS)) {
-        const amount = PRODUCTS[key].amounts[cur];
-        prices[cur][key] = { amount, display: formatPrice(amount, cur) };
+        const amount = PRODUCTS[key].amounts && PRODUCTS[key].amounts[cur];
+        if (amount != null) prices[cur][key] = { amount, display: formatPrice(amount, cur) };
       }
     }
   }
 
   res.set('Cache-Control', 'public, max-age=300');
-  res.json({ detected, country, supported: [...SUPPORTED_CURRENCIES], prices, source: usedEngine ? 'engine' : 'legacy' });
+  res.json({ detected, country, supported: getSupportedCurrenciesArray(), prices, source: usedEngine ? 'engine' : 'legacy' });
 });
 
 app.post('/create-checkout-session', async (req, res) => {
@@ -1447,13 +1442,18 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 
   // ---- Resolve price -----------------------------------------------------
-  // Path A: concept_id present → use the pricing engine + line items.
-  // Path B: legacy product key → use PRODUCTS hardcoded amounts.
+  // Priority order:
+  //   1) If `product` is a known legacy key (image/video/bundle), use PRODUCTS pricing.
+  //      This is the hero-widget path: customer picked Image / Video / Bundle, those have fixed prices.
+  //      We still load the concept (for displayName + downstream generation), but pricing comes from PRODUCTS.
+  //   2) Else if `concept_id` is present (premium concept with bespoke pricing), use the pricing engine.
+  //   3) Else error.
   let displayName = null;
   let unitAmount = null;
   let conceptRow = null;
   let priced = null;
   try {
+    // Always load the concept if its id is provided — needed for delivery / display.
     if (concept_id) {
       const { rows } = await pool.query(
         `SELECT id, slug, name, input_type, price_tier, unit_price_sek_minor, pricing_rules
@@ -1462,6 +1462,15 @@ app.post('/create-checkout-session', async (req, res) => {
       );
       if (!rows.length) return res.status(404).json({ error: 'Concept not found' });
       conceptRow = rows[0];
+    }
+
+    if (product && PRODUCTS[product]) {
+      // Hero-widget path: standard image / video / bundle pricing.
+      displayName = conceptRow ? `${conceptRow.name} — ${PRODUCTS[product].name.split('— ').pop()}` : PRODUCTS[product].name;
+      unitAmount = PRODUCTS[product].amounts[currency];
+      if (unitAmount == null) return res.status(400).json({ error: `No price for ${product} in ${currency}` });
+    } else if (conceptRow) {
+      // Concept-driven pricing path (premium concepts without an image/video/bundle product key).
       priced = await pricing.priceLineItem(
         { concept: conceptRow, quantity: Math.max(1, parseInt(quantity, 10) || 1), modifiers: modifiers || {}, recipients: recipients || [] },
         currency
@@ -1469,8 +1478,7 @@ app.post('/create-checkout-session', async (req, res) => {
       displayName = conceptRow.name;
       unitAmount = priced.display_price_minor;
     } else {
-      displayName = PRODUCTS[product].name;
-      unitAmount = PRODUCTS[product].amounts[currency];
+      return res.status(400).json({ error: 'Cannot resolve price (no product and no concept)' });
     }
   } catch (err) {
     console.error('[checkout] price resolution error:', err.message);
@@ -1997,6 +2005,8 @@ app.get('/admin/currencies', requireRole('admin'), async (req, res) => {
       const rateMapForExample = r ? { [cur]: Number(r.rate), sek: 1 } : pricing.FALLBACK_RATES;
       const exampleMinor = pricing.convertAndCharm(exampleSek, cur, rateMapForExample);
       const examplePretty = pricing.formatDisplay(exampleMinor, cur);
+      const actions = '<form class="inline" method="POST" action="/admin/currencies/toggle/' + cur + '"><button class="btn small" type="submit">Toggle</button></form>' +
+        ' <a class="btn small" href="/admin/currencies/edit/' + cur + '">Edit</a>';
       return '<tr>' +
         '<td><strong>' + cur.toUpperCase() + '</strong></td>' +
         '<td>' + liveRate + '</td>' +
@@ -2004,6 +2014,7 @@ app.get('/admin/currencies', requireRole('admin'), async (req, res) => {
         '<td>' + fmtDate(r ? r.fetched_at : null) + '</td>' +
         '<td>' + ladderLen + '</td>' +
         '<td>149 kr → <strong>' + examplePretty + '</strong></td>' +
+        '<td>' + actions + '</td>' +
       '</tr>';
     };
 
@@ -2026,22 +2037,52 @@ app.get('/admin/currencies', requireRole('admin'), async (req, res) => {
 
       <table style="margin-top:8px;">
         <thead><tr>
-          <th>Currency</th><th>SEK → X rate</th><th>Source</th><th>Fetched at</th><th>Ladder size</th><th>149 kr example</th>
+          <th>Currency</th><th>SEK → X rate</th><th>Source</th><th>Fetched at</th><th>Ladder size</th><th>149 kr example</th><th>Actions</th>
         </tr></thead>
         <tbody>
           ${supported.map(renderRow).join('')}
         </tbody>
       </table>
 
-      <h2 style="margin-top:32px;font-size:18px;">Adding a new currency</h2>
+
+      <h2 style="margin-top:32px;font-size:18px;">Add a new currency</h2>
+      <form method="POST" action="/admin/currencies/save" style="background:#FFF9E6;border-radius:10px;padding:18px;margin-top:8px;border:1px solid rgba(0,0,0,0.08);">
+        <input type="hidden" name="action" value="create">
+        <div class="row">
+          <div class="field"><label>Code (3 letters, lowercase) *</label><input type="text" name="code" required pattern="[a-z]{3}" placeholder="dkk" maxlength="3" style="text-transform:lowercase;"></div>
+          <div class="field"><label>Display name *</label><input type="text" name="display_name" required placeholder="Danish krone"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Symbol *</label><input type="text" name="symbol" required maxlength="4" placeholder="kr"></div>
+          <div class="field"><label>Symbol position</label><select name="symbol_position"><option value="after" selected>after — 99 kr</option><option value="before">before — $9.99</option></select></div>
+          <div class="field"><label>Decimal places</label><select name="decimal_places"><option value="0">0 — integer (SEK/JPY)</option><option value="2" selected>2 — $9.99 / €9.99</option></select></div>
+        </div>
+        <div class="field"><label>Country codes (comma-separated ISO 3166-1 alpha-2)</label>
+          <input type="text" name="country_codes" placeholder="DK">
+          <span class="muted">Visitors from these countries see this currency by default. Leave blank if it's only available via manual currency-picker.</span>
+        </div>
+        <div class="field"><label>Fallback FX rate (1 SEK → X target)</label>
+          <input type="number" step="0.0000001" name="fallback_rate" placeholder="0.65" required>
+          <span class="muted">Used until ECB cron fetches a live rate. Daily refresh overwrites this. For DKK ≈ 0.65, NOK ≈ 1.00, JPY ≈ 14.5.</span>
+        </div>
+        <div class="field"><label>Charm ladder (JSON array of psychologically-attractive prices)</label>
+          <textarea name="charm_ladder" rows="3" placeholder='[9, 19, 29, 49, 69, 99, 149, 199, 299, 499, 999]' required></textarea>
+          <span class="muted">Each FX-converted price snaps UP to the nearest ladder value. Include enough granularity around your launch prices (typically ~50 values from 0.99 up to 999.99 in 2-decimal currencies, or 9 up to 9999 in integer currencies). See sek/usd ladders above for reference shape.</span>
+        </div>
+        <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="5" min="0"></div>
+        <div class="field"><label><input type="checkbox" name="active" value="on" checked> Active</label></div>
+        <button type="submit" class="btn">Add currency</button>
+      </form>
+
+
+      <h2 style="margin-top:32px;font-size:18px;">How the engine flows</h2>
       <ol class="muted" style="margin-top:8px;">
-        <li>Append a charm ladder to <code>CHARM_LADDERS</code> in <code>pricing.js</code>.</li>
-        <li>Add a fallback rate to <code>FALLBACK_RATES</code> in <code>pricing.js</code>.</li>
-        <li>Add the currency code to the ECB cron's <code>TARGETS</code> in <code>fx_cron.js</code>.</li>
-        <li>Add it to <code>SUPPORTED_CURRENCIES</code> in <code>server.js</code> (and to <code>pickCurrency()</code> if there's a country mapping).</li>
-        <li>Deploy. The cron fires on boot, populating <code>fx_rates</code>.</li>
+        <li>You add a currency above. The row is written to the <code>currencies</code> table.</li>
+        <li>The pricing engine immediately reloads — new currency is live for display + checkout.</li>
+        <li>Next ECB cron run (or "Refresh now") fetches the live rate from the European Central Bank.</li>
+        <li>Customer-facing prices auto-convert: SEK base → charm-rounded display in the target currency.</li>
       </ol>
-      <p class="muted">Currencies live in code, not the DB — keeps prod safe from accidental edits.</p>
+      <p class="muted">If the ECB feed doesn't include your currency (rare — they list ~30 majors), the fallback rate you entered stays in use until you update it.</p>
     `;
     res.send(conceptAdminPage('Currencies', body));
   } catch (err) {
@@ -2060,6 +2101,141 @@ app.post('/admin/currencies/refresh', requireRole('admin'), async (req, res) => 
     res.redirect('/admin/currencies?error=' + encodeURIComponent('Refresh error: ' + err.message));
   }
 });
+
+// POST /admin/currencies/save — create or update a currency.
+app.post('/admin/currencies/save', requireRole('admin'), async (req, res) => {
+  const action = req.body.action || 'create';
+  const codeRaw = String(req.body.code || '').trim().toLowerCase();
+  if (!/^[a-z]{3}$/.test(codeRaw)) {
+    return res.redirect('/admin/currencies?error=' + encodeURIComponent('Currency code must be exactly 3 lowercase letters (e.g. dkk).'));
+  }
+  const displayName = String(req.body.display_name || '').trim();
+  const symbol = String(req.body.symbol || '').trim();
+  const symbolPosition = req.body.symbol_position === 'before' ? 'before' : 'after';
+  const decimalPlaces = Math.max(0, Math.min(4, parseInt(req.body.decimal_places, 10) || 0));
+  const sortOrder = parseInt(req.body.sort_order, 10) || 0;
+  const active = req.body.active === 'on' || req.body.active === 'true' || req.body.active === '1';
+  const fallbackRate = parseFloat(req.body.fallback_rate);
+  if (!Number.isFinite(fallbackRate) || fallbackRate <= 0) {
+    return res.redirect('/admin/currencies?error=' + encodeURIComponent('Fallback rate must be a positive number.'));
+  }
+  if (!displayName || !symbol) {
+    return res.redirect('/admin/currencies?error=' + encodeURIComponent('Display name and symbol are required.'));
+  }
+  let charmLadder;
+  try {
+    charmLadder = JSON.parse(req.body.charm_ladder || '[]');
+    if (!Array.isArray(charmLadder) || charmLadder.length === 0) throw new Error('must be a non-empty array');
+    for (const v of charmLadder) {
+      if (typeof v !== 'number' || !isFinite(v) || v <= 0) throw new Error('all values must be positive numbers');
+    }
+  } catch (e) {
+    return res.redirect('/admin/currencies?error=' + encodeURIComponent('Charm ladder must be valid JSON array of positive numbers: ' + e.message));
+  }
+  const countryCodes = String(req.body.country_codes || '')
+    .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+
+  try {
+    if (action === 'update') {
+      await pool.query(
+        `UPDATE currencies SET
+           display_name = $1, symbol = $2, symbol_position = $3, decimal_places = $4,
+           charm_ladder = $5::jsonb, fallback_rate = $6, country_codes = $7::text[],
+           active = $8, sort_order = $9, updated_at = NOW()
+         WHERE code = $10`,
+        [displayName, symbol, symbolPosition, decimalPlaces, JSON.stringify(charmLadder),
+         fallbackRate, countryCodes, active, sortOrder, codeRaw]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO currencies (code, display_name, symbol, symbol_position, decimal_places, charm_ladder, fallback_rate, country_codes, active, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::text[], $9, $10)
+         ON CONFLICT (code) DO UPDATE SET
+           display_name = EXCLUDED.display_name, symbol = EXCLUDED.symbol,
+           symbol_position = EXCLUDED.symbol_position, decimal_places = EXCLUDED.decimal_places,
+           charm_ladder = EXCLUDED.charm_ladder, fallback_rate = EXCLUDED.fallback_rate,
+           country_codes = EXCLUDED.country_codes, active = EXCLUDED.active,
+           sort_order = EXCLUDED.sort_order, updated_at = NOW()`,
+        [codeRaw, displayName, symbol, symbolPosition, decimalPlaces, JSON.stringify(charmLadder),
+         fallbackRate, countryCodes, active, sortOrder]
+      );
+    }
+    await pricing.refreshCurrencyCache();
+    res.redirect('/admin/currencies?refreshed=1');
+  } catch (err) {
+    console.error('[admin currencies save] error:', err.message);
+    res.redirect('/admin/currencies?error=' + encodeURIComponent('Save failed: ' + err.message));
+  }
+});
+
+// POST /admin/currencies/toggle/:code — flip active.
+app.post('/admin/currencies/toggle/:code', requireRole('admin'), async (req, res) => {
+  const code = String(req.params.code || '').toLowerCase();
+  if (!/^[a-z]{3}$/.test(code)) return res.redirect('/admin/currencies?error=' + encodeURIComponent('Invalid currency code.'));
+  try {
+    await pool.query('UPDATE currencies SET active = NOT active, updated_at = NOW() WHERE code = $1', [code]);
+    await pricing.refreshCurrencyCache();
+    res.redirect('/admin/currencies?refreshed=1');
+  } catch (err) {
+    res.redirect('/admin/currencies?error=' + encodeURIComponent('Toggle failed: ' + err.message));
+  }
+});
+
+// GET /admin/currencies/edit/:code — pre-filled edit form (renders the
+// existing add form with values populated; uses action=update on submit).
+app.get('/admin/currencies/edit/:code', requireRole('admin'), async (req, res) => {
+  const code = String(req.params.code || '').toLowerCase();
+  try {
+    const { rows } = await pool.query('SELECT * FROM currencies WHERE code = $1', [code]);
+    if (!rows.length) return res.redirect('/admin/currencies?error=' + encodeURIComponent('Currency not found.'));
+    const c = rows[0];
+    const v = (s) => escapeHtml(s == null ? '' : s);
+    const body = `
+      <div class="top"><h1>Edit currency: ${escapeHtml(c.code.toUpperCase())}</h1><a href="/admin/currencies">← Back</a></div>
+      <form method="POST" action="/admin/currencies/save" style="background:#FFF9E6;border-radius:10px;padding:18px;border:1px solid rgba(0,0,0,0.08);">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="code" value="${v(c.code)}">
+        <div class="row">
+          <div class="field"><label>Code (read-only)</label><input type="text" value="${v(c.code)}" disabled></div>
+          <div class="field"><label>Display name *</label><input type="text" name="display_name" required value="${v(c.display_name)}"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Symbol *</label><input type="text" name="symbol" required value="${v(c.symbol)}"></div>
+          <div class="field"><label>Symbol position</label>
+            <select name="symbol_position">
+              <option value="after"${c.symbol_position === 'after' ? ' selected' : ''}>after — 99 kr</option>
+              <option value="before"${c.symbol_position === 'before' ? ' selected' : ''}>before — $9.99</option>
+            </select>
+          </div>
+          <div class="field"><label>Decimal places</label>
+            <select name="decimal_places">
+              <option value="0"${c.decimal_places === 0 ? ' selected' : ''}>0</option>
+              <option value="2"${c.decimal_places === 2 ? ' selected' : ''}>2</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Country codes (comma-separated)</label>
+          <input type="text" name="country_codes" value="${v((c.country_codes || []).join(','))}">
+        </div>
+        <div class="field"><label>Fallback FX rate (1 SEK → X)</label>
+          <input type="number" step="0.0000001" name="fallback_rate" value="${v(c.fallback_rate)}" required>
+        </div>
+        <div class="field"><label>Charm ladder (JSON array)</label>
+          <textarea name="charm_ladder" rows="4" required>${v(JSON.stringify(c.charm_ladder))}</textarea>
+        </div>
+        <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${v(c.sort_order)}"></div>
+        <div class="field"><label><input type="checkbox" name="active" value="on"${c.active ? ' checked' : ''}> Active</label></div>
+        <button type="submit" class="btn">Save changes</button>
+      </form>
+    `;
+    res.send(conceptAdminPage('Edit currency', body));
+  } catch (err) {
+    console.error('[admin currencies edit] error:', err.message);
+    res.redirect('/admin/currencies?error=' + encodeURIComponent('Edit failed: ' + err.message));
+  }
+});
+
+
 
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
