@@ -1453,7 +1453,7 @@ NavBar.init({ requireAuth: false }).then(status => {
   function markChip(i){Array.from(chipsEl.children).forEach(function(c,idx){c.classList.toggle('on',idx===i);});}
   function showStill(i){stills.forEach(function(im,idx){im.classList.toggle('is-on',idx===i);});}
   function hideAllStills(){stills.forEach(function(im){im.classList.remove('is-on');});}
-  function showVideo(i){videos.forEach(function(v,idx){v.classList.toggle('is-on',idx===i);});if(videos[i]&&videos[i].play){try{videos[i].currentTime=0;videos[i].play();}catch(e){}}}
+  function showVideo(i){videos.forEach(function(v,idx){v.classList.toggle('is-on',idx===i);});if(videos[i]&&videos[i].play){try{videos[i].currentTime=0;const _p=videos[i].play();if(_p&&_p.catch)_p.catch(function(){/* Chrome power-save AbortError — ignore */});}catch(e){}}}
   function hideAllVideos(){videos.forEach(function(v){v.classList.remove('is-on');});}
 
   async function loadConcepts(){
