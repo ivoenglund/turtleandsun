@@ -1798,8 +1798,16 @@ NavBar.init({ requireAuth: false }).then(status => {
     stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
     previewsLeft = MAX_PREVIEWS; renderCounter();
     stillOverlay.style.display = '';
-    stillTitle.textContent = 'Free preview';
-    stillSub.textContent = concepts[current] ? 'in "' + concepts[current].name + '"' : 'Pick a look';
+    // Premium / video-only concepts: no free preview. Make Buy live immediately.
+    var cur = concepts[current];
+    if (cur && cur.no_free_preview) {
+      stillTitle.textContent = 'Pay to generate';
+      stillSub.textContent = '"' + cur.name + '" — delivered by email';
+      demoEl.classList.add('has-preview');
+    } else {
+      stillTitle.textContent = 'Free preview';
+      stillSub.textContent = cur ? 'in "' + cur.name + '"' : 'Pick a look';
+    }
     setGenerateBtnState();
   }
   function exitOrderMode(){

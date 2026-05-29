@@ -1933,12 +1933,19 @@ app.get('/api/widget-concepts', async (req, res) => {
         }];
       }
       if (cTriplets.length === 0) continue; // skip concepts with nothing to show
+      // "No free preview" applies when:
+      //   • price_tier is a premium tier (talking/premium/premium_video), OR
+      //   • input_type === 'video' (no still image to preview anyway)
+      // Either way the Buy button goes live immediately after upload.
+      const noPreview =
+        NO_PREVIEW_TIERS.has(c.price_tier || '') ||
+        (c.input_type || '') === 'video';
       result.push({
         id: c.id,
         name: c.name,
         triplets: cTriplets,
         input_type: c.input_type || 'image_video',
-        no_free_preview: NO_PREVIEW_TIERS.has(c.price_tier || ''),
+        no_free_preview: noPreview,
       });
     }
     res.set('Cache-Control', 'public, max-age=30');
