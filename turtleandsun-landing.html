@@ -163,10 +163,10 @@ html,body{overflow-x:hidden;}
 .ts-source .ts-frame{cursor:pointer;border:1.5px dashed rgba(255,255,255,0.28);}
 .ts-source .ts-frame::before{content:'';position:absolute;inset:0;background:rgba(28,10,0,0.20);z-index:2;transition:background 0.18s;}
 .ts-source .ts-frame:hover::before{background:rgba(28,10,0,0.36);}
-.ts-source .ts-drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;z-index:3;text-align:center;padding:14px;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,0.55);}
-.ts-source .ts-drop svg{width:40px;height:40px;opacity:0.98;}
-.ts-source .ts-drop-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;line-height:1.15;}
-.ts-source .ts-drop-sub{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;opacity:0.92;letter-spacing:0.02em;}
+.ts-source .ts-drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#fff;z-index:3;text-align:center;padding:14px;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,0.7),0 0 18px rgba(0,0,0,0.45);}
+.ts-source .ts-drop svg{width:48px;height:48px;opacity:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.55));}
+.ts-source .ts-drop-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(22px,2.4vw,30px);font-weight:800;line-height:1.1;}
+.ts-source .ts-drop-sub{font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(16px,1.5vw,19px);font-weight:600;opacity:1;letter-spacing:0.01em;}
 .ts-source.drag-over .ts-frame{border-color:#FFE800;}
 .ts-source.drag-over .ts-frame::before{background:rgba(28,10,0,0.5);}
 .ts-demo.is-order .ts-source .ts-frame{cursor:default;border:none;}
