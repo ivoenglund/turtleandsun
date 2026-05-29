@@ -1902,8 +1902,54 @@ NavBar.init({ requireAuth: false }).then(status => {
         // concept config — so admin testing is never blocked by data.
         if (demoEl) demoEl.classList.add('ts-dev-buy-live');
         var devCss = document.createElement('style');
-        devCss.textContent = '.ts-demo.ts-dev-buy-live.is-order .ts-under{background:#3A6B20!important;border-color:#3A6B20!important;color:#fff!important;cursor:pointer!important;padding:11px 16px!important;box-shadow:0 6px 18px rgba(58,107,32,0.32)!important;pointer-events:auto!important;}.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-uf-title,.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-uf-price{color:#fff!important;}.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-buy-prefix{max-width:80px!important;opacity:1!important;}';
+        devCss.textContent = '.ts-demo.ts-dev-buy-live.is-order .ts-under{background:#3A6B20!important;border-color:#3A6B20!important;color:#fff!important;cursor:pointer!important;padding:11px 16px!important;box-shadow:0 6px 18px rgba(58,107,32,0.32)!important;pointer-events:auto!important;}.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-uf-title,.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-uf-price{color:#fff!important;}.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-buy-prefix{max-width:80px!important;opacity:1!important;}.ts-dev-regen{display:block;width:100%;margin-top:8px;padding:9px 14px;background:#FFE800;color:#1C0A00;border:2px solid #1C0A00;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;letter-spacing:0.04em;font-family:inherit;}.ts-dev-regen:hover{background:#1C0A00;color:#FFE800;}.ts-dev-regen.is-busy{opacity:0.6;cursor:progress;}.ts-dev-regen-out{margin-top:6px;font-size:11px;color:#666;font-family:monospace;word-break:break-all;}';
         document.head.appendChild(devCss);
+        // Visible "[DEV] Generate / Regenerate" button under the After-Picture
+        // frame so testing generation is one click — no email, no quota, no Buy.
+        var regenBtn = document.createElement('button');
+        regenBtn.type = 'button';
+        regenBtn.className = 'ts-dev-regen';
+        regenBtn.id = 'ts-dev-regen';
+        regenBtn.textContent = '[DEV] Generate / Regenerate preview';
+        var regenOut = document.createElement('div');
+        regenOut.className = 'ts-dev-regen-out';
+        regenOut.id = 'ts-dev-regen-out';
+        if (stillEl && stillEl.parentNode) {
+          stillEl.parentNode.appendChild(regenBtn);
+          stillEl.parentNode.appendChild(regenOut);
+        }
+        regenBtn.addEventListener('click', async function(){
+          if (!window.tsSelectedConcept) { alert('Pick a concept first.'); return; }
+          if (!window.cloudinaryUrl) { alert('Upload a photo first.'); return; }
+          regenBtn.classList.add('is-busy');
+          regenBtn.textContent = '[DEV] Generating…';
+          regenOut.textContent = '';
+          try {
+            var r = await fetch('/api/dev/preview', {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                cloudinaryUrl: window.cloudinaryUrl,
+                conceptId: window.tsSelectedConcept.id,
+                orientation: orientation || 'portrait',
+              })
+            });
+            var dj = await r.json();
+            if (!r.ok) throw new Error(dj.error || 'generation failed');
+            if (typeof previewImageUrl !== 'undefined') previewImageUrl = dj.url;
+            window.previewImageUrl = dj.url;
+            if (stills[current]) stills[current].src = dj.url;
+            stillEl.classList.remove('is-empty');
+            if (typeof showStill === 'function') showStill(current);
+            if (stillOverlay) stillOverlay.style.display = 'none';
+            demoEl.classList.add('has-preview');
+            regenOut.textContent = '✓ Generated: ' + dj.url;
+          } catch (err) {
+            regenOut.textContent = '✗ ' + err.message;
+          } finally {
+            regenBtn.classList.remove('is-busy');
+            regenBtn.textContent = '[DEV] Generate / Regenerate preview';
+          }
+        });
         // Sticky yellow ribbon so the admin never forgets dev mode is on.
         var rib = document.createElement('div');
         rib.id = 'ts-dev-ribbon';

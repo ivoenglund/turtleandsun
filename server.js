@@ -568,6 +568,38 @@ app.get('/api/auth/status', async (req, res) => {
 // Stripe bypass — creates a "paid" order and triggers generation WITHOUT going to Stripe.
 // HARD-LOCKED: requires admin role AND dev_mode = true. Either failing → 403.
 // Body: { email, cloudinaryUrl, product, conceptId?, customerName? }
+// DEV-only preview generator. No quota, no email gate. Generates an image
+// using the concept's model + prompt and returns the URL so the widget can
+// display it inline. Use this to validate the concept setup before buying.
+app.post('/api/dev/preview', requireRole('admin'), async (req, res) => {
+  if (!cachedDevMode) return res.status(403).json({ error: 'Dev mode is OFF' });
+  const { cloudinaryUrl, conceptId, orientation } = req.body || {};
+  if (!cloudinaryUrl) return res.status(400).json({ error: 'cloudinaryUrl required' });
+  if (!conceptId)    return res.status(400).json({ error: 'conceptId required' });
+  try {
+    const c = await pool.query(
+      `SELECT image_prompt, fal_image_model, image_input_extras, name
+       FROM concepts WHERE id = $1`,
+      [parseInt(conceptId, 10)]
+    );
+    if (!c.rows.length) return res.status(404).json({ error: 'Concept not found' });
+    const cc = c.rows[0];
+    const modelId = cc.fal_image_model || 'fal-ai/kling-image/o1';
+    console.log('[dev-preview]', cc.name, '→', modelId);
+    const result = await generation.generateImage({
+      modelId,
+      prompt: cc.image_prompt || '',
+      photoUrl: cloudinaryUrl,
+      orientation: orientation || 'portrait',
+      inputExtras: cc.image_input_extras || {},
+    });
+    res.json({ ok: true, url: result.url });
+  } catch (err) {
+    console.error('[dev-preview] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
   if (!cachedDevMode) return res.status(403).json({ error: 'Dev mode is OFF' });
   const { email, cloudinaryUrl, product, conceptId, customerName } = req.body || {};
