@@ -2691,10 +2691,13 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
         ? `<img class="thumb" src="${escapeHtml(c.before_image_url)}" alt="before">` : '<span class="muted">—</span>';
       const after = c.after_image_url
         ? `<img class="thumb" src="${escapeHtml(c.after_image_url)}" alt="after">` : '<span class="muted">—</span>';
+      const video = c.example_video_url
+        ? `<video class="thumb" src="${escapeHtml(c.example_video_url)}" muted preload="metadata" style="object-fit:cover;background:#1A0C04;"></video>` : '<span class="muted">—</span>';
       const mainRow = `<tr>
         <td>${c.sort_order}</td>
         <td>${before}</td>
         <td>${after}</td>
+        <td>${video}</td>
         <td><strong>${escapeHtml(c.name)}</strong><br><span class="muted">${escapeHtml(c.slug)}</span></td>
         <td>${escapeHtml(c.filter_category)}</td>
         <td>${escapeHtml(c.input_type)}</td>
@@ -2723,7 +2726,7 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
       const nextNumber = existingTriplets.length
         ? Math.max(...existingTriplets.map((t) => t.triplet_number || 0)) + 1
         : 1;
-      const subRow = `<tr class="slot-subrow"><td colspan="8" style="background:#fafaf6;padding:8px 14px 14px;">
+      const subRow = `<tr class="slot-subrow"><td colspan="9" style="background:#fafaf6;padding:8px 14px 14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Triplets for "${escapeHtml(c.name)}" — each ticked "Rolling demo" rotates in the widget carousel.</div>
           <a href="/admin/triplets?concept=${c.id}" class="muted" style="font-size:11px;">Manage all triplets &rarr;</a>
@@ -2746,10 +2749,10 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
       <style>.slot-subrow td{border-top:none !important;}</style>
       <table>
         <thead><tr>
-          <th>Sort</th><th>Before</th><th>After</th><th>Name</th><th>Category</th>
+          <th>Sort</th><th>Before</th><th>After</th><th>Video</th><th>Name</th><th>Category</th>
           <th>Input</th><th>Status</th><th>Actions</th>
         </tr></thead>
-        <tbody>${tableRows || '<tr><td colspan="8" class="muted">No concepts yet.</td></tr>'}</tbody>
+        <tbody>${tableRows || '<tr><td colspan="9" class="muted">No concepts yet.</td></tr>'}</tbody>
       </table>`;
     res.send(conceptAdminPage('Concepts', body));
   } catch (err) {
