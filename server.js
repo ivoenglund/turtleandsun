@@ -3640,7 +3640,96 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
           <th></th>
         </tr></thead>
         <tbody>${rowHtml || '<tr><td colspan="8" class="muted">No gallery items yet.</td></tr>'}</tbody>
-      </table>`;
+      </table>
+
+      <!-- Drag-and-drop upload from the file system. Activates on any drag onto the page. -->
+      <div id="ts-drop-overlay" style="display:none;position:fixed;inset:0;background:rgba(28,42,20,0.85);z-index:9000;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;padding:30px;text-align:center;">
+        <div style="font-size:46px;font-weight:800;margin-bottom:12px;">Drop to upload</div>
+        <div style="font-size:16px;opacity:0.85;margin-bottom:20px;">Files will be added to the gallery as new items.</div>
+        <div style="background:#fff;color:#1C0A00;padding:18px 22px;border-radius:12px;min-width:320px;max-width:520px;">
+          <label style="display:block;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#666;margin-bottom:6px;">Assign uploaded files to concept</label>
+          <select id="ts-drop-concept" style="width:100%;padding:9px 11px;font-size:14px;border:1px solid #ccc;border-radius:8px;">
+            ${concepts.map((c) => `<option value="${c.id}"${filterConcept === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+          <div style="font-size:12px;color:#888;margin-top:6px;">${filterConcept ? 'Pre-filled from the page filter.' : 'Pick a concept before releasing the files.'}</div>
+        </div>
+      </div>
+      <div id="ts-drop-progress" style="display:none;position:fixed;bottom:24px;right:24px;background:#1C2A14;color:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 12px 32px rgba(0,0,0,0.3);z-index:9100;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;min-width:260px;"></div>
+      <script>
+        (function dropUpload(){
+          var overlay = document.getElementById('ts-drop-overlay');
+          var progress = document.getElementById('ts-drop-progress');
+          var sel = document.getElementById('ts-drop-concept');
+          if (!overlay || !sel) return;
+          var depth = 0;
+          function isFileDrag(e){
+            if (!e.dataTransfer) return false;
+            var t = e.dataTransfer.types;
+            if (!t) return false;
+            for (var i = 0; i < t.length; i++) if (t[i] === 'Files') return true;
+            return false;
+          }
+          window.addEventListener('dragenter', function(e){
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            depth++;
+            overlay.style.display = 'flex';
+          });
+          window.addEventListener('dragover', function(e){
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+          });
+          window.addEventListener('dragleave', function(e){
+            if (!isFileDrag(e)) return;
+            depth = Math.max(0, depth - 1);
+            if (depth === 0) overlay.style.display = 'none';
+          });
+          window.addEventListener('drop', async function(e){
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            depth = 0;
+            overlay.style.display = 'none';
+            var files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+            if (!files.length) return;
+            var conceptId = parseInt(sel.value, 10);
+            if (!conceptId) { alert('Pick a concept first'); return; }
+            await uploadFiles(files, conceptId);
+            location.reload();
+          });
+          async function uploadFiles(files, conceptId){
+            progress.style.display = 'block';
+            var done = 0, failed = 0;
+            function render(){
+              progress.innerHTML = '<div style="font-weight:700;margin-bottom:4px;">Uploading ' + done + '/' + files.length + '</div>' +
+                (failed ? '<div style="color:#FFB400;font-size:12px;">' + failed + ' failed</div>' : '') +
+                (current ? '<div style="font-size:12px;color:#bbb;margin-top:4px;">'+current.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>' : '');
+            }
+            var current = '';
+            for (var i = 0; i < files.length; i++) {
+              var f = files[i];
+              current = f.name;
+              render();
+              try {
+                var kind = f.type.startsWith('video/') ? 'video' : 'image';
+                var fd = new FormData(); fd.append('image', f);
+                var up = await fetch('/upload', { method:'POST', body: fd });
+                var upj = await up.json();
+                if (!up.ok || !upj.url) throw new Error(upj.error || 'Upload failed');
+                var save = await fetch('/admin/concepts/save-to-gallery', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ concept_id: conceptId, url: upj.url, kind: kind }) });
+                var sj = await save.json();
+                if (!save.ok) throw new Error(sj.error || 'Save failed');
+                done++;
+              } catch (e) {
+                failed++;
+                console.warn('[drop-upload]', f.name, e.message);
+              }
+              render();
+            }
+            current = '';
+            progress.innerHTML = '<div style="font-weight:700;">Done · ' + done + '/' + files.length + (failed ? ' (' + failed + ' failed)' : '') + '</div>';
+          }
+        })();
+      </script>`;
 
     res.send(conceptAdminPage('Gallery', body));
   } catch (err) {
