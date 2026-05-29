@@ -1913,6 +1913,25 @@ app.post('/admin/triplets/:id/delete', requireRole('admin'), async (req, res) =>
   }
 });
 
+// Move a triplet to a different concept. Called by the t-card concept select
+// onchange handler on /admin/gallery so the user doesn't have to open the full
+// triplet editor. Note: this does NOT move the underlying media items — those
+// stay attached to whatever concept they came from.
+app.post('/admin/triplets/:id/move-concept', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const conceptId = parseInt(req.body.concept_id, 10);
+  if (!id || !conceptId) return res.status(400).json({ error: 'Bad id/concept' });
+  try {
+    const exists = await pool.query(`SELECT 1 FROM concepts WHERE id = $1`, [conceptId]);
+    if (!exists.rows.length) return res.status(400).json({ error: 'Unknown concept' });
+    await pool.query(`UPDATE concept_triplets SET concept_id = $1 WHERE id = $2`, [conceptId, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[triplet-move-concept] error:', err.message);
+    res.status(500).json({ error: 'Move failed' });
+  }
+});
+
 // Quick-toggle for one boolean field on a triplet — used by the card-grid toggles
 // on the redesigned /admin/gallery so they don't need a full-form Save click.
 app.post('/admin/triplets/:id/toggle', requireRole('admin'), async (req, res) => {
@@ -3890,7 +3909,9 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       return `<div class="t-card ${t.active ? '' : 't-card--off'}" data-trip-id="${t.id}" style="--accent:${accent};">
         <div class="t-card-head">
           <span class="t-badge">#${t.triplet_number}</span>
-          <span class="t-concept">${escapeHtml(t.concept_name)}</span>
+          <select class="t-concept-pick" data-trip-id="${t.id}" title="CONCEPT — move this triplet to a different concept. Note: the underlying media items in the slots stay attached to their original concept; this only re-files the triplet grouping.">
+            ${concepts.map((co) => `<option value="${co.id}"${co.id === t.concept_id ? ' selected' : ''}>${escapeHtml(co.name)}</option>`).join('')}
+          </select>
           <a class="t-edit" href="/admin/triplets?concept=${t.concept_id}#trip-${t.id}" title="Open this triplet in the full editor (change slot assignments, caption, sort order, number).">Edit</a>
         </div>
         <div class="t-thumbs">
@@ -3930,6 +3951,9 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
 
     // Media library section — every media item with editable fields.
     const KIND_OPTS = (current) => CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}"${k === current ? ' selected' : ''}>${k}</option>`).join('');
+    const CONCEPT_SELECT_OPTS = (currentId) => concepts.map((c) =>
+      `<option value="${c.id}"${c.id === currentId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+    ).join('');
     const mediaCard = (m) => {
       const badges = (mediaBadgesById.get(m.id) || []).map((b) =>
         `<span class="m-badge">${escapeHtml(b)}</span>`).join('');
@@ -3942,7 +3966,7 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         <form method="POST" action="/admin/media/${m.id}/update" class="m-edit">
           <input type="hidden" name="return_to" value="/admin/gallery${filterConcept ? '?concept='+filterConcept : ''}">
           <div class="m-name" title="Full file URL (hover): ${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
-          <div class="m-concept" title="The concept this media item is filed under.">${escapeHtml(m.concept_name)}</div>
+          <label title="CONCEPT — which concept this media item belongs to. Change here to move the item to another concept (e.g. move a dog photo from Royal Portrait → Talking Pet).">Concept <select name="concept_id">${CONCEPT_SELECT_OPTS(m.concept_id)}</select></label>
           ${badges ? `<div class="m-badges" title="This media item is currently used in these triplet slots. If you delete it, those slots will go empty.">${badges}</div>` : ''}
           <label title="KIND — image or video. Determines whether the file is used as a Before/After Picture (image) or as an After Video (video).">Kind <select name="kind">${KIND_OPTS(m.kind)}</select></label>
           <label title="FILTERS — comma-separated tags used on the public /gallery page filter chips (e.g. pet, royal, family). An item shows up under a chip if either its own tags or its concept's tags match.">Filters <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="e.g. pet, royal"></label>
@@ -3996,6 +4020,8 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         .t-card-head{display:flex;align-items:center;gap:6px;}
         .t-badge{background:var(--accent,#3A6B20);color:#fff;font-weight:800;font-size:10px;padding:2px 7px;border-radius:8px;letter-spacing:0.04em;flex-shrink:0;}
         .t-concept{font-weight:700;color:#1C0A00;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .t-concept-pick{flex:1;min-width:0;font-size:11px;font-weight:700;color:#1C0A00;padding:3px 5px;border:1px solid #e0dcd0;border-radius:4px;background:#fff;cursor:pointer;}
+        .t-concept-pick:hover{border-color:#3A6B20;}
         .t-edit{font-size:10px;color:#888;text-decoration:none;flex-shrink:0;}
         .t-edit:hover{color:#3A6B20;text-decoration:underline;}
         .t-thumbs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
@@ -4146,6 +4172,22 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
             } catch(err){ alert('Toggle failed: '+err.message); }
           });
         });
+        // Concept move — fetch /admin/triplets/:id/move-concept.
+        // We reload after a successful move so the triplet re-files into the right
+        // concept section in the grid.
+        document.querySelectorAll('.t-concept-pick').forEach(function(sel){
+          sel.addEventListener('change', async function(){
+            var tripId = sel.dataset.tripId;
+            var newConcept = sel.value;
+            sel.disabled = true;
+            try {
+              var r = await fetch('/admin/triplets/'+tripId+'/move-concept', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'concept_id='+encodeURIComponent(newConcept) });
+              var j = await r.json();
+              if (!r.ok) throw new Error(j.error || 'move failed');
+              location.reload();
+            } catch(err){ alert('Move failed: '+err.message); sel.disabled = false; }
+          });
+        });
         // Drag-drop upload (same flow as before)
         (function(){
           var overlay = document.getElementById('ts-drop-overlay');
@@ -4224,7 +4266,15 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
   try {
     const row = await pool.query(`SELECT concept_id FROM concept_media WHERE id = $1`, [mediaId]);
     if (!row.rows.length) return res.status(404).send('Not found');
-    const conceptId = row.rows[0].concept_id;
+    const currentConceptId = row.rows[0].concept_id;
+    // Allow moving the media item to a different concept. If not provided or invalid,
+    // keep the current concept.
+    const newConceptId = req.body.concept_id ? parseInt(req.body.concept_id, 10) : null;
+    let conceptId = currentConceptId;
+    if (newConceptId && newConceptId !== currentConceptId) {
+      const exists = await pool.query(`SELECT 1 FROM concepts WHERE id = $1`, [newConceptId]);
+      if (exists.rows.length) conceptId = newConceptId;
+    }
 
     const caption = req.body.caption == null ? null : (String(req.body.caption).trim() || null);
     const kind = (req.body.kind || '').trim();
@@ -4243,6 +4293,7 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
 
     await pool.query(
       `UPDATE concept_media SET
+         concept_id = $9,
          caption = COALESCE($1, caption),
          kind = COALESCE(NULLIF($2, ''), kind),
          sort_order = COALESCE($3, sort_order),
@@ -4251,7 +4302,7 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
          filter_category = $6,
          source_url = $7
        WHERE id = $8`,
-      [caption, kind, sortOrder, isPrimary, active, filterCategory, sourceUrl, mediaId]
+      [caption, kind, sortOrder, isPrimary, active, filterCategory, sourceUrl, mediaId, conceptId]
     );
 
     if (req.headers.accept === 'application/json' || req.xhr) return res.json({ ok: true });
