@@ -1870,10 +1870,60 @@ NavBar.init({ requireAuth: false }).then(status => {
     }
   });
 
+  // Admin-only dev mode (Stripe bypass). Populated from /api/auth/status. The
+  // server only sets devMode=true when the requesting session is admin AND the
+  // server-side flag is on, so customers never see this no matter what.
+  window.__TS_DEV_MODE = false;
+  fetch('/api/auth/status', { credentials: 'include' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.isAdmin && j.devMode) {
+        window.__TS_DEV_MODE = true;
+        // Sticky yellow ribbon so the admin never forgets dev mode is on.
+        var rib = document.createElement('div');
+        rib.id = 'ts-dev-ribbon';
+        rib.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#FFE800;color:#1C0A00;padding:7px 14px;text-align:center;font-weight:800;font-size:13px;letter-spacing:0.04em;border-bottom:2px solid #1C0A00;font-family:"Plus Jakarta Sans",Arial,sans-serif;z-index:99999;';
+        rib.innerHTML = '⚠ DEV MODE — Buy buttons skip Stripe & generate directly. <a href="/admin" style="color:#1C0A00;text-decoration:underline;margin-left:10px;">Admin</a>';
+        document.body.appendChild(rib);
+        document.body.style.paddingTop = (rib.offsetHeight || 32) + 'px';
+        // Re-label the Buy buttons so it's obvious.
+        ['ts-buy-pic','ts-buy-vid','ts-buy-bundle'].forEach(function(id){
+          var el = document.getElementById(id);
+          if (!el) return;
+          var p = el.querySelector('.ts-buy-prefix');
+          if (p) p.textContent = '[DEV] Skip Stripe';
+        });
+      }
+    })
+    .catch(function(){});
+
+  async function devSkipCheckout(product){
+    if (!window.tsSelectedConcept) { alert('Pick a concept first.'); return; }
+    if (!window.cloudinaryUrl) { alert('Upload a photo first.'); return; }
+    var email = (typeof getEmail === 'function' ? getEmail() : '') || 'dev@turtleandsun.com';
+    var body = {
+      email: email,
+      cloudinaryUrl: window.cloudinaryUrl,
+      product: product,
+      conceptId: window.tsSelectedConcept.id,
+      customerName: (typeof getCustomerName === 'function' ? getCustomerName() : null),
+    };
+    try {
+      var r = await fetch('/api/dev/skip-checkout', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      var j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'dev bypass failed');
+      alert('DEV: order #' + j.orderId + ' marked paid. Generation started — check your email or /admin for the result.');
+    } catch (err) {
+      alert('[DEV] ' + err.message);
+    }
+  }
+
   function buy(product){
     if (mode !== 'order' || !demoEl.classList.contains('has-preview')) return;
     window._orderEmail = getEmail() || window._previewEmail || '';
     window._previewEmail = window._orderEmail;
+    // DEV mode: bypass Stripe completely.
+    if (window.__TS_DEV_MODE) { devSkipCheckout(product); return; }
     if (typeof proceedToCheckout === 'function') proceedToCheckout(product);
     else alert('Checkout unavailable. Please reload and try again.');
   }

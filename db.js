@@ -213,6 +213,19 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS concept_media_kind_active_idx ON concept_media(kind, active);
   `);
 
+  // Key-value system settings used by admin features (dev mode, etc.). The
+  // dev_mode flag MUST default to 'false' so a fresh deploy is never in dev mode.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    INSERT INTO system_settings (key, value)
+      VALUES ('dev_mode', 'false')
+      ON CONFLICT (key) DO NOTHING;
+  `);
+
   // Migrate existing tables to add new columns
   await pool.query(`
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS result_url TEXT;

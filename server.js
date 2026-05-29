@@ -509,12 +509,87 @@ app.get('/auth/verify', async (req, res) => {
   }
 });
 
+// ── Dev mode (Stripe bypass for testing) ─────────────────────────────────────
+// Cached so synchronous template helpers (conceptAdminPage) can read it without
+// awaiting the DB on every render. Loaded at startup + refreshed after toggle.
+let cachedDevMode = false;
+async function loadDevMode() {
+  try {
+    const r = await pool.query(`SELECT value FROM system_settings WHERE key = 'dev_mode'`);
+    cachedDevMode = r.rows.length > 0 && r.rows[0].value === 'true';
+  } catch (e) {
+    console.error('[dev-mode] load failed:', e.message);
+    cachedDevMode = false;
+  }
+  return cachedDevMode;
+}
+// Don't block startup on this — best-effort.
+loadDevMode().then((v) => console.log('[dev-mode] initial state:', v));
+
+async function setDevMode(on) {
+  await pool.query(
+    `INSERT INTO system_settings (key, value, updated_at) VALUES ('dev_mode', $1, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [on ? 'true' : 'false']
+  );
+  cachedDevMode = !!on;
+}
+
+app.post('/admin/dev-mode/toggle', requireRole('admin'), async (req, res) => {
+  const next = !cachedDevMode;
+  await setDevMode(next);
+  console.log('[dev-mode] toggled →', next, 'by', (await getSessionUser(req))?.email);
+  res.redirect(req.body.return_to || '/admin');
+});
+
+// Yellow ribbon HTML — injected at top of every admin page when dev mode is on.
+// Customers never see this because /admin/* routes are all behind requireRole('admin').
+function devRibbonHtml() {
+  if (!cachedDevMode) return '';
+  return `<div style="background:#FFE800;color:#1C0A00;padding:8px 16px;text-align:center;font-weight:800;font-size:13px;letter-spacing:0.04em;border-bottom:2px solid #1C0A00;font-family:'Plus Jakarta Sans',Arial,sans-serif;">
+    ⚠ DEV MODE — Stripe payment is bypassed. Customers see no change; admin-only checkout shortcut is live.
+    <form method="POST" action="/admin/dev-mode/toggle" style="display:inline;margin-left:14px;">
+      <input type="hidden" name="return_to" value="/admin">
+      <button type="submit" style="background:#1C0A00;color:#FFE800;border:none;padding:3px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.04em;">TURN OFF</button>
+    </form>
+  </div>`;
+}
+
 app.get('/api/auth/status', async (req, res) => {
   console.log('[auth] cookies:', req.cookies, 'session token present:', !!req.cookies?.ts_session);
   const user = await getSessionUser(req);
   console.log('[auth] resolved user:', user?.email || 'none');
-  if (!user) return res.json({ loggedIn: false });
-  res.json({ loggedIn: true, email: user.email, isAdmin: user.roles.includes('admin') });
+  if (!user) return res.json({ loggedIn: false, devMode: false });
+  const isAdmin = user.roles.includes('admin');
+  // devMode is only surfaced when the requester is admin — customers never see this flag.
+  res.json({ loggedIn: true, email: user.email, isAdmin, devMode: isAdmin && cachedDevMode });
+});
+
+// Stripe bypass — creates a "paid" order and triggers generation WITHOUT going to Stripe.
+// HARD-LOCKED: requires admin role AND dev_mode = true. Either failing → 403.
+// Body: { email, cloudinaryUrl, product, conceptId?, customerName? }
+app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
+  if (!cachedDevMode) return res.status(403).json({ error: 'Dev mode is OFF' });
+  const { email, cloudinaryUrl, product, conceptId, customerName } = req.body || {};
+  if (!cloudinaryUrl) return res.status(400).json({ error: 'cloudinaryUrl required' });
+  if (!product)       return res.status(400).json({ error: 'product required' });
+  try {
+    const ins = await pool.query(
+      `INSERT INTO orders (email, product, amount, currency, status, image_url, portrait_url, concept_id, customer_name, created_at)
+       VALUES ($1, $2, 0, 'sek', 'paid', $3, $3, $4, $5, NOW())
+       RETURNING id`,
+      [email || 'dev@turtleandsun.com', product, cloudinaryUrl, conceptId || null, customerName || null]
+    );
+    const orderId = ins.rows[0].id;
+    console.log('[dev-skip-checkout] order', orderId, 'product', product, 'concept', conceptId);
+    // Fire-and-forget generation — same code path Stripe webhook uses.
+    generateForOrder(cloudinaryUrl, product, email || '', orderId, conceptId || null, customerName || null)
+      .catch((err) => console.error('[dev-skip-checkout] generation error:', err.message));
+    res.json({ ok: true, orderId, note: 'DEV: order marked paid without Stripe. Generation started.' });
+  } catch (err) {
+    console.error('[dev-skip-checkout] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/auth/logout', (req, res) => {
@@ -646,6 +721,17 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     ${section('\u{1F4B0} Pricing',
       card('Currencies & FX', 'Live FX rates, supported currencies, manual refresh.', '/admin/currencies')
     )}
+
+    <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
+    <div class="admin-grid">
+      <form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">
+        <input type="hidden" name="return_to" value="/admin">
+        <button type="submit" class="admin-card" style="background:${cachedDevMode ? '#FFE800' : '#fff'};border:1px solid ${cachedDevMode ? '#1C0A00' : '#eee'};text-align:left;cursor:pointer;width:100%;font-family:inherit;">
+          <div class="admin-card-title">Dev mode: <strong style="color:${cachedDevMode ? '#1C0A00' : '#a12a1a'};">${cachedDevMode ? 'ON' : 'OFF'}</strong></div>
+          <div class="admin-card-desc">${cachedDevMode ? 'Stripe bypass live for admin sessions. Yellow ribbon shown across admin pages. Click to TURN OFF.' : 'When ON, you can click Buy on the widget to skip Stripe and trigger generation directly. Click to TURN ON.'}</div>
+        </button>
+      </form>
+    </div>
 
     <div class="admin-divider"></div>
 
@@ -2381,6 +2467,7 @@ function conceptAdminPage(title, body) {
 <script src="/currency.js?v=20260526a"></script>
 <script src="/nav.js?v=20260526b"></script>
 <script>NavBar.init({ requireAuth: true });</script>
+${devRibbonHtml()}
 <div class="wrap">${body}</div>
 <footer class="ts-footer">
   <p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
