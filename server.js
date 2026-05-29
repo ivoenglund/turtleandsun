@@ -1972,13 +1972,16 @@ app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
         const sel = m.id === currentMediaId ? ' selected' : '';
         return `<option value="${m.id}"${sel}>${escapeHtml(lbl)}</option>`;
       }).join('');
-      const isVideo = kindLabel === 'Video';
+      // Match by regex — kindLabel may be 'Video' (from /admin/concepts) or 'After Video' (from /admin/triplets).
+      const isVideo = /video/i.test(kindLabel);
+      // Portrait 9:16 thumbnail since all assets are 9:16 portrait.
+      const thumbStyle = 'width:54px;height:96px;object-fit:cover;border-radius:4px;';
       const preview = currentUrl
         ? (isVideo
-            ? `<video src="${escapeHtml(currentUrl)}" muted style="width:64px;height:48px;object-fit:cover;border-radius:4px;background:#000;"></video>`
-            : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:4px;">`)
-        : `<div style="width:64px;height:48px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
-      const slotKind = /video/i.test(kindLabel) ? 'video' : 'image';
+            ? `<video src="${escapeHtml(currentUrl)}" muted playsinline preload="metadata" style="${thumbStyle}background:#000;"></video>`
+            : `<img src="${escapeHtml(currentUrl)}" alt="" style="${thumbStyle}">`)
+        : `<div style="width:54px;height:96px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
+      const slotKind = isVideo ? 'video' : 'image';
       return `<div class="ts-drop-slot" data-slot-kind="${slotKind}" style="display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:6px;border:2px dashed transparent;transition:border-color 0.15s,background 0.15s;">
         <div style="font-size:10px;color:#888;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
         <div style="display:flex;align-items:center;gap:6px;">${preview}<select name="${selectName}" style="flex:1;padding:5px 7px;font-size:12px;min-width:180px;">${opts}</select></div>
@@ -2690,11 +2693,13 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
         const sel = m.id === currentMediaId ? ' selected' : '';
         return `<option value="${m.id}"${sel}>${escapeHtml(label)}</option>`;
       }).join('');
+      // Portrait 9:16 thumbnail (all source assets are portrait).
+      const tStyle = 'width:42px;height:75px;object-fit:cover;border-radius:4px;';
       const preview = currentUrl
         ? (isVideo
-            ? `<video src="${escapeHtml(currentUrl)}" muted style="width:54px;height:40px;object-fit:cover;border-radius:4px;background:#000;"></video>`
-            : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:4px;">`)
-        : `<div style="width:54px;height:40px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px;">${kindLabel.charAt(0)}</div>`;
+            ? `<video src="${escapeHtml(currentUrl)}" muted playsinline preload="metadata" style="${tStyle}background:#000;"></video>`
+            : `<img src="${escapeHtml(currentUrl)}" alt="" style="${tStyle}">`)
+        : `<div style="width:42px;height:75px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px;">${kindLabel.charAt(0)}</div>`;
       return `<div class="ts-drop-slot" data-slot-kind="${slotKind}" style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px;padding:4px;border-radius:6px;border:2px dashed transparent;transition:border-color 0.15s,background 0.15s;">
         <div style="flex-shrink:0;">${preview}</div>
         <div style="flex:1;min-width:0;">
