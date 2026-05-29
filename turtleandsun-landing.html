@@ -1486,17 +1486,38 @@ NavBar.init({ requireAuth: false }).then(status => {
 
   async function loadConcepts(){
     try {
-      const res = await fetch('/gallery');
-      if (!res.ok) throw new Error('gallery fetch failed: '+res.status);
-      const items = await res.json();
-      const map = new Map();
-      items.forEach(function(it){
-        if (!map.has(it.concept_id)) map.set(it.concept_id, {id: it.concept_id, slug: it.concept_slug, name: it.concept_name, image_url: null, video_url: null, source_url: null});
-        const c = map.get(it.concept_id);
-        if (it.kind === 'image' && !c.image_url) { c.image_url = it.url; if (it.source_url) c.source_url = it.source_url; }
-        if (it.kind === 'video' && !c.video_url) { c.video_url = it.url; if (!c.source_url && it.source_url) c.source_url = it.source_url; }
+      // New widget endpoint: each row is { id, name, before_url, image_url, video_url }
+      // — the three explicit slots the admin assigned. Falls back to /gallery
+      // if the new endpoint is missing (older deploys).
+      let rows;
+      try {
+        const res = await fetch('/api/widget-concepts');
+        if (!res.ok) throw new Error('widget-concepts fetch failed: '+res.status);
+        rows = await res.json();
+      } catch (e) {
+        console.warn('[ts-widget] new endpoint missing, falling back to /gallery:', e.message);
+        const res2 = await fetch('/gallery');
+        if (!res2.ok) throw new Error('gallery fetch failed: '+res2.status);
+        const items = await res2.json();
+        const map = new Map();
+        items.forEach(function(it){
+          if (!map.has(it.concept_id)) map.set(it.concept_id, {id: it.concept_id, name: it.concept_name, before_url: it.source_url || null, image_url: null, video_url: null});
+          const c = map.get(it.concept_id);
+          if (it.kind === 'image' && !c.image_url) c.image_url = it.url;
+          if (it.kind === 'video' && !c.video_url) c.video_url = it.url;
+        });
+        rows = Array.from(map.values()).filter(function(c){ return c.image_url || c.video_url; });
+      }
+      // Normalize to widget's internal shape (keep `source_url` alias for older code paths).
+      concepts = rows.map(function(r){
+        return {
+          id: r.id,
+          name: r.name,
+          image_url: r.image_url || null,
+          video_url: r.video_url || null,
+          source_url: r.before_url || null, // backwards-compatible alias used by pickStyle
+        };
       });
-      concepts = Array.from(map.values()).filter(function(c){return c.image_url || c.video_url;});
       if (concepts.length > 6) concepts = concepts.slice(0, 6);
       buildChips(); buildOutputs();
       if (concepts.length > 0) {

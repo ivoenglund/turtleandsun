@@ -1734,6 +1734,32 @@ app.get('/gallery/meta', async (req, res) => {
   }
 });
 
+// What the landing-page rolling-demo widget reads. Each concept that has at
+// least one slot set is returned with its three explicit URLs.
+app.get('/api/widget-concepts', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, before_image_url, after_image_url, example_video_url, sort_order
+       FROM concepts
+       WHERE active = TRUE
+         AND (before_image_url IS NOT NULL OR after_image_url IS NOT NULL OR example_video_url IS NOT NULL)
+       ORDER BY sort_order ASC, id ASC
+       LIMIT 12`
+    );
+    res.set('Cache-Control', 'public, max-age=30');
+    res.json(rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      before_url: r.before_image_url,
+      image_url: r.after_image_url,
+      video_url: r.example_video_url,
+    })));
+  } catch (err) {
+    console.error('[widget-concepts] error:', err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 app.get('/gallery', async (req, res) => {
   const { category, kind } = req.query;
   try {
@@ -2308,18 +2334,64 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
               example_video_url, active, sort_order
        FROM concepts ORDER BY sort_order ASC, id ASC`
     );
+
+    // Library of all active media items, used to populate the inline slot dropdowns.
+    const { rows: mediaItems } = await pool.query(
+      `SELECT cm.id, cm.kind, cm.url, cm.concept_id, c.name AS concept_name
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       WHERE cm.active = TRUE
+       ORDER BY c.name ASC, cm.sort_order ASC, cm.created_at DESC`
+    );
+    const imageItems = mediaItems.filter((m) => m.kind === 'image');
+    const videoItems = mediaItems.filter((m) => m.kind === 'video');
+
     let flash = '';
     if (req.query.saved) flash = `<div class="flash ok">Concept saved.</div>`;
     else if (req.query.deleted) flash = `<div class="flash ok">Concept deleted.</div>`;
     else if (req.query.error) flash = `<div class="flash err">${escapeHtml(req.query.error)}</div>`;
     if (req.query.warn) flash += `<div class="flash err">${escapeHtml(req.query.warn)}</div>`;
 
+    // Render a single slot picker (one row of the sub-grid).
+    // `kindLabel` = 'Before' | 'After Picture' | 'After Video'
+    // `slot` = 'before' | 'image' | 'video' (matches SLOT_TO_COLUMN keys)
+    // `currentUrl` = the concept's current value for that slot (may be null)
+    // `items` = the array of allowed media items (image or video kind)
+    const slotFilename = (url) => {
+      if (!url) return '';
+      return (String(url).split('?')[0].split('/').pop() || '').slice(0, 36);
+    };
+    const slotRow = (conceptId, slot, kindLabel, currentUrl, items) => {
+      const isVideo = slot === 'video';
+      const currentItem = items.find((m) => m.url === currentUrl);
+      const opts = `<option value="">— (none) —</option>` + items.map((m) => {
+        const label = `${m.concept_name} · ${slotFilename(m.url)}`;
+        const sel = m.url === currentUrl ? ' selected' : '';
+        return `<option value="${m.id}"${sel}>${escapeHtml(label)}</option>`;
+      }).join('');
+      const preview = currentUrl
+        ? (isVideo
+            ? `<video src="${escapeHtml(currentUrl)}" muted style="width:64px;height:48px;object-fit:cover;border-radius:4px;background:#000;"></video>`
+            : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:4px;">`)
+        : `<div style="width:64px;height:48px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
+      const filenameMuted = currentItem ? slotFilename(currentItem.url) : (currentUrl ? slotFilename(currentUrl) : '');
+      return `<form method="POST" action="/admin/concepts/${conceptId}/slot" class="inline" style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+        <input type="hidden" name="slot" value="${slot}">
+        <input type="hidden" name="return_to" value="/admin/concepts">
+        <div style="width:64px;flex-shrink:0;">${preview}</div>
+        <div style="width:90px;flex-shrink:0;font-size:12px;color:#666;font-weight:600;">${kindLabel}</div>
+        <select name="media_id" style="flex:1;min-width:180px;padding:5px 7px;font-size:12px;">${opts}</select>
+        <button type="submit" class="btn small">Save</button>
+        ${filenameMuted ? `<span style="font-family:monospace;font-size:10px;color:#aaa;">${escapeHtml(filenameMuted)}</span>` : ''}
+      </form>`;
+    };
+
     const tableRows = rows.map((c) => {
       const before = c.before_image_url
         ? `<img class="thumb" src="${escapeHtml(c.before_image_url)}" alt="before">` : '<span class="muted">—</span>';
       const after = c.after_image_url
         ? `<img class="thumb" src="${escapeHtml(c.after_image_url)}" alt="after">` : '<span class="muted">—</span>';
-      return `<tr>
+      const mainRow = `<tr>
         <td>${c.sort_order}</td>
         <td>${before}</td>
         <td>${after}</td>
@@ -2338,6 +2410,15 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
           </form>
         </td>
       </tr>`;
+      // The inline sub-grid sits under each concept row and lets you pick the
+      // three slot media items without leaving this page.
+      const subRow = `<tr class="slot-subrow"><td colspan="8" style="background:#fafaf6;padding:8px 14px 12px;">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Widget slots for "${escapeHtml(c.name)}"</div>
+        ${slotRow(c.id, 'before', 'Before',         c.before_image_url,   imageItems)}
+        ${slotRow(c.id, 'image',  'After Picture',  c.after_image_url,    imageItems)}
+        ${slotRow(c.id, 'video',  'After Video',    c.example_video_url,  videoItems)}
+      </td></tr>`;
+      return mainRow + subRow;
     }).join('');
 
     const body = `
@@ -2346,6 +2427,7 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
         <a class="btn" href="/admin/concepts/new">+ Add new concept</a>
       </div>
       ${flash}
+      <style>.slot-subrow td{border-top:none !important;}</style>
       <table>
         <thead><tr>
           <th>Sort</th><th>Before</th><th>After</th><th>Name</th><th>Category</th>
@@ -3074,6 +3156,66 @@ app.post('/admin/concepts/:id/media', requireRole('admin'), upload.single('media
   }
 });
 
+// Set one of a concept's three widget slots (Before / After-Picture / After-Video)
+// by referencing an existing gallery item. media_id="" or "0" clears the slot.
+const SLOT_TO_COLUMN = { before: 'before_image_url', image: 'after_image_url', video: 'example_video_url' };
+app.post('/admin/concepts/:id/slot', requireRole('admin'), async (req, res) => {
+  const conceptId = parseInt(req.params.id, 10);
+  const slot = String(req.body.slot || '').trim();
+  const column = SLOT_TO_COLUMN[slot];
+  if (!conceptId || !column) {
+    if (wantsJson(req)) return res.status(400).json({ error: 'Bad slot or concept id' });
+    return res.redirect((req.body.return_to || '/admin/concepts') + '?error=' + encodeURIComponent('Bad slot'));
+  }
+  const mediaIdRaw = req.body.media_id;
+  const mediaId = mediaIdRaw && String(mediaIdRaw).trim() && parseInt(mediaIdRaw, 10) ? parseInt(mediaIdRaw, 10) : null;
+  let url = null;
+  try {
+    if (mediaId) {
+      const r = await pool.query('SELECT url FROM concept_media WHERE id = $1', [mediaId]);
+      if (!r.rows.length) {
+        if (wantsJson(req)) return res.status(404).json({ error: 'Media not found' });
+        return res.redirect((req.body.return_to || '/admin/concepts') + '?error=' + encodeURIComponent('Media not found'));
+      }
+      url = r.rows[0].url;
+    }
+    await pool.query(`UPDATE concepts SET ${column} = $1 WHERE id = $2`, [url, conceptId]);
+  } catch (err) {
+    console.error('[concept-slot] update error:', err.message);
+    if (wantsJson(req)) return res.status(500).json({ error: 'Update failed', details: err.message });
+    return res.redirect((req.body.return_to || '/admin/concepts') + '?error=' + encodeURIComponent('Update failed'));
+  }
+  if (wantsJson(req)) return res.json({ ok: true, url });
+  res.redirect(req.body.return_to || '/admin/concepts?saved=1');
+});
+function wantsJson(req) { return req.headers.accept === 'application/json' || req.xhr; }
+
+// Same as /admin/concepts/:id/slot but reads concept_id from the request body,
+// so the gallery row's slot-assign forms can name the concept inline.
+app.post('/admin/concepts/slot/assign', requireRole('admin'), async (req, res) => {
+  const conceptId = parseInt(req.body.concept_id, 10);
+  const slot = String(req.body.slot || '').trim();
+  const column = SLOT_TO_COLUMN[slot];
+  if (!conceptId || !column) {
+    return res.redirect((req.body.return_to || '/admin/gallery') + '?error=' + encodeURIComponent('Pick a concept and a slot'));
+  }
+  const mediaIdRaw = req.body.media_id;
+  const mediaId = mediaIdRaw && String(mediaIdRaw).trim() && parseInt(mediaIdRaw, 10) ? parseInt(mediaIdRaw, 10) : null;
+  let url = null;
+  try {
+    if (mediaId) {
+      const r = await pool.query('SELECT url FROM concept_media WHERE id = $1', [mediaId]);
+      if (!r.rows.length) return res.redirect((req.body.return_to || '/admin/gallery') + '?error=' + encodeURIComponent('Media not found'));
+      url = r.rows[0].url;
+    }
+    await pool.query(`UPDATE concepts SET ${column} = $1 WHERE id = $2`, [url, conceptId]);
+  } catch (err) {
+    console.error('[concept-slot-assign] error:', err.message);
+    return res.redirect((req.body.return_to || '/admin/gallery') + '?error=' + encodeURIComponent('Update failed'));
+  }
+  res.redirect(req.body.return_to || '/admin/gallery?saved_media=1');
+});
+
 // Update one media item — caption, kind, sort_order, is_primary, active.
 app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
   const mediaId = parseInt(req.params.id, 10);
@@ -3156,26 +3298,29 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       params
     );
 
-    // Compute which media items the rolling-demo widget will currently pick per concept.
-    // Mirrors the /gallery API ordering: is_primary DESC, sort_order ASC, created_at DESC,
-    // then "first image" and "first video" per concept_id.
-    const widgetPickIds = new Set();
-    try {
-      const { rows: widgetItems } = await pool.query(
-        `SELECT cm.id, cm.concept_id, cm.kind
-         FROM concept_media cm
-         JOIN concepts c ON c.id = cm.concept_id
-         WHERE cm.active = TRUE AND c.active = TRUE AND cm.kind IN ('image','video')
-         ORDER BY cm.is_primary DESC, cm.sort_order ASC, cm.created_at DESC`
-      );
-      const seen = new Map(); // concept_id → { image: bool, video: bool }
-      for (const it of widgetItems) {
-        if (!seen.has(it.concept_id)) seen.set(it.concept_id, { image: false, video: false });
-        const s = seen.get(it.concept_id);
-        if (it.kind === 'image' && !s.image) { s.image = true; widgetPickIds.add(it.id); }
-        if (it.kind === 'video' && !s.video) { s.video = true; widgetPickIds.add(it.id); }
-      }
-    } catch (e) { console.warn('[admin-gallery] widget-pick compute failed:', e.message); }
+    // Resolve each concept's three explicit slots so we can show which item is
+    // currently filling each slot on each row. Slots are stored as URL strings
+    // on the concepts table; we match by URL equality to find the media id.
+    const { rows: conceptSlots } = await pool.query(
+      `SELECT id, name, before_image_url, after_image_url, example_video_url
+       FROM concepts WHERE active = TRUE ORDER BY name ASC`
+    );
+    // For each gallery item, compute which concept slot (if any) it fills.
+    // Result: itemSlots.get(media.id) = { before:[conceptName], image:[...], video:[...] }
+    const itemSlotsByUrl = new Map(); // url → { before:[], image:[], video:[] }
+    function addUrlSlot(url, slotKey, conceptName) {
+      if (!url) return;
+      if (!itemSlotsByUrl.has(url)) itemSlotsByUrl.set(url, { before: [], image: [], video: [] });
+      itemSlotsByUrl.get(url)[slotKey].push(conceptName);
+    }
+    for (const c of conceptSlots) {
+      addUrlSlot(c.before_image_url, 'before', c.name);
+      addUrlSlot(c.after_image_url,  'image',  c.name);
+      addUrlSlot(c.example_video_url,'video',  c.name);
+    }
+    // Used to render the per-row concept picker in each slot column.
+    const conceptOptsAll = `<option value="">— (none) —</option>` +
+      conceptSlots.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
     const concepts = (await pool.query(`SELECT id, name FROM concepts ORDER BY name ASC`)).rows;
     const conceptOpts = `<option value="">All concepts</option>` + concepts.map((c) =>
@@ -3189,15 +3334,51 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       `<option value="true"${filterActive === 'true' ? ' selected' : ''}>Active</option>` +
       `<option value="false"${filterActive === 'false' ? ' selected' : ''}>Inactive</option>`;
 
+    // Returns the cell for one slot column on one gallery item row.
+    // Shows a green badge with the assigned concept name(s), an inline form to
+    // assign or change, and (when assigned) a Clear button to unset.
+    // `applicable` = false means this slot doesn't accept this item kind (e.g., a video can't be the "Before").
+    const returnTo = '/admin/gallery' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    const slotCell = (mediaItem, slot, applicable) => {
+      if (!applicable) return `<td class="muted" style="text-align:center;font-size:11px;">—</td>`;
+      const slotMap = itemSlotsByUrl.get(mediaItem.url) || { before: [], image: [], video: [] };
+      const assignedTo = slotMap[slot];
+      const badges = assignedTo.length
+        ? assignedTo.map((name) => `<span style="display:inline-block;background:#3A6B20;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin:1px 0;">${escapeHtml(name)}</span>`).join('<br>')
+        : `<span class="muted" style="font-size:11px;">(not set)</span>`;
+      // Clear buttons — one per concept already using this item in this slot.
+      const clearButtons = assignedTo.map((conceptName) => {
+        const c = conceptSlots.find((x) => x.name === conceptName);
+        if (!c) return '';
+        return `<form method="POST" action="/admin/concepts/slot/assign" class="inline" style="display:inline;">
+          <input type="hidden" name="concept_id" value="${c.id}">
+          <input type="hidden" name="slot" value="${slot}">
+          <input type="hidden" name="media_id" value="">
+          <input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">
+          <button type="submit" class="btn small" style="padding:2px 6px;font-size:10px;background:#fff;border-color:#aaa;color:#666;" title="Clear ${escapeHtml(conceptName)}'s ${slot}">✕</button>
+        </form>`;
+      }).join(' ');
+      return `<td style="vertical-align:top;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${badges}
+          <form method="POST" action="/admin/concepts/slot/assign" class="inline" style="display:flex;gap:4px;">
+            <input type="hidden" name="slot" value="${slot}">
+            <input type="hidden" name="media_id" value="${mediaItem.id}">
+            <input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">
+            <select name="concept_id" style="font-size:11px;padding:3px 5px;flex:1;min-width:90px;">${conceptOptsAll}</select>
+            <button type="submit" class="btn small" style="padding:3px 7px;font-size:10px;" title="Set this item as ${slot} for the selected concept">→</button>
+          </form>
+          ${clearButtons ? `<div style="display:flex;gap:3px;flex-wrap:wrap;">${clearButtons}</div>` : ''}
+        </div>
+      </td>`;
+    };
+
     const rowHtml = items.map((m) => {
       const isVideo = m.kind === 'video';
-      const inWidget = widgetPickIds.has(m.id);
-      // Last URL segment as a quick filename hint. Falls back to full URL if no slash.
+      const slotInfo = itemSlotsByUrl.get(m.url) || { before: [], image: [], video: [] };
+      const inAnySlot = slotInfo.before.length || slotInfo.image.length || slotInfo.video.length;
       const urlStr = String(m.url || '');
       const filename = (urlStr.split('?')[0].split('/').pop() || urlStr).slice(0, 48);
-      const widgetBadge = inWidget
-        ? `<span title="This is the file the rolling demo will show on the landing page" style="display:inline-block;background:#3A6B20;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:0.04em;text-transform:uppercase;margin-top:4px;">🟢 In widget</span>`
-        : '';
       const thumbBlock = isVideo
         ? `<video src="${escapeHtml(m.url)}" muted style="width:96px;height:64px;object-fit:cover;border-radius:4px;background:#000;"></video>`
         : `<img src="${escapeHtml(m.url)}" alt="" style="width:96px;height:64px;object-fit:cover;border-radius:4px;">`;
@@ -3205,29 +3386,29 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
           ${thumbBlock}
           <div title="${escapeHtml(urlStr)}" style="font-family:monospace;font-size:10px;color:#666;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(filename)}</div>
-          ${widgetBadge}
         </div>`;
       const kindOptsRow = CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}"${k === m.kind ? ' selected' : ''}>${k}</option>`).join('');
       return `
-        <tr${inWidget ? ' style="background:rgba(58,107,32,0.04);"' : ''}>
+        <tr${inAnySlot ? ' style="background:rgba(58,107,32,0.04);"' : ''}>
           <td>${thumb}</td>
           <td><a href="/admin/concepts/edit/${m.concept_id}">${escapeHtml(m.concept_name)}</a></td>
+          ${slotCell(m, 'before', !isVideo)}
+          ${slotCell(m, 'image',  !isVideo)}
+          ${slotCell(m, 'video',   isVideo)}
           <td>
             <form method="POST" action="/admin/media/${m.id}/update" class="inline" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-              <input type="hidden" name="return_to" value="/admin/gallery${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}">
+              <input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">
               <select name="kind" style="width:90px;padding:6px 8px;">${kindOptsRow}</select>
-              <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="filters e.g. pet, royal" style="width:180px;padding:6px 8px;">
+              <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="filters e.g. pet, royal" style="width:160px;padding:6px 8px;">
               <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;padding:6px 8px;">
-              <label style="font-weight:normal;display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
               <label style="font-weight:normal;display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
-              <input type="url" name="source_url" value="${escapeHtml(m.source_url || '')}" placeholder="Source (Before) photo URL — optional" title="Original photo this item was generated from. Used as the BEFORE image in the rolling demo when this concept cycles." style="flex:1;min-width:240px;padding:6px 8px;">
               <button type="submit" class="btn small">Save</button>
             </form>
           </td>
           <td class="muted" style="font-size:12px;">${new Date(m.created_at).toISOString().slice(0,10)}</td>
           <td>
             <form method="POST" action="/admin/media/${m.id}/delete" class="inline" onsubmit="return confirm('Delete this gallery item?');">
-              <input type="hidden" name="return_to" value="/admin/gallery${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}">
+              <input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">
               <button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;">Delete</button>
             </form>
           </td>
@@ -3250,8 +3431,17 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       ${req.query.deleted ? '<div class="flash">Deleted.</div>' : ''}
       ${req.query.error ? `<div class="flash err">${escapeHtml(req.query.error)}</div>` : ''}
       <table class="admin-table">
-        <thead><tr><th>Preview</th><th>Concept</th><th>Settings</th><th>Created</th><th></th></tr></thead>
-        <tbody>${rowHtml || '<tr><td colspan="5" class="muted">No gallery items yet.</td></tr>'}</tbody>
+        <thead><tr>
+          <th>Preview</th>
+          <th>Origin&nbsp;concept</th>
+          <th style="min-width:160px;">Before<br><span class="muted" style="font-weight:400;font-size:10px;">(widget left)</span></th>
+          <th style="min-width:160px;">After Picture<br><span class="muted" style="font-weight:400;font-size:10px;">(widget still)</span></th>
+          <th style="min-width:160px;">After Video<br><span class="muted" style="font-weight:400;font-size:10px;">(widget video)</span></th>
+          <th>Settings</th>
+          <th>Created</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rowHtml || '<tr><td colspan="8" class="muted">No gallery items yet.</td></tr>'}</tbody>
       </table>`;
 
     res.send(conceptAdminPage('Gallery', body));
