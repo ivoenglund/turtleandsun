@@ -230,6 +230,7 @@ html,body{overflow-x:hidden;}
 /* Under-frame label — morphs to Buy button after first preview */
 .ts-under{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px;flex-wrap:wrap;border:1.5px solid transparent;background:transparent;color:inherit;font:inherit;cursor:default;padding:6px 14px;border-radius:10px;width:100%;transition:background 0.3s,border-color 0.3s,padding 0.3s,box-shadow 0.3s,transform 0.15s;pointer-events:none;}
 .ts-under .ts-uf-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;transition:color 0.3s;}
+.ts-under .ts-uf-kind{font-size:17px;letter-spacing:0.01em;}
 .ts-under .ts-uf-sep{color:rgba(28,10,0,0.3);font-weight:400;transition:color 0.3s;}
 .ts-under .ts-uf-price{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:#3A6B20;transition:color 0.3s;}
 .ts-buy-prefix{display:inline-block;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:14px;color:inherit;max-width:0;opacity:0;overflow:hidden;white-space:nowrap;margin:0;transition:max-width 0.4s,opacity 0.3s,margin 0.3s;}
@@ -417,7 +418,7 @@ html,body{overflow-x:hidden;}
         </div>
         <button type="button" class="ts-under" id="ts-buy-pic">
           <span class="ts-buy-prefix">Buy</span>
-          <span class="ts-uf-title">Loveogram Picture</span>
+          <span class="ts-uf-title">Loveogram&nbsp;<span class="ts-uf-kind">Picture</span></span>
           <span class="ts-uf-sep">·</span>
           <span class="ts-uf-price" id="ts-price-pic">99 kr</span>
         </button>
@@ -435,7 +436,7 @@ html,body{overflow-x:hidden;}
         </div>
         <button type="button" class="ts-under" id="ts-buy-vid">
           <span class="ts-buy-prefix">Buy</span>
-          <span class="ts-uf-title">Loveogram Video</span>
+          <span class="ts-uf-title">Loveogram&nbsp;<span class="ts-uf-kind">Video</span></span>
           <span class="ts-uf-sep">·</span>
           <span class="ts-uf-price" id="ts-price-vid">149 kr</span>
         </button>
