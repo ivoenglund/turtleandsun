@@ -616,7 +616,9 @@ app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
       [email || 'dev@turtleandsun.com', product]
     );
     const orderId = ins.rows[0].id;
-    console.log('[dev-skip-checkout] order', orderId, 'product', product, 'concept', conceptId);
+    console.log('[dev-skip-checkout] order', orderId, 'product', product, 'concept', conceptId,
+      'previewImageUrl:', previewImageUrl ? previewImageUrl.slice(-60) : 'NONE',
+      'cloudinaryUrl:', cloudinaryUrl ? cloudinaryUrl.slice(-60) : 'NONE');
     // Respond now — generation can take 30–60s. The widget already shows the
     // order-confirmation alert; the user picks up the result in /admin or email.
     res.json({ ok: true, orderId, note: 'DEV: order marked paid without Stripe. Generation started.' });

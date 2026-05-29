@@ -1911,6 +1911,11 @@ NavBar.init({ requireAuth: false }).then(status => {
         regenBtn.className = 'ts-dev-regen';
         regenBtn.id = 'ts-dev-regen';
         regenBtn.textContent = '[DEV] Generate / Regenerate preview';
+        // The "3 free previews" counter is misleading in dev mode since dev
+        // regenerate has no quota. Hide the dot counter; the badge below makes
+        // it clear regenerate is unlimited.
+        var counterEl2 = document.getElementById('ts-counter');
+        if (counterEl2) counterEl2.style.display = 'none';
         var regenOut = document.createElement('div');
         regenOut.className = 'ts-dev-regen-out';
         regenOut.id = 'ts-dev-regen-out';
@@ -1986,7 +1991,10 @@ NavBar.init({ requireAuth: false }).then(status => {
       var r = await fetch('/api/dev/skip-checkout', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
       var j = await r.json();
       if (!r.ok) throw new Error(j.error || 'dev bypass failed');
-      alert('DEV: order #' + j.orderId + ' marked paid. Generation started — check your email or /admin for the result.');
+      var deliverMsg = body.previewImageUrl
+        ? 'DELIVERING the on-screen preview:\n' + body.previewImageUrl
+        : 'NO preview URL was sent — server will generate a new one from your upload.\n(Click [DEV] Regenerate first if you want THIS picture delivered.)';
+      alert('DEV order #' + j.orderId + '\n\n' + deliverMsg);
     } catch (err) {
       alert('[DEV] ' + err.message);
     }
