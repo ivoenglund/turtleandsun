@@ -2632,20 +2632,23 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
       const deleteBtn = isExisting
         ? `<form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" onsubmit="return confirm('Delete triplet ${number}?');"><input type="hidden" name="return_to" value="/admin/concepts"><button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;font-size:10px;padding:3px 7px;">Delete</button></form>`
         : '';
-      return `<form method="POST" action="/admin/triplets/save" style="background:#fff;border:1px solid #e6e2d8;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      // Use a stable colour per triplet number so two triplets read as visually distinct sets.
+      const palette = ['#3A6B20','#1C2A14','#a85c14','#7e1c66','#1c4e7e','#7a1c14'];
+      const accent = palette[((number || 0) - 1) % palette.length] || '#3A6B20';
+      return `<form method="POST" action="/admin/triplets/save" style="background:#fff;border:1px solid #e6e2d8;border-left:5px solid ${accent};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         ${idField}
         <input type="hidden" name="concept_id" value="${conceptId}">
         <input type="hidden" name="return_to" value="/admin/concepts">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-          <div style="background:#1C2A14;color:#FFE800;font-weight:800;font-size:11px;padding:3px 8px;border-radius:10px;letter-spacing:0.06em;">#${number || 'NEW'}</div>
-          <input type="number" name="triplet_number" value="${number}" placeholder="num" style="width:55px;padding:3px 5px;font-size:11px;" title="Triplet number (unique per concept)">
-          <input type="number" name="sort_order" value="${sortOrder}" style="width:55px;padding:3px 5px;font-size:11px;" title="Display order in the carousel">
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#3A6B20;cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${inRolling ? ' checked' : ''}> Rolling demo</label>
-          <input type="text" name="caption" value="${captionVal}" placeholder="caption (optional)" style="flex:1;min-width:120px;padding:3px 7px;font-size:11px;">
-          <button type="submit" class="btn small" style="padding:3px 10px;font-size:11px;">Save</button>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+          <div style="background:${accent};color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:14px;letter-spacing:0.04em;">Triplet #${number || 'NEW'}</div>
+          <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;">Num <input type="number" name="triplet_number" value="${number}" placeholder="num" style="width:55px;padding:3px 5px;font-size:11px;" title="Triplet number (unique per concept)"></label>
+          <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;">Order <input type="number" name="sort_order" value="${sortOrder}" style="width:55px;padding:3px 5px;font-size:11px;" title="Display order in the carousel"></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:${accent};cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${inRolling ? ' checked' : ''}> Rolling demo</label>
+          <input type="text" name="caption" value="${captionVal}" placeholder="caption (optional)" style="flex:1;min-width:120px;padding:4px 8px;font-size:12px;">
+          <button type="submit" class="btn small" style="padding:4px 12px;font-size:12px;">Save</button>
           ${deleteBtn}
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${tripletSlot('before_media_id', beforeId, beforeUrl, imageItems, 'Before')}
           ${tripletSlot('image_media_id',  imageId,  imageUrl,  imageItems, 'Picture')}
           ${tripletSlot('video_media_id',  videoId,  videoUrl,  videoItems, 'Video')}
@@ -3783,27 +3786,37 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       params
     );
 
-    // Resolve each concept's three explicit slots so we can show which item is
-    // currently filling each slot on each row. Slots are stored as URL strings
-    // on the concepts table; we match by URL equality to find the media id.
+    // Resolve which concepts (and triplets) use each gallery item as a slot,
+    // so the table cells can show "Royal Portrait #1" badges. Two sources:
+    //   - Legacy: concepts.before_image_url / after_image_url / example_video_url (matched by URL).
+    //   - New:    concept_triplets.before_media_id / image_media_id / video_media_id (matched by media id).
     const { rows: conceptSlots } = await pool.query(
       `SELECT id, name, before_image_url, after_image_url, example_video_url
        FROM concepts WHERE active = TRUE ORDER BY name ASC`
     );
-    // For each gallery item, compute which concept slot (if any) it fills.
-    // Result: itemSlots.get(media.id) = { before:[conceptName], image:[...], video:[...] }
-    const itemSlotsByUrl = new Map(); // url → { before:[], image:[], video:[] }
-    function addUrlSlot(url, slotKey, conceptName) {
-      if (!url) return;
-      if (!itemSlotsByUrl.has(url)) itemSlotsByUrl.set(url, { before: [], image: [], video: [] });
-      itemSlotsByUrl.get(url)[slotKey].push(conceptName);
-    }
+    const itemSlotsByUrl = new Map();     // url    → { before:[label], image:[label], video:[label] }
+    const itemSlotsByMediaId = new Map(); // mediaId → same shape
+    function ensureUrlBucket(url){ if (!itemSlotsByUrl.has(url)) itemSlotsByUrl.set(url, {before:[], image:[], video:[]}); return itemSlotsByUrl.get(url); }
+    function ensureIdBucket(id){ if (!itemSlotsByMediaId.has(id)) itemSlotsByMediaId.set(id, {before:[], image:[], video:[]}); return itemSlotsByMediaId.get(id); }
     for (const c of conceptSlots) {
-      addUrlSlot(c.before_image_url, 'before', c.name);
-      addUrlSlot(c.after_image_url,  'image',  c.name);
-      addUrlSlot(c.example_video_url,'video',  c.name);
+      if (c.before_image_url)  ensureUrlBucket(c.before_image_url ).before.push(`${c.name} (legacy)`);
+      if (c.after_image_url)   ensureUrlBucket(c.after_image_url  ).image .push(`${c.name} (legacy)`);
+      if (c.example_video_url) ensureUrlBucket(c.example_video_url).video .push(`${c.name} (legacy)`);
     }
-    // Used to render the per-row concept picker in each slot column.
+    const { rows: tripletAssignments } = await pool.query(
+      `SELECT t.id, t.concept_id, t.triplet_number, t.before_media_id, t.image_media_id, t.video_media_id, c.name AS concept_name
+       FROM concept_triplets t
+       JOIN concepts c ON c.id = t.concept_id
+       WHERE c.active = TRUE
+       ORDER BY c.name ASC, t.triplet_number ASC`
+    );
+    for (const t of tripletAssignments) {
+      const label = `${t.concept_name} #${t.triplet_number}`;
+      if (t.before_media_id) ensureIdBucket(t.before_media_id).before.push(label);
+      if (t.image_media_id)  ensureIdBucket(t.image_media_id ).image .push(label);
+      if (t.video_media_id)  ensureIdBucket(t.video_media_id ).video .push(label);
+    }
+    // Used to render the per-row concept picker in each slot column (legacy slot endpoint).
     const conceptOptsAll = `<option value="">— (none) —</option>` +
       conceptSlots.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
@@ -3820,14 +3833,13 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       `<option value="false"${filterActive === 'false' ? ' selected' : ''}>Inactive</option>`;
 
     // Returns the cell for one slot column on one gallery item row.
-    // Shows a green badge with the assigned concept name(s), an inline form to
-    // assign or change, and (when assigned) a Clear button to unset.
-    // `applicable` = false means this slot doesn't accept this item kind (e.g., a video can't be the "Before").
+    // Combines legacy URL-based assignments AND new triplet assignments.
     const returnTo = '/admin/gallery' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
     const slotCell = (mediaItem, slot, applicable) => {
       if (!applicable) return `<td class="muted" style="text-align:center;font-size:11px;">—</td>`;
-      const slotMap = itemSlotsByUrl.get(mediaItem.url) || { before: [], image: [], video: [] };
-      const assignedTo = slotMap[slot];
+      const urlMap = itemSlotsByUrl.get(mediaItem.url) || { before: [], image: [], video: [] };
+      const idMap  = itemSlotsByMediaId.get(mediaItem.id) || { before: [], image: [], video: [] };
+      const assignedTo = urlMap[slot].concat(idMap[slot]);
       const badges = assignedTo.length
         ? assignedTo.map((name) => `<span style="display:inline-block;background:#3A6B20;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin:1px 0;">${escapeHtml(name)}</span>`).join('<br>')
         : `<span class="muted" style="font-size:11px;">(not set)</span>`;
