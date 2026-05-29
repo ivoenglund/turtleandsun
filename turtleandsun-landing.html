@@ -1738,9 +1738,13 @@ NavBar.init({ requireAuth: false }).then(status => {
       }
     }
     else {
-      // In order mode, both columns are always visible (user is buying both possibilities).
-      if (stillCol) stillCol.style.display = '';
-      if (videoCol) videoCol.style.display = '';
+      // In order mode, columns follow the concept's input_type:
+      //   image       → show only After Picture
+      //   video       → show only After Video
+      //   image_video → show both
+      var it = (concepts[i].input_type || 'image_video');
+      if (stillCol) stillCol.style.display = (it === 'video') ? 'none' : '';
+      if (videoCol) videoCol.style.display = (it === 'image') ? 'none' : '';
       hideAllStills();
       stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
       stillOverlay.style.display = '';
@@ -1798,8 +1802,13 @@ NavBar.init({ requireAuth: false }).then(status => {
     stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
     previewsLeft = MAX_PREVIEWS; renderCounter();
     stillOverlay.style.display = '';
-    // Premium / video-only concepts: no free preview. Make Buy live immediately.
     var cur = concepts[current];
+    // Respect input_type for the After columns. image-only/video-only concepts
+    // collapse the other column instead of showing an empty placeholder.
+    var it = (cur && cur.input_type) || 'image_video';
+    if (stillCol) stillCol.style.display = (it === 'video') ? 'none' : '';
+    if (videoCol) videoCol.style.display = (it === 'image') ? 'none' : '';
+    // Premium / video-only concepts: no free preview. Make Buy live immediately.
     if (cur && cur.no_free_preview) {
       stillTitle.textContent = 'Pay to generate';
       stillSub.textContent = '"' + cur.name + '" — delivered by email';
