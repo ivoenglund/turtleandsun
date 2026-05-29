@@ -1985,27 +1985,32 @@ app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
       </div>`;
     };
 
-    const tripletCard = (t) => `<form method="POST" action="/admin/triplets/save" style="background:#fff;border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px;">
-      <input type="hidden" name="id" value="${t.id || ''}">
-      <input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="background:#1C2A14;color:#FFE800;font-weight:800;font-size:13px;padding:5px 12px;border-radius:14px;">${escapeHtml(t.concept_name)} · #${t.triplet_number}</div>
-        <select name="concept_id" style="padding:5px 9px;font-size:12px;">
-          ${concepts.map((c) => `<option value="${c.id}"${c.id === t.concept_id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-        </select>
-        <label style="font-size:12px;">Number <input type="number" name="triplet_number" value="${t.triplet_number}" style="width:60px;padding:5px;"></label>
-        <label style="font-size:12px;">Order <input type="number" name="sort_order" value="${t.sort_order}" style="width:60px;padding:5px;"></label>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#3A6B20;cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${t.in_rolling_demo ? ' checked' : ''}> Rolling demo</label>
-        <input type="text" name="caption" value="${escapeHtml(t.caption || '')}" placeholder="caption (optional)" style="flex:1;min-width:180px;padding:5px 9px;font-size:12px;">
-        <button type="submit" class="btn small">Save</button>
-        <form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" onsubmit="return confirm('Delete triplet #${t.triplet_number} for ${escapeHtml(t.concept_name).replace(/"/g, '&quot;').replace(/'/g, '&#39;')}?');"><input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}"><button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;">Delete</button></form>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
-        ${slotPicker('before_media_id', t.before_media_id, t.before_url, imageItems, 'Before')}
-        ${slotPicker('image_media_id',  t.image_media_id,  t.image_url,  imageItems, 'After Picture')}
-        ${slotPicker('video_media_id',  t.video_media_id,  t.video_url,  videoItems, 'After Video')}
-      </div>
-    </form>`;
+    const tripletCard = (t) => `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px;">
+      <form method="POST" action="/admin/triplets/save">
+        <input type="hidden" name="id" value="${t.id || ''}">
+        <input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="background:#1C2A14;color:#FFE800;font-weight:800;font-size:13px;padding:5px 12px;border-radius:14px;">${escapeHtml(t.concept_name)} · #${t.triplet_number}</div>
+          <select name="concept_id" style="padding:5px 9px;font-size:12px;">
+            ${concepts.map((c) => `<option value="${c.id}"${c.id === t.concept_id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+          <label style="font-size:12px;">Number <input type="number" name="triplet_number" value="${t.triplet_number}" style="width:60px;padding:5px;"></label>
+          <label style="font-size:12px;">Order <input type="number" name="sort_order" value="${t.sort_order}" style="width:60px;padding:5px;"></label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#3A6B20;cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${t.in_rolling_demo ? ' checked' : ''}> Rolling demo</label>
+          <input type="text" name="caption" value="${escapeHtml(t.caption || '')}" placeholder="caption (optional)" style="flex:1;min-width:180px;padding:5px 9px;font-size:12px;">
+          <button type="submit" class="btn small">Save</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+          ${slotPicker('before_media_id', t.before_media_id, t.before_url, imageItems, 'Before')}
+          ${slotPicker('image_media_id',  t.image_media_id,  t.image_url,  imageItems, 'After Picture')}
+          ${slotPicker('video_media_id',  t.video_media_id,  t.video_url,  videoItems, 'After Video')}
+        </div>
+      </form>
+      <form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" style="margin-top:10px;text-align:right;" onsubmit="return confirm('Delete triplet #${t.triplet_number} for ${escapeHtml(t.concept_name).replace(/"/g, '&quot;').replace(/'/g, '&#39;')}?');">
+        <input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}">
+        <button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;">Delete</button>
+      </form>
+    </div>`;
 
     const conceptFilterOpts = `<option value="">All concepts</option>` + concepts.map((c) => `<option value="${c.id}"${c.id === filterConcept ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 
@@ -2715,30 +2720,34 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
       const imageUrl  = (t && t.image_url)  || (fallbackUrls && fallbackUrls.image)  || null;
       const videoUrl  = (t && t.video_url)  || (fallbackUrls && fallbackUrls.video)  || null;
       const deleteBtn = isExisting
-        ? `<form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" onsubmit="return confirm('Delete triplet ${number}?');"><input type="hidden" name="return_to" value="/admin/concepts"><button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;font-size:10px;padding:3px 7px;">Delete</button></form>`
+        ? `<form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" style="display:inline-block;margin-left:6px;" onsubmit="return confirm('Delete triplet ${number}?');"><input type="hidden" name="return_to" value="/admin/concepts"><button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;font-size:10px;padding:3px 7px;">Delete</button></form>`
         : '';
       // Use a stable colour per triplet number so two triplets read as visually distinct sets.
       const palette = ['#3A6B20','#1C2A14','#a85c14','#7e1c66','#1c4e7e','#7a1c14'];
       const accent = palette[((number || 0) - 1) % palette.length] || '#3A6B20';
-      return `<form method="POST" action="/admin/triplets/save" style="background:#fff;border:1px solid #e6e2d8;border-left:5px solid ${accent};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-        ${idField}
-        <input type="hidden" name="concept_id" value="${conceptId}">
-        <input type="hidden" name="return_to" value="/admin/concepts">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
-          <div style="background:${accent};color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:14px;letter-spacing:0.04em;">Triplet #${number || 'NEW'}</div>
-          <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;">Num <input type="number" name="triplet_number" value="${number}" placeholder="num" style="width:55px;padding:3px 5px;font-size:11px;" title="Triplet number (unique per concept)"></label>
-          <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;">Order <input type="number" name="sort_order" value="${sortOrder}" style="width:55px;padding:3px 5px;font-size:11px;" title="Display order in the carousel"></label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:${accent};cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${inRolling ? ' checked' : ''}> Rolling demo</label>
-          <input type="text" name="caption" value="${captionVal}" placeholder="caption (optional)" style="flex:1;min-width:120px;padding:4px 8px;font-size:12px;">
-          <button type="submit" class="btn small" style="padding:4px 12px;font-size:12px;">Save</button>
-          ${deleteBtn}
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${tripletSlot('before_media_id', beforeId, beforeUrl, imageItems, 'Before')}
-          ${tripletSlot('image_media_id',  imageId,  imageUrl,  imageItems, 'Picture')}
-          ${tripletSlot('video_media_id',  videoId,  videoUrl,  videoItems, 'Video')}
-        </div>
-      </form>`;
+      // Save form and Delete form are siblings inside a wrapper div — NEVER nest forms
+      // (browser merges hidden inputs and breaks return_to on submit).
+      return `<div style="background:#fff;border:1px solid #e6e2d8;border-left:5px solid ${accent};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <form method="POST" action="/admin/triplets/save">
+          ${idField}
+          <input type="hidden" name="concept_id" value="${conceptId}">
+          <input type="hidden" name="return_to" value="/admin/concepts">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+            <div style="background:${accent};color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:14px;letter-spacing:0.04em;">Triplet #${number || 'NEW'}</div>
+            <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;">Num <input type="number" name="triplet_number" value="${number}" placeholder="num" style="width:55px;padding:3px 5px;font-size:11px;" title="Triplet number (unique per concept)"></label>
+            <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;">Order <input type="number" name="sort_order" value="${sortOrder}" style="width:55px;padding:3px 5px;font-size:11px;" title="Display order in the carousel"></label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:${accent};cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${inRolling ? ' checked' : ''}> Rolling demo</label>
+            <input type="text" name="caption" value="${captionVal}" placeholder="caption (optional)" style="flex:1;min-width:120px;padding:4px 8px;font-size:12px;">
+            <button type="submit" class="btn small" style="padding:4px 12px;font-size:12px;">Save</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${tripletSlot('before_media_id', beforeId, beforeUrl, imageItems, 'Before')}
+            ${tripletSlot('image_media_id',  imageId,  imageUrl,  imageItems, 'Picture')}
+            ${tripletSlot('video_media_id',  videoId,  videoUrl,  videoItems, 'Video')}
+          </div>
+        </form>
+        ${deleteBtn ? `<div style="text-align:right;margin-top:6px;">${deleteBtn}</div>` : ''}
+      </div>`;
     };
     // Empty form for adding a new triplet.
     const newTripletForm = (conceptId, suggestedNumber) => tripletRow(conceptId, {
