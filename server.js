@@ -4124,6 +4124,7 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
           </div>
           <div class="m-actions">
             <button type="submit" class="btn small" title="Save the field changes above (Kind, Filters, Sort, Active).">Save</button>
+            <a href="/admin/media/${m.id}/download" class="m-dl" title="Download the original file through the server (bypasses Chrome enterprise download blocks that hit direct R2 links).">↓</a>
             <button type="submit" formaction="/admin/media/${m.id}/delete" formnovalidate onclick="return confirm('Delete this gallery item?');" class="m-del" title="Delete this media item permanently. The file in R2 storage stays, but the DB row is removed. Triplets that reference this item will lose that slot.">×</button>
           </div>
         </form>
@@ -4207,6 +4208,8 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         .m-actions .btn.small{flex:1;padding:5px;font-size:11px;}
         .m-del{background:transparent;border:1px solid #ddd;color:#c33;font-size:14px;line-height:1;cursor:pointer;padding:4px 9px;border-radius:4px;}
         .m-del:hover{background:#fee;border-color:#c33;}
+        .m-dl{display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid #ddd;color:#3A6B20;font-size:14px;font-weight:700;line-height:1;text-decoration:none;padding:4px 9px;border-radius:4px;}
+        .m-dl:hover{background:#eef6e2;border-color:#3A6B20;}
       </style>
 
       <div class="g-top">
@@ -4474,6 +4477,48 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
   } catch (err) {
     console.error('[concept-media] update error:', err.message);
     res.status(500).json({ error: 'Update failed', details: err.message });
+  }
+});
+
+// Download proxy. Streams an R2 file through the app with Content-Disposition:
+// attachment, so an enterprise-managed Chrome that blocks direct downloads from
+// the R2 origin will still allow it (since it comes from turtleandsun.com).
+app.get('/admin/media/:id/download', requireRole('admin'), async (req, res) => {
+  const mediaId = parseInt(req.params.id, 10);
+  try {
+    const r = await pool.query(`SELECT url, kind FROM concept_media WHERE id = $1`, [mediaId]);
+    if (!r.rows.length) return res.status(404).send('Not found');
+    const { url, kind } = r.rows[0];
+    if (!url) return res.status(404).send('No URL');
+    // Derive filename + mime from the URL extension.
+    const fname = (String(url).split('?')[0].split('/').pop() || 'download');
+    const ext = (fname.split('.').pop() || '').toLowerCase();
+    const mime =
+      kind === 'video' ? (ext === 'webm' ? 'video/webm' : 'video/mp4') :
+      ext === 'png'  ? 'image/png'  :
+      ext === 'gif'  ? 'image/gif'  :
+      ext === 'webp' ? 'image/webp' :
+      ext === 'mp4'  ? 'video/mp4'  :
+      'image/jpeg';
+    const upstream = await fetch(url);
+    if (!upstream.ok) return res.status(502).send('Upstream fetch failed: ' + upstream.status);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${fname.replace(/"/g, '')}"`);
+    if (upstream.headers.get('content-length')) {
+      res.setHeader('Content-Length', upstream.headers.get('content-length'));
+    }
+    // Stream the body through. Node 18+ fetch returns a web ReadableStream.
+    const reader = upstream.body.getReader();
+    res.on('close', () => { try { reader.cancel(); } catch (e) {} });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+    res.end();
+  } catch (err) {
+    console.error('[media-download] error:', err.message);
+    res.status(500).send('Download failed: ' + err.message);
   }
 });
 
