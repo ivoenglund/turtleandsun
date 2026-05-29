@@ -234,12 +234,12 @@ html,body{overflow-x:hidden;}
 .ts-frame-sound{left:10px;}
 .ts-demo:not(.is-order) .ts-output .ts-frame-action{display:flex;}
 
-/* Global rolling-demo controls (label · pause · sound) — top-right of the demo area */
-.ts-demo-ctrls{position:absolute;top:8px;right:8px;display:none;gap:6px;align-items:center;z-index:6;}
+/* Rolling-demo controls (pill · pause · sound) — sit BELOW the Before frame
+   inside the source column, next to the existing "Rolling demo" pill. */
+.ts-demo-ctrls{display:none;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;}
 .ts-demo:not(.is-order) .ts-demo-ctrls{display:flex;}
-.ts-demo-ctrl-label{background:rgba(0,0,0,0.55);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.04em;padding:8px 12px;border-radius:20px;text-transform:uppercase;line-height:1;user-select:none;}
-.ts-demo-ctrl{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-demo-ctrl:hover{background:rgba(0,0,0,0.88);transform:scale(1.08);}
+.ts-demo-ctrl{width:32px;height:32px;border-radius:50%;background:rgba(28,10,0,0.65);color:#fff;border:none;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
+.ts-demo-ctrl:hover{background:#1C0A00;transform:scale(1.08);}
 .ts-demo-ctrl.is-on{background:#FFE800;color:#1C0A00;}
 
 /* Under-frame label — morphs to Buy button after first preview */
@@ -370,13 +370,6 @@ html,body{overflow-x:hidden;}
     </div>
 
     <div class="ts-demo" id="ts-demo">
-      <!-- Top-right controls for the rolling demo:
-             "Rolling demo" label  ·  Pause/Play  ·  Sound on/off -->
-      <div class="ts-demo-ctrls">
-        <span class="ts-demo-ctrl-label">Rolling demo</span>
-        <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo">⏸</button>
-        <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound">🔇</button>
-      </div>
       <!-- 1. SOURCE -->
       <div class="ts-col ts-source" id="ts-source">
         <div class="ts-mobile-step"><span class="ts-ms-num">1</span><span class="ts-ms-text">Upload a photo</span></div>
@@ -392,7 +385,11 @@ html,body{overflow-x:hidden;}
             <div class="ts-drop-sub">or click to upload</div>
           </div>
         </div>
-        <span class="ts-mode-pill" id="ts-mode-pill">Rolling demo</span>
+        <div class="ts-demo-ctrls" id="ts-demo-ctrls">
+          <span class="ts-mode-pill" id="ts-mode-pill">Rolling demo</span>
+          <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo">⏸</button>
+          <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound">🔇</button>
+        </div>
       </div>
 
       <!-- 2. CHIPS + RATIO -->
