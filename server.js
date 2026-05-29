@@ -1395,7 +1395,7 @@ app.get('/api/currency', async (req, res) => {
   let usedEngine = false;
   try {
     const rates = await pricing.getFxRates();
-    for (const cur of getSupportedCurrenciesArray()) {
+    for (const cur of pricing.getSupportedCurrencies()) {
       prices[cur] = {};
       for (const key of Object.keys(PRODUCTS)) {
         const tier = key === 'bundle' ? 'bundle' : key;
@@ -1411,7 +1411,7 @@ app.get('/api/currency', async (req, res) => {
     // Fall back to hardcoded PRODUCTS amounts
     console.warn('[api/currency] pricing engine unavailable, using legacy amounts:', err.message);
     prices = {};
-    for (const cur of getSupportedCurrenciesArray()) {
+    for (const cur of pricing.getSupportedCurrencies()) {
       prices[cur] = {};
       for (const key of Object.keys(PRODUCTS)) {
         const amount = PRODUCTS[key].amounts && PRODUCTS[key].amounts[cur];
@@ -1421,7 +1421,7 @@ app.get('/api/currency', async (req, res) => {
   }
 
   res.set('Cache-Control', 'public, max-age=300');
-  res.json({ detected, country, supported: getSupportedCurrenciesArray(), prices, source: usedEngine ? 'engine' : 'legacy' });
+  res.json({ detected, country, supported: pricing.getSupportedCurrencies(), prices, source: usedEngine ? 'engine' : 'legacy' });
 });
 
 app.post('/create-checkout-session', async (req, res) => {
