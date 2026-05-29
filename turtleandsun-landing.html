@@ -1490,16 +1490,24 @@ NavBar.init({ requireAuth: false }).then(status => {
     }
   }
 
-  // Only restore when the customer actually returned from Stripe — either via the browser
-  // back button (navigation type "back_forward") or via Stripe's cancel redirect (referrer = stripe.com).
-  // A plain refresh or a fresh visit should NOT auto-restore.
+  // Restore by default whenever sessionStorage has fresh state. The ONE case we deliberately
+  // suppress is an explicit page reload (the user pressed F5 / Cmd-R to start over).
+  // - Back from Stripe → not a reload, ts_state present → restore.
+  // - Stripe cancel redirect → not a reload, ts_state present → restore.
+  // - Plain reload → ts_state present, but nav type is 'reload' → clear and skip.
+  // - Fresh visit → no ts_state → restoreFromSession returns false anyway.
   function shouldRestore() {
+    let isReload = false;
     try {
-      const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || null;
-      if (nav && nav.type === 'back_forward') return true;
+      if (performance.navigation && performance.navigation.type === 1) isReload = true;
+      const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      if (nav && nav.type === 'reload') isReload = true;
     } catch (e) {}
-    if (document.referrer && /(^|\.)stripe\.com/i.test(new URL(document.referrer).hostname || '')) return true;
-    return false;
+    if (isReload) {
+      try { sessionStorage.removeItem('ts_state'); } catch (e) {}
+      return false;
+    }
+    return true;
   }
 
   function restoreFromSession() {
