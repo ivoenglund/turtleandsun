@@ -33,6 +33,62 @@ const {
   requireAuth, requireRole,
 } = require('./auth');
 const { sendDailyDigest, gatherDigestSections, block: digestBlock } = require('./digest');
+
+// Drop handler used by both /admin/concepts and /admin/triplets so a thumbnail
+// dragged from /admin/gallery (even in a separate browser window) can populate
+// any slot picker. The picker is wrapped in a `.ts-drop-slot` element with a
+// `data-slot-kind` attribute ("image" or "video"). The dragged payload is
+// `{ id, kind, url }` JSON in the "application/x-ts-media" MIME type.
+const TS_DROP_HANDLER_JS = `<script>
+(function(){
+  document.querySelectorAll('.ts-drop-slot').forEach(function(zone){
+    zone.addEventListener('dragover', function(e){
+      var types = e.dataTransfer && e.dataTransfer.types ? e.dataTransfer.types : [];
+      var ok = false;
+      for (var i=0;i<types.length;i++) if (types[i]==='application/x-ts-media' || types[i]==='text/plain') ok = true;
+      if (!ok) return;
+      e.preventDefault();
+      zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', function(){ zone.classList.remove('dragover'); });
+    zone.addEventListener('drop', function(e){
+      zone.classList.remove('dragover');
+      var json = e.dataTransfer.getData('application/x-ts-media');
+      if (!json) return;
+      e.preventDefault();
+      var data;
+      try { data = JSON.parse(json); } catch(err){ return; }
+      var slotKind = zone.dataset.slotKind;
+      if (data.kind !== slotKind) { alert('This slot expects a '+slotKind+', the dropped item is a '+data.kind); return; }
+      var sel = zone.querySelector('select');
+      if (!sel) return;
+      var opt = sel.querySelector('option[value="'+data.id+'"]');
+      if (!opt) {
+        var n = document.createElement('option');
+        n.value = String(data.id);
+        n.textContent = 'New · ' + (data.url || '').split('/').pop().split('?')[0];
+        sel.appendChild(n);
+      }
+      sel.value = String(data.id);
+      sel.classList.add('dropped');
+      // Update the local thumbnail preview if there is one next to the select.
+      var prev = zone.querySelector('img, video, div[style*="background:#f0ede6"], div[style*="background: #f0ede6"]');
+      if (prev) {
+        var tagName = data.kind === 'video' ? 'video' : 'img';
+        if (prev.tagName.toLowerCase() !== tagName) {
+          var newEl = document.createElement(tagName);
+          newEl.style.cssText = prev.style.cssText || 'width:54px;height:40px;object-fit:cover;border-radius:4px;background:#000;';
+          if (tagName === 'video') { newEl.muted = true; }
+          newEl.src = data.url;
+          prev.replaceWith(newEl);
+        } else {
+          prev.src = data.url;
+        }
+      }
+    });
+  });
+})();
+</script>`;
 const pricing = require('./pricing');
 const { scheduleFxRefresh } = require('./fx_cron');
 
@@ -1922,7 +1978,8 @@ app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
             ? `<video src="${escapeHtml(currentUrl)}" muted style="width:64px;height:48px;object-fit:cover;border-radius:4px;background:#000;"></video>`
             : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:4px;">`)
         : `<div style="width:64px;height:48px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
-      return `<div style="display:flex;flex-direction:column;gap:3px;">
+      const slotKind = isVideo ? 'video' : 'image';
+      return `<div class="ts-drop-slot" data-slot-kind="${slotKind}" style="display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:6px;border:2px dashed transparent;transition:border-color 0.15s,background 0.15s;">
         <div style="font-size:10px;color:#888;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
         <div style="display:flex;align-items:center;gap:6px;">${preview}<select name="${selectName}" style="flex:1;padding:5px 7px;font-size:12px;min-width:180px;">${opts}</select></div>
       </div>`;
@@ -1985,7 +2042,12 @@ app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
           ${slotPicker('image_media_id',  null, null, imageItems, 'After Picture')}
           ${slotPicker('video_media_id',  null, null, videoItems, 'After Video')}
         </div>
-      </form>`;
+      </form>
+      <style>
+        .ts-drop-slot.dragover{border-color:#3A6B20 !important;background:rgba(58,107,32,0.08);}
+        .ts-drop-slot select.dropped{background:#FFF3C4 !important;font-weight:600;}
+      </style>
+      ${TS_DROP_HANDLER_JS}`;
     res.send(conceptAdminPage('Triplets', body));
   } catch (err) {
     console.error('[triplets-list] error:', err.message);
@@ -2613,8 +2675,11 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
       return (String(url).split('?')[0].split('/').pop() || '').slice(0, 36);
     };
     // Render one media slot picker (Before/After-Pic/After-Vid) inside a triplet row.
+    // Wrapped in a `.ts-drop-slot` zone so the receiving end of cross-tab drag-drop
+    // (from /admin/gallery thumbnails) can populate the select on drop.
     const tripletSlot = (selectName, currentMediaId, currentUrl, items, kindLabel) => {
       const isVideo = kindLabel === 'Video';
+      const slotKind = isVideo ? 'video' : 'image';
       const opts = `<option value="">— (none) —</option>` + items.map((m) => {
         const label = `${m.concept_name} · ${slotFilename(m.url)}`;
         const sel = m.id === currentMediaId ? ' selected' : '';
@@ -2625,7 +2690,7 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
             ? `<video src="${escapeHtml(currentUrl)}" muted style="width:54px;height:40px;object-fit:cover;border-radius:4px;background:#000;"></video>`
             : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:4px;">`)
         : `<div style="width:54px;height:40px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px;">${kindLabel.charAt(0)}</div>`;
-      return `<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px;">
+      return `<div class="ts-drop-slot" data-slot-kind="${slotKind}" style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px;padding:4px;border-radius:6px;border:2px dashed transparent;transition:border-color 0.15s,background 0.15s;">
         <div style="flex-shrink:0;">${preview}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:10px;color:#888;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
@@ -2746,14 +2811,20 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
         <a class="btn" href="/admin/concepts/new">+ Add new concept</a>
       </div>
       ${flash}
-      <style>.slot-subrow td{border-top:none !important;}</style>
+      <style>
+        .slot-subrow td{border-top:none !important;}
+        .ts-drop-slot.dragover{border-color:#3A6B20 !important;background:rgba(58,107,32,0.08);}
+        .ts-drop-slot select.dropped{background:#FFF3C4 !important;font-weight:600;}
+      </style>
+      <p class="muted" style="font-size:12px;margin:8px 0 14px;">💡 Open <a href="/admin/gallery" target="_blank">the gallery in a second window</a> and drag thumbnails onto any slot below. Hit Save on the triplet after the drop to persist.</p>
       <table>
         <thead><tr>
           <th>Sort</th><th>Before</th><th>After</th><th>Video</th><th>Name</th><th>Category</th>
           <th>Input</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody>${tableRows || '<tr><td colspan="9" class="muted">No concepts yet.</td></tr>'}</tbody>
-      </table>`;
+      </table>
+      ${TS_DROP_HANDLER_JS}`;
     res.send(conceptAdminPage('Concepts', body));
   } catch (err) {
     console.error('[concepts] list error:', err.message);
@@ -3767,17 +3838,18 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
     const fname = (u) => (u ? (String(u).split('?')[0].split('/').pop() || '').slice(0, 22) : '');
     const thumb = (m, label) => {
       if (!m || !m.url) return `<div class="g-thumb g-thumb--empty"><span>${label || '—'}</span></div>`;
+      const drag = m.id ? ` draggable="true" data-mid="${m.id}" data-mkind="${m.kind}" data-murl="${escUrl(m.url)}"` : '';
       return m.kind === 'video'
-        ? `<video class="g-thumb" src="${escUrl(m.url)}" muted preload="metadata" title="${escapeHtml(fname(m.url))}"></video>`
-        : `<img class="g-thumb" src="${escUrl(m.url)}" alt="" title="${escapeHtml(fname(m.url))}">`;
+        ? `<video class="g-thumb"${drag} src="${escUrl(m.url)}" muted preload="metadata" title="${escapeHtml(fname(m.url))}"></video>`
+        : `<img class="g-thumb"${drag} src="${escUrl(m.url)}" alt="" title="${escapeHtml(fname(m.url))}">`;
     };
 
     const tripletCard = (t) => {
       const palette = ['#3A6B20','#1C2A14','#a85c14','#7e1c66','#1c4e7e','#7a1c14'];
       const accent = palette[((t.triplet_number || 0) - 1) % palette.length] || '#3A6B20';
-      const beforeM = t.before_url ? { url: t.before_url, kind: 'image' } : null;
-      const imageM  = t.image_url  ? { url: t.image_url,  kind: 'image' } : null;
-      const videoM  = t.video_url  ? { url: t.video_url,  kind: 'video' } : null;
+      const beforeM = t.bm_id ? { id: t.bm_id, url: t.before_url, kind: 'image' } : null;
+      const imageM  = t.im_id ? { id: t.im_id, url: t.image_url,  kind: 'image' } : null;
+      const videoM  = t.vm_id ? { id: t.vm_id, url: t.video_url,  kind: 'video' } : null;
       return `<div class="t-card ${t.active ? '' : 't-card--off'}" data-trip-id="${t.id}" style="--accent:${accent};">
         <div class="t-card-head">
           <span class="t-badge">#${t.triplet_number}</span>
@@ -3827,7 +3899,7 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       </header>
       <div class="m-grid">
         ${unassigned.map((m) => `<div class="m-card">
-          ${m.kind === 'video' ? `<video class="m-thumb" src="${escUrl(m.url)}" muted preload="metadata"></video>` : `<img class="m-thumb" src="${escUrl(m.url)}" alt="">`}
+          ${m.kind === 'video' ? `<video class="m-thumb" draggable="true" data-mid="${m.id}" data-mkind="${m.kind}" data-murl="${escUrl(m.url)}" src="${escUrl(m.url)}" muted preload="metadata"></video>` : `<img class="m-thumb" draggable="true" data-mid="${m.id}" data-mkind="${m.kind}" data-murl="${escUrl(m.url)}" src="${escUrl(m.url)}" alt="">`}
           <div class="m-meta">
             <div class="m-name" title="${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
             <div class="m-concept">${escapeHtml(m.concept_name)} · ${escapeHtml(m.kind)}</div>
@@ -3920,6 +3992,21 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       <div id="ts-drop-progress" style="display:none;position:fixed;bottom:24px;right:24px;background:#1C2A14;color:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 12px 32px rgba(0,0,0,0.3);z-index:9100;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;min-width:260px;"></div>
 
       <script>
+        // Make every thumbnail with [data-mid] draggable. Payload is JSON with
+        // media id / kind / url so the receiving window can populate a slot picker.
+        document.querySelectorAll('[data-mid]').forEach(function(el){
+          el.addEventListener('dragstart', function(e){
+            try {
+              var payload = { id: parseInt(el.dataset.mid, 10), kind: el.dataset.mkind, url: el.dataset.murl };
+              e.dataTransfer.setData('application/x-ts-media', JSON.stringify(payload));
+              e.dataTransfer.setData('text/plain', el.dataset.murl || '');
+              e.dataTransfer.effectAllowed = 'copy';
+            } catch(err){}
+            el.style.opacity = '0.5';
+          });
+          el.addEventListener('dragend', function(){ el.style.opacity = ''; });
+        });
+
         // Toggle handlers — fetch /admin/triplets/:id/toggle for instant flip.
         document.querySelectorAll('.t-toggle').forEach(function(lbl){
           lbl.addEventListener('click', async function(e){
