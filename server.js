@@ -602,7 +602,7 @@ app.post('/api/dev/preview', requireRole('admin'), async (req, res) => {
 
 app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
   if (!cachedDevMode) return res.status(403).json({ error: 'Dev mode is OFF' });
-  const { email, cloudinaryUrl, product, conceptId, customerName } = req.body || {};
+  const { email, cloudinaryUrl, previewImageUrl, product, conceptId, customerName } = req.body || {};
   if (!cloudinaryUrl) return res.status(400).json({ error: 'cloudinaryUrl required' });
   if (!product)       return res.status(400).json({ error: 'product required' });
   try {
@@ -621,16 +621,20 @@ app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
     // order-confirmation alert; the user picks up the result in /admin or email.
     res.json({ ok: true, orderId, note: 'DEV: order marked paid without Stripe. Generation started.' });
 
-    // ---- Generation (background) -------------------------------------------
-    // For image/bundle products, generateForOrder expects portrait_url to be
-    // the ALREADY-generated preview image. Real customers click "Generate
-    // preview" before Buy, so portrait_url = preview. The dev path skips that
-    // step, so we must generate the preview here first — otherwise the order's
-    // result_url ends up being the customer's raw upload (the bug Ivo hit).
+    // ---- Generation / delivery (background) --------------------------------
+    // Priority:
+    //   1. If the widget sent previewImageUrl (the picture the admin is looking
+    //      at after Regenerate), use it as-is. NO re-generation. That's what
+    //      the customer expects: "I'm buying THIS one."
+    //   2. Otherwise, for image/bundle products without a preview, generate
+    //      one from the raw upload so result_url is a real Loveogram, not the
+    //      cobra upload.
+    //   3. Talking/video products: generateForOrder handles its own generation.
     (async () => {
       try {
-        let portraitUrl = cloudinaryUrl;
-        const needsPreGen = (product === 'image' || product === 'bundle');
+        let portraitUrl = previewImageUrl || cloudinaryUrl;
+        const usingProvidedPreview = !!previewImageUrl;
+        const needsPreGen = !usingProvidedPreview && (product === 'image' || product === 'bundle');
         if (needsPreGen && conceptId) {
           const c = await pool.query(
             `SELECT image_prompt, fal_image_model, image_input_extras
@@ -639,7 +643,7 @@ app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
           if (c.rows.length) {
             const cc = c.rows[0];
             const modelId = cc.fal_image_model || 'fal-ai/kling-image/o1';
-            console.log('[dev-skip-checkout] pre-generating preview with', modelId);
+            console.log('[dev-skip-checkout] no preview supplied — pre-generating with', modelId);
             const result = await generation.generateImage({
               modelId,
               prompt: cc.image_prompt || '',
@@ -650,6 +654,8 @@ app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
             portraitUrl = result.url;
             console.log('[dev-skip-checkout] preview generated:', portraitUrl);
           }
+        } else if (usingProvidedPreview) {
+          console.log('[dev-skip-checkout] using supplied preview:', portraitUrl);
         }
         await generateForOrder(portraitUrl, product, email || '', orderId, conceptId || null, customerName || null);
       } catch (err) {

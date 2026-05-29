@@ -1972,9 +1972,12 @@ NavBar.init({ requireAuth: false }).then(status => {
     if (!window.tsSelectedConcept) { alert('Pick a concept first.'); return; }
     if (!window.cloudinaryUrl) { alert('Upload a photo first.'); return; }
     var email = (typeof getEmail === 'function' ? getEmail() : '') || 'dev@turtleandsun.com';
+    // Send the preview URL the user is looking at, so the server can deliver
+    // THAT image instead of re-running generation and producing a different one.
     var body = {
       email: email,
       cloudinaryUrl: window.cloudinaryUrl,
+      previewImageUrl: window.previewImageUrl || null,
       product: product,
       conceptId: window.tsSelectedConcept.id,
       customerName: (typeof getCustomerName === 'function' ? getCustomerName() : null),
