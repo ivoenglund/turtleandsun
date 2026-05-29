@@ -1898,6 +1898,12 @@ NavBar.init({ requireAuth: false }).then(status => {
     .then(function(j){
       if (j && j.isAdmin && j.devMode) {
         window.__TS_DEV_MODE = true;
+        // In dev mode, Buy is ALWAYS available regardless of preview state or
+        // concept config — so admin testing is never blocked by data.
+        if (demoEl) demoEl.classList.add('ts-dev-buy-live');
+        var devCss = document.createElement('style');
+        devCss.textContent = '.ts-demo.ts-dev-buy-live.is-order .ts-under{background:#3A6B20!important;border-color:#3A6B20!important;color:#fff!important;cursor:pointer!important;padding:11px 16px!important;box-shadow:0 6px 18px rgba(58,107,32,0.32)!important;pointer-events:auto!important;}.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-uf-title,.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-uf-price{color:#fff!important;}.ts-demo.ts-dev-buy-live.is-order .ts-under .ts-buy-prefix{max-width:80px!important;opacity:1!important;}';
+        document.head.appendChild(devCss);
         // Sticky yellow ribbon so the admin never forgets dev mode is on.
         var rib = document.createElement('div');
         rib.id = 'ts-dev-ribbon';
@@ -1942,7 +1948,8 @@ NavBar.init({ requireAuth: false }).then(status => {
     var sel = window.tsSelectedConcept && window.tsSelectedConcept.concept;
     var noPreview = sel && sel.no_free_preview;
     // Normal flow: must have a preview shown. No-preview concepts: skip that check.
-    if (!noPreview && !demoEl.classList.contains('has-preview')) return;
+    // Dev mode (admin): always allow Buy regardless, so data setup never blocks testing.
+    if (!window.__TS_DEV_MODE && !noPreview && !demoEl.classList.contains('has-preview')) return;
     window._orderEmail = getEmail() || window._previewEmail || '';
     window._previewEmail = window._orderEmail;
     // DEV mode: bypass Stripe completely.
