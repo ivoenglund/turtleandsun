@@ -3232,6 +3232,11 @@ function conceptFormBody(concept, errorMsg) {
         if (!imageActive && !videoActive) {
           showTab(showImage ? 'image' : 'video');
         }
+        // Don't keep `required` on inputs inside a hidden tab — the browser
+        // can't focus a hidden field on validation failure, so the form's
+        // Create button silently does nothing.
+        var imgPrompt = document.querySelector('[name=image_prompt]');
+        if (imgPrompt) { if (showImage) imgPrompt.setAttribute('required',''); else imgPrompt.removeAttribute('required'); }
       }
       function setStatus(kind, m){
         var el = document.getElementById('test' + (kind === 'image' ? 'Image' : 'Video') + 'Status');
@@ -3435,6 +3440,41 @@ function conceptFormBody(concept, errorMsg) {
       renderModelFields('image');
       renderModelFields('video');
       applyInputType(document.getElementById('inputTypeSelect').value);
+
+      // Visible submit-validator. If HTML5 validation fails (required field
+      // empty, pattern mismatch, etc.), find the first invalid field, switch
+      // to its tab if needed, scroll to it, focus it, and surface a banner.
+      (function(){
+        var form = document.querySelector('form[action="/admin/concepts/save"]');
+        if (!form) return;
+        form.addEventListener('submit', function(e){
+          if (form.checkValidity()) return; // valid → let it submit normally
+          e.preventDefault();
+          var bad = form.querySelector(':invalid');
+          if (!bad) return;
+          // Which tab is this field in? Walk up to find .ts-tab id.
+          var tab = bad.closest('.ts-tab');
+          if (tab && tab.id === 'tabVideo') showTab('video');
+          else if (tab && tab.id === 'tabImage') showTab('image');
+          // Banner so the user sees what's wrong instead of a silent fail.
+          var label = bad.closest('.field') ? bad.closest('.field').querySelector('label') : null;
+          var name = (label && label.textContent.trim()) || bad.name || 'a required field';
+          var msg = bad.validationMessage || 'Required';
+          var banner = document.getElementById('ts-form-err');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'ts-form-err';
+            banner.className = 'flash err';
+            banner.style.cssText = 'position:sticky;top:10px;z-index:100;margin:10px 0;';
+            form.parentNode.insertBefore(banner, form);
+          }
+          banner.textContent = 'Cannot create concept — ' + name + ': ' + msg;
+          banner.scrollIntoView({behavior:'smooth', block:'start'});
+          try { bad.focus({preventScroll:true}); } catch(e2){ try{bad.focus();}catch(e3){} }
+          bad.style.outline = '2px solid #c33';
+          setTimeout(function(){ bad.style.outline = ''; }, 3000);
+        });
+      })();
     </script>`;
 }
 
