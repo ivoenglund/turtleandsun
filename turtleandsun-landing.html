@@ -65,9 +65,10 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
   padding-left:20px;padding-right:20px;}
 .g-grid.g-grid-empty{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;columns:auto;}
 @media(max-width:1180px){.g-grid{margin-left:0;margin-right:0;padding-left:0;padding-right:0;}}
-.g-card{aspect-ratio:var(--ratio,9/16);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s,outline-color 0.2s;background:#1A0C04;outline:5px solid transparent;outline-offset:0;position:relative;break-inside:avoid;margin-bottom:10px;display:block;}
+.g-card{aspect-ratio:var(--ratio,9/16);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;background:#1A0C04;position:relative;break-inside:avoid;margin-bottom:10px;display:block;}
 .g-card:hover{transform:translateY(-4px);box-shadow:0 12px 36px rgba(0,0,0,0.22);}
-.g-card.is-selected{outline-color:#3A6B20;box-shadow:0 12px 36px rgba(58,107,32,0.45);transform:translateY(-4px);}
+/* Use box-shadow (spread + drop) instead of outline to dodge Safari's outline+transform render bug. */
+.g-card.is-selected{box-shadow:0 0 0 5px #3A6B20, 0 12px 36px rgba(58,107,32,0.45);transform:translateY(-4px);}
 /* iOS Safari sometimes fails to repaint <img> inside a card after the translateY lift. Force a GPU layer on the media. */
 .g-card img,.g-card video{-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden;}
 .g-card.is-selected::after{content:'✓';position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:#3A6B20;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;z-index:2;}
