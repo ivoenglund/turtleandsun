@@ -585,10 +585,45 @@ app.post('/api/dev/skip-checkout', requireRole('admin'), async (req, res) => {
     );
     const orderId = ins.rows[0].id;
     console.log('[dev-skip-checkout] order', orderId, 'product', product, 'concept', conceptId);
-    // Fire-and-forget generation — same code path Stripe webhook uses.
-    generateForOrder(cloudinaryUrl, product, email || '', orderId, conceptId || null, customerName || null)
-      .catch((err) => console.error('[dev-skip-checkout] generation error:', err.message));
+    // Respond now — generation can take 30–60s. The widget already shows the
+    // order-confirmation alert; the user picks up the result in /admin or email.
     res.json({ ok: true, orderId, note: 'DEV: order marked paid without Stripe. Generation started.' });
+
+    // ---- Generation (background) -------------------------------------------
+    // For image/bundle products, generateForOrder expects portrait_url to be
+    // the ALREADY-generated preview image. Real customers click "Generate
+    // preview" before Buy, so portrait_url = preview. The dev path skips that
+    // step, so we must generate the preview here first — otherwise the order's
+    // result_url ends up being the customer's raw upload (the bug Ivo hit).
+    (async () => {
+      try {
+        let portraitUrl = cloudinaryUrl;
+        const needsPreGen = (product === 'image' || product === 'bundle');
+        if (needsPreGen && conceptId) {
+          const c = await pool.query(
+            `SELECT image_prompt, fal_image_model, image_input_extras
+             FROM concepts WHERE id = $1`, [parseInt(conceptId, 10)]
+          );
+          if (c.rows.length) {
+            const cc = c.rows[0];
+            const modelId = cc.fal_image_model || 'fal-ai/kling-image/o1';
+            console.log('[dev-skip-checkout] pre-generating preview with', modelId);
+            const result = await generation.generateImage({
+              modelId,
+              prompt: cc.image_prompt || '',
+              photoUrl: cloudinaryUrl,
+              orientation: 'portrait',
+              inputExtras: cc.image_input_extras || {},
+            });
+            portraitUrl = result.url;
+            console.log('[dev-skip-checkout] preview generated:', portraitUrl);
+          }
+        }
+        await generateForOrder(portraitUrl, product, email || '', orderId, conceptId || null, customerName || null);
+      } catch (err) {
+        console.error('[dev-skip-checkout] generation error:', err.message);
+      }
+    })();
   } catch (err) {
     console.error('[dev-skip-checkout] error:', err.message);
     res.status(500).json({ error: err.message });
