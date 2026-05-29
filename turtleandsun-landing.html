@@ -1456,6 +1456,9 @@ NavBar.init({ requireAuth: false }).then(status => {
   const ratiosEl = document.getElementById('ts-ratios');
   const stillEl = document.getElementById('ts-still-frame');
   const videoEl = document.getElementById('ts-video-frame');
+  // Outer columns — collapsed when a duplex triplet has no picture or no video.
+  const stillCol = stillEl ? stillEl.closest('.ts-col') : null;
+  const videoCol = videoEl ? videoEl.closest('.ts-col') : null;
   const stillOverlay = document.getElementById('ts-still-overlay');
   const stillTitle = document.getElementById('ts-still-title');
   const stillSub = document.getElementById('ts-still-sub');
@@ -1553,6 +1556,9 @@ NavBar.init({ requireAuth: false }).then(status => {
         if (mode === 'demo') {
           const tInit = activeTriplet(concepts[current]);
           beforeEl.src = tInit.before_url || DEMO_SRC;
+          // Apply duplex collapse on initial render too, so the first frame is correct.
+          if (stillCol) stillCol.style.display = tInit.image_url ? '' : 'none';
+          if (videoCol) videoCol.style.display = tInit.video_url ? '' : 'none';
           // Mark we've shown triplet 0 so the next cycle of this concept lands on triplet 1.
           if (concepts[current].triplets && concepts[current].triplets.length > 1) {
             tripletIndex[concepts[current].id] = 1;
@@ -1699,6 +1705,11 @@ NavBar.init({ requireAuth: false }).then(status => {
         }
       }
       beforeEl.src = t.before_url || DEMO_SRC;
+      // Duplex collapse: if a triplet only has Before+Picture or Before+Video,
+      // hide whichever column has no asset so the layout doesn't show a stale
+      // frame from the previous triplet.
+      if (stillCol) stillCol.style.display = t.image_url ? '' : 'none';
+      if (videoCol) videoCol.style.display = t.video_url ? '' : 'none';
       showStill(i); showVideo(i);
       if (concepts[i].triplets && concepts[i].triplets.length > 1) {
         var n = (tripletIndex[concepts[i].id] || 0) + 1;
@@ -1707,6 +1718,9 @@ NavBar.init({ requireAuth: false }).then(status => {
       }
     }
     else {
+      // In order mode, both columns are always visible (user is buying both possibilities).
+      if (stillCol) stillCol.style.display = '';
+      if (videoCol) videoCol.style.display = '';
       hideAllStills();
       stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
       stillOverlay.style.display = '';
