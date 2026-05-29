@@ -3813,23 +3813,33 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       tripsByConcept.get(t.concept_id).push(t);
     }
 
-    // Media items not currently used in any triplet slot — shown in the
-    // "Unassigned media" grid at the bottom so you can still see + manage them.
+    // Media library — every active media item (or all if show_inactive), with the fields we
+    // expose for editing right on the card. We also flag which triplet slots (if any) use the
+    // item so the card can carry the green badges.
     const assignedIds = new Set();
-    for (const t of tRows) {
-      if (t.before_media_id) assignedIds.add(t.before_media_id);
-      if (t.image_media_id ) assignedIds.add(t.image_media_id );
-      if (t.video_media_id ) assignedIds.add(t.video_media_id );
+    const mediaBadgesById = new Map(); // mediaId -> ["Royal Portrait #1 · Before", …]
+    function addBadge(mediaId, label) {
+      if (!mediaId) return;
+      if (!mediaBadgesById.has(mediaId)) mediaBadgesById.set(mediaId, []);
+      mediaBadgesById.get(mediaId).push(label);
     }
-    const mediaWhere = ['cm.active = TRUE'];
+    for (const t of tRows) {
+      const label = `${t.concept_name} #${t.triplet_number}`;
+      if (t.before_media_id) { assignedIds.add(t.before_media_id); addBadge(t.before_media_id, `${label} · Before`); }
+      if (t.image_media_id ) { assignedIds.add(t.image_media_id ); addBadge(t.image_media_id , `${label} · Picture`); }
+      if (t.video_media_id ) { assignedIds.add(t.video_media_id ); addBadge(t.video_media_id , `${label} · Video`); }
+    }
+    const mediaWhere = [];
     const mediaParams = [];
+    if (!showInactive) mediaWhere.push('cm.active = TRUE');
     if (filterConcept) { mediaParams.push(filterConcept); mediaWhere.push(`cm.concept_id = $${mediaParams.length}`); }
     const { rows: allMedia } = await pool.query(
-      `SELECT cm.id, cm.kind, cm.url, cm.concept_id, cm.created_at, c.name AS concept_name
+      `SELECT cm.id, cm.kind, cm.url, cm.concept_id, cm.created_at, cm.sort_order, cm.is_primary,
+              cm.active, cm.filter_category, cm.source_url, c.name AS concept_name
        FROM concept_media cm
        JOIN concepts c ON c.id = cm.concept_id
-       WHERE ${mediaWhere.join(' AND ')}
-       ORDER BY cm.created_at DESC, cm.id DESC`,
+       ${mediaWhere.length ? 'WHERE ' + mediaWhere.join(' AND ') : ''}
+       ORDER BY c.name ASC, cm.sort_order ASC, cm.created_at DESC`,
       mediaParams
     );
     const unassigned = allMedia.filter((m) => !assignedIds.has(m.id));
@@ -3891,20 +3901,42 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         </section>`;
       }).join('');
 
-    // Unassigned items
-    const unassignedHtml = unassigned.length ? `<section class="g-section">
+    // Media library section — every media item with editable fields.
+    const KIND_OPTS = (current) => CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}"${k === current ? ' selected' : ''}>${k}</option>`).join('');
+    const mediaCard = (m) => {
+      const badges = (mediaBadgesById.get(m.id) || []).map((b) =>
+        `<span class="m-badge">${escapeHtml(b)}</span>`).join('');
+      const dragAttrs = `draggable="true" data-mid="${m.id}" data-mkind="${m.kind}" data-murl="${escUrl(m.url)}"`;
+      const thumbEl = m.kind === 'video'
+        ? `<video class="m-thumb" ${dragAttrs} src="${escUrl(m.url)}" muted preload="metadata"></video>`
+        : `<img class="m-thumb" ${dragAttrs} src="${escUrl(m.url)}" alt="">`;
+      return `<div class="m-card ${m.active ? '' : 'm-card--off'}">
+        ${thumbEl}
+        <form method="POST" action="/admin/media/${m.id}/update" class="m-edit">
+          <input type="hidden" name="return_to" value="/admin/gallery${filterConcept ? '?concept='+filterConcept : ''}">
+          <div class="m-name" title="${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
+          <div class="m-concept">${escapeHtml(m.concept_name)}</div>
+          ${badges ? `<div class="m-badges">${badges}</div>` : ''}
+          <label>Kind <select name="kind">${KIND_OPTS(m.kind)}</select></label>
+          <label>Filters <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="e.g. pet, royal"></label>
+          <div class="m-row">
+            <label class="m-flex">Sort <input type="number" name="sort_order" value="${m.sort_order || 0}"></label>
+            <label class="m-chk"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
+          </div>
+          <div class="m-actions">
+            <button type="submit" class="btn small">Save</button>
+            <button type="submit" formaction="/admin/media/${m.id}/delete" formnovalidate onclick="return confirm('Delete this gallery item?');" class="m-del" title="Delete">×</button>
+          </div>
+        </form>
+      </div>`;
+    };
+    const unassignedHtml = allMedia.length ? `<section class="g-section">
       <header class="g-section-head">
-        <h2>Unassigned media <span class="g-count">${unassigned.length} item${unassigned.length === 1 ? '' : 's'}</span></h2>
-        <span class="muted" style="font-size:12px;">Files in the library not used by any triplet yet.</span>
+        <h2>Media library <span class="g-count">${allMedia.length} item${allMedia.length === 1 ? '' : 's'}${unassigned.length !== allMedia.length ? ` · ${unassigned.length} not in any triplet` : ''}</span></h2>
+        <span class="muted" style="font-size:12px;">Drag any thumbnail onto a triplet slot in /admin/concepts or /admin/triplets.</span>
       </header>
       <div class="m-grid">
-        ${unassigned.map((m) => `<div class="m-card">
-          ${m.kind === 'video' ? `<video class="m-thumb" draggable="true" data-mid="${m.id}" data-mkind="${m.kind}" data-murl="${escUrl(m.url)}" src="${escUrl(m.url)}" muted preload="metadata"></video>` : `<img class="m-thumb" draggable="true" data-mid="${m.id}" data-mkind="${m.kind}" data-murl="${escUrl(m.url)}" src="${escUrl(m.url)}" alt="">`}
-          <div class="m-meta">
-            <div class="m-name" title="${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
-            <div class="m-concept">${escapeHtml(m.concept_name)} · ${escapeHtml(m.kind)}</div>
-          </div>
-        </div>`).join('')}
+        ${allMedia.map(mediaCard).join('')}
       </div>
     </section>` : '';
 
@@ -3942,8 +3974,8 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         .t-thumbs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
         .t-slot{display:flex;flex-direction:column;gap:2px;align-items:center;}
         .t-slot-lbl{font-size:8px;font-weight:700;color:#888;letter-spacing:0.05em;text-transform:uppercase;}
-        .g-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:4px;background:#1A0C04;display:block;}
-        .g-thumb--empty{display:flex;align-items:center;justify-content:center;color:#aaa;font-size:18px;font-weight:700;background:#f0ede6;}
+        .g-thumb{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:4px;background:#1A0C04;display:block;}
+        .g-thumb--empty{aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:18px;font-weight:700;background:#f0ede6;border-radius:4px;}
         .t-caption{font-size:11px;color:#666;font-style:italic;line-height:1.3;}
         .t-toggles{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:auto;}
         .t-toggle{display:inline-flex;align-items:center;gap:3px;background:#f3f0e6;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:600;color:#888;cursor:pointer;transition:background 0.15s,color 0.15s;user-select:none;}
@@ -3952,12 +3984,28 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         .t-del{margin-left:auto;display:inline;}
         .t-del button{background:transparent;border:none;color:#c33;font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:4px;}
         .t-del button:hover{background:#fee;}
-        .m-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
-        .m-card{background:#fff;border:1px solid #e6e2d8;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;font-size:11px;}
-        .m-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;background:#1A0C04;display:block;}
-        .m-meta{padding:5px 7px;}
+
+        /* Media-library cards — portrait thumb on top, editable form below */
+        .m-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;}
+        .m-card{background:#fff;border:1px solid #e6e2d8;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;font-size:11px;transition:opacity 0.15s,box-shadow 0.15s;}
+        .m-card:hover{box-shadow:0 4px 14px rgba(0,0,0,0.06);}
+        .m-card--off{opacity:0.5;}
+        .m-thumb{width:100%;aspect-ratio:9/16;object-fit:cover;background:#1A0C04;display:block;cursor:grab;}
+        .m-edit{padding:8px 9px;display:flex;flex-direction:column;gap:5px;}
+        .m-edit label{font-size:10px;font-weight:600;color:#666;margin:0;display:flex;flex-direction:column;gap:2px;}
+        .m-edit select,.m-edit input[type=text],.m-edit input[type=number]{font-family:inherit;font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;width:100%;box-sizing:border-box;background:#fff;}
+        .m-row{display:flex;gap:6px;align-items:end;}
+        .m-flex{flex:1;}
+        .m-chk{flex-shrink:0;flex-direction:row !important;align-items:center !important;gap:3px !important;color:#3A6B20 !important;font-weight:700 !important;cursor:pointer;}
+        .m-chk input{width:auto !important;}
         .m-name{font-family:monospace;font-size:10px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        .m-concept{font-size:10px;color:#888;margin-top:2px;}
+        .m-concept{font-size:10px;color:#888;font-weight:600;}
+        .m-badges{display:flex;flex-direction:column;gap:2px;}
+        .m-badge{background:#3A6B20;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;letter-spacing:0.04em;line-height:1.3;}
+        .m-actions{display:flex;gap:6px;align-items:center;margin-top:2px;}
+        .m-actions .btn.small{flex:1;padding:5px;font-size:11px;}
+        .m-del{background:transparent;border:1px solid #ddd;color:#c33;font-size:14px;line-height:1;cursor:pointer;padding:4px 9px;border-radius:4px;}
+        .m-del:hover{background:#fee;border-color:#c33;}
       </style>
 
       <div class="g-top">
