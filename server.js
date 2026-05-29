@@ -1751,6 +1751,7 @@ app.get('/gallery', async (req, res) => {
     }
     const result = await pool.query(
       `SELECT cm.id, cm.kind, cm.url, cm.thumbnail_url, cm.caption, cm.sort_order, cm.is_primary,
+              cm.source_url,
               c.id AS concept_id, c.slug AS concept_slug, c.name AS concept_name,
               c.description AS concept_description, c.filter_category
        FROM concept_media cm
@@ -3090,6 +3091,7 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
     const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
     const active = !(req.body.active === 'false' || req.body.active === '0' || req.body.active === 'off');
     const filterCategory = req.body.filter_category == null ? null : (String(req.body.filter_category).trim() || null);
+    const sourceUrl = req.body.source_url == null ? null : (String(req.body.source_url).trim() || null);
 
     if (isPrimary) {
       await pool.query(`UPDATE concept_media SET is_primary = FALSE WHERE concept_id = $1`, [conceptId]);
@@ -3102,9 +3104,10 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
          sort_order = COALESCE($3, sort_order),
          is_primary = $4,
          active = $5,
-         filter_category = $6
-       WHERE id = $7`,
-      [caption, kind, sortOrder, isPrimary, active, filterCategory, mediaId]
+         filter_category = $6,
+         source_url = $7
+       WHERE id = $8`,
+      [caption, kind, sortOrder, isPrimary, active, filterCategory, sourceUrl, mediaId]
     );
 
     if (req.headers.accept === 'application/json' || req.xhr) return res.json({ ok: true });
@@ -3217,6 +3220,7 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
               <input type="number" name="sort_order" value="${m.sort_order}" style="width:60px;padding:6px 8px;">
               <label style="font-weight:normal;display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" name="is_primary"${m.is_primary ? ' checked' : ''}> Primary</label>
               <label style="font-weight:normal;display:flex;align-items:center;gap:4px;font-size:12px;"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
+              <input type="url" name="source_url" value="${escapeHtml(m.source_url || '')}" placeholder="Source (Before) photo URL — optional" title="Original photo this item was generated from. Used as the BEFORE image in the rolling demo when this concept cycles." style="flex:1;min-width:240px;padding:6px 8px;">
               <button type="submit" class="btn small">Save</button>
             </form>
           </td>
@@ -3280,6 +3284,8 @@ app.get('/admin/gallery/new', requireRole('admin'), async (req, res) => {
           <span class="muted">Item-level filters in addition to the concept's filters. Use to tag this specific item (e.g. "pet" when the underlying photo is of a dog, even though the concept "Royal Portrait" also takes people).</span></div>
         <div class="field"><label>Upload file</label><input type="file" name="media" accept="image/*,video/*"></div>
         <div class="field"><label>— or paste a URL</label><input type="url" name="url_override" placeholder="https://..."></div>
+        <div class="field"><label>Source photo URL (optional)</label><input type="url" name="source_url" placeholder="https://... — the original photo this was generated from">
+          <span class="muted">If set, the landing-page rolling demo shows this as the "Before" photo when this concept is on screen. Lets the demo cycle through different originals (dog, person, etc.) instead of one fixed photo.</span></div>
         <button type="submit" class="btn">Add to gallery</button>
       </form>`;
     res.send(conceptAdminPage('Add gallery item', body));
@@ -3298,6 +3304,7 @@ app.post('/admin/gallery/new', requireRole('admin'), upload.single('media'), asy
     if (!CONCEPT_MEDIA_KINDS.includes(kind)) return res.redirect(`${back}?error=` + encodeURIComponent('Invalid kind'));
     const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
     const filterCategory = (req.body.filter_category || '').trim() || null;
+    const sourceUrl = (req.body.source_url || '').trim() || null;
     const urlOverride = (req.body.url_override || '').trim();
 
     let url = urlOverride;
@@ -3323,9 +3330,9 @@ app.post('/admin/gallery/new', requireRole('admin'), upload.single('media'), asy
       await pool.query(`UPDATE concept_media SET is_primary = FALSE WHERE concept_id = $1`, [conceptId]);
     }
     await pool.query(
-      `INSERT INTO concept_media (concept_id, kind, url, sort_order, is_primary, filter_category)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [conceptId, kind, url, sortOrder, isPrimary, filterCategory]
+      `INSERT INTO concept_media (concept_id, kind, url, sort_order, is_primary, filter_category, source_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [conceptId, kind, url, sortOrder, isPrimary, filterCategory, sourceUrl]
     );
     res.redirect(`/admin/gallery?saved_media=1&concept=${conceptId}`);
   } catch (err) {

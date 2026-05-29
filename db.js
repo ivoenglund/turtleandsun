@@ -250,6 +250,7 @@ async function initDb() {
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS description TEXT;
     ALTER TABLE concepts ALTER COLUMN filter_category TYPE TEXT;
     ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS filter_category TEXT;
+    ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS source_url TEXT;
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS engaged BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 

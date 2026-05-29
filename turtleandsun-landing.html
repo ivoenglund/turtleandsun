@@ -1491,10 +1491,10 @@ NavBar.init({ requireAuth: false }).then(status => {
       const items = await res.json();
       const map = new Map();
       items.forEach(function(it){
-        if (!map.has(it.concept_id)) map.set(it.concept_id, {id: it.concept_id, slug: it.concept_slug, name: it.concept_name, image_url: null, video_url: null});
+        if (!map.has(it.concept_id)) map.set(it.concept_id, {id: it.concept_id, slug: it.concept_slug, name: it.concept_name, image_url: null, video_url: null, source_url: null});
         const c = map.get(it.concept_id);
-        if (it.kind === 'image' && !c.image_url) c.image_url = it.url;
-        if (it.kind === 'video' && !c.video_url) c.video_url = it.url;
+        if (it.kind === 'image' && !c.image_url) { c.image_url = it.url; if (it.source_url) c.source_url = it.source_url; }
+        if (it.kind === 'video' && !c.video_url) { c.video_url = it.url; if (!c.source_url && it.source_url) c.source_url = it.source_url; }
       });
       concepts = Array.from(map.values()).filter(function(c){return c.image_url || c.video_url;});
       if (concepts.length > 6) concepts = concepts.slice(0, 6);
@@ -1509,6 +1509,8 @@ NavBar.init({ requireAuth: false }).then(status => {
         showStill(current); showVideo(current); markChip(current);
         // Sync the global so the existing checkout knows
         window.tsSelectedConcept = {id: concepts[current].id, concept: concepts[current]};
+        // Show this concept's recorded source as the BEFORE photo (falls back to DEMO_SRC if not set)
+        if (mode === 'demo') beforeEl.src = (concepts[current] && concepts[current].source_url) ? concepts[current].source_url : DEMO_SRC;
         // Try to restore state from a previous Stripe-back navigation BEFORE starting the demo cycle.
         const restored = restoreFromSession();
         if (!restored) startCycle();
@@ -1636,7 +1638,11 @@ NavBar.init({ requireAuth: false }).then(status => {
     window.tsSelectedConcept = {id: concepts[i].id, concept: concepts[i]};
     try { localStorage.setItem('tsSelectedConceptId', String(concepts[i].id)); } catch (e) {}
     if (fromUser) { userInteracted = true; lastInteraction = Date.now(); }
-    if (mode === 'demo') { showStill(i); showVideo(i); }
+    if (mode === 'demo') {
+      showStill(i); showVideo(i);
+      // Cycle the BEFORE photo to match the concept's recorded source, if it has one.
+      beforeEl.src = (concepts[i] && concepts[i].source_url) ? concepts[i].source_url : DEMO_SRC;
+    }
     else {
       hideAllStills();
       stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
