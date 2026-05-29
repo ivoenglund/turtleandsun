@@ -32,7 +32,7 @@ const {
   createSession, setSessionCookie, getSessionUser,
   requireAuth, requireRole,
 } = require('./auth');
-const { sendDailyDigest } = require('./digest');
+const { sendDailyDigest, gatherDigestSections, block: digestBlock } = require('./digest');
 const pricing = require('./pricing');
 const { scheduleFxRefresh } = require('./fx_cron');
 
@@ -560,56 +560,107 @@ app.get('/admin', requireRole('admin'), (req, res) => {
   const section = (heading, cards) =>
     `<h2 class="admin-section">${heading}</h2><div class="admin-grid">${cards}</div>`;
 
-  const digestCard = `<div class="admin-card">
-      <div class="admin-card-title">Trigger daily digest</div>
-      <div class="admin-card-desc">Send the daily ops email now.</div>
-      <div style="margin-top:8px;"><button type="button" class="btn small" id="btnDigest" onclick="sendDigest()">Send now</button>
-        <span id="digestStatus" class="muted" style="margin-left:8px;"></span></div>
-    </div>`;
-
+  // Layout intent: top sections are things Ivo works with daily; bottom is
+  // third-party services he only occasionally clicks into.
   const body = `
     <h1>Admin dashboard</h1>
     <style>
       .admin-section{font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#1C0A00;margin:28px 0 12px;}
+      .admin-section-sub{font-size:12px;color:#888;text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px;}
       .admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
       .admin-card{display:block;background:#fff;border:1px solid #eee;border-radius:10px;padding:14px 16px;text-decoration:none;color:#1C0A00;transition:box-shadow 0.15s,transform 0.15s;}
       .admin-card:hover{box-shadow:0 6px 20px rgba(0,0,0,0.08);transform:translateY(-1px);}
       .admin-card-title{font-weight:700;font-size:14px;margin-bottom:4px;}
       .admin-card-desc{font-size:12px;color:#888;line-height:1.4;}
+      .admin-divider{margin:36px 0 0;border-top:1px solid #eee;}
     </style>
-    ${section('\u{1F4CA} Analytics',
-      card('Visits & visitors map', 'Traffic log, geo map, and IP labels.', '/admin/visits') +
+
+    ${section('\u{1F4C5} Daily — what to check this morning',
+      card('Daily digest', 'Live revenue, visitors, humans, delivery health.', '/admin/digest') +
       card('Failed deliveries', 'Orders that failed generation or email.', '/admin/failed-deliveries') +
-      digestCard +
-      card('Sentry', 'Error tracking and alerts.', 'https://turtle-and-sun.sentry.io/', true) +
-      card('Plausible', 'Privacy-friendly traffic analytics.', 'https://plausible.io/turtleandsun.com', true) +
-      card('Google Search Console', 'Search indexing and performance.', 'https://search.google.com/search-console', true)
+      card('Visits & visitors map', 'Traffic log, geo map, and IP labels.', '/admin/visits')
     )}
+
     ${section('\u{1F3A8} Content',
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
       card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery')
     )}
-    ${section('\u{1F4B3} Payments',
-      card('Stripe dashboard', 'Payments, payouts, and customers.', 'https://dashboard.stripe.com', true) +
+
+    ${section('\u{1F4B0} Pricing',
       card('Currencies & FX', 'Live FX rates, supported currencies, manual refresh.', '/admin/currencies')
     )}
-    ${section('\u{1F6E0}️ Integrations',
+
+    <div class="admin-divider"></div>
+
+    ${section('\u{1F517} External services <span class="admin-section-sub">— monitoring &amp; vendor consoles</span>',
+      card('Stripe dashboard', 'Payments, payouts, and customers.', 'https://dashboard.stripe.com', true) +
+      card('Sentry', 'Error tracking and alerts.', 'https://turtle-and-sun.sentry.io/', true) +
+      card('Plausible', 'Privacy-friendly traffic analytics.', 'https://plausible.io/turtleandsun.com', true) +
+      card('Google Search Console', 'Search indexing and performance.', 'https://search.google.com/search-console', true) +
       card('fal.ai', 'AI generation credits and usage.', 'https://fal.ai/dashboard', true) +
       card('Resend', 'Transactional email delivery.', 'https://resend.com/emails', true) +
       card('Cloudinary', 'Media storage and uploads.', 'https://cloudinary.com/console', true) +
       card('ImprovMX', 'Inbound email forwarding.', 'https://app.improvmx.com/', true) +
       card('Railway', 'App hosting and deploys.', 'https://railway.app/', true)
-    )}
+    )}`;
+  res.send(conceptAdminPage('Admin dashboard', body));
+});
+
+// ---------------------------------------------------------------------------
+// /admin/digest — live, on-demand view of the same data shown in the
+// 06:00 UTC daily email. Includes a "Send me a fresh copy" button that
+// triggers /admin/_digest_test (existing endpoint).
+// ---------------------------------------------------------------------------
+app.get('/admin/digest', requireRole('admin'), async (req, res) => {
+  let sections;
+  try {
+    sections = await gatherDigestSections();
+  } catch (err) {
+    return res.status(500).send('Digest data fetch failed: ' + err.message);
+  }
+  const body = `
+    <style>
+      .digest-wrap{max-width:680px;margin:0 auto;background:#FFF9E6;padding:24px;border-radius:12px;}
+      .digest-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+      .digest-head h1{font-family:Arial,sans-serif;font-size:22px;color:#1C0A00;margin:0;}
+      .digest-meta{font-size:12px;color:#888;font-family:Arial,sans-serif;}
+      .digest-send{padding:9px 16px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+      .digest-send:hover{background:#1C0A00;}
+      .digest-send:disabled{opacity:0.6;cursor:not-allowed;}
+      #digestStatus{font-size:12px;color:#3A6B20;margin-left:10px;font-family:Arial,sans-serif;}
+    </style>
+    <div class="digest-wrap">
+      <div class="digest-head">
+        <div>
+          <h1>Turtleandsun Daily — ${escapeHtml(sections.date)}</h1>
+          <div class="digest-meta">Live snapshot (last 24h from now). The same data ships to your inbox at 06:00 UTC.</div>
+        </div>
+        <div>
+          <button type="button" class="digest-send" id="btnDigest" onclick="sendDigest()">Send me a fresh email</button>
+          <span id="digestStatus"></span>
+        </div>
+      </div>
+      ${digestBlock('Revenue (last 24h)', sections.revenueHtml)}
+      ${digestBlock('Orders by product (last 24h)', sections.productsHtml)}
+      ${digestBlock('Visitors (last 24h)', sections.visitorsHtml)}
+      ${digestBlock('Currency suggestions', sections.suggestionsHtml)}
+      ${digestBlock('Delivery health (last 24h)', sections.healthHtml)}
+    </div>
     <script>
       async function sendDigest(){
         var b=document.getElementById('btnDigest'); var s=document.getElementById('digestStatus');
-        b.disabled=true; s.textContent='Sending…';
-        try { var r=await fetch('/admin/_digest_test'); if(!r.ok) throw new Error('HTTP '+r.status); s.textContent='Sent ✓'; }
-        catch(e){ s.textContent='Failed: '+e.message; }
+        b.disabled=true; s.textContent='Sending…'; s.style.color='#888';
+        try {
+          var r=await fetch('/admin/_digest_test');
+          if(!r.ok) throw new Error('HTTP '+r.status);
+          s.textContent='Sent ✓ — check your inbox'; s.style.color='#3A6B20';
+        } catch(e) {
+          s.textContent='Failed: '+e.message; s.style.color='#C13D2A';
+        }
         b.disabled=false;
       }
     </script>`;
-  res.send(conceptAdminPage('Admin dashboard', body));
+  res.send(conceptAdminPage('Daily digest', body));
 });
 
 app.get('/admin/visits', requireRole('admin'), (req, res) => {

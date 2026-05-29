@@ -31,7 +31,11 @@ function block(title, inner) {
   </div>`;
 }
 
-async function sendDailyDigest() {
+// ---------------------------------------------------------------------------
+// Data fetch — returns { date, revenueHtml, productsHtml, visitorsHtml, ... }.
+// Same data powers both the daily email and the /admin/digest live page.
+// ---------------------------------------------------------------------------
+async function gatherDigestSections() {
   const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
 
   // 1) REVENUE (last 24h vs previous 24h)
@@ -81,10 +85,15 @@ async function sendDailyDigest() {
     productsHtml = `Image: ${counts.image}<br>Video: ${counts.video}<br>Bundle: ${counts.bundle}`;
   } catch (e) { console.error('[digest] products error:', e.message); productsHtml = '(error)'; }
 
-  // 3) VISITORS (last 24h)
+  // 3) VISITORS (last 24h) — total unique + humans (engaged = TRUE)
   let visitorsHtml;
   try {
-    const tot = await pool.query(`SELECT COUNT(DISTINCT ip)::int AS n FROM visits WHERE created_at >= NOW() - INTERVAL '24 hours'`);
+    const tot = await pool.query(
+      `SELECT
+         COUNT(DISTINCT ip)::int AS total,
+         COUNT(DISTINCT ip) FILTER (WHERE engaged = TRUE)::int AS humans
+       FROM visits WHERE created_at >= NOW() - INTERVAL '24 hours'`
+    );
     const top = await pool.query(
       `SELECT country, COUNT(DISTINCT ip)::int AS n FROM visits
        WHERE created_at >= NOW() - INTERVAL '24 hours' AND country IS NOT NULL
@@ -101,7 +110,13 @@ async function sendDailyDigest() {
     const suspList = susp.rows.length
       ? susp.rows.map(r => `${r.ip} · ${r.country || '?'} · ${r.hits} hits`).join('<br>')
       : 'None.';
-    visitorsHtml = `<strong>${tot.rows[0].n}</strong> unique visitors<br><br>` +
+    const totalN = tot.rows[0].total;
+    const humansN = tot.rows[0].humans;
+    const humanPct = totalN > 0 ? ((humansN / totalN) * 100).toFixed(0) : '0';
+    visitorsHtml =
+      `<strong>${totalN}</strong> unique visitors · ` +
+      `<strong style="color:#3A6B20;">${humansN} human${humansN === 1 ? '' : 's'}</strong> ` +
+      `<span style="color:#888;">(${humanPct}% engaged)</span><br><br>` +
       `<span style="color:#888;">Top countries</span><br>${list}<br><br>` +
       `<span style="color:#888;">Suspicious activity (IPs with &gt; 30 visits in 24h)</span><br>${suspList}`;
   } catch (e) { console.error('[digest] visitors error:', e.message); visitorsHtml = '(error)'; }
@@ -141,33 +156,42 @@ async function sendDailyDigest() {
     healthHtml = `Paid but not delivered (24h): ${pending.rows[0].n}<br>Failed deliveries (24h, unresolved): ${failed.rows[0].n}`;
   } catch (e) { console.error('[digest] health error:', e.message); healthHtml = '(error)'; }
 
-  // 6) QUICK LINKS
+  // 6) QUICK LINKS — used only in the email body
   const linksHtml =
     `<a href="https://turtleandsun.com/admin/visits">/admin/visits</a><br>` +
     `<a href="https://turtleandsun.com/admin/failed-deliveries">/admin/failed-deliveries</a><br>` +
     `<a href="https://turtle-and-sun.sentry.io/">Sentry</a>`;
 
-  const html = `<div style="max-width:560px;margin:0 auto;background:#FFF9E6;padding:24px;">
-    <h1 style="font-family:Arial,sans-serif;font-size:20px;color:#1C0A00;margin:0 0 16px;">Turtleandsun Daily — ${date}</h1>
-    ${block('Revenue (last 24h)', revenueHtml)}
-    ${block('Orders by product (last 24h)', productsHtml)}
-    ${block('Visitors (last 24h)', visitorsHtml)}
-    ${block('Currency suggestions', suggestionsHtml)}
-    ${block('Delivery health (last 24h)', healthHtml)}
-    ${block('Quick links', linksHtml)}
-  </div>`;
+  return { date, revenueHtml, productsHtml, visitorsHtml, suggestionsHtml, healthHtml, linksHtml };
+}
 
+// Wrap the sections in the cream email shell used by Resend.
+function buildEmailHtml(s) {
+  return `<div style="max-width:560px;margin:0 auto;background:#FFF9E6;padding:24px;">
+    <h1 style="font-family:Arial,sans-serif;font-size:20px;color:#1C0A00;margin:0 0 16px;">Turtleandsun Daily — ${s.date}</h1>
+    ${block('Revenue (last 24h)', s.revenueHtml)}
+    ${block('Orders by product (last 24h)', s.productsHtml)}
+    ${block('Visitors (last 24h)', s.visitorsHtml)}
+    ${block('Currency suggestions', s.suggestionsHtml)}
+    ${block('Delivery health (last 24h)', s.healthHtml)}
+    ${block('Quick links', s.linksHtml)}
+  </div>`;
+}
+
+async function sendDailyDigest() {
+  const sections = await gatherDigestSections();
+  const html = buildEmailHtml(sections);
   try {
     await resend.emails.send({
       from: 'Turtle and Sun <noreply@turtleandsun.com>',
       to: 'ivo.englund@gmail.com',
-      subject: `Turtleandsun Daily — ${date}`,
+      subject: `Turtleandsun Daily — ${sections.date}`,
       html,
     });
-    console.log('[digest] sent for', date);
+    console.log('[digest] sent for', sections.date);
   } catch (e) {
     console.error('[digest] send failed:', e.message);
   }
 }
 
-module.exports = { sendDailyDigest };
+module.exports = { sendDailyDigest, gatherDigestSections, block };
