@@ -791,22 +791,32 @@ async function handleFile(file) {
   // Reset state for new upload
   cloudinaryUrl = null;
   previewImageUrl = null;
-  document.getElementById('uploadLabel').textContent = file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name;
-  document.getElementById('uploadSub').textContent = 'Uploading…';
+  window.cloudinaryUrl = null;
+  window.previewImageUrl = null;
 
-  // Show local thumbnail
+  // Legacy step1 UI updates — guarded since markup was removed in 2026-05-29 hero-widget splice.
+  var _lbl = document.getElementById('uploadLabel'); if (_lbl) _lbl.textContent = file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name;
+  var _sub = document.getElementById('uploadSub'); if (_sub) _sub.textContent = 'Uploading…';
+
+  // Show local thumbnail (legacy) + detect orientation (still useful for the new widget)
   const reader = new FileReader();
   reader.onload = function(ev) {
-    document.getElementById('uploadThumb').src = ev.target.result;
-    document.getElementById('uploadThumb').style.display = 'block';
-    document.getElementById('uploadIcon').style.display = 'none';
+    var _thumb = document.getElementById('uploadThumb');
+    if (_thumb) { _thumb.src = ev.target.result; _thumb.style.display = 'block'; }
+    var _ico = document.getElementById('uploadIcon'); if (_ico) _ico.style.display = 'none';
     // Detect source orientation and preselect the closest aspect ratio
     const img = new Image();
     img.onload = function() {
       let o = 'square';
       if (img.naturalWidth > img.naturalHeight * 1.1) o = 'landscape';
       else if (img.naturalHeight > img.naturalWidth * 1.1) o = 'portrait';
-      setOrientation(o);
+      if (typeof setOrientation === 'function') setOrientation(o);
+      // Sync the new widget's ratio buttons + frames to match the detected orientation
+      var tsRatios = document.getElementById('ts-ratios');
+      if (tsRatios) {
+        var match = tsRatios.querySelector('.ts-ratio-btn[data-orient="' + o + '"]');
+        if (match) match.click();
+      }
     };
     img.src = ev.target.result;
   };
@@ -820,13 +830,14 @@ async function handleFile(file) {
     const data = await res.json();
     if (data.url) {
       cloudinaryUrl = data.url;
-      document.getElementById('uploadSub').textContent = 'Uploaded ✓';
+      window.cloudinaryUrl = data.url;
+      var _sub2 = document.getElementById('uploadSub'); if (_sub2) _sub2.textContent = 'Uploaded ✓';
     } else {
-      document.getElementById('uploadSub').textContent = 'Upload failed';
+      var _sub3 = document.getElementById('uploadSub'); if (_sub3) _sub3.textContent = 'Upload failed';
       console.error('Upload response missing URL:', data);
     }
   } catch (err) {
-    document.getElementById('uploadSub').textContent = 'Upload failed';
+    var _sub4 = document.getElementById('uploadSub'); if (_sub4) _sub4.textContent = 'Upload failed';
     console.error('Upload error:', err);
   }
 }
