@@ -1978,7 +1978,7 @@ app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
             ? `<video src="${escapeHtml(currentUrl)}" muted style="width:64px;height:48px;object-fit:cover;border-radius:4px;background:#000;"></video>`
             : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:4px;">`)
         : `<div style="width:64px;height:48px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
-      const slotKind = isVideo ? 'video' : 'image';
+      const slotKind = /video/i.test(kindLabel) ? 'video' : 'image';
       return `<div class="ts-drop-slot" data-slot-kind="${slotKind}" style="display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:6px;border:2px dashed transparent;transition:border-color 0.15s,background 0.15s;">
         <div style="font-size:10px;color:#888;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
         <div style="display:flex;align-items:center;gap:6px;">${preview}<select name="${selectName}" style="flex:1;padding:5px 7px;font-size:12px;min-width:180px;">${opts}</select></div>
@@ -2678,7 +2678,7 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
     // Wrapped in a `.ts-drop-slot` zone so the receiving end of cross-tab drag-drop
     // (from /admin/gallery thumbnails) can populate the select on drop.
     const tripletSlot = (selectName, currentMediaId, currentUrl, items, kindLabel) => {
-      const isVideo = kindLabel === 'Video';
+      const isVideo = /video/i.test(kindLabel);
       const slotKind = isVideo ? 'video' : 'image';
       const opts = `<option value="">— (none) —</option>` + items.map((m) => {
         const label = `${m.concept_name} · ${slotFilename(m.url)}`;
@@ -4053,7 +4053,48 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
             el.style.opacity = '0.5';
           });
           el.addEventListener('dragend', function(){ el.style.opacity = ''; });
+          // Double-click → fullscreen lightbox with sound (videos) / full resolution (images).
+          el.addEventListener('dblclick', function(){
+            openGalleryLightbox(el.dataset.murl || el.src || '', el.dataset.mkind || (el.tagName === 'VIDEO' ? 'video' : 'image'));
+          });
         });
+
+        function openGalleryLightbox(url, kind){
+          if (!url) return;
+          var overlay = document.getElementById('g-lightbox');
+          if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'g-lightbox';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9500;display:flex;align-items:center;justify-content:center;padding:30px;cursor:zoom-out;';
+            overlay.addEventListener('click', function(e){ if (e.target === overlay) closeGalleryLightbox(); });
+            document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeGalleryLightbox(); });
+            document.body.appendChild(overlay);
+          }
+          overlay.innerHTML = '';
+          overlay.style.display = 'flex';
+          var close = document.createElement('button');
+          close.type = 'button'; close.textContent = '×';
+          close.style.cssText = 'position:absolute;top:18px;right:24px;background:none;border:none;color:#fff;font-size:42px;cursor:pointer;line-height:1;padding:0;';
+          close.onclick = closeGalleryLightbox;
+          overlay.appendChild(close);
+          var media;
+          if (kind === 'video') {
+            media = document.createElement('video');
+            media.src = url; media.controls = true; media.autoplay = true; media.loop = true; media.muted = false; media.playsInline = true;
+            media.style.cssText = 'max-width:92vw;max-height:90vh;border-radius:10px;display:block;';
+          } else {
+            media = document.createElement('img');
+            media.src = url; media.alt = '';
+            media.style.cssText = 'max-width:92vw;max-height:90vh;border-radius:10px;display:block;object-fit:contain;';
+          }
+          overlay.appendChild(media);
+        }
+        function closeGalleryLightbox(){
+          var o = document.getElementById('g-lightbox');
+          if (!o) return;
+          o.innerHTML = '';
+          o.style.display = 'none';
+        }
 
         // Toggle handlers — fetch /admin/triplets/:id/toggle for instant flip.
         document.querySelectorAll('.t-toggle').forEach(function(lbl){
