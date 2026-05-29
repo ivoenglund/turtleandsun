@@ -1,13 +1,14 @@
 // fx_cron.js
 //
-// Daily FX rate fetcher. Pulls the ECB reference rates XML, computes SEK-base
-// cross-rates for every currency we support, and writes one row per pair
-// into the fx_rates table.
+// Daily FX rate fetcher. Pulls the ECB reference rates XML, computes
+// SEK-base cross rates for every currency the pricing module reports as
+// supported (via pricing.getSupportedCurrencies, which is DB-driven),
+// and writes one row per pair into the fx_rates table.
 //
 // ECB feed: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml
-//   - Free, no API key, updated once per business day around 16:00 CET.
-//   - All rates are expressed against EUR (1 EUR = X target).
-//   - We rebase to SEK because that's our home currency.
+// - Free, no API key, updated once per business day around 16:00 CET.
+// - All rates are expressed against EUR (1 EUR = X target).
+// - We rebase to SEK because that's our home currency.
 //
 // Fallback strategy: if the fetch fails, we don't write new rows — the
 // pricing engine keeps using the previous day's cached rows. If no rows
@@ -18,13 +19,20 @@ const { pool } = require('./db');
 
 const ECB_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
 
-// Currencies we surface to customers. Add to this list as new charm
-// ladders go into pricing.js.
-const TARGETS = ['usd', 'eur', 'gbp', 'sek'];
+// Read live from the currencies table via pricing.getSupportedCurrencies()
+// so adding a row in the admin automatically extends the ECB fetch — no
+// code change needed. Falls back to the hardcoded set if pricing module
+// hasn't loaded the DB yet (first boot).
+function getTargets() {
+  try {
+    const pricing = require('./pricing');
+    const live = pricing.getSupportedCurrencies && pricing.getSupportedCurrencies();
+    if (Array.isArray(live) && live.length > 0) return live;
+  } catch (_) { /* fall through */ }
+  return ['usd', 'eur', 'gbp', 'sek'];
+}
 
 // Parse ECB XML — flat structure, one <Cube currency="X" rate="Y"/> per pair.
-// We're not pulling a full XML parser dependency just for this; a simple
-// regex extraction is enough for the well-known feed shape.
 function parseEcbXml(xml) {
   const rates = { eur: 1.0 };
   const re = /<Cube\s+currency=['"]([A-Z]{3})['"]\s+rate=['"]([\d.]+)['"]/g;
@@ -46,7 +54,8 @@ function rebaseToSek(eurRates) {
     throw new Error('ECB feed did not return a SEK rate');
   }
   const out = { sek: 1.0 };
-  for (const code of TARGETS) {
+  const targets = getTargets();
+  for (const code of targets) {
     if (code === 'sek') continue;
     const targetPerEur = eurRates[code];
     if (targetPerEur && targetPerEur > 0) {
@@ -57,11 +66,8 @@ function rebaseToSek(eurRates) {
 }
 
 async function fetchEcbRates() {
-  // Node 18+ has global fetch; fal of node-cron etc. already require modern
-  // node, so this is safe.
   const res = await fetch(ECB_URL, {
     headers: { 'User-Agent': 'Turtleandsun/1.0 (+https://turtleandsun.com)' },
-    // ECB feed is ~5KB — a generous timeout is fine.
   });
   if (!res.ok) throw new Error(`ECB fetch failed: ${res.status} ${res.statusText}`);
   const xml = await res.text();
@@ -85,7 +91,6 @@ async function writeRates(sekRates) {
   }
 }
 
-// Public entrypoint — called by the cron schedule and (optionally) at boot.
 async function refreshFxRates() {
   try {
     const rates = await fetchEcbRates();
@@ -98,13 +103,9 @@ async function refreshFxRates() {
   }
 }
 
-// Schedule via node-cron. Caller registers this from server.js with the
-// same pattern as digest.js. Default: every day at 04:00 UTC.
 function scheduleFxRefresh(cron) {
-  // Run once at boot so an empty fx_rates table gets seeded immediately.
-  // Don't block startup if the network is slow.
+  // Run once at boot so an empty fx_rates table gets seeded.
   refreshFxRates().catch(() => {});
-
   // Daily 04:00 UTC. ECB publishes at ~14:15 CET (13:15 UTC) — we pull the
   // morning after to be safe with their cutover.
   cron.schedule('0 4 * * *', () => {
@@ -115,6 +116,7 @@ function scheduleFxRefresh(cron) {
 module.exports = {
   refreshFxRates,
   scheduleFxRefresh,
-  parseEcbXml,   // exported for testing
-  rebaseToSek,   // exported for testing
+  parseEcbXml,
+  rebaseToSek,
+  getTargets,
 };

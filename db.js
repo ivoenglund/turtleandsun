@@ -371,6 +371,69 @@ async function initDb() {
       AND o.product IS NOT NULL
   `);
 
+
+  // ====================================================================
+  // Currencies table — DB-driven currency catalogue (2026-05-28).
+  // Each row is one supported currency. Replaces the hardcoded
+  // CHARM_LADDERS / FALLBACK_RATES / SUPPORTED_CURRENCIES sets that
+  // previously lived in code only. Code constants stay as final fallback
+  // if the table is empty.
+  // ====================================================================
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS currencies (
+      code TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      symbol_position TEXT NOT NULL DEFAULT 'after' CHECK (symbol_position IN ('before', 'after')),
+      decimal_places INTEGER NOT NULL DEFAULT 2 CHECK (decimal_places >= 0 AND decimal_places <= 4),
+      charm_ladder JSONB NOT NULL DEFAULT '[]'::jsonb,
+      fallback_rate NUMERIC(14, 8) NOT NULL DEFAULT 1.0,
+      country_codes TEXT[] NOT NULL DEFAULT '{}',
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_currencies_active ON currencies (active, sort_order);
+  `);
+
+  // Seed the four launch currencies if the table is empty. After seeding,
+  // edits happen via /admin/currencies. The seed payloads match the legacy
+  // hardcoded CHARM_LADDERS + FALLBACK_RATES exactly so behavior is
+  // identical at deploy time.
+  const curCount = await pool.query(`SELECT COUNT(*)::int AS n FROM currencies`);
+  if (curCount.rows[0].n === 0) {
+    const SEK_LADDER = JSON.stringify([
+      9, 19, 29, 39, 49, 59, 69, 79, 89, 99,
+      109, 119, 129, 139, 149, 159, 169, 179, 189, 199,
+      229, 249, 279, 299, 329, 349, 379, 399, 449, 499,
+      549, 599, 649, 699, 749, 799, 849, 899, 949, 999,
+      1099, 1199, 1299, 1399, 1499, 1699, 1799, 1899, 1999,
+      2299, 2499, 2799, 2999, 3499, 3999, 4499, 4999,
+      5999, 6999, 7999, 8999, 9999, 14999, 19999, 24999, 29999
+    ]);
+    const DOT99_LADDER = JSON.stringify([
+      0.99, 1.99, 2.99, 3.99, 4.99, 5.99, 6.99, 7.99, 8.99, 9.99,
+      10.99, 11.99, 12.99, 13.99, 14.99, 15.99, 16.99, 17.99, 18.99, 19.99,
+      21.99, 24.99, 27.99, 29.99, 34.99, 39.99, 44.99, 49.99,
+      54.99, 59.99, 64.99, 69.99, 74.99, 79.99, 84.99, 89.99, 94.99, 99.99,
+      109.99, 119.99, 129.99, 149.99, 169.99, 199.99,
+      249.99, 299.99, 349.99, 399.99, 499.99, 699.99, 999.99
+    ]);
+    // EU country codes used by pickCurrency.
+    const EU = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES'];
+    await pool.query(
+      `INSERT INTO currencies (code, display_name, symbol, symbol_position, decimal_places, charm_ladder, fallback_rate, country_codes, active, sort_order)
+       VALUES
+         ('sek', 'Swedish krona',  'kr', 'after',  0, $1::jsonb, 1.0,   $5::text[], TRUE, 1),
+         ('usd', 'US Dollar',      '$',  'before', 2, $2::jsonb, 0.094, $6::text[], TRUE, 2),
+         ('eur', 'Euro',           E'\\u20AC', 'before', 2, $2::jsonb, 0.087, $7::text[], TRUE, 3),
+         ('gbp', 'British Pound',  E'\\u00A3', 'before', 2, $2::jsonb, 0.075, $8::text[], TRUE, 4)`,
+      [SEK_LADDER, DOT99_LADDER, DOT99_LADDER, DOT99_LADDER, ['SE'], ['US'], EU, ['GB']]
+    );
+    console.log('Seeded currencies: sek, usd, eur, gbp');
+  }
+
   // Unique index on prompts.style_id for ON CONFLICT support
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS prompts_style_id_unique ON prompts (style_id);
