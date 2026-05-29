@@ -960,12 +960,18 @@ window.placeOrder = function() {
 };
 
 async function proceedToCheckout(productOverride) {
-  document.getElementById('upsellModal').classList.remove('open');
+  var _upsell = document.getElementById('upsellModal'); if (_upsell) _upsell.classList.remove('open');
   const product = productOverride || selectedProduct;
   const email = window._orderEmail || '';
-  const btn = document.querySelector('.btn-order');
-  btn.disabled = true;
-  btn.textContent = 'Redirecting…';
+  // Disable whichever buy button is in play. Legacy step3 .btn-order is gone post-splice; route to the
+  // matching widget button instead so the customer sees a "Redirecting…" state.
+  const wBtn = {
+    image: document.getElementById('ts-buy-pic'),
+    video: document.getElementById('ts-buy-vid'),
+    bundle: document.getElementById('ts-buy-bundle'),
+  }[product] || document.querySelector('.btn-order');
+  const _origLabel = wBtn ? wBtn.textContent : null;
+  if (wBtn) { wBtn.disabled = true; wBtn.textContent = 'Redirecting…'; }
   // Persist state so a browser back from Stripe restores the user's progress
   const conceptId = window.tsSelectedConcept ? window.tsSelectedConcept.id : null;
   try {
@@ -983,13 +989,11 @@ async function proceedToCheckout(productOverride) {
     if (data.url) {
       window.location.href = data.url;
     } else {
-      btn.disabled = false;
-      btn.textContent = 'Order';
+      if (wBtn) { wBtn.disabled = false; wBtn.textContent = _origLabel || 'Order'; }
       alert('Checkout failed. Please try again.');
     }
   } catch (err) {
-    btn.disabled = false;
-    btn.textContent = 'Order';
+    if (wBtn) { wBtn.disabled = false; wBtn.textContent = _origLabel || 'Order'; }
     alert('Checkout failed. Please try again.');
   }
 }
