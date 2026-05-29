@@ -2048,6 +2048,12 @@ function conceptAdminPage(title, body) {
   .preview img,.preview video{max-width:160px;max-height:120px;border-radius:6px;border:1px solid #ddd;display:block;}
   .muted{color:#888;font-size:12px;}
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  /* "Generating…" feedback for the concept-edit Test buttons */
+  .btn.is-busy{background:#FFB400 !important;color:#1C0A00 !important;cursor:progress;}
+  .ts-test-spinner{display:inline-block;width:13px;height:13px;border:2.4px solid rgba(28,10,0,0.18);border-top-color:#1C0A00;border-radius:50%;animation:ts-test-spin 0.7s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes ts-test-spin{to{transform:rotate(360deg);}}
+  /* Make the test-status text more visible while a job is in-flight */
+  #testImageStatus:not(:empty),#testVideoStatus:not(:empty){background:#FFF3C4;color:#1C0A00;padding:8px 12px;border-radius:6px;font-weight:600;border:1px solid rgba(28,10,0,0.12);display:inline-block;margin-top:10px !important;font-size:13px;}
 </style></head><body class="ts-nav-loggedin ts-nav-admin">
 <div class="sun"></div>
 <script src="/currency.js?v=20260526a"></script>
@@ -2552,8 +2558,27 @@ function conceptFormBody(concept, errorMsg) {
 
         <div class="ts-test">
           <h2 style="font-size:18px;margin:0 0 6px;">Test video</h2>
-          <p class="muted" style="margin:0 0 14px;">Uses the image generated in the Image tab. Admin pays the fal.ai cost (≈ ${TEST_COST_VIDEO}).</p>
-          <div id="videoTestHint" class="muted" style="margin-bottom:10px;">Generate a test image in the Image tab first.</div>
+          <p class="muted" style="margin:0 0 14px;">Admin pays the fal.ai cost (≈ ${TEST_COST_VIDEO}).</p>
+          <div id="videoTestHint" class="muted" style="margin-bottom:10px;">Pick a starting picture below, then click Test video.</div>
+
+          <!-- Starting-picture chooser: use the just-generated test image, upload a different one, or pick from the gallery library. -->
+          <div class="field" style="background:#FFF9E6;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+            <label style="margin-bottom:8px;">Starting picture for video</label>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+              <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="videoStart" value="generated" checked> Use generated test image</label>
+              <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="videoStart" value="upload"> Upload different image</label>
+              <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="videoStart" value="gallery"> Pick from gallery</label>
+            </div>
+            <div id="videoStartUploadWrap" style="display:none;">
+              <input type="file" id="videoStartUpload" accept="image/*">
+              <span id="videoStartUploadStatus" class="muted" style="margin-left:8px;"></span>
+            </div>
+            <div id="videoStartGalleryWrap" style="display:none;">
+              <select id="videoStartGallery" style="width:100%;"></select>
+            </div>
+            <div id="videoStartPreview" style="margin-top:10px;"></div>
+          </div>
+
           <button type="button" class="btn secondary" id="btnTestVideo" onclick="runTestVideo()" disabled>Test video</button>
           <div id="testVideoStatus" class="muted" style="margin-top:12px;"></div>
           <div id="testVideoResult" style="margin-top:14px;"></div>
@@ -2795,12 +2820,30 @@ function conceptFormBody(concept, errorMsg) {
         var el = document.getElementById('test' + (kind === 'image' ? 'Image' : 'Video') + 'Status');
         if (el) el.textContent = m || '';
       }
+      // Idle labels — captured once so we can restore them after busy state.
+      window.__btnLabels = window.__btnLabels || {
+        image: (document.getElementById('btnTestImage') || {}).textContent || 'Test image',
+        video: (document.getElementById('btnTestVideo') || {}).textContent || 'Test video',
+      };
+      function applyBusyButton(btn, busy, idleLabel){
+        if (!btn) return;
+        if (busy) {
+          btn.dataset.idleLabel = btn.dataset.idleLabel || idleLabel || btn.textContent;
+          btn.innerHTML = '<span class="ts-test-spinner" aria-hidden="true"></span> Generating…';
+          btn.classList.add('is-busy');
+        } else {
+          btn.innerHTML = btn.dataset.idleLabel || idleLabel || 'Test';
+          btn.classList.remove('is-busy');
+        }
+      }
       function setBusy(kind, busy){
         if (kind === 'image') {
+          applyBusyButton(document.getElementById('btnTestImage'), busy, window.__btnLabels.image);
           document.getElementById('btnTestImage').disabled = busy;
           document.getElementById('testPhoto').disabled = busy;
           document.getElementById('btnTestVideo').disabled = busy || !window.__testImageUrl;
         } else {
+          applyBusyButton(document.getElementById('btnTestVideo'), busy, window.__btnLabels.video);
           document.getElementById('btnTestVideo').disabled = busy;
         }
       }
@@ -2832,9 +2875,12 @@ function conceptFormBody(concept, errorMsg) {
           var inputDump = j.input_used ? '<div class="muted" style="margin-top:8px;">fal input used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;font-size:11px;">'+escJs(JSON.stringify(j.input_used, null, 2))+'</pre>' : '';
           document.getElementById('testImageResult').innerHTML =
             '<img src="'+j.url+'" style="max-width:320px;border-radius:8px;display:block;margin-bottom:8px;">' +
-            '<div class="muted">Image prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
+            '<button type="button" class="btn small" onclick="saveTestToGallery(\\''+j.url+'\\', \\'image\\', this)">💾 Save to gallery</button>' +
+            '<div class="muted" style="margin-top:8px;">Image prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
             inputDump;
           setStatus('image', '');
+          // Refresh the starting-picture preview (which defaults to "generated").
+          refreshVideoStartPreview();
           // Unlock the Test video button now that we have an image
           var hint = document.getElementById('videoTestHint');
           if (hint) hint.textContent = 'Image ready. Switch to the Video tab and click Test video.';
@@ -2842,12 +2888,13 @@ function conceptFormBody(concept, errorMsg) {
         setBusy('image', false);
       }
       async function runTestVideo(){
-        if(!window.__testImageUrl){ setStatus('video', 'Generate a test image in the Image tab first.'); return; }
+        var portrait = getVideoStartingUrl();
+        if(!portrait){ setStatus('video', 'Pick or generate a starting picture first.'); return; }
         setBusy('video', true); setStatus('video', 'Generating video… this can take a minute.');
         try {
           var v = formVals();
           var body = {
-            portrait_url: window.__testImageUrl,
+            portrait_url: portrait,
             video_prompt: v.video_prompt,
             fal_video_model: v.fal_video_model,
             video_input_extras: v.video_input_extras,
@@ -2862,7 +2909,8 @@ function conceptFormBody(concept, errorMsg) {
           var inputDump2 = j.input_used ? '<div class="muted" style="margin-top:8px;">fal input used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;font-size:11px;">'+escJs(JSON.stringify(j.input_used, null, 2))+'</pre>' : '';
           document.getElementById('testVideoResult').innerHTML =
             '<video src="'+j.url+'" controls style="max-width:320px;border-radius:8px;display:block;margin-top:12px;"></video>' +
-            '<div class="muted">Video prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
+            '<button type="button" class="btn small" style="margin-top:8px;" onclick="saveTestToGallery(\\''+j.url+'\\', \\'video\\', this)">💾 Save to gallery</button>' +
+            '<div class="muted" style="margin-top:8px;">Video prompt used:</div><pre style="white-space:pre-wrap;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">'+escJs(j.prompt_used)+'</pre>' +
             inputDump2;
           setStatus('video', '');
         } catch(e){ setStatus('video', 'Error: '+e.message); }
@@ -2872,6 +2920,101 @@ function conceptFormBody(concept, errorMsg) {
         var el=document.querySelector('[name='+n+']'); if(el) el.addEventListener('input', syncTestInput);
       });
       syncTestInput();
+
+      // ---------------------------------------------------------------------
+      // Save-to-gallery (called from result-panel buttons after a test runs)
+      // ---------------------------------------------------------------------
+      window.__conceptId = ${c && c.id ? c.id : 'null'};
+      async function saveTestToGallery(url, kind, btn){
+        if(!window.__conceptId){ alert('Cannot save: no concept id (save the concept first).'); return; }
+        btn.disabled = true; btn.textContent = 'Saving…';
+        try {
+          var r = await fetch('/admin/concepts/save-to-gallery', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({concept_id: window.__conceptId, url: url, kind: kind})});
+          var j = await r.json();
+          if(!r.ok) throw new Error(j.error || 'Save failed');
+          btn.textContent = j.deduplicated ? '✓ Already in gallery' : '✓ Saved to gallery';
+          btn.style.background = '#3A6B20'; btn.style.color = '#fff';
+          // Refresh the library picker in case the user wants to use this new item as a starting picture.
+          loadVideoStartGallery();
+        } catch(e){
+          btn.disabled = false; btn.textContent = '💾 Save to gallery (retry)';
+          alert('Error: '+e.message);
+        }
+      }
+
+      // ---------------------------------------------------------------------
+      // Video starting-picture chooser
+      // ---------------------------------------------------------------------
+      window.__videoStartUploadUrl = null;
+      function getVideoStartingUrl(){
+        var picked = (document.querySelector('input[name="videoStart"]:checked') || {}).value || 'generated';
+        if (picked === 'generated') return window.__testImageUrl || null;
+        if (picked === 'upload')    return window.__videoStartUploadUrl || null;
+        if (picked === 'gallery') {
+          var sel = document.getElementById('videoStartGallery');
+          return (sel && sel.value) ? sel.value : null;
+        }
+        return null;
+      }
+      function refreshVideoStartPreview(){
+        var url = getVideoStartingUrl();
+        var prev = document.getElementById('videoStartPreview');
+        if (!prev) return;
+        prev.innerHTML = url
+          ? '<img src="'+url+'" style="max-width:140px;border-radius:6px;border:1px solid #ddd;display:block;">'
+          : '<span class="muted" style="font-size:12px;">No starting picture selected yet.</span>';
+        var btn = document.getElementById('btnTestVideo');
+        if (btn) btn.disabled = !url;
+      }
+      document.querySelectorAll('input[name="videoStart"]').forEach(function(r){
+        r.addEventListener('change', function(){
+          var picked = r.value;
+          document.getElementById('videoStartUploadWrap').style.display  = picked === 'upload'  ? 'block' : 'none';
+          document.getElementById('videoStartGalleryWrap').style.display = picked === 'gallery' ? 'block' : 'none';
+          if (picked === 'gallery') loadVideoStartGallery();
+          refreshVideoStartPreview();
+        });
+      });
+      // Upload handler — when a file is chosen for the "upload different" option,
+      // push it through /upload and remember the resulting URL.
+      var vUp = document.getElementById('videoStartUpload');
+      if (vUp) vUp.addEventListener('change', async function(){
+        var f = vUp.files[0]; if(!f) return;
+        var st = document.getElementById('videoStartUploadStatus');
+        st.textContent = 'Uploading…';
+        try {
+          var fd = new FormData(); fd.append('image', f);
+          var up = await fetch('/upload', { method:'POST', body: fd });
+          var upj = await up.json();
+          if(!up.ok) throw new Error(upj.error || 'Upload failed');
+          window.__videoStartUploadUrl = upj.url;
+          st.textContent = '✓ Ready';
+          refreshVideoStartPreview();
+        } catch(e){ st.textContent = 'Error: '+e.message; }
+      });
+      // Library picker — populate the gallery dropdown lazily on first open.
+      var galleryLoaded = false;
+      async function loadVideoStartGallery(){
+        var sel = document.getElementById('videoStartGallery');
+        if (!sel) return;
+        if (galleryLoaded) return;
+        sel.innerHTML = '<option>Loading…</option>';
+        try {
+          var r = await fetch('/admin/media/library?kind=image');
+          var rows = await r.json();
+          if (!Array.isArray(rows) || rows.length === 0) { sel.innerHTML = '<option value="">(no images in library yet)</option>'; galleryLoaded = true; return; }
+          sel.innerHTML = '<option value="">— pick an image —</option>' + rows.map(function(m){
+            var fname = (String(m.url).split('?')[0].split('/').pop() || '').slice(0, 60);
+            return '<option value="'+m.url+'">'+(m.concept_name + ' · ' + fname).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</option>';
+          }).join('');
+          galleryLoaded = true;
+        } catch(e){
+          sel.innerHTML = '<option value="">Failed to load library</option>';
+        }
+      }
+      var vGal = document.getElementById('videoStartGallery');
+      if (vGal) vGal.addEventListener('change', refreshVideoStartPreview);
+      refreshVideoStartPreview();
       renderModelFields('image');
       renderModelFields('video');
       applyInputType(document.getElementById('inputTypeSelect').value);
@@ -3189,6 +3332,61 @@ app.post('/admin/concepts/:id/slot', requireRole('admin'), async (req, res) => {
   res.redirect(req.body.return_to || '/admin/concepts?saved=1');
 });
 function wantsJson(req) { return req.headers.accept === 'application/json' || req.xhr; }
+
+// Save a test-image or test-video output to the gallery library so it can be
+// reused as a slot, browsed, or shown to customers. Body: { concept_id, url, kind }.
+app.post('/admin/concepts/save-to-gallery', requireRole('admin'), async (req, res) => {
+  try {
+    const conceptId = parseInt(req.body.concept_id, 10);
+    const url = String(req.body.url || '').trim();
+    const kind = String(req.body.kind || '').trim();
+    if (!conceptId) return res.status(400).json({ error: 'concept_id required' });
+    if (!url) return res.status(400).json({ error: 'url required' });
+    if (!CONCEPT_MEDIA_KINDS.includes(kind)) return res.status(400).json({ error: 'Invalid kind' });
+
+    // Avoid creating a duplicate row if this exact URL is already in the concept's gallery.
+    const dup = await pool.query(
+      `SELECT id FROM concept_media WHERE concept_id = $1 AND url = $2 LIMIT 1`,
+      [conceptId, url]
+    );
+    if (dup.rows.length) return res.json({ ok: true, id: dup.rows[0].id, deduplicated: true });
+
+    const maxRes = await pool.query(
+      `SELECT COALESCE(MAX(sort_order), 0) AS m FROM concept_media WHERE concept_id = $1`,
+      [conceptId]
+    );
+    const sortOrder = (maxRes.rows[0].m || 0) + 1;
+    const ins = await pool.query(
+      `INSERT INTO concept_media (concept_id, kind, url, sort_order, active)
+       VALUES ($1, $2, $3, $4, TRUE) RETURNING id`,
+      [conceptId, kind, url, sortOrder]
+    );
+    res.json({ ok: true, id: ins.rows[0].id });
+  } catch (err) {
+    console.error('[save-to-gallery] error:', err.message);
+    res.status(500).json({ error: 'Save failed', details: err.message });
+  }
+});
+
+// Lists all active image-kind media items, used by the "Pick from gallery"
+// dropdown when starting a test video from an existing library image.
+app.get('/admin/media/library', requireRole('admin'), async (req, res) => {
+  try {
+    const kind = req.query.kind && CONCEPT_MEDIA_KINDS.includes(req.query.kind) ? req.query.kind : 'image';
+    const { rows } = await pool.query(
+      `SELECT cm.id, cm.url, cm.kind, c.id AS concept_id, c.name AS concept_name
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       WHERE cm.active = TRUE AND cm.kind = $1
+       ORDER BY c.name ASC, cm.sort_order ASC, cm.created_at DESC`,
+      [kind]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[media-library] error:', err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
 
 // Same as /admin/concepts/:id/slot but reads concept_id from the request body,
 // so the gallery row's slot-assign forms can name the concept inline.
