@@ -427,8 +427,8 @@ async function initDb() {
        VALUES
          ('sek', 'Swedish krona',  'kr', 'after',  0, $1::jsonb, 1.0,   $5::text[], TRUE, 1),
          ('usd', 'US Dollar',      '$',  'before', 2, $2::jsonb, 0.094, $6::text[], TRUE, 2),
-         ('eur', 'Euro',           E'\\u20AC', 'before', 2, $2::jsonb, 0.087, $7::text[], TRUE, 3),
-         ('gbp', 'British Pound',  E'\\u00A3', 'before', 2, $2::jsonb, 0.075, $8::text[], TRUE, 4)`,
+         ('eur', 'Euro',           E'\\u20AC', 'before', 2, $3::jsonb, 0.087, $7::text[], TRUE, 3),
+         ('gbp', 'British Pound',  E'\\u00A3', 'before', 2, $4::jsonb, 0.075, $8::text[], TRUE, 4)`,
       [SEK_LADDER, DOT99_LADDER, DOT99_LADDER, DOT99_LADDER, ['SE'], ['US'], EU, ['GB']]
     );
     console.log('Seeded currencies: sek, usd, eur, gbp');
