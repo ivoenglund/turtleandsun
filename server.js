@@ -3796,6 +3796,8 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
   try {
     const filterConcept = req.query.concept ? parseInt(req.query.concept, 10) : null;
     const showInactive  = req.query.show_inactive === '1' || req.query.show_inactive === 'true';
+    // 'triplet' = all 3 slots filled, 'duplex' = exactly 2, 'single' = exactly 1, '' = all.
+    const filterKind = ['triplet','duplex','single'].includes(req.query.kind) ? req.query.kind : '';
 
     const concepts = (await pool.query(
       `SELECT id, name FROM concepts WHERE active = TRUE ORDER BY name ASC`
@@ -3819,7 +3821,18 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
        ORDER BY c.name ASC, t.sort_order ASC, t.triplet_number ASC`,
       tripParams
     );
-    const triplets = showInactive ? tRows : tRows.filter((t) => t.active);
+    const tripletsAfterActive = showInactive ? tRows : tRows.filter((t) => t.active);
+    // Filter by slot-fill kind so the user can see only triplets, only duplexes, etc.
+    const slotCount = (t) => (t.before_media_id ? 1 : 0) + (t.image_media_id ? 1 : 0) + (t.video_media_id ? 1 : 0);
+    const triplets = filterKind
+      ? tripletsAfterActive.filter((t) => {
+          const n = slotCount(t);
+          if (filterKind === 'triplet') return n === 3;
+          if (filterKind === 'duplex')  return n === 2;
+          if (filterKind === 'single')  return n === 1;
+          return true;
+        })
+      : tripletsAfterActive;
     // Group by concept_id
     const tripsByConcept = new Map();
     for (const t of triplets) {
@@ -3878,7 +3891,7 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         <div class="t-card-head">
           <span class="t-badge">#${t.triplet_number}</span>
           <span class="t-concept">${escapeHtml(t.concept_name)}</span>
-          <a class="t-edit" href="/admin/triplets?concept=${t.concept_id}#trip-${t.id}" title="Open in triplet manager">Edit</a>
+          <a class="t-edit" href="/admin/triplets?concept=${t.concept_id}#trip-${t.id}" title="Open this triplet in the full editor (change slot assignments, caption, sort order, number).">Edit</a>
         </div>
         <div class="t-thumbs">
           <div class="t-slot"><span class="t-slot-lbl">Before</span>${thumb(beforeM, 'B')}</div>
@@ -3887,12 +3900,12 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         </div>
         ${t.caption ? `<div class="t-caption">${escapeHtml(t.caption)}</div>` : ''}
         <div class="t-toggles">
-          <label class="t-toggle ${t.active ? 'on' : ''}" data-field="active"><input type="checkbox"${t.active ? ' checked' : ''}><span>Active</span></label>
-          <label class="t-toggle ${t.in_rolling_demo ? 'on' : ''}" data-field="rolling"><input type="checkbox"${t.in_rolling_demo ? ' checked' : ''}><span>Rolling</span></label>
-          <label class="t-toggle ${t.in_gallery ? 'on' : ''}" data-field="gallery"><input type="checkbox"${t.in_gallery ? ' checked' : ''}><span>Gallery</span></label>
+          <label class="t-toggle ${t.active ? 'on' : ''}" data-field="active" title="ACTIVE — master switch. When OFF, this triplet is hidden from the rolling demo AND from the public gallery, regardless of the other toggles."><input type="checkbox"${t.active ? ' checked' : ''}><span>Active</span></label>
+          <label class="t-toggle ${t.in_rolling_demo ? 'on' : ''}" data-field="rolling" title="ROLLING — include this triplet in the home-page rolling demo (the cycling Before/After/Video carousel under the hero). Each visit to this concept's row in the carousel advances to the next rolling triplet."><input type="checkbox"${t.in_rolling_demo ? ' checked' : ''}><span>Rolling</span></label>
+          <label class="t-toggle ${t.in_gallery ? 'on' : ''}" data-field="gallery" title="GALLERY — show this triplet on the public /gallery page. Independent of the rolling demo, so you can showcase a triplet on the gallery page without putting it in the home-page carousel."><input type="checkbox"${t.in_gallery ? ' checked' : ''}><span>Gallery</span></label>
           <form method="POST" action="/admin/triplets/${t.id}/delete" class="t-del" onsubmit="return confirm('Delete triplet #${t.triplet_number} for ${escapeHtml(t.concept_name).replace(/'/g, '&#39;').replace(/"/g, '&quot;')}?');">
             <input type="hidden" name="return_to" value="/admin/gallery${filterConcept ? '?concept='+filterConcept : ''}">
-            <button type="submit" title="Delete triplet">×</button>
+            <button type="submit" title="Delete this triplet record. The underlying media items in the library are NOT deleted — only this grouping.">×</button>
           </form>
         </div>
       </div>`;
@@ -3928,18 +3941,18 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         ${thumbEl}
         <form method="POST" action="/admin/media/${m.id}/update" class="m-edit">
           <input type="hidden" name="return_to" value="/admin/gallery${filterConcept ? '?concept='+filterConcept : ''}">
-          <div class="m-name" title="${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
-          <div class="m-concept">${escapeHtml(m.concept_name)}</div>
-          ${badges ? `<div class="m-badges">${badges}</div>` : ''}
-          <label>Kind <select name="kind">${KIND_OPTS(m.kind)}</select></label>
-          <label>Filters <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="e.g. pet, royal"></label>
+          <div class="m-name" title="Full file URL (hover): ${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
+          <div class="m-concept" title="The concept this media item is filed under.">${escapeHtml(m.concept_name)}</div>
+          ${badges ? `<div class="m-badges" title="This media item is currently used in these triplet slots. If you delete it, those slots will go empty.">${badges}</div>` : ''}
+          <label title="KIND — image or video. Determines whether the file is used as a Before/After Picture (image) or as an After Video (video).">Kind <select name="kind">${KIND_OPTS(m.kind)}</select></label>
+          <label title="FILTERS — comma-separated tags used on the public /gallery page filter chips (e.g. pet, royal, family). An item shows up under a chip if either its own tags or its concept's tags match.">Filters <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="e.g. pet, royal"></label>
           <div class="m-row">
-            <label class="m-flex">Sort <input type="number" name="sort_order" value="${m.sort_order || 0}"></label>
-            <label class="m-chk"><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
+            <label class="m-flex" title="SORT — display order within the concept. Lower numbers appear first.">Sort <input type="number" name="sort_order" value="${m.sort_order || 0}"></label>
+            <label class="m-chk" title="ACTIVE — master switch for this media item. When OFF, the item is hidden from the public gallery and from new triplet slot pickers. Triplets that already reference it will show a broken slot."><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
           </div>
           <div class="m-actions">
-            <button type="submit" class="btn small">Save</button>
-            <button type="submit" formaction="/admin/media/${m.id}/delete" formnovalidate onclick="return confirm('Delete this gallery item?');" class="m-del" title="Delete">×</button>
+            <button type="submit" class="btn small" title="Save the field changes above (Kind, Filters, Sort, Active).">Save</button>
+            <button type="submit" formaction="/admin/media/${m.id}/delete" formnovalidate onclick="return confirm('Delete this gallery item?');" class="m-del" title="Delete this media item permanently. The file in R2 storage stays, but the DB row is removed. Triplets that reference this item will lose that slot.">×</button>
           </div>
         </form>
       </div>`;
@@ -4032,9 +4045,15 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       </div>
       <form method="GET" action="/admin/gallery" class="g-filters">
         <span style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Filter</span>
-        <label>Concept <select name="concept" onchange="this.form.submit()">${conceptOpts}</select></label>
-        <label><input type="checkbox" name="show_inactive" value="1" onchange="this.form.submit()"${showInactive ? ' checked' : ''}> Show inactive</label>
-        <a href="/admin/gallery" class="muted" style="font-size:11px;">Reset</a>
+        <label title="Show only triplets that belong to this concept">Concept <select name="concept" onchange="this.form.submit()">${conceptOpts}</select></label>
+        <label title="Triplets are sets of three media slots: Before, After Picture, After Video. Triplets = all 3 filled; Duplexes = exactly 2 filled (one missing); Singles = only one slot filled.">Type <select name="kind" onchange="this.form.submit()">
+          <option value=""${filterKind === '' ? ' selected' : ''}>All</option>
+          <option value="triplet"${filterKind === 'triplet' ? ' selected' : ''}>Triplets (3/3)</option>
+          <option value="duplex"${filterKind === 'duplex' ? ' selected' : ''}>Duplexes (2/3)</option>
+          <option value="single"${filterKind === 'single' ? ' selected' : ''}>Singles (1/3)</option>
+        </select></label>
+        <label title="Include items where Active is OFF (normally hidden)"><input type="checkbox" name="show_inactive" value="1" onchange="this.form.submit()"${showInactive ? ' checked' : ''}> Show inactive</label>
+        <a href="/admin/gallery" class="muted" style="font-size:11px;" title="Clear all filters">Reset</a>
       </form>
       ${flash}
       ${sectionsHtml || `<p class="muted">No triplets in${filterConcept ? ' this concept' : ' the library yet'}. <a href="/admin/triplets${filterConcept ? `?concept=${filterConcept}` : ''}">Create one →</a></p>`}
