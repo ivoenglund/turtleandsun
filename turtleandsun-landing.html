@@ -1481,11 +1481,71 @@ NavBar.init({ requireAuth: false }).then(status => {
         showStill(current); showVideo(current); markChip(current);
         // Sync the global so the existing checkout knows
         window.tsSelectedConcept = {id: concepts[current].id, concept: concepts[current]};
-        startCycle();
+        // Try to restore state from a previous Stripe-back navigation BEFORE starting the demo cycle.
+        const restored = restoreFromSession();
+        if (!restored) startCycle();
       }
     } catch (e) {
       console.warn('[ts-widget] loadConcepts failed:', e);
     }
+  }
+
+  function restoreFromSession() {
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem('ts_state') || 'null'); } catch (e) { return false; }
+    if (!saved || !saved.ts || Date.now() - saved.ts > 2 * 60 * 60 * 1000) return false;
+    if (!saved.cloudinaryUrl) return false;
+
+    // Enter order mode using the persisted upload URL (the R2 URL works as an img src)
+    mode = 'order';
+    demoEl.classList.add('is-order');
+    if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+    beforeEl.src = saved.cloudinaryUrl;
+    hideAllStills(); hideAllVideos();
+    stillEl.classList.add('is-empty');
+    videoEl.classList.add('is-empty');
+
+    // Globals for the legacy checkout helpers
+    window.cloudinaryUrl = saved.cloudinaryUrl;
+    try { cloudinaryUrl = saved.cloudinaryUrl; } catch (e) {}
+
+    // Restore the chip selection
+    if (saved.conceptId) {
+      const idx = concepts.findIndex(function(c){ return c.id === saved.conceptId; });
+      if (idx !== -1) { current = idx; markChip(idx); window.tsSelectedConcept = { id: concepts[idx].id, concept: concepts[idx] }; }
+    }
+
+    // Restore the aspect ratio
+    if (saved.orientation) {
+      const rb = ratiosEl.querySelector('.ts-ratio-btn[data-orient="' + saved.orientation + '"]');
+      if (rb) rb.click();
+      if (typeof setOrientation === 'function') setOrientation(saved.orientation);
+    }
+
+    // Restore the email so they don't have to retype
+    if (saved.email) {
+      emailInput.value = saved.email;
+      window._previewEmail = saved.email;
+    }
+
+    // Restore the generated preview if one was made before the Stripe redirect
+    if (saved.previewImageUrl) {
+      window.previewImageUrl = saved.previewImageUrl;
+      try { previewImageUrl = saved.previewImageUrl; } catch (e) {}
+      if (stills[current]) stills[current].src = saved.previewImageUrl;
+      stillEl.classList.remove('is-empty');
+      showStill(current);
+      stillOverlay.style.display = 'none';
+      demoEl.classList.add('has-preview');
+      // Server is the source of truth on preview count; assume one used so the UI hints accurately.
+      previewsLeft = Math.max(0, MAX_PREVIEWS - 1);
+    } else {
+      previewsLeft = MAX_PREVIEWS;
+    }
+    renderCounter();
+    setGenerateBtnState();
+
+    return true;
   }
 
   function buildChips(){
