@@ -583,7 +583,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
 
     ${section('\u{1F3A8} Content',
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
-      card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery')
+      card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery') +
+      card('Triplets', 'Group Before / After-Picture / After-Video into rolling demo sets.', '/admin/triplets')
     )}
 
     ${section('\u{1F4B0} Pricing',
@@ -1734,29 +1735,241 @@ app.get('/gallery/meta', async (req, res) => {
   }
 });
 
-// What the landing-page rolling-demo widget reads. Each concept that has at
-// least one slot set is returned with its three explicit URLs.
+// What the landing-page rolling-demo widget reads. Each active concept is
+// returned with its array of triplets (in_rolling_demo=TRUE, sorted). If a
+// concept has no triplets yet but has the legacy single-slot URLs set on the
+// concept row, we synthesize an implicit triplet #1 from those so nothing
+// breaks during the transition.
 app.get('/api/widget-concepts', async (req, res) => {
   try {
-    const { rows } = await pool.query(
+    const { rows: concepts } = await pool.query(
       `SELECT id, name, before_image_url, after_image_url, example_video_url, sort_order
        FROM concepts
        WHERE active = TRUE
-         AND (before_image_url IS NOT NULL OR after_image_url IS NOT NULL OR example_video_url IS NOT NULL)
        ORDER BY sort_order ASC, id ASC
        LIMIT 12`
     );
+    const { rows: triplets } = await pool.query(
+      `SELECT t.id, t.concept_id, t.triplet_number, t.sort_order,
+              bm.url AS before_url, im.url AS image_url, vm.url AS video_url
+       FROM concept_triplets t
+       LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
+       LEFT JOIN concept_media im ON im.id = t.image_media_id  AND im.active = TRUE
+       LEFT JOIN concept_media vm ON vm.id = t.video_media_id  AND vm.active = TRUE
+       WHERE t.in_rolling_demo = TRUE
+       ORDER BY t.sort_order ASC, t.triplet_number ASC`
+    );
+    const tripletsByConcept = new Map();
+    for (const t of triplets) {
+      if (!t.before_url && !t.image_url && !t.video_url) continue;
+      if (!tripletsByConcept.has(t.concept_id)) tripletsByConcept.set(t.concept_id, []);
+      tripletsByConcept.get(t.concept_id).push({
+        number: t.triplet_number,
+        before_url: t.before_url,
+        image_url: t.image_url,
+        video_url: t.video_url,
+      });
+    }
+    const result = [];
+    for (const c of concepts) {
+      let cTriplets = tripletsByConcept.get(c.id) || [];
+      // Fallback: synthesize an implicit triplet #1 from the legacy single-slot URLs.
+      if (cTriplets.length === 0 && (c.before_image_url || c.after_image_url || c.example_video_url)) {
+        cTriplets = [{
+          number: 1,
+          before_url: c.before_image_url || null,
+          image_url:  c.after_image_url  || null,
+          video_url:  c.example_video_url || null,
+        }];
+      }
+      if (cTriplets.length === 0) continue; // skip concepts with nothing to show
+      result.push({ id: c.id, name: c.name, triplets: cTriplets });
+    }
     res.set('Cache-Control', 'public, max-age=30');
-    res.json(rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      before_url: r.before_image_url,
-      image_url: r.after_image_url,
-      video_url: r.example_video_url,
-    })));
+    res.json(result);
   } catch (err) {
     console.error('[widget-concepts] error:', err.message);
     res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Create or update a triplet. Body: { id?, concept_id, triplet_number,
+// before_media_id?, image_media_id?, video_media_id?, in_rolling_demo, sort_order, caption? }
+app.post('/admin/triplets/save', requireRole('admin'), async (req, res) => {
+  try {
+    const id = parseInt(req.body.id, 10) || null;
+    const conceptId = parseInt(req.body.concept_id, 10);
+    if (!conceptId) return res.redirect((req.body.return_to || '/admin/triplets') + '?error=' + encodeURIComponent('Missing concept'));
+    const tripletNumber = parseInt(req.body.triplet_number, 10) || 1;
+    const sortOrder = parseInt(req.body.sort_order, 10) || 0;
+    const inRolling = req.body.in_rolling_demo === 'on' || req.body.in_rolling_demo === 'true' || req.body.in_rolling_demo === '1';
+    const beforeMediaId = req.body.before_media_id ? parseInt(req.body.before_media_id, 10) : null;
+    const imageMediaId  = req.body.image_media_id  ? parseInt(req.body.image_media_id,  10) : null;
+    const videoMediaId  = req.body.video_media_id  ? parseInt(req.body.video_media_id,  10) : null;
+    const caption = req.body.caption ? String(req.body.caption).trim() || null : null;
+
+    if (id) {
+      await pool.query(
+        `UPDATE concept_triplets SET
+           concept_id = $1, triplet_number = $2, sort_order = $3,
+           in_rolling_demo = $4,
+           before_media_id = $5, image_media_id = $6, video_media_id = $7,
+           caption = $8
+         WHERE id = $9`,
+        [conceptId, tripletNumber, sortOrder, inRolling, beforeMediaId, imageMediaId, videoMediaId, caption, id]
+      );
+    } else {
+      // Auto-assign triplet_number if not set or collides.
+      const existing = await pool.query(
+        `SELECT triplet_number FROM concept_triplets WHERE concept_id = $1 ORDER BY triplet_number ASC`,
+        [conceptId]
+      );
+      let n = tripletNumber;
+      const taken = new Set(existing.rows.map((r) => r.triplet_number));
+      if (taken.has(n) || !n) {
+        n = 1;
+        while (taken.has(n)) n++;
+      }
+      await pool.query(
+        `INSERT INTO concept_triplets (concept_id, triplet_number, sort_order, in_rolling_demo,
+           before_media_id, image_media_id, video_media_id, caption)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [conceptId, n, sortOrder, inRolling, beforeMediaId, imageMediaId, videoMediaId, caption]
+      );
+    }
+    if (wantsJson(req)) return res.json({ ok: true });
+    res.redirect(req.body.return_to || '/admin/concepts');
+  } catch (err) {
+    console.error('[triplets-save] error:', err.message);
+    res.redirect((req.body.return_to || '/admin/triplets') + '?error=' + encodeURIComponent(err.message));
+  }
+});
+
+app.post('/admin/triplets/:id/delete', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM concept_triplets WHERE id = $1`, [parseInt(req.params.id, 10)]);
+    res.redirect(req.body.return_to || '/admin/triplets?deleted=1');
+  } catch (err) {
+    console.error('[triplets-delete] error:', err.message);
+    res.redirect((req.body.return_to || '/admin/triplets') + '?error=' + encodeURIComponent(err.message));
+  }
+});
+
+// Standalone triplets manager.
+app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
+  try {
+    const filterConcept = req.query.concept ? parseInt(req.query.concept, 10) : null;
+    const { rows: concepts } = await pool.query(
+      `SELECT id, name FROM concepts WHERE active = TRUE ORDER BY name ASC`
+    );
+    const { rows: media } = await pool.query(
+      `SELECT cm.id, cm.kind, cm.url, c.name AS concept_name
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       WHERE cm.active = TRUE
+       ORDER BY c.name ASC, cm.sort_order ASC, cm.created_at DESC`
+    );
+    const imageItems = media.filter((m) => m.kind === 'image');
+    const videoItems = media.filter((m) => m.kind === 'video');
+
+    const whereSql = filterConcept ? 'WHERE t.concept_id = $1' : '';
+    const params = filterConcept ? [filterConcept] : [];
+    const { rows: triplets } = await pool.query(
+      `SELECT t.id, t.concept_id, t.triplet_number, t.sort_order, t.in_rolling_demo,
+              t.before_media_id, t.image_media_id, t.video_media_id, t.caption,
+              c.name AS concept_name,
+              bm.url AS before_url, im.url AS image_url, vm.url AS video_url
+       FROM concept_triplets t
+       JOIN concepts c ON c.id = t.concept_id
+       LEFT JOIN concept_media bm ON bm.id = t.before_media_id
+       LEFT JOIN concept_media im ON im.id = t.image_media_id
+       LEFT JOIN concept_media vm ON vm.id = t.video_media_id
+       ${whereSql}
+       ORDER BY c.name ASC, t.sort_order ASC, t.triplet_number ASC`,
+      params
+    );
+
+    const fname = (url) => (url ? (String(url).split('?')[0].split('/').pop() || '').slice(0, 28) : '');
+    const slotPicker = (selectName, currentMediaId, currentUrl, items, kindLabel) => {
+      const opts = `<option value="">— (none) —</option>` + items.map((m) => {
+        const lbl = `${m.concept_name} · ${fname(m.url)}`;
+        const sel = m.id === currentMediaId ? ' selected' : '';
+        return `<option value="${m.id}"${sel}>${escapeHtml(lbl)}</option>`;
+      }).join('');
+      const isVideo = kindLabel === 'Video';
+      const preview = currentUrl
+        ? (isVideo
+            ? `<video src="${escapeHtml(currentUrl)}" muted style="width:64px;height:48px;object-fit:cover;border-radius:4px;background:#000;"></video>`
+            : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:4px;">`)
+        : `<div style="width:64px;height:48px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
+      return `<div style="display:flex;flex-direction:column;gap:3px;">
+        <div style="font-size:10px;color:#888;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
+        <div style="display:flex;align-items:center;gap:6px;">${preview}<select name="${selectName}" style="flex:1;padding:5px 7px;font-size:12px;min-width:180px;">${opts}</select></div>
+      </div>`;
+    };
+
+    const tripletCard = (t) => `<form method="POST" action="/admin/triplets/save" style="background:#fff;border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px;">
+      <input type="hidden" name="id" value="${t.id || ''}">
+      <input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="background:#1C2A14;color:#FFE800;font-weight:800;font-size:13px;padding:5px 12px;border-radius:14px;">${escapeHtml(t.concept_name)} · #${t.triplet_number}</div>
+        <select name="concept_id" style="padding:5px 9px;font-size:12px;">
+          ${concepts.map((c) => `<option value="${c.id}"${c.id === t.concept_id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+        </select>
+        <label style="font-size:12px;">Number <input type="number" name="triplet_number" value="${t.triplet_number}" style="width:60px;padding:5px;"></label>
+        <label style="font-size:12px;">Order <input type="number" name="sort_order" value="${t.sort_order}" style="width:60px;padding:5px;"></label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#3A6B20;cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${t.in_rolling_demo ? ' checked' : ''}> Rolling demo</label>
+        <input type="text" name="caption" value="${escapeHtml(t.caption || '')}" placeholder="caption (optional)" style="flex:1;min-width:180px;padding:5px 9px;font-size:12px;">
+        <button type="submit" class="btn small">Save</button>
+        <form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" onsubmit="return confirm('Delete triplet #${t.triplet_number} for ${escapeHtml(t.concept_name).replace(/"/g, '&quot;').replace(/'/g, '&#39;')}?');"><input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}"><button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;">Delete</button></form>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+        ${slotPicker('before_media_id', t.before_media_id, t.before_url, imageItems, 'Before')}
+        ${slotPicker('image_media_id',  t.image_media_id,  t.image_url,  imageItems, 'After Picture')}
+        ${slotPicker('video_media_id',  t.video_media_id,  t.video_url,  videoItems, 'After Video')}
+      </div>
+    </form>`;
+
+    const conceptFilterOpts = `<option value="">All concepts</option>` + concepts.map((c) => `<option value="${c.id}"${c.id === filterConcept ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+
+    const body = `
+      <div class="top">
+        <h1>Triplets</h1>
+        <a class="btn" href="/admin/concepts">&larr; Back to concepts</a>
+      </div>
+      <p class="muted" style="margin:0 0 16px;">A triplet groups a Before photo, an After Picture, and an After Video into one set under a concept. Triplets marked <strong>Rolling demo</strong> are cycled in the landing-page widget — each visit to a concept's row in the carousel advances to the next triplet.</p>
+      <form method="GET" action="/admin/triplets" style="display:flex;gap:10px;align-items:end;margin-bottom:20px;">
+        <div class="field" style="margin:0;"><label>Concept</label><select name="concept">${conceptFilterOpts}</select></div>
+        <button type="submit" class="btn secondary">Filter</button>
+        <a href="/admin/triplets" class="muted" style="align-self:center;">Reset</a>
+      </form>
+      ${req.query.error ? `<div class="flash err">${escapeHtml(req.query.error)}</div>` : ''}
+      ${req.query.deleted ? `<div class="flash ok">Deleted.</div>` : ''}
+      ${triplets.length ? triplets.map(tripletCard).join('') : '<p class="muted">No triplets yet. Add one from the Concepts page (sub-grid under each concept) or below.</p>'}
+      <h2 style="font-size:16px;margin-top:32px;">Add new triplet</h2>
+      <form method="POST" action="/admin/triplets/save" style="background:#FFF9E6;border:1px solid #e8d870;border-radius:10px;padding:14px;">
+        <input type="hidden" name="return_to" value="${escapeHtml('/admin/triplets' + (filterConcept ? `?concept=${filterConcept}` : ''))}">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <select name="concept_id" required style="padding:5px 9px;font-size:12px;">
+            <option value="">— pick concept —</option>
+            ${concepts.map((c) => `<option value="${c.id}"${c.id === filterConcept ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+          <label style="font-size:12px;">Number <input type="number" name="triplet_number" value="" placeholder="auto" style="width:80px;padding:5px;"></label>
+          <label style="font-size:12px;">Order <input type="number" name="sort_order" value="0" style="width:60px;padding:5px;"></label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#3A6B20;cursor:pointer;"><input type="checkbox" name="in_rolling_demo" checked> Rolling demo</label>
+          <input type="text" name="caption" placeholder="caption (optional)" style="flex:1;min-width:180px;padding:5px 9px;font-size:12px;">
+          <button type="submit" class="btn">Create triplet</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+          ${slotPicker('before_media_id', null, null, imageItems, 'Before')}
+          ${slotPicker('image_media_id',  null, null, imageItems, 'After Picture')}
+          ${slotPicker('video_media_id',  null, null, videoItems, 'After Video')}
+        </div>
+      </form>`;
+    res.send(conceptAdminPage('Triplets', body));
+  } catch (err) {
+    console.error('[triplets-list] error:', err.message);
+    res.status(500).send('Failed: ' + escapeHtml(err.message));
   }
 });
 
@@ -2352,45 +2565,103 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
     const imageItems = mediaItems.filter((m) => m.kind === 'image');
     const videoItems = mediaItems.filter((m) => m.kind === 'video');
 
+    // Triplets across all concepts. We'll render them grouped under each concept.
+    const { rows: allTriplets } = await pool.query(
+      `SELECT t.id, t.concept_id, t.triplet_number, t.sort_order, t.in_rolling_demo,
+              t.before_media_id, t.image_media_id, t.video_media_id, t.caption,
+              bm.url AS before_url, im.url AS image_url, vm.url AS video_url
+       FROM concept_triplets t
+       LEFT JOIN concept_media bm ON bm.id = t.before_media_id
+       LEFT JOIN concept_media im ON im.id = t.image_media_id
+       LEFT JOIN concept_media vm ON vm.id = t.video_media_id
+       ORDER BY t.concept_id ASC, t.sort_order ASC, t.triplet_number ASC`
+    );
+    const tripletsByConcept = new Map();
+    for (const t of allTriplets) {
+      if (!tripletsByConcept.has(t.concept_id)) tripletsByConcept.set(t.concept_id, []);
+      tripletsByConcept.get(t.concept_id).push(t);
+    }
+
     let flash = '';
     if (req.query.saved) flash = `<div class="flash ok">Concept saved.</div>`;
     else if (req.query.deleted) flash = `<div class="flash ok">Concept deleted.</div>`;
     else if (req.query.error) flash = `<div class="flash err">${escapeHtml(req.query.error)}</div>`;
     if (req.query.warn) flash += `<div class="flash err">${escapeHtml(req.query.warn)}</div>`;
 
-    // Render a single slot picker (one row of the sub-grid).
-    // `kindLabel` = 'Before' | 'After Picture' | 'After Video'
-    // `slot` = 'before' | 'image' | 'video' (matches SLOT_TO_COLUMN keys)
-    // `currentUrl` = the concept's current value for that slot (may be null)
-    // `items` = the array of allowed media items (image or video kind)
     const slotFilename = (url) => {
       if (!url) return '';
       return (String(url).split('?')[0].split('/').pop() || '').slice(0, 36);
     };
-    const slotRow = (conceptId, slot, kindLabel, currentUrl, items) => {
-      const isVideo = slot === 'video';
-      const currentItem = items.find((m) => m.url === currentUrl);
+    // Render one media slot picker (Before/After-Pic/After-Vid) inside a triplet row.
+    const tripletSlot = (selectName, currentMediaId, currentUrl, items, kindLabel) => {
+      const isVideo = kindLabel === 'Video';
       const opts = `<option value="">— (none) —</option>` + items.map((m) => {
         const label = `${m.concept_name} · ${slotFilename(m.url)}`;
-        const sel = m.url === currentUrl ? ' selected' : '';
+        const sel = m.id === currentMediaId ? ' selected' : '';
         return `<option value="${m.id}"${sel}>${escapeHtml(label)}</option>`;
       }).join('');
       const preview = currentUrl
         ? (isVideo
-            ? `<video src="${escapeHtml(currentUrl)}" muted style="width:64px;height:48px;object-fit:cover;border-radius:4px;background:#000;"></video>`
-            : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:4px;">`)
-        : `<div style="width:64px;height:48px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">none</div>`;
-      const filenameMuted = currentItem ? slotFilename(currentItem.url) : (currentUrl ? slotFilename(currentUrl) : '');
-      return `<form method="POST" action="/admin/concepts/${conceptId}/slot" class="inline" style="display:flex;align-items:center;gap:8px;padding:4px 0;">
-        <input type="hidden" name="slot" value="${slot}">
+            ? `<video src="${escapeHtml(currentUrl)}" muted style="width:54px;height:40px;object-fit:cover;border-radius:4px;background:#000;"></video>`
+            : `<img src="${escapeHtml(currentUrl)}" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:4px;">`)
+        : `<div style="width:54px;height:40px;border-radius:4px;background:#f0ede6;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px;">${kindLabel.charAt(0)}</div>`;
+      return `<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px;">
+        <div style="flex-shrink:0;">${preview}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;color:#888;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
+          <select name="${selectName}" style="width:100%;padding:4px 6px;font-size:11px;">${opts}</select>
+        </div>
+      </div>`;
+    };
+    // Render one triplet row as a save-as-you-go form.
+    const tripletRow = (conceptId, t, fallbackUrls) => {
+      // `t` may be a real row from concept_triplets OR a synthesized object with
+      // null id and the legacy concept URLs as the visible state.
+      const isExisting = !!(t && t.id);
+      const idField = isExisting ? `<input type="hidden" name="id" value="${t.id}">` : '';
+      const number = t ? t.triplet_number : '';
+      const sortOrder = t ? t.sort_order : 0;
+      const inRolling = t ? !!t.in_rolling_demo : true;
+      const captionVal = t && t.caption ? escapeHtml(t.caption) : '';
+      const beforeId = t ? t.before_media_id : null;
+      const imageId  = t ? t.image_media_id  : null;
+      const videoId  = t ? t.video_media_id  : null;
+      const beforeUrl = (t && t.before_url) || (fallbackUrls && fallbackUrls.before) || null;
+      const imageUrl  = (t && t.image_url)  || (fallbackUrls && fallbackUrls.image)  || null;
+      const videoUrl  = (t && t.video_url)  || (fallbackUrls && fallbackUrls.video)  || null;
+      const deleteBtn = isExisting
+        ? `<form method="POST" action="/admin/triplets/${t.id}/delete" class="inline" onsubmit="return confirm('Delete triplet ${number}?');"><input type="hidden" name="return_to" value="/admin/concepts"><button type="submit" class="btn small" style="background:#fff;border-color:#c33;color:#c33;font-size:10px;padding:3px 7px;">Delete</button></form>`
+        : '';
+      return `<form method="POST" action="/admin/triplets/save" style="background:#fff;border:1px solid #e6e2d8;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+        ${idField}
+        <input type="hidden" name="concept_id" value="${conceptId}">
         <input type="hidden" name="return_to" value="/admin/concepts">
-        <div style="width:64px;flex-shrink:0;">${preview}</div>
-        <div style="width:90px;flex-shrink:0;font-size:12px;color:#666;font-weight:600;">${kindLabel}</div>
-        <select name="media_id" style="flex:1;min-width:180px;padding:5px 7px;font-size:12px;">${opts}</select>
-        <button type="submit" class="btn small">Save</button>
-        ${filenameMuted ? `<span style="font-family:monospace;font-size:10px;color:#aaa;">${escapeHtml(filenameMuted)}</span>` : ''}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <div style="background:#1C2A14;color:#FFE800;font-weight:800;font-size:11px;padding:3px 8px;border-radius:10px;letter-spacing:0.06em;">#${number || 'NEW'}</div>
+          <input type="number" name="triplet_number" value="${number}" placeholder="num" style="width:55px;padding:3px 5px;font-size:11px;" title="Triplet number (unique per concept)">
+          <input type="number" name="sort_order" value="${sortOrder}" style="width:55px;padding:3px 5px;font-size:11px;" title="Display order in the carousel">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#3A6B20;cursor:pointer;"><input type="checkbox" name="in_rolling_demo"${inRolling ? ' checked' : ''}> Rolling demo</label>
+          <input type="text" name="caption" value="${captionVal}" placeholder="caption (optional)" style="flex:1;min-width:120px;padding:3px 7px;font-size:11px;">
+          <button type="submit" class="btn small" style="padding:3px 10px;font-size:11px;">Save</button>
+          ${deleteBtn}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${tripletSlot('before_media_id', beforeId, beforeUrl, imageItems, 'Before')}
+          ${tripletSlot('image_media_id',  imageId,  imageUrl,  imageItems, 'Picture')}
+          ${tripletSlot('video_media_id',  videoId,  videoUrl,  videoItems, 'Video')}
+        </div>
       </form>`;
     };
+    // Empty form for adding a new triplet.
+    const newTripletForm = (conceptId, suggestedNumber) => tripletRow(conceptId, {
+      id: null,
+      triplet_number: suggestedNumber,
+      sort_order: 0,
+      in_rolling_demo: true,
+      before_media_id: null, image_media_id: null, video_media_id: null,
+      before_url: null, image_url: null, video_url: null,
+      caption: null,
+    });
 
     const tableRows = rows.map((c) => {
       const before = c.before_image_url
@@ -2416,13 +2687,29 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
           </form>
         </td>
       </tr>`;
-      // The inline sub-grid sits under each concept row and lets you pick the
-      // three slot media items without leaving this page.
-      const subRow = `<tr class="slot-subrow"><td colspan="8" style="background:#fafaf6;padding:8px 14px 12px;">
-        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Widget slots for "${escapeHtml(c.name)}"</div>
-        ${slotRow(c.id, 'before', 'Before',         c.before_image_url,   imageItems)}
-        ${slotRow(c.id, 'image',  'After Picture',  c.after_image_url,    imageItems)}
-        ${slotRow(c.id, 'video',  'After Video',    c.example_video_url,  videoItems)}
+      // The inline sub-grid sits under each concept row and lists its triplets.
+      // If the concept has no triplet rows but has legacy single-slot URLs set,
+      // show a single synthetic triplet #1 as a starting point.
+      const existingTriplets = tripletsByConcept.get(c.id) || [];
+      const hasFallback = !existingTriplets.length && (c.before_image_url || c.after_image_url || c.example_video_url);
+      const tripletRows = existingTriplets.length
+        ? existingTriplets.map((t) => tripletRow(c.id, t, null)).join('')
+        : (hasFallback
+            ? `<div style="font-size:11px;color:#888;margin-bottom:6px;">No triplets yet — the legacy single Before/After URLs on this concept will be used as triplet #1 until you save one.</div>`
+            : '');
+      const nextNumber = existingTriplets.length
+        ? Math.max(...existingTriplets.map((t) => t.triplet_number || 0)) + 1
+        : 1;
+      const subRow = `<tr class="slot-subrow"><td colspan="8" style="background:#fafaf6;padding:8px 14px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Triplets for "${escapeHtml(c.name)}" — each ticked "Rolling demo" rotates in the widget carousel.</div>
+          <a href="/admin/triplets?concept=${c.id}" class="muted" style="font-size:11px;">Manage all triplets &rarr;</a>
+        </div>
+        ${tripletRows}
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer;font-size:12px;color:#3A6B20;font-weight:600;">+ New triplet #${nextNumber}</summary>
+          <div style="margin-top:8px;">${newTripletForm(c.id, nextNumber)}</div>
+        </details>
       </td></tr>`;
       return mainRow + subRow;
     }).join('');

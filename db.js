@@ -252,6 +252,25 @@ async function initDb() {
     ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS filter_category TEXT;
     ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS source_url TEXT;
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS engaged BOOLEAN NOT NULL DEFAULT FALSE;
+
+    -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
+    -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
+    -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle
+    -- under each concept rather than one fixed example.
+    CREATE TABLE IF NOT EXISTS concept_triplets (
+      id              SERIAL PRIMARY KEY,
+      concept_id      INTEGER NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+      triplet_number  INTEGER NOT NULL,
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      in_rolling_demo BOOLEAN NOT NULL DEFAULT TRUE,
+      before_media_id INTEGER REFERENCES concept_media(id) ON DELETE SET NULL,
+      image_media_id  INTEGER REFERENCES concept_media(id) ON DELETE SET NULL,
+      video_media_id  INTEGER REFERENCES concept_media(id) ON DELETE SET NULL,
+      caption         TEXT,
+      created_at      TIMESTAMP DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS concept_triplets_concept_number_idx ON concept_triplets(concept_id, triplet_number);
+    CREATE INDEX IF NOT EXISTS concept_triplets_rolling_idx ON concept_triplets(concept_id, in_rolling_demo, sort_order);
   `);
 
   // ====================================================================
