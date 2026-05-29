@@ -2262,7 +2262,7 @@ function conceptAdminPage(title, body) {
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #eee;font-size:14px;vertical-align:middle;}
   th{background:#FFF3C4;text-transform:uppercase;font-size:11px;letter-spacing:0.04em;}
-  img.thumb{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f3f3f3;}
+  img.thumb,video.thumb{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f3f3f3;}
   .btn{display:inline-block;padding:9px 16px;background:#3A6B20;color:#FFF9E6;border:none;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;}
   .btn.secondary{background:#1C0A00;}
   .btn.danger{background:#a12a1a;}
