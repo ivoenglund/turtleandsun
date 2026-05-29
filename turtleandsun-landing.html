@@ -227,6 +227,13 @@ html,body{overflow-x:hidden;}
 .ts-demo.is-order .ts-output .ts-frame.is-empty video{opacity:0 !important;}
 @keyframes ts-spin{to{transform:rotate(360deg);}}
 
+/* Maximize + sound buttons on output frames — visible in demo mode only */
+.ts-frame-action{position:absolute;bottom:10px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:16px;line-height:1;display:none;align-items:center;justify-content:center;z-index:4;transition:background 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
+.ts-frame-action:hover{background:rgba(0,0,0,0.88);}
+.ts-frame-max{right:10px;}
+.ts-frame-sound{left:10px;}
+.ts-demo:not(.is-order) .ts-output .ts-frame-action{display:flex;}
+
 /* Under-frame label — morphs to Buy button after first preview */
 .ts-under{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px;flex-wrap:wrap;border:1.5px solid transparent;background:transparent;color:inherit;font:inherit;cursor:default;padding:6px 14px;border-radius:10px;width:100%;transition:background 0.3s,border-color 0.3s,padding 0.3s,box-shadow 0.3s,transform 0.15s;pointer-events:none;}
 .ts-under .ts-uf-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;color:#1C0A00;transition:color 0.3s;}
@@ -405,6 +412,7 @@ html,body{overflow-x:hidden;}
             <span class="ts-pc-dots"><span class="ts-pc-dot is-on"></span><span class="ts-pc-dot is-on"></span><span class="ts-pc-dot is-on"></span></span>
             <span id="ts-pc-label">3 free previews</span>
           </div>
+          <button type="button" class="ts-frame-action ts-frame-max" id="ts-still-max" title="Open full size" aria-label="Open full size">⛶</button>
           <div class="ts-overlay" id="ts-still-overlay">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
             <div class="ts-oo-title" id="ts-still-title">Free preview</div>
@@ -428,6 +436,8 @@ html,body{overflow-x:hidden;}
       <div class="ts-col ts-output ts-video">
         <div class="ts-frame" id="ts-video-frame">
           <span class="ts-label is-after">After</span>
+          <button type="button" class="ts-frame-action ts-frame-sound" id="ts-video-sound" title="Toggle sound" aria-label="Toggle sound">🔇</button>
+          <button type="button" class="ts-frame-action ts-frame-max" id="ts-video-max" title="Open full size" aria-label="Open full size">⛶</button>
           <div class="ts-overlay">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
             <div class="ts-oo-title">Video arrives by email</div>
@@ -1769,6 +1779,42 @@ NavBar.init({ requireAuth: false }).then(status => {
   buyPicBtn.addEventListener('click', function(){ buy('image'); });
   buyVidBtn.addEventListener('click', function(){ buy('video'); });
   buyBundleBtn.addEventListener('click', function(){ buy('bundle'); });
+
+  // ===== Lightbox + sound on output frames (demo mode only) =====
+  // Reuses the existing openLightbox() function defined in the main script for the gallery cards.
+  const stillMaxBtn  = document.getElementById('ts-still-max');
+  const videoMaxBtn  = document.getElementById('ts-video-max');
+  const videoSoundBtn = document.getElementById('ts-video-sound');
+
+  function openMax(kind){
+    if (mode !== 'demo' || !concepts[current]) return;
+    const c = concepts[current];
+    const url = kind === 'video' ? c.video_url : c.image_url;
+    if (!url) return;
+    if (typeof window.openLightbox === 'function') {
+      window.openLightbox({ kind: kind, url: url, concept_name: c.name, concept_description: '' });
+    }
+  }
+  if (stillMaxBtn) stillMaxBtn.addEventListener('click', function(e){ e.stopPropagation(); openMax('image'); });
+  if (videoMaxBtn) videoMaxBtn.addEventListener('click', function(e){ e.stopPropagation(); openMax('video'); });
+  stillEl.addEventListener('dblclick', function(){ openMax('image'); });
+  videoEl.addEventListener('dblclick', function(){ openMax('video'); });
+
+  if (videoSoundBtn) {
+    videoSoundBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if (mode !== 'demo') return;
+      const v = videos[current];
+      if (!v || typeof v.muted !== 'boolean') return; // happens if the fallback is an <img>, not a <video>
+      // Mute any other gallery videos so only one sound source plays at a time.
+      try {
+        document.querySelectorAll('.g-card video').forEach(function(other){ other.muted = true; });
+        document.querySelectorAll('.g-action[data-action="sound"]').forEach(function(b){ b.textContent = '🔇'; });
+      } catch (e2) {}
+      v.muted = !v.muted;
+      videoSoundBtn.textContent = v.muted ? '🔇' : '🔊';
+    });
+  }
 
   function startCycle(){
     if (cycleTimer) clearInterval(cycleTimer);

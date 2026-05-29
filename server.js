@@ -3153,6 +3153,27 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
       params
     );
 
+    // Compute which media items the rolling-demo widget will currently pick per concept.
+    // Mirrors the /gallery API ordering: is_primary DESC, sort_order ASC, created_at DESC,
+    // then "first image" and "first video" per concept_id.
+    const widgetPickIds = new Set();
+    try {
+      const { rows: widgetItems } = await pool.query(
+        `SELECT cm.id, cm.concept_id, cm.kind
+         FROM concept_media cm
+         JOIN concepts c ON c.id = cm.concept_id
+         WHERE cm.active = TRUE AND c.active = TRUE AND cm.kind IN ('image','video')
+         ORDER BY cm.is_primary DESC, cm.sort_order ASC, cm.created_at DESC`
+      );
+      const seen = new Map(); // concept_id → { image: bool, video: bool }
+      for (const it of widgetItems) {
+        if (!seen.has(it.concept_id)) seen.set(it.concept_id, { image: false, video: false });
+        const s = seen.get(it.concept_id);
+        if (it.kind === 'image' && !s.image) { s.image = true; widgetPickIds.add(it.id); }
+        if (it.kind === 'video' && !s.video) { s.video = true; widgetPickIds.add(it.id); }
+      }
+    } catch (e) { console.warn('[admin-gallery] widget-pick compute failed:', e.message); }
+
     const concepts = (await pool.query(`SELECT id, name FROM concepts ORDER BY name ASC`)).rows;
     const conceptOpts = `<option value="">All concepts</option>` + concepts.map((c) =>
       `<option value="${c.id}"${filterConcept === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
@@ -3167,12 +3188,25 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
 
     const rowHtml = items.map((m) => {
       const isVideo = m.kind === 'video';
-      const thumb = isVideo
+      const inWidget = widgetPickIds.has(m.id);
+      // Last URL segment as a quick filename hint. Falls back to full URL if no slash.
+      const urlStr = String(m.url || '');
+      const filename = (urlStr.split('?')[0].split('/').pop() || urlStr).slice(0, 48);
+      const widgetBadge = inWidget
+        ? `<span title="This is the file the rolling demo will show on the landing page" style="display:inline-block;background:#3A6B20;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:0.04em;text-transform:uppercase;margin-top:4px;">🟢 In widget</span>`
+        : '';
+      const thumbBlock = isVideo
         ? `<video src="${escapeHtml(m.url)}" muted style="width:96px;height:64px;object-fit:cover;border-radius:4px;background:#000;"></video>`
         : `<img src="${escapeHtml(m.url)}" alt="" style="width:96px;height:64px;object-fit:cover;border-radius:4px;">`;
+      const thumb = `
+        <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+          ${thumbBlock}
+          <div title="${escapeHtml(urlStr)}" style="font-family:monospace;font-size:10px;color:#666;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(filename)}</div>
+          ${widgetBadge}
+        </div>`;
       const kindOptsRow = CONCEPT_MEDIA_KINDS.map((k) => `<option value="${k}"${k === m.kind ? ' selected' : ''}>${k}</option>`).join('');
       return `
-        <tr>
+        <tr${inWidget ? ' style="background:rgba(58,107,32,0.04);"' : ''}>
           <td>${thumb}</td>
           <td><a href="/admin/concepts/edit/${m.concept_id}">${escapeHtml(m.concept_name)}</a></td>
           <td>
