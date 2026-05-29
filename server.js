@@ -1762,10 +1762,26 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
     } catch (e) { /* non-fatal */ }
   }
 
-  // Image side — only for image / image_video / bundle products.
-  // The preview portrait the customer already accepted IS the deliverable.
-  const wantsImage = (product === 'image' || product === 'bundle' ||
-                      (concept && (concept.input_type === 'image' || concept.input_type === 'image_video')));
+  // What did the customer actually pay for?
+  // `product` is authoritative when present (the new hero-widget always sends one
+  // of image/video/bundle). Falls back to the concept's input_type only for
+  // legacy / direct-link orders that lack a product field.
+  const hasProduct = (product === 'image' || product === 'video' || product === 'bundle');
+  const isTalkingConcept = !!(concept && concept.input_type === 'talking');
+  let wantsImage, wantsVideo, wantsTalking;
+  if (hasProduct) {
+    wantsImage   = (product === 'image' || product === 'bundle');
+    // For a talking concept, the "video" half of the bundle is the talking clip.
+    wantsTalking = isTalkingConcept && (product === 'video' || product === 'bundle');
+    wantsVideo   = !isTalkingConcept && (product === 'video' || product === 'bundle');
+  } else {
+    // Legacy fallback: derive from concept input_type
+    wantsImage   = !!(concept && (concept.input_type === 'image' || concept.input_type === 'image_video'));
+    wantsTalking = isTalkingConcept;
+    wantsVideo   = !!(concept && (concept.input_type === 'image_video' || concept.input_type === 'video')) && !isTalkingConcept;
+  }
+
+  // Image side — the preview the customer already accepted IS the deliverable.
   if (wantsImage) {
     imageUrl = portrait_url;
     console.log('Using preview portrait as final image:', imageUrl);
@@ -1773,11 +1789,6 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
       await pool.query('UPDATE orders SET result_url = $1 WHERE id = $2', [imageUrl, orderId]);
     }
   }
-
-  // Video side — dispatch through the concept type when present.
-  const wantsTalking = !!(concept && concept.input_type === 'talking');
-  const wantsVideo  = (product === 'video' || product === 'bundle' ||
-                       (concept && (concept.input_type === 'image_video' || concept.input_type === 'video'))) && !wantsTalking;
 
   if (wantsTalking) {
     const modelId = concept.talking_model || 'fal-ai/kling-video/v3/pro/image-to-video__talking';
