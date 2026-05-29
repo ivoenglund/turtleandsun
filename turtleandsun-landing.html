@@ -160,15 +160,15 @@ html,body{overflow-x:hidden;}
 .ts-counter.is-empty{background:rgba(193,61,42,0.92);}
 
 /* Source / drop zone */
-.ts-source .ts-frame{cursor:pointer;border:2px dashed rgba(255,255,255,0.45);}
-.ts-source .ts-frame::before{content:'';position:absolute;inset:0;background:rgba(28,10,0,0.42);z-index:2;transition:background 0.18s;}
-.ts-source .ts-frame:hover::before{background:rgba(28,10,0,0.6);}
-.ts-source .ts-drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#fff;z-index:3;text-align:center;padding:14px;pointer-events:none;}
-.ts-source .ts-drop svg{width:32px;height:32px;opacity:0.95;}
-.ts-source .ts-drop-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;}
-.ts-source .ts-drop-sub{font-family:'DM Sans',sans-serif;font-size:11px;opacity:0.78;letter-spacing:0.05em;}
+.ts-source .ts-frame{cursor:pointer;border:1.5px dashed rgba(255,255,255,0.28);}
+.ts-source .ts-frame::before{content:'';position:absolute;inset:0;background:rgba(28,10,0,0.20);z-index:2;transition:background 0.18s;}
+.ts-source .ts-frame:hover::before{background:rgba(28,10,0,0.36);}
+.ts-source .ts-drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;z-index:3;text-align:center;padding:14px;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,0.55);}
+.ts-source .ts-drop svg{width:40px;height:40px;opacity:0.98;}
+.ts-source .ts-drop-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;line-height:1.15;}
+.ts-source .ts-drop-sub{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;opacity:0.92;letter-spacing:0.02em;}
 .ts-source.drag-over .ts-frame{border-color:#FFE800;}
-.ts-source.drag-over .ts-frame::before{background:rgba(28,10,0,0.7);}
+.ts-source.drag-over .ts-frame::before{background:rgba(28,10,0,0.5);}
 .ts-demo.is-order .ts-source .ts-frame{cursor:default;border:none;}
 .ts-demo.is-order .ts-source .ts-frame::before{display:none;}
 .ts-demo.is-order .ts-source .ts-drop{display:none;}
