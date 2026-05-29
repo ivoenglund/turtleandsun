@@ -4252,9 +4252,23 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
         document.querySelectorAll('[data-mid]').forEach(function(el){
           el.addEventListener('dragstart', function(e){
             try {
-              var payload = { id: parseInt(el.dataset.mid, 10), kind: el.dataset.mkind, url: el.dataset.murl };
+              var url  = el.dataset.murl || '';
+              var kind = el.dataset.mkind || '';
+              var payload = { id: parseInt(el.dataset.mid, 10), kind: kind, url: url };
               e.dataTransfer.setData('application/x-ts-media', JSON.stringify(payload));
-              e.dataTransfer.setData('text/plain', el.dataset.murl || '');
+              e.dataTransfer.setData('text/plain', url);
+              e.dataTransfer.setData('text/uri-list', url);
+              // Chrome's "drag file from browser to OS file explorer" hook.
+              // Format: <mime>:<filename>:<absolute URL>
+              var fname = (url.split('?')[0].split('/').pop() || 'download');
+              var ext = (fname.split('.').pop() || '').toLowerCase();
+              var mime =
+                kind === 'video' ? (ext === 'webm' ? 'video/webm' : 'video/mp4') :
+                ext === 'png'  ? 'image/png'  :
+                ext === 'gif'  ? 'image/gif'  :
+                ext === 'webp' ? 'image/webp' :
+                'image/jpeg';
+              e.dataTransfer.setData('DownloadURL', mime + ':' + fname + ':' + url);
               e.dataTransfer.effectAllowed = 'copy';
             } catch(err){}
             el.style.opacity = '0.5';
