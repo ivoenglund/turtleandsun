@@ -3232,8 +3232,8 @@ function conceptFormBody(concept, errorMsg) {
         if (!imageActive && !videoActive) {
           showTab(showImage ? 'image' : 'video');
         }
-        // Don't keep `required` on inputs inside a hidden tab — the browser
-        // can't focus a hidden field on validation failure, so the form's
+        // Don't keep the required attribute on inputs inside a hidden tab —
+        // the browser can't focus a hidden field on validation failure, so the
         // Create button silently does nothing.
         var imgPrompt = document.querySelector('[name=image_prompt]');
         if (imgPrompt) { if (showImage) imgPrompt.setAttribute('required',''); else imgPrompt.removeAttribute('required'); }
