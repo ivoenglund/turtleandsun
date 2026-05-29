@@ -1888,12 +1888,17 @@ app.get('/gallery/meta', async (req, res) => {
 app.get('/api/widget-concepts', async (req, res) => {
   try {
     const { rows: concepts } = await pool.query(
-      `SELECT id, name, before_image_url, after_image_url, example_video_url, sort_order
+      `SELECT id, name, before_image_url, after_image_url, example_video_url, sort_order,
+              price_tier, input_type
        FROM concepts
        WHERE active = TRUE
        ORDER BY sort_order ASC, id ASC
        LIMIT 12`
     );
+    // Premium concepts (talking pet, family portrait, etc.) skip the free
+    // preview step — too expensive to generate just for a preview. The Buy
+    // button on the widget goes live as soon as a photo is uploaded.
+    const NO_PREVIEW_TIERS = new Set(['talking', 'premium', 'premium_video']);
     const { rows: triplets } = await pool.query(
       `SELECT t.id, t.concept_id, t.triplet_number, t.sort_order,
               bm.url AS before_url, im.url AS image_url, vm.url AS video_url
@@ -1928,7 +1933,13 @@ app.get('/api/widget-concepts', async (req, res) => {
         }];
       }
       if (cTriplets.length === 0) continue; // skip concepts with nothing to show
-      result.push({ id: c.id, name: c.name, triplets: cTriplets });
+      result.push({
+        id: c.id,
+        name: c.name,
+        triplets: cTriplets,
+        input_type: c.input_type || 'image_video',
+        no_free_preview: NO_PREVIEW_TIERS.has(c.price_tier || ''),
+      });
     }
     res.set('Cache-Control', 'public, max-age=30');
     res.json(result);

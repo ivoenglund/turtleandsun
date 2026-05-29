@@ -1549,6 +1549,8 @@ NavBar.init({ requireAuth: false }).then(status => {
           image_url:  t.image_url  || null,
           video_url:  t.video_url  || null,
           source_url: t.before_url || null, // backwards-compatible alias used by pickStyle
+          input_type: r.input_type || 'image_video',
+          no_free_preview: !!r.no_free_preview,
         };
       }).filter(function(c){ return c.triplets.some(function(t){ return t.image_url || t.video_url || t.before_url; }); });
       if (concepts.length > 6) concepts = concepts.slice(0, 6);
@@ -1742,8 +1744,17 @@ NavBar.init({ requireAuth: false }).then(status => {
       hideAllStills();
       stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
       stillOverlay.style.display = '';
-      stillTitle.textContent = previewsLeft === 0 ? 'All previews used' : 'Free preview';
-      stillSub.textContent = previewsLeft === 0 ? 'Buy "' + concepts[i].name + '" to download' : 'in "' + concepts[i].name + '"';
+      // Premium concepts (talking pet, family portrait): no free preview. The
+      // Buy button goes live immediately and we tell the customer what they're
+      // buying. has-preview is the same CSS hook the regular flow uses.
+      if (concepts[i].no_free_preview) {
+        stillTitle.textContent = 'Pay to generate';
+        stillSub.textContent = '"' + concepts[i].name + '" — delivered by email';
+        demoEl.classList.add('has-preview');
+      } else {
+        stillTitle.textContent = previewsLeft === 0 ? 'All previews used' : 'Free preview';
+        stillSub.textContent = previewsLeft === 0 ? 'Buy "' + concepts[i].name + '" to download' : 'in "' + concepts[i].name + '"';
+      }
       setGenerateBtnState();
     }
   }
@@ -1891,7 +1902,7 @@ NavBar.init({ requireAuth: false }).then(status => {
           var el = document.getElementById(id);
           if (!el) return;
           var p = el.querySelector('.ts-buy-prefix');
-          if (p) p.textContent = '[DEV] Skip Stripe';
+          if (p) { p.textContent = 'DEV'; p.style.background = '#FFE800'; p.style.color = '#1C0A00'; p.style.padding = '2px 6px'; p.style.borderRadius = '4px'; p.style.fontWeight = '800'; }
         });
       }
     })
@@ -1919,7 +1930,11 @@ NavBar.init({ requireAuth: false }).then(status => {
   }
 
   function buy(product){
-    if (mode !== 'order' || !demoEl.classList.contains('has-preview')) return;
+    if (mode !== 'order') return;
+    var sel = window.tsSelectedConcept && window.tsSelectedConcept.concept;
+    var noPreview = sel && sel.no_free_preview;
+    // Normal flow: must have a preview shown. No-preview concepts: skip that check.
+    if (!noPreview && !demoEl.classList.contains('has-preview')) return;
     window._orderEmail = getEmail() || window._previewEmail || '';
     window._previewEmail = window._orderEmail;
     // DEV mode: bypass Stripe completely.
