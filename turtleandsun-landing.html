@@ -234,9 +234,10 @@ html,body{overflow-x:hidden;}
 .ts-frame-sound{left:10px;}
 .ts-demo:not(.is-order) .ts-output .ts-frame-action{display:flex;}
 
-/* Global rolling-demo controls (pause + sound) — top-right of the demo area */
-.ts-demo-ctrls{position:absolute;top:8px;right:8px;display:none;gap:6px;z-index:6;}
+/* Global rolling-demo controls (label · pause · sound) — top-right of the demo area */
+.ts-demo-ctrls{position:absolute;top:8px;right:8px;display:none;gap:6px;align-items:center;z-index:6;}
 .ts-demo:not(.is-order) .ts-demo-ctrls{display:flex;}
+.ts-demo-ctrl-label{background:rgba(0,0,0,0.55);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.04em;padding:8px 12px;border-radius:20px;text-transform:uppercase;line-height:1;user-select:none;}
 .ts-demo-ctrl{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
 .ts-demo-ctrl:hover{background:rgba(0,0,0,0.88);transform:scale(1.08);}
 .ts-demo-ctrl.is-on{background:#FFE800;color:#1C0A00;}
@@ -370,9 +371,9 @@ html,body{overflow-x:hidden;}
 
     <div class="ts-demo" id="ts-demo">
       <!-- Top-right controls for the rolling demo:
-             1. Rolling on/off (⏸/▶) — also toggled by clicking the demo frames.
-             2. Sound on/off (🔇/🔊) — applies to whichever rolling video is showing. -->
+             "Rolling demo" label  ·  Pause/Play  ·  Sound on/off -->
       <div class="ts-demo-ctrls">
+        <span class="ts-demo-ctrl-label">Rolling demo</span>
         <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo">⏸</button>
         <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound">🔇</button>
       </div>
