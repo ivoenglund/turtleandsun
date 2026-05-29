@@ -1756,7 +1756,7 @@ app.get('/api/widget-concepts', async (req, res) => {
        LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
        LEFT JOIN concept_media im ON im.id = t.image_media_id  AND im.active = TRUE
        LEFT JOIN concept_media vm ON vm.id = t.video_media_id  AND vm.active = TRUE
-       WHERE t.in_rolling_demo = TRUE
+       WHERE t.in_rolling_demo = TRUE AND t.active = TRUE
        ORDER BY t.sort_order ASC, t.triplet_number ASC`
     );
     const tripletsByConcept = new Map();
@@ -1803,6 +1803,8 @@ app.post('/admin/triplets/save', requireRole('admin'), async (req, res) => {
     const tripletNumber = parseInt(req.body.triplet_number, 10) || 1;
     const sortOrder = parseInt(req.body.sort_order, 10) || 0;
     const inRolling = req.body.in_rolling_demo === 'on' || req.body.in_rolling_demo === 'true' || req.body.in_rolling_demo === '1';
+    const inGallery = req.body.in_gallery === 'on' || req.body.in_gallery === 'true' || req.body.in_gallery === '1';
+    const active = !(req.body.active === 'false' || req.body.active === '0' || req.body.active === 'off');
     const beforeMediaId = req.body.before_media_id ? parseInt(req.body.before_media_id, 10) : null;
     const imageMediaId  = req.body.image_media_id  ? parseInt(req.body.image_media_id,  10) : null;
     const videoMediaId  = req.body.video_media_id  ? parseInt(req.body.video_media_id,  10) : null;
@@ -1812,11 +1814,11 @@ app.post('/admin/triplets/save', requireRole('admin'), async (req, res) => {
       await pool.query(
         `UPDATE concept_triplets SET
            concept_id = $1, triplet_number = $2, sort_order = $3,
-           in_rolling_demo = $4,
-           before_media_id = $5, image_media_id = $6, video_media_id = $7,
-           caption = $8
-         WHERE id = $9`,
-        [conceptId, tripletNumber, sortOrder, inRolling, beforeMediaId, imageMediaId, videoMediaId, caption, id]
+           in_rolling_demo = $4, in_gallery = $5, active = $6,
+           before_media_id = $7, image_media_id = $8, video_media_id = $9,
+           caption = $10
+         WHERE id = $11`,
+        [conceptId, tripletNumber, sortOrder, inRolling, inGallery, active, beforeMediaId, imageMediaId, videoMediaId, caption, id]
       );
     } else {
       // Auto-assign triplet_number if not set or collides.
@@ -1831,10 +1833,10 @@ app.post('/admin/triplets/save', requireRole('admin'), async (req, res) => {
         while (taken.has(n)) n++;
       }
       await pool.query(
-        `INSERT INTO concept_triplets (concept_id, triplet_number, sort_order, in_rolling_demo,
+        `INSERT INTO concept_triplets (concept_id, triplet_number, sort_order, in_rolling_demo, in_gallery, active,
            before_media_id, image_media_id, video_media_id, caption)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [conceptId, n, sortOrder, inRolling, beforeMediaId, imageMediaId, videoMediaId, caption]
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [conceptId, n, sortOrder, inRolling, inGallery, active, beforeMediaId, imageMediaId, videoMediaId, caption]
       );
     }
     if (wantsJson(req)) return res.json({ ok: true });
@@ -1852,6 +1854,24 @@ app.post('/admin/triplets/:id/delete', requireRole('admin'), async (req, res) =>
   } catch (err) {
     console.error('[triplets-delete] error:', err.message);
     res.redirect((req.body.return_to || '/admin/triplets') + '?error=' + encodeURIComponent(err.message));
+  }
+});
+
+// Quick-toggle for one boolean field on a triplet — used by the card-grid toggles
+// on the redesigned /admin/gallery so they don't need a full-form Save click.
+app.post('/admin/triplets/:id/toggle', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const field = String(req.body.field || '').trim();
+  const allowed = { active: 'active', rolling: 'in_rolling_demo', gallery: 'in_gallery' };
+  const column = allowed[field];
+  if (!id || !column) return res.status(400).json({ error: 'Bad field' });
+  try {
+    await pool.query(`UPDATE concept_triplets SET ${column} = NOT ${column} WHERE id = $1`, [id]);
+    const r = await pool.query(`SELECT ${column} AS value FROM concept_triplets WHERE id = $1`, [id]);
+    res.json({ ok: true, value: r.rows[0] ? r.rows[0].value : null });
+  } catch (err) {
+    console.error('[triplet-toggle] error:', err.message);
+    res.status(500).json({ error: 'Toggle failed' });
   }
 });
 
@@ -3678,6 +3698,288 @@ app.get('/admin/media/library', requireRole('admin'), async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// /admin/gallery — dense triplet-card grid (new default view).
+// Grouped by concept. Each card shows the three thumbnails, concept · #N badge,
+// caption, and quick toggles for Active / Rolling demo / In bottom gallery.
+// Unassigned media items (no triplet yet) appear below in a smaller grid.
+// ---------------------------------------------------------------------------
+app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
+  try {
+    const filterConcept = req.query.concept ? parseInt(req.query.concept, 10) : null;
+    const showInactive  = req.query.show_inactive === '1' || req.query.show_inactive === 'true';
+
+    const concepts = (await pool.query(
+      `SELECT id, name FROM concepts WHERE active = TRUE ORDER BY name ASC`
+    )).rows;
+
+    // Triplets with resolved media URLs.
+    const whereTrip = filterConcept ? 'WHERE t.concept_id = $1' : '';
+    const tripParams = filterConcept ? [filterConcept] : [];
+    const { rows: tRows } = await pool.query(
+      `SELECT t.id, t.concept_id, t.triplet_number, t.sort_order, t.active, t.in_rolling_demo, t.in_gallery, t.caption,
+              t.before_media_id, t.image_media_id, t.video_media_id,
+              c.name AS concept_name,
+              bm.url AS before_url, im.url AS image_url, vm.url AS video_url,
+              bm.id  AS bm_id,       im.id  AS im_id,       vm.id  AS vm_id
+       FROM concept_triplets t
+       JOIN concepts c ON c.id = t.concept_id
+       LEFT JOIN concept_media bm ON bm.id = t.before_media_id
+       LEFT JOIN concept_media im ON im.id = t.image_media_id
+       LEFT JOIN concept_media vm ON vm.id = t.video_media_id
+       ${whereTrip}
+       ORDER BY c.name ASC, t.sort_order ASC, t.triplet_number ASC`,
+      tripParams
+    );
+    const triplets = showInactive ? tRows : tRows.filter((t) => t.active);
+    // Group by concept_id
+    const tripsByConcept = new Map();
+    for (const t of triplets) {
+      if (!tripsByConcept.has(t.concept_id)) tripsByConcept.set(t.concept_id, []);
+      tripsByConcept.get(t.concept_id).push(t);
+    }
+
+    // Media items not currently used in any triplet slot — shown in the
+    // "Unassigned media" grid at the bottom so you can still see + manage them.
+    const assignedIds = new Set();
+    for (const t of tRows) {
+      if (t.before_media_id) assignedIds.add(t.before_media_id);
+      if (t.image_media_id ) assignedIds.add(t.image_media_id );
+      if (t.video_media_id ) assignedIds.add(t.video_media_id );
+    }
+    const mediaWhere = ['cm.active = TRUE'];
+    const mediaParams = [];
+    if (filterConcept) { mediaParams.push(filterConcept); mediaWhere.push(`cm.concept_id = $${mediaParams.length}`); }
+    const { rows: allMedia } = await pool.query(
+      `SELECT cm.id, cm.kind, cm.url, cm.concept_id, cm.created_at, c.name AS concept_name
+       FROM concept_media cm
+       JOIN concepts c ON c.id = cm.concept_id
+       WHERE ${mediaWhere.join(' AND ')}
+       ORDER BY cm.created_at DESC, cm.id DESC`,
+      mediaParams
+    );
+    const unassigned = allMedia.filter((m) => !assignedIds.has(m.id));
+
+    const escUrl = (u) => escapeHtml(u || '');
+    const fname = (u) => (u ? (String(u).split('?')[0].split('/').pop() || '').slice(0, 22) : '');
+    const thumb = (m, label) => {
+      if (!m || !m.url) return `<div class="g-thumb g-thumb--empty"><span>${label || '—'}</span></div>`;
+      return m.kind === 'video'
+        ? `<video class="g-thumb" src="${escUrl(m.url)}" muted preload="metadata" title="${escapeHtml(fname(m.url))}"></video>`
+        : `<img class="g-thumb" src="${escUrl(m.url)}" alt="" title="${escapeHtml(fname(m.url))}">`;
+    };
+
+    const tripletCard = (t) => {
+      const palette = ['#3A6B20','#1C2A14','#a85c14','#7e1c66','#1c4e7e','#7a1c14'];
+      const accent = palette[((t.triplet_number || 0) - 1) % palette.length] || '#3A6B20';
+      const beforeM = t.before_url ? { url: t.before_url, kind: 'image' } : null;
+      const imageM  = t.image_url  ? { url: t.image_url,  kind: 'image' } : null;
+      const videoM  = t.video_url  ? { url: t.video_url,  kind: 'video' } : null;
+      return `<div class="t-card ${t.active ? '' : 't-card--off'}" data-trip-id="${t.id}" style="--accent:${accent};">
+        <div class="t-card-head">
+          <span class="t-badge">#${t.triplet_number}</span>
+          <span class="t-concept">${escapeHtml(t.concept_name)}</span>
+          <a class="t-edit" href="/admin/triplets?concept=${t.concept_id}#trip-${t.id}" title="Open in triplet manager">Edit</a>
+        </div>
+        <div class="t-thumbs">
+          <div class="t-slot"><span class="t-slot-lbl">Before</span>${thumb(beforeM, 'B')}</div>
+          <div class="t-slot"><span class="t-slot-lbl">Picture</span>${thumb(imageM, 'P')}</div>
+          <div class="t-slot"><span class="t-slot-lbl">Video</span>${thumb(videoM, 'V')}</div>
+        </div>
+        ${t.caption ? `<div class="t-caption">${escapeHtml(t.caption)}</div>` : ''}
+        <div class="t-toggles">
+          <label class="t-toggle ${t.active ? 'on' : ''}" data-field="active"><input type="checkbox"${t.active ? ' checked' : ''}><span>Active</span></label>
+          <label class="t-toggle ${t.in_rolling_demo ? 'on' : ''}" data-field="rolling"><input type="checkbox"${t.in_rolling_demo ? ' checked' : ''}><span>Rolling</span></label>
+          <label class="t-toggle ${t.in_gallery ? 'on' : ''}" data-field="gallery"><input type="checkbox"${t.in_gallery ? ' checked' : ''}><span>Gallery</span></label>
+          <form method="POST" action="/admin/triplets/${t.id}/delete" class="t-del" onsubmit="return confirm('Delete triplet #${t.triplet_number} for ${escapeHtml(t.concept_name).replace(/'/g, '&#39;').replace(/"/g, '&quot;')}?');">
+            <input type="hidden" name="return_to" value="/admin/gallery${filterConcept ? '?concept='+filterConcept : ''}">
+            <button type="submit" title="Delete triplet">×</button>
+          </form>
+        </div>
+      </div>`;
+    };
+
+    // Render concept sections
+    const sectionsHtml = concepts
+      .filter((c) => !filterConcept || c.id === filterConcept)
+      .filter((c) => (tripsByConcept.get(c.id) || []).length > 0)
+      .map((c) => {
+        const tList = tripsByConcept.get(c.id) || [];
+        return `<section class="g-section">
+          <header class="g-section-head">
+            <h2>${escapeHtml(c.name)} <span class="g-count">${tList.length} triplet${tList.length === 1 ? '' : 's'}</span></h2>
+            <a class="g-mini-link" href="/admin/triplets?concept=${c.id}">Manage →</a>
+          </header>
+          <div class="t-grid">
+            ${tList.map(tripletCard).join('')}
+          </div>
+        </section>`;
+      }).join('');
+
+    // Unassigned items
+    const unassignedHtml = unassigned.length ? `<section class="g-section">
+      <header class="g-section-head">
+        <h2>Unassigned media <span class="g-count">${unassigned.length} item${unassigned.length === 1 ? '' : 's'}</span></h2>
+        <span class="muted" style="font-size:12px;">Files in the library not used by any triplet yet.</span>
+      </header>
+      <div class="m-grid">
+        ${unassigned.map((m) => `<div class="m-card">
+          ${m.kind === 'video' ? `<video class="m-thumb" src="${escUrl(m.url)}" muted preload="metadata"></video>` : `<img class="m-thumb" src="${escUrl(m.url)}" alt="">`}
+          <div class="m-meta">
+            <div class="m-name" title="${escapeHtml(m.url)}">${escapeHtml(fname(m.url))}</div>
+            <div class="m-concept">${escapeHtml(m.concept_name)} · ${escapeHtml(m.kind)}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </section>` : '';
+
+    const conceptOpts = `<option value="">All concepts</option>` + concepts.map((c) =>
+      `<option value="${c.id}"${filterConcept === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+    ).join('');
+
+    const flash = (req.query.saved_media ? `<div class="flash ok">Saved.</div>` : '') +
+                  (req.query.deleted ? `<div class="flash ok">Deleted.</div>` : '') +
+                  (req.query.error ? `<div class="flash err">${escapeHtml(req.query.error)}</div>` : '');
+
+    const body = `
+      <style>
+        .g-top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+        .g-top h1{margin:0;font-size:22px;}
+        .g-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+        .g-filters{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px 10px;margin-bottom:16px;font-size:12px;}
+        .g-filters select{padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;background:#fff;}
+        .g-filters label{font-weight:600;color:#666;margin:0;font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+        .g-section{margin-bottom:24px;}
+        .g-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:5px;}
+        .g-section-head h2{margin:0;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:#1C0A00;font-weight:700;}
+        .g-count{font-size:11px;font-weight:500;color:#888;text-transform:none;letter-spacing:0;margin-left:4px;}
+        .g-mini-link{font-size:11px;color:#3A6B20;text-decoration:none;}
+        .g-mini-link:hover{text-decoration:underline;}
+        .t-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+        .t-card{background:#fff;border:1px solid #e6e2d8;border-left:4px solid var(--accent,#3A6B20);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:11px;transition:opacity 0.15s,box-shadow 0.15s;}
+        .t-card:hover{box-shadow:0 4px 14px rgba(0,0,0,0.06);}
+        .t-card--off{opacity:0.5;}
+        .t-card-head{display:flex;align-items:center;gap:6px;}
+        .t-badge{background:var(--accent,#3A6B20);color:#fff;font-weight:800;font-size:10px;padding:2px 7px;border-radius:8px;letter-spacing:0.04em;flex-shrink:0;}
+        .t-concept{font-weight:700;color:#1C0A00;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .t-edit{font-size:10px;color:#888;text-decoration:none;flex-shrink:0;}
+        .t-edit:hover{color:#3A6B20;text-decoration:underline;}
+        .t-thumbs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
+        .t-slot{display:flex;flex-direction:column;gap:2px;align-items:center;}
+        .t-slot-lbl{font-size:8px;font-weight:700;color:#888;letter-spacing:0.05em;text-transform:uppercase;}
+        .g-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:4px;background:#1A0C04;display:block;}
+        .g-thumb--empty{display:flex;align-items:center;justify-content:center;color:#aaa;font-size:18px;font-weight:700;background:#f0ede6;}
+        .t-caption{font-size:11px;color:#666;font-style:italic;line-height:1.3;}
+        .t-toggles{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:auto;}
+        .t-toggle{display:inline-flex;align-items:center;gap:3px;background:#f3f0e6;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:600;color:#888;cursor:pointer;transition:background 0.15s,color 0.15s;user-select:none;}
+        .t-toggle input{display:none;}
+        .t-toggle.on{background:var(--accent,#3A6B20);color:#fff;}
+        .t-del{margin-left:auto;display:inline;}
+        .t-del button{background:transparent;border:none;color:#c33;font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:4px;}
+        .t-del button:hover{background:#fee;}
+        .m-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+        .m-card{background:#fff;border:1px solid #e6e2d8;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;font-size:11px;}
+        .m-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;background:#1A0C04;display:block;}
+        .m-meta{padding:5px 7px;}
+        .m-name{font-family:monospace;font-size:10px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .m-concept{font-size:10px;color:#888;margin-top:2px;}
+      </style>
+
+      <div class="g-top">
+        <h1>Gallery</h1>
+        <div class="g-actions">
+          <a class="btn" href="/admin/gallery/new${filterConcept ? `?concept=${filterConcept}` : ''}">+ Upload</a>
+          <a class="btn secondary" href="/admin/triplets${filterConcept ? `?concept=${filterConcept}` : ''}">+ Triplet</a>
+          <a class="muted" style="font-size:11px;" href="/admin/gallery/table${filterConcept ? `?concept=${filterConcept}` : ''}">Legacy table view ↗</a>
+        </div>
+      </div>
+      <form method="GET" action="/admin/gallery" class="g-filters">
+        <span style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Filter</span>
+        <label>Concept <select name="concept" onchange="this.form.submit()">${conceptOpts}</select></label>
+        <label><input type="checkbox" name="show_inactive" value="1" onchange="this.form.submit()"${showInactive ? ' checked' : ''}> Show inactive</label>
+        <a href="/admin/gallery" class="muted" style="font-size:11px;">Reset</a>
+      </form>
+      ${flash}
+      ${sectionsHtml || `<p class="muted">No triplets in${filterConcept ? ' this concept' : ' the library yet'}. <a href="/admin/triplets${filterConcept ? `?concept=${filterConcept}` : ''}">Create one →</a></p>`}
+      ${unassignedHtml}
+
+      <!-- Drop overlay (drag files from Explorer) -->
+      <div id="ts-drop-overlay" style="display:none;position:fixed;inset:0;background:rgba(28,42,20,0.85);z-index:9000;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;padding:30px;text-align:center;">
+        <div style="font-size:46px;font-weight:800;margin-bottom:12px;">Drop to upload</div>
+        <div style="font-size:16px;opacity:0.85;margin-bottom:20px;">Files will be added to the gallery as new items.</div>
+        <div style="background:#fff;color:#1C0A00;padding:18px 22px;border-radius:12px;min-width:320px;max-width:520px;">
+          <label style="display:block;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#666;margin-bottom:6px;">Assign to concept</label>
+          <select id="ts-drop-concept" style="width:100%;padding:9px 11px;font-size:14px;border:1px solid #ccc;border-radius:8px;">
+            ${concepts.map((c) => `<option value="${c.id}"${filterConcept === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div id="ts-drop-progress" style="display:none;position:fixed;bottom:24px;right:24px;background:#1C2A14;color:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 12px 32px rgba(0,0,0,0.3);z-index:9100;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;min-width:260px;"></div>
+
+      <script>
+        // Toggle handlers — fetch /admin/triplets/:id/toggle for instant flip.
+        document.querySelectorAll('.t-toggle').forEach(function(lbl){
+          lbl.addEventListener('click', async function(e){
+            e.preventDefault();
+            var card = lbl.closest('.t-card');
+            var tripId = card.dataset.tripId;
+            var field = lbl.dataset.field;
+            try {
+              var r = await fetch('/admin/triplets/'+tripId+'/toggle', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'field='+encodeURIComponent(field) });
+              var j = await r.json();
+              if (!r.ok) throw new Error(j.error || 'toggle failed');
+              lbl.classList.toggle('on', !!j.value);
+              lbl.querySelector('input').checked = !!j.value;
+              if (field === 'active') card.classList.toggle('t-card--off', !j.value);
+            } catch(err){ alert('Toggle failed: '+err.message); }
+          });
+        });
+        // Drag-drop upload (same flow as before)
+        (function(){
+          var overlay = document.getElementById('ts-drop-overlay');
+          var progress = document.getElementById('ts-drop-progress');
+          var sel = document.getElementById('ts-drop-concept');
+          if (!overlay || !sel) return;
+          var depth = 0;
+          function isFileDrag(e){ if(!e.dataTransfer) return false; var t=e.dataTransfer.types; if(!t) return false; for(var i=0;i<t.length;i++) if(t[i]==='Files') return true; return false; }
+          window.addEventListener('dragenter', function(e){ if(!isFileDrag(e)) return; e.preventDefault(); depth++; overlay.style.display='flex'; });
+          window.addEventListener('dragover',  function(e){ if(!isFileDrag(e)) return; e.preventDefault(); });
+          window.addEventListener('dragleave', function(e){ if(!isFileDrag(e)) return; depth=Math.max(0,depth-1); if(depth===0) overlay.style.display='none'; });
+          window.addEventListener('drop', async function(e){
+            if(!isFileDrag(e)) return;
+            e.preventDefault(); depth=0; overlay.style.display='none';
+            var files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+            if (!files.length) return;
+            var conceptId = parseInt(sel.value, 10);
+            if (!conceptId) { alert('Pick a concept first'); return; }
+            progress.style.display='block';
+            var done=0, failed=0, current='';
+            function render(){ progress.innerHTML='<div style="font-weight:700;margin-bottom:4px;">Uploading '+done+'/'+files.length+'</div>'+(failed?'<div style="color:#FFB400;font-size:12px;">'+failed+' failed</div>':'')+(current?'<div style="font-size:12px;color:#bbb;margin-top:4px;">'+current.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>':''); }
+            for (var i=0;i<files.length;i++) {
+              var f=files[i]; current=f.name; render();
+              try {
+                var kind=f.type.startsWith('video/')?'video':'image';
+                var fd=new FormData(); fd.append('image',f);
+                var up=await fetch('/upload',{method:'POST',body:fd}); var upj=await up.json();
+                if(!up.ok || !upj.url) throw new Error(upj.error||'Upload failed');
+                var save=await fetch('/admin/concepts/save-to-gallery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({concept_id:conceptId,url:upj.url,kind:kind})});
+                var sj=await save.json(); if(!save.ok) throw new Error(sj.error||'Save failed');
+                done++;
+              } catch(err){ failed++; console.warn('[drop]',f.name,err.message); }
+              render();
+            }
+            current=''; progress.innerHTML='<div style="font-weight:700;">Done · '+done+'/'+files.length+(failed?' ('+failed+' failed)':'')+'</div>';
+            setTimeout(function(){ location.reload(); }, 700);
+          });
+        })();
+      </script>`;
+    res.send(conceptAdminPage('Gallery', body));
+  } catch (err) {
+    console.error('[gallery] list error:', err.message);
+    res.status(500).send('Failed to load gallery: ' + escapeHtml(err.message));
+  }
+});
+
 // Same as /admin/concepts/:id/slot but reads concept_id from the request body,
 // so the gallery row's slot-assign forms can name the concept inline.
 app.post('/admin/concepts/slot/assign', requireRole('admin'), async (req, res) => {
@@ -3763,7 +4065,10 @@ app.post('/admin/media/:id/delete', requireRole('admin'), async (req, res) => {
 
 // ----- /admin/gallery — list + add page -----
 
-app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
+// Legacy wide-table gallery — kept under /admin/gallery/table for the rare
+// "show me the raw rows" need. The default /admin/gallery now serves the
+// dense triplet-card grid below.
+app.get('/admin/gallery/table', requireRole('admin'), async (req, res) => {
   try {
     const filterConcept = req.query.concept ? parseInt(req.query.concept, 10) : null;
     const filterKind = req.query.kind && CONCEPT_MEDIA_KINDS.includes(req.query.kind) ? req.query.kind : null;

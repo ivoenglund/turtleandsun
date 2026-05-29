@@ -271,6 +271,8 @@ async function initDb() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS concept_triplets_concept_number_idx ON concept_triplets(concept_id, triplet_number);
     CREATE INDEX IF NOT EXISTS concept_triplets_rolling_idx ON concept_triplets(concept_id, in_rolling_demo, sort_order);
+    ALTER TABLE concept_triplets ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE concept_triplets ADD COLUMN IF NOT EXISTS in_gallery BOOLEAN NOT NULL DEFAULT TRUE;
   `);
 
   // ====================================================================
