@@ -1786,17 +1786,22 @@ app.post('/create-checkout-session', async (req, res) => {
       orientation: orientation || '',
       currency,
     };
-    // Review win-back discount (additive; default path unchanged when no valid code).
-    let discountApply = null;
+    // Review win-back discount - applied IN-APP (no Stripe coupon). We reduce the
+    // unit price by the code's percent_off before creating the session.
     if (discount_code) {
       try {
         const dc = await reviews.validateDiscountCode(email, discount_code);
-        if (dc.valid) { discountApply = dc; meta.discount_code = String(discount_code).trim(); }
-      } catch (e) { console.error('[checkout] discount validate error:', e.message); }
+        if (dc.valid) {
+          const pct = Math.max(0, Math.min(100, dc.percent_off || 0));
+          unitAmount = Math.max(1, Math.round(unitAmount * (100 - pct) / 100));
+          meta.discount_code = String(discount_code).trim();
+          meta.discount_percent = String(pct);
+          displayName = displayName + ' (\u2212' + pct + '%)';
+        }
+      } catch (e) { console.error('[checkout] discount apply error:', e.message); }
     }
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      discounts: discountApply ? [{ coupon: discountApply.coupon }] : undefined,
       line_items: [{
         price_data: {
           currency,
