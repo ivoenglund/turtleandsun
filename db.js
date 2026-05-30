@@ -395,6 +395,15 @@ async function initDb() {
     )
   );
 
+  // Reviews + discount engine (2026-05-30). reviews, discount_codes tables +
+  // orders.review_email_sent_at / review_token. See migrations/reviews_engine.sql
+  await pool.query(
+    require('fs').readFileSync(
+      require('path').join(__dirname, 'migrations', 'reviews_engine.sql'),
+      'utf8'
+    )
+  );
+
   // Backfill: every existing order without line items gets one synthetic line
   // item matching its current product + amount. Idempotent (guarded by
   // NOT EXISTS on order_line_items.order_id).

@@ -544,23 +544,7 @@ html,body{overflow-x:hidden;}
   </style>
   <section class="ts-testimonials" id="tsTestimonials" style="display:none;">
     <h2 class="ts-testi-title">Loved by the people who made one</h2>
-    <div class="ts-testi-grid">
-      <figure class="ts-testi-card">
-        <div class="ts-testi-stars">★★★★★</div>
-        <blockquote>REPLACE with a real customer's words.</blockquote>
-        <figcaption>REPLACE — Name, City</figcaption>
-      </figure>
-      <figure class="ts-testi-card">
-        <div class="ts-testi-stars">★★★★★</div>
-        <blockquote>REPLACE with a real customer's words.</blockquote>
-        <figcaption>REPLACE — Name, City</figcaption>
-      </figure>
-      <figure class="ts-testi-card">
-        <div class="ts-testi-stars">★★★★★</div>
-        <blockquote>REPLACE with a real customer's words.</blockquote>
-        <figcaption>REPLACE — Name, City</figcaption>
-      </figure>
-    </div>
+    <div class="ts-testi-grid" id="tsTestiGrid"></div>
   </section>
 
   <!-- old .trust strip removed — replaced by ts-pay-trust + per-product captions in the hero widget -->
@@ -1079,7 +1063,7 @@ async function proceedToCheckout(productOverride) {
     const res = await fetch('/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation, currency: window.tsCurrency && window.tsCurrency.code, concept_id: conceptId }),
+      body: JSON.stringify({ product, image_url: cloudinaryUrl, portrait_url: previewImageUrl, email, orientation, currency: window.tsCurrency && window.tsCurrency.code, concept_id: conceptId, discount_code: window.tsDiscountCode || undefined }),
     });
     const data = await res.json();
     if (data.url) {
@@ -2252,5 +2236,23 @@ NavBar.init({ requireAuth: false }).then(status => {
 </script>
 <!-- ============ END HERO WIDGET BOOT ============ -->
 
+<script>
+(function(){
+  var grid=document.getElementById('tsTestiGrid'),sec=document.getElementById('tsTestimonials');
+  if(!grid||!sec)return;
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  fetch('/api/reviews/published').then(function(r){return r.ok?r.json():[];}).then(function(rows){
+    if(!rows||!rows.length)return;
+    grid.innerHTML=rows.slice(0,3).map(function(rv){
+      var stars='★★★★★'.slice(0,(rv.rating||5));
+      var photo=rv.photo_url?('<img src="'+esc(rv.photo_url)+'" alt="" style="width:100%;border-radius:10px;margin-bottom:10px;object-fit:cover;max-height:200px">'):'';
+      var body=(rv.title?('<strong>'+esc(rv.title)+'</strong> '):'')+esc(rv.body||'');
+      return '<figure class="ts-testi-card">'+photo+'<div class="ts-testi-stars">'+stars+'</div><blockquote>'+body+'</blockquote><figcaption>'+esc(rv.display_name||'A happy customer')+'</figcaption></figure>';
+    }).join('');
+    sec.style.display='';
+  }).catch(function(){});
+})();
+</script>
+<script>try{window.tsDiscountCode=(new URLSearchParams(location.search).get('code')||'').trim();}catch(e){}</script>
 </body>
 </html>

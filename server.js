@@ -33,6 +33,7 @@ const {
   requireAuth, requireRole,
 } = require('./auth');
 const { sendDailyDigest, gatherDigestSections, block: digestBlock } = require('./digest');
+const reviews = require('./reviews');
 
 // Drop handler used by both /admin/concepts and /admin/triplets so a thumbnail
 // dragged from /admin/gallery (even in a separate browser window) can populate
@@ -197,6 +198,11 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
       console.log('Order recorded, id:', orderId);
     } catch (err) {
       console.error('Order insert error:', err.message);
+    }
+
+    // Mark a review win-back discount code as used, if one was applied to this order.
+    if (session.metadata && session.metadata.discount_code && orderId) {
+      reviews.markDiscountUsed(session.metadata.discount_code, orderId).catch((e) => console.error('[webhook] markDiscountUsed:', e.message));
     }
 
     // ---------------------------------------------------------------
@@ -1708,7 +1714,7 @@ app.get('/api/currency', async (req, res) => {
 });
 
 app.post('/create-checkout-session', async (req, res) => {
-  const { product, image_url, portrait_url, email, orientation, concept_id, quantity, modifiers, recipients, customer_name } = req.body;
+  const { product, image_url, portrait_url, email, orientation, concept_id, quantity, modifiers, recipients, customer_name, discount_code } = req.body;
   // Either a concept_id OR a legacy product key is required.
   if (!concept_id && !PRODUCTS[product]) return res.status(400).json({ error: 'Invalid product (no concept_id or known product key)' });
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
@@ -1780,8 +1786,17 @@ app.post('/create-checkout-session', async (req, res) => {
       orientation: orientation || '',
       currency,
     };
+    // Review win-back discount (additive; default path unchanged when no valid code).
+    let discountApply = null;
+    if (discount_code) {
+      try {
+        const dc = await reviews.validateDiscountCode(email, discount_code);
+        if (dc.valid) { discountApply = dc; meta.discount_code = String(discount_code).trim(); }
+      } catch (e) { console.error('[checkout] discount validate error:', e.message); }
+    }
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
+      discounts: discountApply ? [{ coupon: discountApply.coupon }] : undefined,
       line_items: [{
         price_data: {
           currency,
@@ -2851,6 +2866,7 @@ app.get('/admin/currencies/edit/:code', requireRole('admin'), async (req, res) =
 
 // Mount occasions-engine admin (national occasions + campaign queue).
 require('./admin_occasions').register(app, { requireRole, escapeHtml, conceptAdminPage });
+reviews.register(app, { requireRole, escapeHtml, conceptAdminPage });
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
   try {
