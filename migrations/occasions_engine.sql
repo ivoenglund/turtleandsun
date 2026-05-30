@@ -158,3 +158,6 @@ ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
   ('orthodox-xmas','Orthodox Christmas (7 Jan)','seasonal','["RS", "ME", "MK", "RU", "MD", "BY"]'::jsonb,'fixed','{"type": "fixed", "month": 1, "day": 7}'::jsonb,'Julian-calendar Christmas.','Med','verify')
 ON CONFLICT (slug) DO NOTHING;
+INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
+  ('new-year','New Year (1 Jan)','seasonal','["US", "CA", "AU", "AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT", "XK", "LV", "LI", "LT", "LU", "MT", "MD", "MC", "ME", "NL", "MK", "NO", "PL", "PT", "RO", "RU", "SM", "RS", "SK", "SI", "ES", "SE", "CH", "TR", "UA", "GB", "VA"]'::jsonb,'fixed','{"type": "fixed", "month": 1, "day": 1}'::jsonb,'New Year greeting/offer. PRIMARY gift-giving day in Russia, Turkey, Belarus & Ukraine (where Christmas is not). Fresh-start / family angle elsewhere.','High','ok')
+ON CONFLICT (slug) DO NOTHING;
