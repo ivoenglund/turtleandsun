@@ -17,6 +17,8 @@ const { Resend } = require('resend');
 const multer = require('multer');
 let cron = null; try { cron = require('node-cron'); } catch (e) { /* cron optional */ }
 let storage = null; try { storage = require('./storage'); } catch (e) { /* photo upload optional */ }
+let requireAuth = function (req,res,next){ return res.redirect('/login'); };
+try { requireAuth = require('./auth').requireAuth; } catch (e) { /* auth optional */ }
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.EMAIL_FROM || 'Turtle and Sun <hello@turtleandsun.com>';
@@ -132,6 +134,28 @@ document.getElementById('submit').addEventListener('click',async function(){
 </script></body></html>`;
 }
 
+function reviewsListPage(cards) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reviews \u2014 Turtle and Sun</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&family=DM+Sans:wght@400&display=swap" rel="stylesheet">
+<style>${PAGE_CSS}
+.wrap{max-width:1040px}
+.back{display:inline-block;margin-bottom:14px;color:#3A6B20;text-decoration:none;font-weight:600}
+.rvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.rv{background:rgba(255,255,255,0.7);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(4px)}
+.rv img{width:100%;border-radius:10px;object-fit:cover;max-height:220px}
+.rv .st{color:#3A6B20;letter-spacing:2px}
+.rv blockquote{margin:0;font-size:15px;line-height:1.6;color:rgba(28,10,0,0.85)}
+.rv figcaption{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:13px;color:rgba(28,10,0,0.6);margin-top:auto}
+.empty{text-align:center;color:rgba(28,10,0,0.7);grid-column:1/-1}
+</style></head><body><div class="wrap">
+<a class="back" href="/">\u2190 Turtle and Sun</a>
+<h1>What families say</h1><p class="sub">Real Loveograms, real words.</p>
+<div class="rvgrid">${cards}</div>
+</div></body></html>`;
+}
+
 function register(app, deps) {
   const { requireRole, escapeHtml, conceptAdminPage } = deps;
   const esc = (s) => escapeHtml(s == null ? '' : String(s));
@@ -244,6 +268,36 @@ function register(app, deps) {
     try { await pool.query("UPDATE reviews SET status='rejected', moderated_at=NOW() WHERE id=$1", [parseInt(req.params.id, 10)]); }
     catch (e) { /* ignore */ }
     res.redirect('/admin/reviews?saved=1');
+  });
+
+  // ---- PUBLIC: reviews listing page ----
+  app.get('/reviews', async (req, res) => {
+    let cards = '';
+    try {
+      const { rows } = await pool.query(
+        `SELECT display_name, rating, title, body, photo_url FROM reviews
+          WHERE status='approved' AND consent_publish=TRUE
+          ORDER BY moderated_at DESC NULLS LAST, created_at DESC LIMIT 60`);
+      cards = rows.map(function(r){
+        var stars='\u2605\u2605\u2605\u2605\u2605'.slice(0,(r.rating||5));
+        var photo = r.photo_url ? ('<img src="'+esc(r.photo_url)+'" alt="">') : '';
+        var head = r.title ? ('<strong>'+esc(r.title)+'</strong> ') : '';
+        return '<figure class="rv">'+photo+'<div class="st">'+stars+'</div><blockquote>'+head+esc(r.body||'')+'</blockquote><figcaption>'+esc(r.display_name||'A happy customer')+'</figcaption></figure>';
+      }).join('') || '<p class="empty">No reviews yet \u2014 be the first to make a Loveogram.</p>';
+    } catch (e) { cards = '<p class="empty">Reviews are taking a break. Check back soon.</p>'; }
+    res.set('Content-Type','text/html; charset=utf-8').send(reviewsListPage(cards));
+  });
+
+  // ---- CUSTOMER: leave a review from the account (auto-resolves latest paid order) ----
+  app.get('/account/review', requireAuth, async (req, res) => {
+    try {
+      const email = req.user && req.user.email;
+      const { rows } = await pool.query(
+        "SELECT id FROM orders WHERE email=$1 AND status='paid' ORDER BY created_at DESC LIMIT 1", [email]);
+      if (!rows.length) return res.set('Content-Type','text/html; charset=utf-8').send(reviewPage('', false));
+      const token = await ensureReviewToken(rows[0].id);
+      res.redirect('/review?t=' + encodeURIComponent(token));
+    } catch (e) { res.redirect('/review'); }
   });
 
   // ---- Day-after review-request email (gated by REVIEW_EMAILS_ENABLED=true) ----
