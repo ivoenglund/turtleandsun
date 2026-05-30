@@ -805,7 +805,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     ${section('\u{1F3A8} Content',
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
       card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery') +
-      card('Triplets', 'Group Before / After-Picture / After-Video into rolling demo sets.', '/admin/triplets')
+      card('Triplets', 'Group Before / After-Picture / After-Video into rolling demo sets.', '/admin/triplets') +
+      card('Reviews', 'Moderate customer reviews; approve to publish on the landing.', '/admin/reviews')
     )}
 
     ${section('\u{1F4B0} Pricing',
