@@ -27,6 +27,16 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 *
 
 function rtoken(n = 24) { return crypto.randomBytes(n).toString('base64url'); }
 function codeStr() { return 'TS-' + crypto.randomBytes(4).toString('hex').toUpperCase(); }
+const _rlMap = new Map();
+function rateLimited(ip, max, windowMs) {
+  max = max || 6; windowMs = windowMs || 600000;
+  const now = Date.now();
+  const arr = (_rlMap.get(ip) || []).filter(function (t) { return now - t < windowMs; });
+  if (arr.length >= max) { _rlMap.set(ip, arr); return true; }
+  arr.push(now); _rlMap.set(ip, arr);
+  if (_rlMap.size > 5000) { for (const k of _rlMap.keys()) { if (!_rlMap.get(k).length) _rlMap.delete(k); } }
+  return false;
+}
 
 // ---- Discount-code helpers (exported; used by /create-checkout-session + webhook) ----
 async function generateDiscountCode(email, orderId, opts = {}) {
@@ -174,6 +184,8 @@ function register(app, deps) {
   // ---- PUBLIC: submit review ----
   app.post('/api/review/submit', upload.single('photo'), async (req, res) => {
     try {
+      const _ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
+      if (rateLimited(_ip)) return res.status(429).json({ ok: false, error: 'Too many submissions \u2014 please try again in a few minutes.' });
       const t = String(req.body.token || '').trim();
       const { rows } = await pool.query('SELECT id, email FROM orders WHERE review_token = $1', [t]);
       if (!rows.length) return res.status(400).json({ ok: false, error: 'Invalid or expired link.' });
