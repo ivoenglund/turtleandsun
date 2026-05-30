@@ -389,6 +389,9 @@ const PUBLIC_HTML = new Set([
   '/pricing.html',
   '/faq.html',
   '/login.html',
+  '/privacy.html',
+  '/terms.html',
+  '/refund.html',
 ]);
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') && !PUBLIC_HTML.has(req.path)) {
@@ -402,6 +405,9 @@ app.use(express.static(path.join(__dirname)));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'turtleandsun-landing.html')));
 app.get('/faq', (req, res) => res.sendFile(path.join(__dirname, 'faq.html')));
 app.get('/pricing', (req, res) => res.sendFile(path.join(__dirname, 'pricing.html')));
+app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'privacy.html')));
+app.get('/terms', (req, res) => res.sendFile(path.join(__dirname, 'terms.html')));
+app.get('/refund', (req, res) => res.sendFile(path.join(__dirname, 'refund.html')));
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
