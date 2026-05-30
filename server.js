@@ -806,6 +806,11 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Currencies & FX', 'Live FX rates, supported currencies, manual refresh.', '/admin/currencies')
     )}
 
+    ${section('\u{1F4C6} Occasions & campaigns',
+      card('Gifting occasions', 'National occasions, live dates, markets — what the campaign agent runs on.', '/admin/occasions') +
+      card('Campaign queue', 'What is queued to draft, print, and send.', '/admin/occasions/queue')
+    )}
+
     <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
     <div class="admin-grid">
       <form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">
@@ -2843,6 +2848,9 @@ app.get('/admin/currencies/edit/:code', requireRole('admin'), async (req, res) =
 
 
 
+
+// Mount occasions-engine admin (national occasions + campaign queue).
+require('./admin_occasions').register(app, { requireRole, escapeHtml, conceptAdminPage });
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
   try {
