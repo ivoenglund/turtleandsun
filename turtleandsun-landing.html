@@ -357,7 +357,24 @@ html,body{overflow-x:hidden;}
   <div class="ts-hero-copy">
     <h1 class="ts-hero-h1">The family photo<br>you could never take.</h1>
     <p class="ts-hero-sub">Turn any photo into a <strong>Loveogram Picture</strong> from 99 kr or a cinematic <strong>Loveogram Video</strong> from 149 kr — free preview before you pay.</p>
+    <div class="ts-hero-trust" aria-label="Trust and reassurance">
+      <span class="ts-ht-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        Secure payment via Stripe
+      </span>
+      <span class="ts-ht-sep">·</span>
+      <span class="ts-ht-item">Free preview before you pay</span>
+      <span class="ts-ht-sep">·</span>
+      <span class="ts-ht-item">Delivered by email in minutes</span>
+    </div>
   </div>
+  <style>
+  .ts-hero-trust{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:rgba(28,10,0,0.62);}
+  .ts-hero-trust .ts-ht-item{display:inline-flex;align-items:center;gap:6px;}
+  .ts-hero-trust .ts-ht-item svg{width:15px;height:15px;opacity:0.8;}
+  .ts-hero-trust .ts-ht-sep{color:rgba(28,10,0,0.3);}
+  @media(max-width:760px){.ts-hero-trust{font-size:12px;gap:6px 10px;}.ts-hero-trust .ts-ht-sep{display:none;}}
+  </style>
 
   <!-- ============ HERO WIDGET (2026-05-29 splice) ============ -->
   <input type="file" id="ts-file" accept="image/jpeg,image/png,image/webp" style="display:none">
