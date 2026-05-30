@@ -48,34 +48,34 @@ CREATE INDEX IF NOT EXISTS idx_holiday_occasions_active ON holiday_occasions(act
 CREATE INDEX IF NOT EXISTS idx_campaign_queue_status ON campaign_queue(status);
 CREATE INDEX IF NOT EXISTS idx_campaign_queue_date ON campaign_queue(occasion_date);
 
--- ---- Seed: 36 national/location occasions -----------------------------------
+-- ---- Seed: 36 national/location occasions (explicit market lists) --------
 
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
   ('md-no','Mother''s Day — Norway','mothers_day','["Norway"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 2, "weekday": 0, "nth": 2}'::jsonb,'Earliest Mother''s Day of the year.','High','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('valentine','Valentine''s Day','couples','["US", "UK", "Canada", "Australia", "Ireland", "+ most markets"]'::jsonb,'fixed','{"type": "fixed", "month": 2, "day": 14}'::jsonb,'Couples / romantic portraits; strong last-minute digital.','High','ok')
+  ('valentine','Valentine''s Day','couples','["US", "Canada", "Australia", "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia & Herzegovina", "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands", "North Macedonia", "Norway", "Poland", "Portugal", "Romania", "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine", "UK", "Vatican City"]'::jsonb,'fixed','{"type": "fixed", "month": 2, "day": 14}'::jsonb,'Couples / romantic portraits; strong last-minute digital.','High','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('womens-8mar','Women''s / Mother''s Day (8 Mar)','mothers_day','["Albania", "Bulgaria", "Bosnia & Herzegovina", "Kosovo", "Moldova", "Montenegro", "North Macedonia", "Serbia"]'::jsonb,'fixed','{"type": "fixed", "month": 3, "day": 8}'::jsonb,'8 Mar is the mothers/women gifting day in E. Europe/Balkans.','Med','verify')
+  ('womens-8mar','Women''s / Mother''s Day (8 Mar)','mothers_day','["Albania", "Bosnia & Herzegovina", "Bulgaria", "Kosovo", "Moldova", "Montenegro", "North Macedonia", "Serbia"]'::jsonb,'fixed','{"type": "fixed", "month": 3, "day": 8}'::jsonb,'8 Mar is the mothers/women gifting day in E. Europe/Balkans.','Med','verify')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
   ('md-ukie','Mother''s Day — UK & Ireland','mothers_day','["UK", "Ireland"]'::jsonb,'easter_offset','{"type": "easter_offset", "days": -21}'::jsonb,'Mothering Sunday — moves yearly, ~3 wks before Easter.','High','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('fd-stjoseph','Father''s Day — St Joseph','fathers_day','["Spain", "Italy", "Portugal", "Croatia", "Slovenia", "Andorra", "San Marino", "Vatican City"]'::jsonb,'fixed','{"type": "fixed", "month": 3, "day": 19}'::jsonb,'Catholic-Europe Father''s Day; dad portraits.','High','ok')
+  ('fd-stjoseph','Father''s Day — St Joseph','fathers_day','["Andorra", "Bosnia & Herzegovina", "Croatia", "Italy", "Montenegro", "Portugal", "San Marino", "Slovenia", "Spain", "Vatican City"]'::jsonb,'fixed','{"type": "fixed", "month": 3, "day": 19}'::jsonb,'Catholic-Europe Father''s Day; dad portraits.','High','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
   ('md-si','Mother''s Day — Slovenia','mothers_day','["Slovenia"]'::jsonb,'fixed','{"type": "fixed", "month": 3, "day": 25}'::jsonb,'Fixed 25 March.','Med','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('easter','Easter (Western)','seasonal','["+ all Western-calendar markets"]'::jsonb,'easter_offset','{"type": "easter_offset", "days": 0}'::jsonb,'Family-gathering + spring/pet themes.','Low-Med','ok')
+  ('easter','Easter (Western)','seasonal','["US", "Canada", "Australia", "Albania", "Andorra", "Austria", "Belgium", "Bosnia & Herzegovina", "Croatia", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Hungary", "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Monaco", "Netherlands", "Norway", "Poland", "Portugal", "San Marino", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "UK", "Vatican City"]'::jsonb,'easter_offset','{"type": "easter_offset", "days": 0}'::jsonb,'Family-gathering + spring/pet themes. Western-calendar markets.','Low-Med','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('md-1sun-may','Mother''s Day — 1st Sun May','mothers_day','["Spain", "Portugal", "Hungary", "Lithuania", "Romania", "Andorra"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 5, "weekday": 0, "nth": 1}'::jsonb,'First of the May Mother''s Day waves.','High','ok')
+  ('md-1sun-may','Mother''s Day — 1st Sun May','mothers_day','["Andorra", "Hungary", "Lithuania", "Portugal", "Romania", "Spain"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 5, "weekday": 0, "nth": 1}'::jsonb,'First of the May Mother''s Day waves.','High','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('md-2sun-may','Mother''s Day — 2nd Sun May (BIG)','mothers_day','["US", "Canada", "Australia", "Austria", "Belgium", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "Germany", "Greece", "Iceland", "Italy", "Latvia", "Malta", "Netherlands", "San Marino", "Slovakia", "Switzerland", "Turkey", "Ukraine"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 5, "weekday": 0, "nth": 2}'::jsonb,'One of the two biggest gifting days worldwide.','Peak','ok')
+  ('md-2sun-may','Mother''s Day — 2nd Sun May (BIG)','mothers_day','["US", "Canada", "Australia", "Austria", "Belgium", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "Germany", "Greece", "Iceland", "Italy", "Latvia", "Liechtenstein", "Malta", "Netherlands", "San Marino", "Slovakia", "Switzerland", "Turkey", "Ukraine", "Vatican City"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 5, "weekday": 0, "nth": 2}'::jsonb,'One of the two biggest gifting days worldwide.','Peak','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
   ('fd-ro','Father''s Day — Romania','fathers_day','["Romania"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 5, "weekday": 0, "nth": 2}'::jsonb,'2nd Sun May, a week after RO Mother''s Day.','Med','ok')
@@ -102,7 +102,7 @@ INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_pa
   ('md-lu','Mother''s Day — Luxembourg','mothers_day','["Luxembourg"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 6, "weekday": 0, "nth": 2}'::jsonb,'Late Mother''s Day (2nd Sun June).','Med','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('fd-3sun-jun','Father''s Day — 3rd Sun Jun (BIG)','fathers_day','["US", "Canada", "UK", "Ireland", "France", "Greece", "Hungary", "Malta", "Netherlands", "Slovakia", "Turkey", "Ukraine", "Cyprus", "Czechia", "Monaco"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 6, "weekday": 0, "nth": 3}'::jsonb,'Biggest Father''s Day; dad + pet-and-dad.','High','ok')
+  ('fd-3sun-jun','Father''s Day — 3rd Sun Jun (BIG)','fathers_day','["US", "Canada", "UK", "Ireland", "Albania", "Cyprus", "Czechia", "France", "Greece", "Hungary", "Malta", "Monaco", "Netherlands", "Slovakia", "Turkey", "Ukraine"]'::jsonb,'nth_weekday','{"type": "nth_weekday", "month": 6, "weekday": 0, "nth": 3}'::jsonb,'Biggest Father''s Day; dad + pet-and-dad.','High','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
   ('fd-pl','Father''s Day — Poland','fathers_day','["Poland"]'::jsonb,'fixed','{"type": "fixed", "month": 6, "day": 23}'::jsonb,'Fixed 23 June.','Med','ok')
@@ -150,11 +150,11 @@ INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_pa
   ('fd-bg','Father''s Day — Bulgaria','fathers_day','["Bulgaria"]'::jsonb,'fixed','{"type": "fixed", "month": 12, "day": 26}'::jsonb,'Fixed 26 December.','Med','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('christmas','Christmas (24-25 Dec)','seasonal','["+ all markets"]'::jsonb,'fixed','{"type": "fixed", "month": 12, "day": 25}'::jsonb,'Biggest revenue window. Gift day 24 vs 25 by market; honour print cut-offs.','Peak','ok')
+  ('christmas','Christmas (24-25 Dec)','seasonal','["US", "Canada", "Australia", "Albania", "Andorra", "Austria", "Belgium", "Bosnia & Herzegovina", "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Monaco", "Netherlands", "Norway", "Poland", "Portugal", "Romania", "San Marino", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine", "UK", "Vatican City"]'::jsonb,'fixed','{"type": "fixed", "month": 12, "day": 25}'::jsonb,'Biggest revenue window. Gift day 24 vs 25 by market; honour print cut-offs.','Peak','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('threekings','Three Kings (6 Jan)','seasonal','["Spain", "Italy"]'::jsonb,'fixed','{"type": "fixed", "month": 1, "day": 6}'::jsonb,'Reyes/Befana — main kids'' gift day in ES & IT.','Med','ok')
+  ('threekings','Three Kings (6 Jan)','seasonal','["Spain", "Italy", "Andorra"]'::jsonb,'fixed','{"type": "fixed", "month": 1, "day": 6}'::jsonb,'Reyes/Befana — main kids'' gift day in ES, IT & Andorra.','Med','ok')
 ON CONFLICT (slug) DO NOTHING;
 INSERT INTO holiday_occasions (slug,name,occasion_type,markets,rule_type,rule_params,content_angle,priority,confidence) VALUES
-  ('orthodox-xmas','Orthodox Christmas (7 Jan)','seasonal','["Serbia", "Russia", "Montenegro", "North Macedonia", "Moldova"]'::jsonb,'fixed','{"type": "fixed", "month": 1, "day": 7}'::jsonb,'Julian-calendar Christmas.','Med','verify')
+  ('orthodox-xmas','Orthodox Christmas (7 Jan)','seasonal','["Serbia", "Montenegro", "North Macedonia", "Russia", "Moldova", "Belarus"]'::jsonb,'fixed','{"type": "fixed", "month": 1, "day": 7}'::jsonb,'Julian-calendar Christmas.','Med','verify')
 ON CONFLICT (slug) DO NOTHING;
