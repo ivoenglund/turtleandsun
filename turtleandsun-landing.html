@@ -507,6 +507,44 @@ html,body{overflow-x:hidden;}
   <div class="g-grid" id="g1"></div>
   <div class="g-grid" id="g2"></div>
   <div class="g-grid" id="g3"></div>
+
+  <!-- ============ TESTIMONIALS (added 2026-05-30) ============
+       HIDDEN until you have REAL quotes. To publish:
+         1. Replace each quote + name below with a real customer's own words
+            (e.g. your son's reaction, or a beta tester). Keep it honest.
+         2. Delete  style="display:none"  from the <section> tag.
+       Never publish invented quotes or fake names. -->
+  <style>
+  .ts-testimonials{margin:40px 0 8px;}
+  .ts-testi-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(22px,2.6vw,30px);font-weight:800;color:#1C0A00;text-align:center;margin-bottom:22px;}
+  .ts-testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:980px;margin:0 auto;}
+  .ts-testi-card{background:rgba(255,255,255,0.6);border-radius:14px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(4px);box-shadow:0 6px 18px rgba(0,0,0,0.08);}
+  .ts-testi-stars{color:#3A6B20;font-size:16px;letter-spacing:2px;line-height:1;}
+  .ts-testi-card blockquote{font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.6;color:rgba(28,10,0,0.85);font-weight:400;margin:0;}
+  .ts-testi-card figcaption{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.6);margin-top:auto;}
+  @media(max-width:760px){.ts-testi-grid{grid-template-columns:1fr;}.ts-testimonials{margin:28px 0 4px;}}
+  </style>
+  <section class="ts-testimonials" id="tsTestimonials" style="display:none;">
+    <h2 class="ts-testi-title">Loved by the people who made one</h2>
+    <div class="ts-testi-grid">
+      <figure class="ts-testi-card">
+        <div class="ts-testi-stars">★★★★★</div>
+        <blockquote>REPLACE with a real customer's words.</blockquote>
+        <figcaption>REPLACE — Name, City</figcaption>
+      </figure>
+      <figure class="ts-testi-card">
+        <div class="ts-testi-stars">★★★★★</div>
+        <blockquote>REPLACE with a real customer's words.</blockquote>
+        <figcaption>REPLACE — Name, City</figcaption>
+      </figure>
+      <figure class="ts-testi-card">
+        <div class="ts-testi-stars">★★★★★</div>
+        <blockquote>REPLACE with a real customer's words.</blockquote>
+        <figcaption>REPLACE — Name, City</figcaption>
+      </figure>
+    </div>
+  </section>
+
   <!-- old .trust strip removed — replaced by ts-pay-trust + per-product captions in the hero widget -->
 </div>
 
