@@ -380,6 +380,21 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_voice_clones_user ON voice_clones (user_id);
   `);
 
+  // ====================================================================
+  // Occasions engine (2026-05-30). National/location occasions table +
+  // campaign send/print queue, plus a 36-row seed of national occasions.
+  // Schema and seed live in migrations/occasions_engine.sql (single source
+  // of truth); idempotent (CREATE IF NOT EXISTS / ON CONFLICT DO NOTHING).
+  // Personal occasions use the existing `occasions` table.
+  // See Claude_Workspace/03_Turtleandsun/01_Context/_POST_LAUNCH_FEATURES.md #22
+  // ====================================================================
+  await pool.query(
+    require('fs').readFileSync(
+      require('path').join(__dirname, 'migrations', 'occasions_engine.sql'),
+      'utf8'
+    )
+  );
+
   // Backfill: every existing order without line items gets one synthetic line
   // item matching its current product + amount. Idempotent (guarded by
   // NOT EXISTS on order_line_items.order_id).
