@@ -37,7 +37,7 @@ How to treat the merge tags: text inside double curly braces is a variable that 
 - {{review_url}} = a link to leave a review.
 
 Rules for the HTML you return:
-1. Return a COMPLETE HTML email body I can paste straight back in — only the HTML, no explanation, no markdown fences.
+1. Return the COMPLETE HTML document, from <!doctype html> to </html> — only the HTML, no explanation, no markdown fences. Keep the outer shell unchanged: the cream #FBF6EC page background, a centred container (max-width:560px; margin:0 auto; padding:28px 22px), the bold dark-green (#1C2A14) \"Turtle & Sun\" heading at the top, the dark-green button with yellow (#FFE800) text, and the footer containing {{site_url}} and the {{unsubscribe_url}} link. Unless I say otherwise, only rewrite the wording between the heading and the footer.
 2. Email-safe HTML only: inline CSS (no style blocks, no external stylesheets), simple structure, web-safe fonts. Assume Gmail, Apple Mail and Outlook.
 3. No JavaScript.
 4. Must read well in both light and dark mode — set text colours explicitly, never rely on a white background.
