@@ -916,7 +916,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Resend', 'Transactional email delivery.', 'https://resend.com/emails', true) +
       card('Cloudinary', 'Media storage and uploads.', 'https://cloudinary.com/console', true) +
       card('ImprovMX', 'Inbound email forwarding.', 'https://app.improvmx.com/', true) +
-      card('Railway', 'App hosting and deploys.', 'https://railway.app/', true)
+      card('Railway', 'App hosting and deploys.', 'https://railway.app/', true) +
+      card('Namecheap', 'Domain registration &amp; DNS records.', 'https://ap.www.namecheap.com/domains/domaincontrolpanel/turtleandsun.com/advancedns', true)
     )}`;
   res.send(conceptAdminPage('Admin dashboard', body));
 });
