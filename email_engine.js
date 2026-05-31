@@ -552,6 +552,7 @@ function register(app, helpers) {
       if (!t) return res.redirect('/admin/email');
       const k = encodeURIComponent(t.key);
       const initial = JSON.stringify(t.html_body || '<p>Hi {{customer_name}},</p>').replace(/</g, '\\u003c');
+      const gjsData = t.gjs_data ? JSON.stringify(t.gjs_data).replace(/</g, '\\u003c') : 'null';
       const body = `
         <p><a href="/admin/email/template/${k}">&larr; Back to template</a></p>
         <h1>Visual editor: ${esc(t.key)}</h1>
@@ -568,12 +569,17 @@ function register(app, helpers) {
         <script>
         (function(){
           var INITIAL = ${initial};
+          var GJS_DATA = ${gjsData};
           var presetFn = window.grapesjsPresetNewsletter || window['grapesjs-preset-newsletter'];
-          var editor = grapesjs.init({
+          var editorCfg = {
             container: '#gjs', height: '72vh', fromElement: false, storageManager: false,
-            plugins: presetFn ? [presetFn] : [],
-            components: INITIAL
-          });
+            plugins: presetFn ? [presetFn] : []
+          };
+          // Only set components on init if we have no saved project JSON.
+          // If we DO have project JSON we load it after init so styles round-trip correctly.
+          if (!GJS_DATA) editorCfg.components = INITIAL;
+          var editor = grapesjs.init(editorCfg);
+          if (GJS_DATA) { editor.loadProjectData(GJS_DATA); }
           function exportHtml(){
             var h = null;
             try { h = editor.runCommand('gjs-get-inlined-html'); } catch (e) { h = null; }
@@ -582,8 +588,9 @@ function register(app, helpers) {
           }
           document.getElementById('gjsSave').addEventListener('click', function(){
             var html = exportHtml();
+            var gjsProjectData = editor.getProjectData();
             var st = document.getElementById('gjsStatus'); st.textContent = 'Saving...';
-            fetch(location.pathname, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: html }) })
+            fetch(location.pathname, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: html, gjsData: gjsProjectData }) })
               .then(function(r){ return r.json(); })
               .then(function(j){ if(j && j.ok){ window.location = '/admin/email/template/${k}'; } else { st.textContent = 'Save failed' + (j && j.error ? ': ' + j.error : '') + '.'; } })
               .catch(function(){ st.textContent = 'Save failed - try again.'; });
@@ -597,7 +604,11 @@ function register(app, helpers) {
     try {
       const html = String((req.body && req.body.html) || '');
       if (!html) return res.status(400).json({ ok: false, error: 'empty' });
-      await pool.query('UPDATE email_templates SET html_body=$2, updated_at=NOW() WHERE key=$1', [req.params.key, html]);
+      const gjsData = (req.body && req.body.gjsData && typeof req.body.gjsData === 'object') ? req.body.gjsData : null;
+      await pool.query(
+        'UPDATE email_templates SET html_body=$2, gjs_data=$3, updated_at=NOW() WHERE key=$1',
+        [req.params.key, html, gjsData ? JSON.stringify(gjsData) : null]
+      );
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
   });

@@ -98,3 +98,6 @@ CREATE TABLE IF NOT EXISTS email_suppression (
   reason TEXT NOT NULL,               -- unsubscribe | bounce | complaint | manual
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- GrapesJS editor state (added 2026-06-01): stores project JSON so styles round-trip correctly.
+ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS gjs_data JSONB;
