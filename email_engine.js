@@ -27,6 +27,25 @@ const FROM = process.env.EMAIL_FROM || 'Turtle and Sun <hello@turtleandsun.com>'
 const SITE = process.env.PUBLIC_BASE_URL || 'https://turtleandsun.com';
 const UNSUB_SECRET = process.env.EMAIL_UNSUB_SECRET || process.env.STRIPE_WEBHOOK_SECRET || 'ts-unsub-fallback-secret';
 const UNSUB_MAILBOX = process.env.EMAIL_UNSUB_MAILBOX || 'hello@turtleandsun.com';
+const AI_PROMPT = `You are helping me edit an email for Turtle & Sun (turtleandsun.com) — we turn family photos into personalised "Loveogram" art and video gifts. Below (after the marker) is the current email as an HTML body.
+
+How to treat the merge tags: text inside double curly braces is a variable that gets replaced with a real value when the email is sent. Keep every one EXACTLY as written — do not rename, translate, remove, or add spaces inside them:
+- {{customer_name}} = the recipient first name. It can be empty, so write so the sentence still reads if it is blank.
+- {{site_url}} = https://turtleandsun.com
+- {{unsubscribe_url}} = the one-click unsubscribe link. It must stay in the footer.
+- {{code}} = a discount code (used on the review / win-back emails).
+- {{review_url}} = a link to leave a review.
+
+Rules for the HTML you return:
+1. Return a COMPLETE HTML email body I can paste straight back in — only the HTML, no explanation, no markdown fences.
+2. Email-safe HTML only: inline CSS (no style blocks, no external stylesheets), simple structure, web-safe fonts. Assume Gmail, Apple Mail and Outlook.
+3. No JavaScript.
+4. Must read well in both light and dark mode — set text colours explicitly, never rely on a white background.
+5. Keep the unsubscribe link in the footer.
+6. Tone: warm, sincere, family-oriented. British/European English. One clear message and one call-to-action button.
+7. Keep all merge tags intact (see above).
+
+When I ask for changes ("make it shorter", "warmer", "add competitor idea X"), apply them and return the full updated HTML body again.`;
 
 function enabled() { return String(process.env.EMAIL_ENGINE_ENABLED || '').toLowerCase() === 'true'; }
 function norm(e) { return String(e || '').trim().toLowerCase(); }
@@ -460,23 +479,60 @@ function register(app, helpers) {
     } catch (e) { res.status(500).send('error: ' + esc(e.message)); }
   });
 
-  // edit template
+  // edit template (live preview + copy-for-AI prompt)
   app.get('/admin/email/template/:key', requireRole('admin'), async (req, res) => {
     try {
       const t = await getTemplate(req.params.key);
       if (!t) return res.redirect('/admin/email');
+      const k = encodeURIComponent(t.key);
       let b = '<p><a href="/admin/email">&larr; Email engine</a></p><h1>Template: ' + esc(t.key) + '</h1>';
-      b += '<form method="POST" action="/admin/email/template/' + encodeURIComponent(t.key) + '">' +
+      b += '<form method="POST" action="/admin/email/template/' + k + '">' +
         '<p><label>Name<br><input name="name" value="' + esc(t.name) + '"></label></p>' +
         '<p><label>Subject<br><input name="subject" value="' + esc(t.subject) + '"></label></p>' +
-        '<p><label>HTML body<br><textarea name="html_body">' + esc(t.html_body) + '</textarea></label></p>' +
+        '<p><label>HTML body<br><textarea name="html_body" id="htmlbody">' + esc(t.html_body) + '</textarea></label></p>' +
         '<p><label>Plain-text body (optional)<br><textarea name="text_body" style="min-height:90px">' + esc(t.text_body || '') + '</textarea></label></p>' +
         '<p><label><input type="checkbox" name="active" ' + (t.active ? 'checked' : '') + ' style="width:auto"> Active</label></p>' +
-        '<button class="btn">Save</button></form>' +
-        '<p class="muted">Merge tags: {{customer_name}}, {{site_url}}, {{unsubscribe_url}}, {{code}}, {{review_url}} — plus anything you pass in a sequence context.</p>';
+        '<button class="btn">Save</button></form>';
+      b += `
+        <h2>Live preview</h2>
+        <p class="muted">Sample values are filled in so you see the real email. Updates as you edit the HTML above.</p>
+        <iframe id="tplpreview" sandbox="" style="width:100%;height:520px;border:1px solid #e3dcc8;border-radius:10px;background:#fff"></iframe>
+        <h2>Edit with an AI (outside this app)</h2>
+        <p class="muted">Copy the prompt + HTML, paste into ChatGPT or Claude (together with any competitor emails), ask for changes, then paste the new HTML back into the box above and Save.</p>
+        <div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn" id="copyboth">Copy prompt + HTML</button>
+          <button type="button" class="btn" id="copyhtml" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14">Copy HTML only</button>
+          <button type="button" class="btn" id="copyprompt" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14">Copy prompt only</button>
+        </div>
+        <label class="muted">The prompt (editable — included by the buttons above):</label>
+        <textarea id="aiprompt" style="min-height:240px">${esc(AI_PROMPT)}</textarea>
+        <p class="muted">Merge tags: {{customer_name}}, {{site_url}}, {{unsubscribe_url}}, {{code}}, {{review_url}} — plus anything you pass in a sequence context. Keep them intact when editing.</p>
+        <script>
+        (function(){
+          var ta = document.getElementById('htmlbody');
+          var frame = document.getElementById('tplpreview');
+          var promptEl = document.getElementById('aiprompt');
+          var keys = ['customer_name','site_url','unsubscribe_url','code','review_url'];
+          var sample = { customer_name:'Ivo', site_url:'https://turtleandsun.com', unsubscribe_url:'#unsubscribe', code:'TS-1A2B3C', review_url:'https://turtleandsun.com/account/review' };
+          function render(){
+            var html = ta.value || '';
+            keys.forEach(function(key){ html = html.split('{{'+key+'}}').join(sample[key]); });
+            if(!/unsubscribe/i.test(html)){ html += '<hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px"><p style="font:12px Arial,sans-serif;color:#999">An unsubscribe link is added here automatically in the real email.</p>'; }
+            frame.srcdoc = html;
+          }
+          ta.addEventListener('input', render);
+          render();
+          var NL = String.fromCharCode(10);
+          function copy(text, btn){ navigator.clipboard.writeText(text).then(function(){ var o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = o; }, 1200); }); }
+          document.getElementById('copyhtml').addEventListener('click', function(){ copy(ta.value, this); });
+          document.getElementById('copyprompt').addEventListener('click', function(){ copy(promptEl.value, this); });
+          document.getElementById('copyboth').addEventListener('click', function(){ copy(promptEl.value + NL + NL + '----- CURRENT EMAIL HTML -----' + NL + NL + ta.value, this); });
+        })();
+        </script>`;
       res.send(page('Template ' + t.key, b));
     } catch (e) { res.status(500).send('error: ' + esc(e.message)); }
   });
+
   app.post('/admin/email/template/:key', requireRole('admin'), async (req, res) => {
     try {
       await pool.query(
