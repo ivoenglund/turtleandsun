@@ -522,7 +522,9 @@ html,body{overflow-x:hidden;}
     <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Style</span>
     <button class="fb on" data-filter="all">All</button>
   </div>
+  <div class="g-section-label" id="g1-label" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.55);letter-spacing:0.04em;margin:6px 0 8px;">Videos</div>
   <div class="g-grid" id="g1"></div>
+  <div class="g-section-label" id="g2-label" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.55);letter-spacing:0.04em;margin:6px 0 8px;">Images</div>
   <div class="g-grid" id="g2"></div>
   <div class="g-grid" id="g3"></div>
 
@@ -1212,6 +1214,8 @@ async function loadGallery(category, kind) {
       const g3 = document.getElementById('g3');
       var _videoCount = items.filter(function(it){ return it && it.kind === 'video'; }).length;
       var _imageCount = items.length - _videoCount;
+      var _g1l = document.getElementById('g1-label'); if (_g1l) _g1l.style.display = _videoCount > 0 ? '' : 'none';
+      var _g2l = document.getElementById('g2-label'); if (_g2l) _g2l.style.display = _imageCount > 0 ? '' : 'none';
       // Videos render in the top block (g1); images in the block below (g2),
       // so videos sit on top and images at the end. g3 stays hidden (legacy).
       if (g1) { g1.innerHTML = ''; g1.classList.remove('g-grid-empty'); window._tsVideos = []; window._tsVisible = new Set(); window._tsPlaying = []; window._tsRotPtr = 0; if (window._tsVideoObserver) window._tsVideoObserver.disconnect(); }
@@ -1350,6 +1354,7 @@ async function loadGallery(category, kind) {
   } catch (e) {}
   // Fallback to placeholder swatches if /gallery returns nothing or errors.
   // Use the uniform grid layout (not masonry) for the placeholders.
+  ['g1-label','g2-label'].forEach(function(id){ var l = document.getElementById(id); if (l) l.style.display = 'none'; });
   ['g1','g2','g3'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) { el.classList.add('g-grid-empty'); el.style.display = ''; }
