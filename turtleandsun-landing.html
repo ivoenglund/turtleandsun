@@ -1207,10 +1207,12 @@ async function loadGallery(category, kind) {
       const g1 = document.getElementById('g1');
       const g2 = document.getElementById('g2');
       const g3 = document.getElementById('g3');
-      // Masonry: all items flow into a single grid (g1). Hide the two legacy
-      // overflow grids that the placeholder layout still uses.
+      var _videoCount = items.filter(function(it){ return it && it.kind === 'video'; }).length;
+      var _imageCount = items.length - _videoCount;
+      // Videos render in the top block (g1); images in the block below (g2),
+      // so videos sit on top and images at the end. g3 stays hidden (legacy).
       if (g1) { g1.innerHTML = ''; g1.classList.remove('g-grid-empty'); window._tsVideos = []; window._tsVisible = new Set(); window._tsPlaying = []; window._tsRotPtr = 0; if (window._tsVideoObserver) window._tsVideoObserver.disconnect(); }
-      if (g2) { g2.innerHTML = ''; g2.style.display = 'none'; }
+      if (g2) { g2.innerHTML = ''; g2.classList.remove('g-grid-empty'); g2.classList.add('g-grid'); g2.style.display = _imageCount > 0 ? '' : 'none'; }
       if (g3) { g3.innerHTML = ''; g3.style.display = 'none'; }
       items.forEach(function(item, i) {
         const card = document.createElement('div');
@@ -1319,10 +1321,10 @@ async function loadGallery(category, kind) {
             }
           });
         }
-        if (g1) g1.appendChild(card);
+        if (item.kind === 'video') { if (g1) g1.appendChild(card); } else { if (g2) g2.appendChild(card); }
       });
       // Size the columns dynamically so a filtered-down gallery shows bigger tiles.
-      setGalleryColumns(items.length);
+      setGalleryColumns(_videoCount);
       // Auto-play the first few video tiles on load so the gallery is alive
       // without a hover — essential on mobile/touch where hover doesn't exist.
       // Seeds the SAME max-5 queue used by hover/tap, so as the visitor
