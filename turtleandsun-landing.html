@@ -1317,6 +1317,26 @@ async function loadGallery(category, kind) {
       });
       // Size the columns dynamically so a filtered-down gallery shows bigger tiles.
       setGalleryColumns(items.length);
+      // Auto-play the first few video tiles on load so the gallery is alive
+      // without a hover — essential on mobile/touch where hover doesn't exist.
+      // Seeds the SAME max-5 queue used by hover/tap, so as the visitor
+      // activates other tiles these evict oldest-first. The IntersectionObserver
+      // still pauses any of these that sit below the fold.
+      (function seedFirstVideos() {
+        if (!g1) return;
+        function seed() {
+          var vids = g1.querySelectorAll('video');
+          var n = Math.min(window._tsHoverQueueMax || 5, vids.length);
+          for (var vi = 0; vi < n; vi++) { window._tsPlayVideo(vids[vi]); }
+        }
+        var r = g1.getBoundingClientRect();
+        var inView = r.top < (window.innerHeight || 0) && r.bottom > 0;
+        if (inView) { setTimeout(seed, 60); return; }
+        var once = new IntersectionObserver(function(entries) {
+          entries.forEach(function(e) { if (e.isIntersecting) { seed(); once.disconnect(); } });
+        }, { threshold: 0 });
+        once.observe(g1);
+      })();
       return;
     }
   } catch (e) {}
