@@ -315,8 +315,9 @@ async function ensureSeeds() {
   } catch (e) { console.error('[email] ensureSeeds error:', e.message); }
 }
 
+const EMAIL_BG = 'linear-gradient(180deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%)';
 function wrap(title, inner) {
-  return '<!doctype html><html><body style="margin:0;background:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
+  return '<!doctype html><html><body style="margin:0;background:' + EMAIL_BG + ';background-color:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
     '<div style="max-width:560px;margin:0 auto;padding:28px 22px">' +
     '<img src="https://turtleandsun.com/logo.png" width="246" height="94" alt="Turtle and Sun" style="width:246px;height:94px;display:block;margin-bottom:18px">' +
     inner +
@@ -571,9 +572,11 @@ function register(app, helpers) {
           var INITIAL = ${initial};
           var GJS_DATA = ${gjsData};
           var presetFn = window.grapesjsPresetNewsletter || window['grapesjs-preset-newsletter'];
+          var EMAIL_BG = 'linear-gradient(180deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%)';
           var editorCfg = {
             container: '#gjs', height: '72vh', fromElement: false, storageManager: false,
-            plugins: presetFn ? [presetFn] : []
+            plugins: presetFn ? [presetFn] : [],
+            protectedCss: 'body{background:' + EMAIL_BG + '!important;background-color:#FBF6EC!important;min-height:100vh!important}'
           };
           // Only set components on init if we have no saved project JSON.
           // If we DO have project JSON we load it after init so styles round-trip correctly.
