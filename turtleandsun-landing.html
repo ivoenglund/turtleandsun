@@ -1078,75 +1078,78 @@ async function proceedToCheckout(productOverride) {
   }
 }
 
-// Video activation controller — "constellation of recent hovers".
-// Behavior:
-//   - Up to 5 videos can play simultaneously (the most recently activated).
-//     New hover pushes the new video to the front of the queue; if the
-//     queue is full, the oldest playing video is evicted (paused).
-//   - Activation triggers: mouseenter (desktop), touchstart (mobile/tablet).
-//   - Mouseleave does NOT immediately pause — the queue evicts naturally
-//     as the user explores further. Feels alive vs strict one-at-a-time.
-//   - Viewport-leave pause: a separate IntersectionObserver pauses any
-//     playing video that leaves the screen, so scrolling away frees
-//     resources (and the video is removed from the queue).
-//   - Selection (click) and lightbox (double-click) are unchanged.
-window._tsHoverQueueMax = 5;
-window._tsHoverQueue = window._tsHoverQueue || [];
-window._tsPlayVideo = function(v) {
-  if (!v) return;
-  var q = window._tsHoverQueue;
-  // Move to front (or insert) — re-hovering an already-playing tile keeps it fresh.
-  var idx = q.indexOf(v);
-  if (idx >= 0) q.splice(idx, 1);
-  // Evict oldest if at capacity.
-  if (q.length >= window._tsHoverQueueMax) {
-    var evicted = q.pop();
-    if (evicted && !evicted.paused) { try { evicted.pause(); } catch (e) {} }
-  }
-  q.unshift(v);
-  if (v.paused) {
-    var p = v.play();
-    if (p && p.catch) p.catch(function(){});
-  }
+// Gallery video rotation controller.
+//   - Up to 5 videos play at once, and ONLY videos currently on screen.
+//   - Videos do not loop: when one ends, its slot advances to the next on-screen
+//     video not already playing (round-robin), so every visible video gets shown
+//     over time. Off-screen videos are never started.
+//   - Scrolling a playing video off screen frees its slot; scrolling videos in
+//     fills free slots. Hover (desktop) / tap (mobile) still starts a specific one.
+window._tsMaxPlaying = 5;
+window._tsVideos = window._tsVideos || [];
+window._tsVisible = window._tsVisible || new Set();
+window._tsPlaying = window._tsPlaying || [];
+window._tsRotPtr = window._tsRotPtr || 0;
+window._tsRegisterVideo = function(v) {
+  if (v && window._tsVideos.indexOf(v) === -1) window._tsVideos.push(v);
 };
-window._tsPauseVideo = function(v) {
+function _tsStart(v) {
   if (!v) return;
+  if (window._tsPlaying.indexOf(v) === -1) {
+    if (window._tsPlaying.length >= window._tsMaxPlaying) {
+      var ev = window._tsPlaying.shift();
+      if (ev && !ev.paused) { try { ev.pause(); } catch (e) {} }
+    }
+    window._tsPlaying.push(v);
+  }
+  if (v.ended || (v.duration && v.currentTime >= v.duration - 0.05)) {
+    try { v.currentTime = 0; } catch (e) {}
+  }
+  if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function(){}); }
+}
+function _tsStop(v) {
+  if (!v) return;
+  var i = window._tsPlaying.indexOf(v);
+  if (i >= 0) window._tsPlaying.splice(i, 1);
   if (!v.paused) { try { v.pause(); } catch (e) {} }
-  var q = window._tsHoverQueue;
-  var idx = q.indexOf(v);
-  if (idx >= 0) q.splice(idx, 1);
-};
-
-// Singleton IntersectionObserver — does NOT auto-play, only pauses anything
-// playing once it leaves the viewport. Play is intent-driven (hover/tap).
+}
+window._tsStopVideo = _tsStop;
+function _tsFill() {
+  var vids = window._tsVideos;
+  if (!vids.length) return;
+  while (window._tsPlaying.length < window._tsMaxPlaying) {
+    var picked = null;
+    for (var k = 0; k < vids.length; k++) {
+      var idx = (window._tsRotPtr + k) % vids.length;
+      var cand = vids[idx];
+      if (window._tsVisible.has(cand) && window._tsPlaying.indexOf(cand) === -1) {
+        picked = cand; window._tsRotPtr = (idx + 1) % vids.length; break;
+      }
+    }
+    if (!picked) break;
+    _tsStart(picked);
+  }
+}
+window._tsFill = _tsFill;
+window._tsOnVideoEnded = function(v) { _tsStop(v); _tsFill(); };
 window._tsVideoObserver = window._tsVideoObserver || new IntersectionObserver(function(entries) {
   entries.forEach(function(entry) {
-    if (entry.intersectionRatio < 0.2) {
-      window._tsPauseVideo(entry.target);
+    if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
+      window._tsVisible.add(entry.target);
+    } else {
+      window._tsVisible.delete(entry.target);
+      _tsStop(entry.target);
     }
   });
+  _tsFill();
 }, { threshold: [0, 0.2, 1] });
-
-// Wire hover (desktop) + tap (mobile) on every video card. Idempotent — safe
-// to call repeatedly when gallery re-renders.
+window._tsPlayVideo = function(v) { _tsStart(v); _tsFill(); };
+window._tsPauseVideo = function(v) { _tsStop(v); };
 window._tsAttachVideoActivators = function(cardEl, videoEl) {
   if (!cardEl || !videoEl || cardEl._tsActivatorsAttached) return;
   cardEl._tsActivatorsAttached = true;
-
-  // Desktop: hover joins the play queue (up to 5 simultaneous). Mouseleave
-  // does NOT immediately pause — the queue evicts naturally as the user
-  // explores other tiles. Feels like a constellation of recent activity.
-  cardEl.addEventListener('mouseenter', function() {
-    window._tsPlayVideo(videoEl);
-  });
-
-  // Mobile: tap plays. The card's existing click handler still fires for
-  // selection. We attach `touchstart` (not click) so the video starts
-  // immediately, not after the click-vs-tap heuristic delay. Tapping a
-  // different card automatically pauses the previous one via _tsPlayVideo.
-  cardEl.addEventListener('touchstart', function() {
-    window._tsPlayVideo(videoEl);
-  }, { passive: true });
+  cardEl.addEventListener('mouseenter', function() { _tsStart(videoEl); });
+  cardEl.addEventListener('touchstart', function() { _tsStart(videoEl); }, { passive: true });
 };
 
 // Current filter selections — driven by chips, both axes can be combined.
@@ -1197,13 +1200,16 @@ async function loadGallery(category, kind) {
   try {
     const res = await fetch(url);
     const items = await res.json();
+    if (Array.isArray(items)) {
+      items.sort(function(a, b){ return (a && a.kind === 'video' ? 0 : 1) - (b && b.kind === 'video' ? 0 : 1); });
+    }
     if (items && items.length > 0) {
       const g1 = document.getElementById('g1');
       const g2 = document.getElementById('g2');
       const g3 = document.getElementById('g3');
       // Masonry: all items flow into a single grid (g1). Hide the two legacy
       // overflow grids that the placeholder layout still uses.
-      if (g1) { g1.innerHTML = ''; g1.classList.remove('g-grid-empty'); }
+      if (g1) { g1.innerHTML = ''; g1.classList.remove('g-grid-empty'); window._tsVideos = []; window._tsVisible = new Set(); window._tsPlaying = []; window._tsRotPtr = 0; if (window._tsVideoObserver) window._tsVideoObserver.disconnect(); }
       if (g2) { g2.innerHTML = ''; g2.style.display = 'none'; }
       if (g3) { g3.innerHTML = ''; g3.style.display = 'none'; }
       items.forEach(function(item, i) {
@@ -1217,7 +1223,7 @@ async function loadGallery(category, kind) {
           media = document.createElement('video');
           media.src = item.url;
           media.muted = true;
-          media.loop = true;
+          media.loop = false;
           media.playsInline = true;
           media.preload = 'metadata';
           media.controlsList = 'nodownload noremoteplayback';
@@ -1232,7 +1238,7 @@ async function loadGallery(category, kind) {
             try { media.currentTime = 0.1; } catch (e) {}
           });
           // Out-of-viewport pause only (does not auto-play).
-          window._tsVideoObserver.observe(media);
+          window._tsVideoObserver.observe(media); window._tsRegisterVideo(media); media.addEventListener('ended', function(){ window._tsOnVideoEnded(media); });
           // Intent-driven activation: hover (desktop) or tap (mobile) starts
           // playback, and only one video plays at a time globally.
           // Deferred so the card element exists when the activator wires up.
@@ -1324,11 +1330,7 @@ async function loadGallery(category, kind) {
       // still pauses any of these that sit below the fold.
       (function seedFirstVideos() {
         if (!g1) return;
-        function seed() {
-          var vids = g1.querySelectorAll('video');
-          var n = Math.min(window._tsHoverQueueMax || 5, vids.length);
-          for (var vi = 0; vi < n; vi++) { window._tsPlayVideo(vids[vi]); }
-        }
+        function seed() { if (window._tsFill) window._tsFill(); }
         var r = g1.getBoundingClientRect();
         var inView = r.top < (window.innerHeight || 0) && r.bottom > 0;
         if (inView) { setTimeout(seed, 60); return; }
@@ -1355,7 +1357,7 @@ async function loadGallery(category, kind) {
 function openLightbox(item) {
   tsBeacon();
   // Pause and mute all gallery videos behind the lightbox
-  document.querySelectorAll('.g-card video').forEach(function(v) { v.pause(); });
+  document.querySelectorAll('.g-card video').forEach(function(v) { if (window._tsStopVideo) { window._tsStopVideo(v); } else { v.pause(); } });
 
   var overlay = document.getElementById('ts-lightbox');
   if (!overlay) {
@@ -1427,7 +1429,7 @@ function closeLightbox() {
     overlay.innerHTML = '';
     overlay.style.display = 'none';
   }
-  // The IntersectionObserver will restart any video that's still in view.
+  setTimeout(function(){ if (window._tsFill) window._tsFill(); }, 0);
 }
 // Multi-currency price rendering
 function renderPrices() {
