@@ -123,6 +123,47 @@ fal.config({ credentials: process.env.FAL_API_KEY });
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// --- Crash guards: keep the process alive under load; report to Sentry. ---
+// A single unhandled promise rejection would otherwise take the whole
+// process down mid-request. We log + report and stay up.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', (reason && reason.stack) ? reason.stack : reason);
+  try { if (process.env.SENTRY_DSN) Sentry.captureException(reason); } catch (_) {}
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', (err && err.stack) ? err.stack : err);
+  try { if (process.env.SENTRY_DSN) Sentry.captureException(err); } catch (_) {}
+});
+
+// --- Free-preview cost guards. /preview calls fal.ai (paid) on every hit and
+// the email-based quota is bypassable, so we add a per-connection rate limit
+// plus a hard global daily ceiling (kill-switch) so spend cannot run away
+// unattended at launch. All tunable via env. ---
+const PREVIEW_IP_MAX = parseInt(process.env.PREVIEW_IP_MAX || '8', 10);            // previews per IP per window
+const PREVIEW_IP_WINDOW_MS = parseInt(process.env.PREVIEW_IP_WINDOW_MS || '600000', 10); // 10 min
+const PREVIEW_DAILY_MAX = parseInt(process.env.PREVIEW_DAILY_MAX || '600', 10);    // global previews per day
+const _previewRlMap = new Map();
+function previewClientIp(req) {
+  return ((req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.ip || 'unknown';
+}
+function previewRateLimited(ip) {
+  const now = Date.now();
+  const arr = (_previewRlMap.get(ip) || []).filter((t) => now - t < PREVIEW_IP_WINDOW_MS);
+  if (arr.length >= PREVIEW_IP_MAX) { _previewRlMap.set(ip, arr); return true; }
+  arr.push(now); _previewRlMap.set(ip, arr);
+  if (_previewRlMap.size > 5000) { for (const k of _previewRlMap.keys()) { if (!_previewRlMap.get(k).length) _previewRlMap.delete(k); } }
+  return false;
+}
+let _previewDay = new Date().toISOString().slice(0, 10);
+let _previewDayCount = 0;
+function previewGlobalExceeded() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== _previewDay) { _previewDay = today; _previewDayCount = 0; }
+  if (_previewDayCount >= PREVIEW_DAILY_MAX) return true;
+  _previewDayCount += 1;
+  return false;
+}
+
 const app = express();
 app.set('trust proxy', true);
 app.use((req, res, next) => {
@@ -175,6 +216,23 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
   }
 
   console.log('Webhook received:', event.type, event.id);
+
+  // Idempotency — Stripe retries webhook deliveries on slow/failed responses.
+  // Record each event id once; a duplicate short-circuits before any order
+  // insert, generation, or email, preventing double fal spend / double sends.
+  try {
+    const _dup = await pool.query(
+      `INSERT INTO processed_webhook_events (event_id) VALUES ($1)
+       ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
+      [event.id]
+    );
+    if (_dup.rowCount === 0) {
+      console.log('Webhook duplicate ignored:', event.id);
+      return res.json({ received: true, duplicate: true });
+    }
+  } catch (e) {
+    console.error('[webhook] idempotency guard error (continuing):', e.message);
+  }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
@@ -1831,6 +1889,12 @@ app.post('/preview', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'email is required' });
   markEngaged(req);
 
+  // Per-connection rate limit — caps free-preview abuse / fal cost from one source.
+  const _previewIp = previewClientIp(req);
+  if (previewRateLimited(_previewIp)) {
+    return res.status(429).json({ error: 'Too many previews from this connection — please wait a few minutes and try again.' });
+  }
+
   // Preview quota
   try {
     const result = await pool.query(
@@ -1885,6 +1949,12 @@ app.post('/preview', async (req, res) => {
     : 'Transform @Image1 into a royal portrait painting wearing an ornate golden crown and red velvet royal robes, set in a grand palace. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed.';
   const inputExtras = useConcept ? (concept.image_input_extras || {}) : {};
 
+  // Global daily ceiling — hard safety cap so preview spend can't run away unattended.
+  if (previewGlobalExceeded()) {
+    console.warn('[preview] global daily ceiling reached (' + PREVIEW_DAILY_MAX + ') — shedding load');
+    return res.status(503).json({ error: 'Previews are extremely busy right now — please try again in a little while.' });
+  }
+
   // Log the attempt before firing.
   const logged = await generation.logGenerationStart({
     conceptId: concept ? concept.id : null,
@@ -1911,7 +1981,7 @@ app.post('/preview', async (req, res) => {
   } catch (err) {
     console.error('Preview error:', JSON.stringify(err, null, 2));
     await generation.logGenerationFailure(logged.id, err.message);
-    res.status(500).json({ error: 'Preview generation failed', details: err.message, body: err.body ?? null });
+    res.status(500).json({ error: 'We could not create that preview just now — please try again in a moment.' });
   }
 });
 

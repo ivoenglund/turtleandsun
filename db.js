@@ -213,6 +213,15 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS concept_media_kind_active_idx ON concept_media(kind, active);
   `);
 
+  // Webhook idempotency — records each processed Stripe event id so retried
+  // webhook deliveries are ignored (no double order / double generation).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS processed_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
   // Key-value system settings used by admin features (dev mode, etc.). The
   // dev_mode flag MUST default to 'false' so a fresh deploy is never in dev mode.
   await pool.query(`
