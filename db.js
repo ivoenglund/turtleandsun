@@ -413,6 +413,15 @@ async function initDb() {
     )
   );
 
+  // Email engine (2026-05-31). Unified lifecycle email: templates, sequences,
+  // enrollments, sends, delivery events, suppression. See migrations/email_engine.sql
+  await pool.query(
+    require('fs').readFileSync(
+      require('path').join(__dirname, 'migrations', 'email_engine.sql'),
+      'utf8'
+    )
+  );
+
   // Backfill: every existing order without line items gets one synthetic line
   // item matching its current product + amount. Idempotent (guarded by
   // NOT EXISTS on order_line_items.order_id).

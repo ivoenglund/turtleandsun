@@ -34,6 +34,7 @@ const {
 } = require('./auth');
 const { sendDailyDigest, gatherDigestSections, block: digestBlock } = require('./digest');
 const reviews = require('./reviews');
+const emailEngine = require('./email_engine');
 
 // Drop handler used by both /admin/concepts and /admin/triplets so a thumbnail
 // dragged from /admin/gallery (even in a separate browser window) can populate
@@ -318,6 +319,23 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
       } catch (err) {
         console.error('User update error:', err.message);
       }
+    }
+
+    // First purchase -> enroll into the post-purchase email journey. Gated by
+    // EMAIL_ENGINE_ENABLED; enrollments accrue even while sending is OFF.
+    if (email) {
+      try {
+        const _oc = await pool.query('SELECT COUNT(*)::int AS n FROM orders WHERE email = $1', [email]);
+        if (_oc.rows[0].n <= 1) {
+          let _code = '';
+          try { const _dc = await reviews.generateDiscountCode(email, orderId, { percent: 50, days: 30 }); _code = (_dc && _dc.code) ? _dc.code : ''; } catch (e) {}
+          emailEngine.onEvent('first_purchase', {
+            email: email,
+            context: { customer_name: customer_name || '', order_id: orderId || null, code: _code,
+                       review_url: (process.env.PUBLIC_BASE_URL || 'https://turtleandsun.com') + '/account/review' }
+          }).catch(function (e) { console.error('[email] first_purchase enroll:', e.message); });
+        }
+      } catch (e) { console.error('[email] first_purchase check:', e.message); }
     }
 
     // Deliver portrait — no re-generation needed
@@ -2943,6 +2961,7 @@ app.get('/admin/currencies/edit/:code', requireRole('admin'), async (req, res) =
 // Mount occasions-engine admin (national occasions + campaign queue).
 require('./admin_occasions').register(app, { requireRole, escapeHtml, conceptAdminPage });
 reviews.register(app, { requireRole, escapeHtml, conceptAdminPage });
+emailEngine.register(app, { requireRole, escapeHtml, conceptAdminPage });
 
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
   try {
@@ -5173,6 +5192,7 @@ scheduleFxRefresh(cron);
 
 initDb()
   .then(() => seedGallery())
+  .then(() => emailEngine.ensureSeeds())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
