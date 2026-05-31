@@ -1160,8 +1160,8 @@ window.tsGalleryFilter = { category: 'all', kind: 'all' };
 // auto-fill 200px-column default. Always capped by what the viewport can
 // actually fit at ≥200px per tile so a 30-item gallery on a 360px phone
 // still gets 2 sensible columns.
-function setGalleryColumns(count) {
-  const g = document.getElementById('g1');
+function setGalleryColumns(count, elId) {
+  const g = document.getElementById(elId || 'g1');
   if (!g) return;
   const vw = Math.max(window.innerWidth || 0, 320);
   // Cap at 7 columns on desktop even on ultra-wide screens — beyond that
@@ -1184,9 +1184,10 @@ function setGalleryColumns(count) {
 
 // On resize, recompute column count using the last-known item count.
 window.addEventListener('resize', function() {
-  const g = document.getElementById('g1');
-  if (!g || !g.dataset.itemCount) return;
-  setGalleryColumns(parseInt(g.dataset.itemCount, 10) || 0);
+  ['g1','g2'].forEach(function(id){
+    var g = document.getElementById(id);
+    if (g && g.dataset.itemCount) setGalleryColumns(parseInt(g.dataset.itemCount, 10) || 0, id);
+  });
 });
 
 async function loadGallery(category, kind) {
@@ -1199,8 +1200,10 @@ async function loadGallery(category, kind) {
   const url = qs.length ? '/gallery?' + qs.join('&') : '/gallery';
   try {
     const res = await fetch(url);
-    const items = await res.json();
+    let items = await res.json();
     if (Array.isArray(items)) {
+      var _seen = {};
+      items = items.filter(function(it){ var u = it && it.url; if (!u) return true; if (_seen[u]) return false; _seen[u] = 1; return true; });
       items.sort(function(a, b){ return (a && a.kind === 'video' ? 0 : 1) - (b && b.kind === 'video' ? 0 : 1); });
     }
     if (items && items.length > 0) {
@@ -1324,7 +1327,8 @@ async function loadGallery(category, kind) {
         if (item.kind === 'video') { if (g1) g1.appendChild(card); } else { if (g2) g2.appendChild(card); }
       });
       // Size the columns dynamically so a filtered-down gallery shows bigger tiles.
-      setGalleryColumns(_videoCount);
+      setGalleryColumns(_videoCount, 'g1');
+      if (_imageCount > 0) setGalleryColumns(_imageCount, 'g2');
       // Auto-play the first few video tiles on load so the gallery is alive
       // without a hover — essential on mobile/touch where hover doesn't exist.
       // Seeds the SAME max-5 queue used by hover/tap, so as the visitor
