@@ -238,8 +238,8 @@ html,body{overflow-x:hidden;}
    inside the source column, next to the existing "Rolling demo" pill. */
 .ts-demo-ctrls{display:none;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;}
 .ts-demo:not(.is-order) .ts-demo-ctrls{display:flex;}
-.ts-demo-ctrl{width:32px;height:32px;border-radius:50%;background:rgba(28,10,0,0.65);color:#fff;border:none;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
-.ts-demo-ctrl:hover{background:#1C0A00;transform:scale(1.08);}
+.ts-demo-ctrl{width:40px;height:40px;border-radius:50%;background:rgba(28,10,0,0.65);color:#fff;border:none;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.15s,transform 0.15s;font-family:'Plus Jakarta Sans',sans-serif;}
+.ts-demo-ctrl svg{width:22px;height:22px;display:block;}.ts-demo-ctrl:hover{background:#1C0A00;transform:scale(1.08);}
 .ts-demo-ctrl.is-on{background:#FFE800;color:#1C0A00;}
 
 /* Under-frame label — morphs to Buy button after first preview */
@@ -404,8 +404,8 @@ html,body{overflow-x:hidden;}
         </div>
         <div class="ts-demo-ctrls" id="ts-demo-ctrls">
           <span class="ts-mode-pill" id="ts-mode-pill">Rolling demo</span>
-          <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo">⏸</button>
-          <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound">🔇</button>
+          <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg></button>
+          <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg></button>
         </div>
       </div>
 
@@ -2114,7 +2114,7 @@ NavBar.init({ requireAuth: false }).then(status => {
   // When `true`, the rolling demo is paused: no auto-advance, current video stops.
   let cyclePaused = false;
   const demoSoundBtn = document.getElementById('ts-demo-sound');
-  const demoPauseBtn = document.getElementById('ts-demo-pause');
+  const demoPauseBtn = document.getElementById('ts-demo-pause'); var TS_ICON_PAUSE='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg>';var TS_ICON_PLAY='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>';var TS_ICON_SON='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a9 9 0 0 1 0 12"/></svg>';var TS_ICON_SOFF='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>';
 
   function setPaused(p){
     cyclePaused = !!p;
@@ -2130,7 +2130,7 @@ NavBar.init({ requireAuth: false }).then(status => {
       scheduleNext();
     }
     if (demoPauseBtn) {
-      demoPauseBtn.textContent = cyclePaused ? '▶' : '⏸';
+      demoPauseBtn.innerHTML = cyclePaused ? TS_ICON_PLAY : TS_ICON_PAUSE;
       demoPauseBtn.classList.toggle('is-on', cyclePaused);
       demoPauseBtn.title = cyclePaused ? 'Resume rolling demo' : 'Pause rolling demo';
     }
@@ -2168,7 +2168,7 @@ NavBar.init({ requireAuth: false }).then(status => {
       }
     });
     if (demoSoundBtn) {
-      demoSoundBtn.textContent = globalSoundOn ? '🔊' : '🔇';
+      demoSoundBtn.innerHTML = globalSoundOn ? TS_ICON_SON : TS_ICON_SOFF;
       demoSoundBtn.classList.toggle('is-on', globalSoundOn);
     }
   }
