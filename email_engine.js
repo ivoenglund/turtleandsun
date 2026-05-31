@@ -492,7 +492,8 @@ function register(app, helpers) {
         '<p><label>HTML body<br><textarea name="html_body" id="htmlbody">' + esc(t.html_body) + '</textarea></label></p>' +
         '<p><label>Plain-text body (optional)<br><textarea name="text_body" style="min-height:90px">' + esc(t.text_body || '') + '</textarea></label></p>' +
         '<p><label><input type="checkbox" name="active" ' + (t.active ? 'checked' : '') + ' style="width:auto"> Active</label></p>' +
-        '<button class="btn">Save</button></form>';
+        '<button class="btn">Save</button></form>' +
+        '<p style="margin:14px 0"><a class="btn" href="/admin/email/template/' + k + '/design">Open visual editor (drag &amp; drop)</a></p>';
       b += `
         <h2>Live preview</h2>
         <p class="muted">Sample values are filled in so you see the real email. Updates as you edit the HTML above.</p>
@@ -507,55 +508,25 @@ function register(app, helpers) {
         <label class="muted">The prompt (editable — included by the buttons above):</label>
         <textarea id="aiprompt" style="min-height:240px">${esc(AI_PROMPT)}</textarea>
         <p class="muted">Merge tags: {{customer_name}}, {{site_url}}, {{unsubscribe_url}}, {{code}}, {{review_url}} — plus anything you pass in a sequence context. Keep them intact when editing.</p>
-        <h2>Send to Figma or Canva</h2>
-        <p class="muted">A server can't write into Figma, but the free <strong>html.to.design</strong> plugin imports this email as editable layers: click "Copy HTML for Figma", open the plugin inside Figma, and paste. Or download a PNG to drop into Canva/Figma as a reference. Anything you restyle there comes back to email by re-pasting the HTML into the box above.</p>
-        <div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn" id="copyfigma">Copy HTML for Figma</button>
-          <a class="btn" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14;text-decoration:none" target="_blank" rel="noopener" href="https://www.figma.com/community/plugin/1159123024924461424/html-to-design">Open html.to.design plugin ↗</a>
-          <button type="button" class="btn" id="downloadpng" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14">Download PNG</button>
-        </div>
-        <div id="pngsource" style="position:absolute;left:-99999px;top:0;width:600px"></div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <script>
         (function(){
           var ta = document.getElementById('htmlbody');
           var frame = document.getElementById('tplpreview');
           var promptEl = document.getElementById('aiprompt');
-          var pngsource = document.getElementById('pngsource');
           var keys = ['customer_name','site_url','unsubscribe_url','code','review_url'];
           var sample = { customer_name:'Ivo', site_url:'https://turtleandsun.com', unsubscribe_url:'#unsubscribe', code:'TS-1A2B3C', review_url:'https://turtleandsun.com/account/review' };
-          function substituted(){
+          function render(){
             var html = ta.value || '';
             keys.forEach(function(key){ html = html.split('{{'+key+'}}').join(sample[key]); });
-            return html;
-          }
-          function render(){
-            var html = substituted();
             if(!/unsubscribe/i.test(html)){ html += '<hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px"><p style="font:12px Arial,sans-serif;color:#999">An unsubscribe link is added here automatically in the real email.</p>'; }
             frame.srcdoc = html;
-            if(pngsource){ pngsource.innerHTML = html; }
           }
-          ta.addEventListener('input', render);
-          render();
+          ta.addEventListener('input', render); render();
           var NL = String.fromCharCode(10);
           function copy(text, btn){ navigator.clipboard.writeText(text).then(function(){ var o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = o; }, 1200); }); }
           document.getElementById('copyhtml').addEventListener('click', function(){ copy(ta.value, this); });
           document.getElementById('copyprompt').addEventListener('click', function(){ copy(promptEl.value, this); });
           document.getElementById('copyboth').addEventListener('click', function(){ copy(promptEl.value + NL + NL + '----- CURRENT EMAIL HTML -----' + NL + NL + ta.value, this); });
-          document.getElementById('copyfigma').addEventListener('click', function(){ copy(substituted(), this); });
-          document.getElementById('downloadpng').addEventListener('click', function(){
-            var btn = this;
-            if(!window.html2canvas){ alert('Image tool still loading — try again in a second.'); return; }
-            var card = (pngsource && pngsource.firstElementChild) ? pngsource.firstElementChild : pngsource;
-            btn.textContent = 'Rendering...';
-            window.html2canvas(card, { backgroundColor:'#FBF6EC', scale:2, useCORS:true }).then(function(canvas){
-              canvas.toBlob(function(blob){
-                var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'email-preview.png'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
-                btn.textContent = 'Download PNG';
-              });
-            }).catch(function(){ btn.textContent = 'Download PNG'; alert('Could not render the image.'); });
-          });
         })();
         </script>`;
       res.send(page('Template ' + t.key, b));
@@ -571,6 +542,62 @@ function register(app, helpers) {
       );
       res.redirect('/admin/email/template/' + encodeURIComponent(req.params.key));
     } catch (e) { res.status(500).send('error: ' + esc(e.message)); }
+  });
+
+  // Visual (GrapesJS) editor for a template — drag/drop, exports email-safe inline-CSS HTML.
+  // Same editing engine can later be pointed at greeting-card designs (different output pipeline).
+  app.get('/admin/email/template/:key/design', requireRole('admin'), async (req, res) => {
+    try {
+      const t = await getTemplate(req.params.key);
+      if (!t) return res.redirect('/admin/email');
+      const k = encodeURIComponent(t.key);
+      const initial = JSON.stringify(t.html_body || '<p>Hi {{customer_name}},</p>').replace(/</g, '\\u003c');
+      const body = `
+        <p><a href="/admin/email/template/${k}">&larr; Back to template</a></p>
+        <h1>Visual editor: ${esc(t.key)}</h1>
+        <div style="display:flex;gap:8px;align-items:center;margin:8px 0 12px">
+          <button class="btn" id="gjsSave">Save &amp; close</button>
+          <a class="btn" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14;text-decoration:none" href="/admin/email/template/${k}">Cancel</a>
+          <span class="muted" id="gjsStatus"></span>
+        </div>
+        <p class="muted">Drag blocks from the right, click any text to edit it, use the style panel for colours and spacing. Keep the {{merge tags}} as plain text. Save exports email-safe inline-CSS HTML back to the template.</p>
+        <div id="gjs"></div>
+        <link rel="stylesheet" href="https://unpkg.com/grapesjs@0.21.13/dist/css/grapes.min.css">
+        <script src="https://unpkg.com/grapesjs@0.21.13/dist/grapes.min.js"></script>
+        <script src="https://unpkg.com/grapesjs-preset-newsletter@1.0.2"></script>
+        <script>
+        (function(){
+          var INITIAL = ${initial};
+          var presetFn = window.grapesjsPresetNewsletter || window['grapesjs-preset-newsletter'];
+          var editor = grapesjs.init({
+            container: '#gjs', height: '72vh', fromElement: false, storageManager: false,
+            plugins: presetFn ? [presetFn] : [],
+            components: INITIAL
+          });
+          function exportHtml(){
+            try { return editor.runCommand('gjs-get-inlined-html'); }
+            catch (e) { return editor.getHtml() + '<style>' + editor.getCss() + '</style>'; }
+          }
+          document.getElementById('gjsSave').addEventListener('click', function(){
+            var html = exportHtml();
+            var st = document.getElementById('gjsStatus'); st.textContent = 'Saving...';
+            fetch(location.pathname, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: html }) })
+              .then(function(r){ return r.json(); })
+              .then(function(j){ if(j && j.ok){ window.location = '/admin/email/template/${k}'; } else { st.textContent = 'Save failed.'; } })
+              .catch(function(){ st.textContent = 'Save failed - try again.'; });
+          });
+        })();
+        </script>`;
+      res.send(page('Visual editor ' + t.key, body));
+    } catch (e) { res.status(500).send('error: ' + esc(e.message)); }
+  });
+  app.post('/admin/email/template/:key/design', requireRole('admin'), async (req, res) => {
+    try {
+      const html = String((req.body && req.body.html) || '');
+      if (!html) return res.status(400).json({ ok: false, error: 'empty' });
+      await pool.query('UPDATE email_templates SET html_body=$2, updated_at=NOW() WHERE key=$1', [req.params.key, html]);
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
   });
 
   // edit sequence (toggle active + edit steps)
