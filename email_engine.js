@@ -507,18 +507,33 @@ function register(app, helpers) {
         <label class="muted">The prompt (editable — included by the buttons above):</label>
         <textarea id="aiprompt" style="min-height:240px">${esc(AI_PROMPT)}</textarea>
         <p class="muted">Merge tags: {{customer_name}}, {{site_url}}, {{unsubscribe_url}}, {{code}}, {{review_url}} — plus anything you pass in a sequence context. Keep them intact when editing.</p>
+        <h2>Send to Figma or Canva</h2>
+        <p class="muted">A server can't write into Figma, but the free <strong>html.to.design</strong> plugin imports this email as editable layers: click "Copy HTML for Figma", open the plugin inside Figma, and paste. Or download a PNG to drop into Canva/Figma as a reference. Anything you restyle there comes back to email by re-pasting the HTML into the box above.</p>
+        <div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn" id="copyfigma">Copy HTML for Figma</button>
+          <a class="btn" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14;text-decoration:none" target="_blank" rel="noopener" href="https://www.figma.com/community/plugin/1159123024924461424/html-to-design">Open html.to.design plugin ↗</a>
+          <button type="button" class="btn" id="downloadpng" style="background:#fff;color:#1C2A14;border:1px solid #1C2A14">Download PNG</button>
+        </div>
+        <div id="pngsource" style="position:absolute;left:-99999px;top:0;width:600px"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <script>
         (function(){
           var ta = document.getElementById('htmlbody');
           var frame = document.getElementById('tplpreview');
           var promptEl = document.getElementById('aiprompt');
+          var pngsource = document.getElementById('pngsource');
           var keys = ['customer_name','site_url','unsubscribe_url','code','review_url'];
           var sample = { customer_name:'Ivo', site_url:'https://turtleandsun.com', unsubscribe_url:'#unsubscribe', code:'TS-1A2B3C', review_url:'https://turtleandsun.com/account/review' };
-          function render(){
+          function substituted(){
             var html = ta.value || '';
             keys.forEach(function(key){ html = html.split('{{'+key+'}}').join(sample[key]); });
+            return html;
+          }
+          function render(){
+            var html = substituted();
             if(!/unsubscribe/i.test(html)){ html += '<hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px"><p style="font:12px Arial,sans-serif;color:#999">An unsubscribe link is added here automatically in the real email.</p>'; }
             frame.srcdoc = html;
+            if(pngsource){ pngsource.innerHTML = html; }
           }
           ta.addEventListener('input', render);
           render();
@@ -527,6 +542,20 @@ function register(app, helpers) {
           document.getElementById('copyhtml').addEventListener('click', function(){ copy(ta.value, this); });
           document.getElementById('copyprompt').addEventListener('click', function(){ copy(promptEl.value, this); });
           document.getElementById('copyboth').addEventListener('click', function(){ copy(promptEl.value + NL + NL + '----- CURRENT EMAIL HTML -----' + NL + NL + ta.value, this); });
+          document.getElementById('copyfigma').addEventListener('click', function(){ copy(substituted(), this); });
+          document.getElementById('downloadpng').addEventListener('click', function(){
+            var btn = this;
+            if(!window.html2canvas){ alert('Image tool still loading — try again in a second.'); return; }
+            var card = (pngsource && pngsource.firstElementChild) ? pngsource.firstElementChild : pngsource;
+            btn.textContent = 'Rendering...';
+            window.html2canvas(card, { backgroundColor:'#FBF6EC', scale:2, useCORS:true }).then(function(canvas){
+              canvas.toBlob(function(blob){
+                var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'email-preview.png'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+                btn.textContent = 'Download PNG';
+              });
+            }).catch(function(){ btn.textContent = 'Download PNG'; alert('Could not render the image.'); });
+          });
         })();
         </script>`;
       res.send(page('Template ' + t.key, b));
