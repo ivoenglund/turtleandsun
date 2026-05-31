@@ -285,7 +285,7 @@ async function ensureSeeds() {
     for (const t of STARTER_TEMPLATES) {
       await pool.query(
         `INSERT INTO email_templates (key, name, subject, html_body, text_body, category)
-         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (key) DO NOTHING`,
+         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (key) DO UPDATE SET html_body=EXCLUDED.html_body, updated_at=NOW()`,
         [t.key, t.name, t.subject, t.html, t.text || null, t.category || 'lifecycle']
       );
     }
@@ -318,13 +318,13 @@ async function ensureSeeds() {
 function wrap(title, inner) {
   return '<!doctype html><html><body style="margin:0;background:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
     '<div style="max-width:560px;margin:0 auto;padding:28px 22px">' +
-    '<div style="font-size:22px;font-weight:800;color:#1C2A14;margin-bottom:18px">Turtle &amp; Sun</div>' +
+    '<img src="https://turtleandsun.com/logo.png" width="246" height="94" alt="Turtle and Sun" style="width:246px;height:94px;display:block;margin-bottom:18px">' +
     inner +
     '<p style="font:12px/1.6 Arial;color:#999;margin-top:26px">Turtle &amp; Sun · <a href="{{site_url}}" style="color:#999">{{site_url}}</a><br>' +
     '<a href="{{unsubscribe_url}}" style="color:#999;text-decoration:underline">Unsubscribe</a></p>' +
     '</div></body></html>';
 }
-const BTN = 'display:inline-block;background:#1C2A14;color:#FFE800;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px';
+const BTN = 'display:inline-block;background:#097f0b;color:#FFE800;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px';
 
 const STARTER_TEMPLATES = [
   {
