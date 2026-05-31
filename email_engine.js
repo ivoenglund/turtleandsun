@@ -575,15 +575,17 @@ function register(app, helpers) {
             components: INITIAL
           });
           function exportHtml(){
-            try { return editor.runCommand('gjs-get-inlined-html'); }
-            catch (e) { return editor.getHtml() + '<style>' + editor.getCss() + '</style>'; }
+            var h = null;
+            try { h = editor.runCommand('gjs-get-inlined-html'); } catch (e) { h = null; }
+            if (!h) { h = editor.getHtml() + '<style>' + editor.getCss() + '</style>'; }
+            return h;
           }
           document.getElementById('gjsSave').addEventListener('click', function(){
             var html = exportHtml();
             var st = document.getElementById('gjsStatus'); st.textContent = 'Saving...';
             fetch(location.pathname, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: html }) })
               .then(function(r){ return r.json(); })
-              .then(function(j){ if(j && j.ok){ window.location = '/admin/email/template/${k}'; } else { st.textContent = 'Save failed.'; } })
+              .then(function(j){ if(j && j.ok){ window.location = '/admin/email/template/${k}'; } else { st.textContent = 'Save failed' + (j && j.error ? ': ' + j.error : '') + '.'; } })
               .catch(function(){ st.textContent = 'Save failed - try again.'; });
           });
         })();
