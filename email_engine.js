@@ -317,7 +317,10 @@ async function ensureSeeds() {
 
 const EMAIL_BG = 'linear-gradient(180deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%)';
 function wrap(title, inner) {
-  return '<!doctype html><html style="min-height:100%"><body style="margin:0;min-height:100%;background:' + EMAIL_BG + ';background-color:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
+  return '<!doctype html><html style="min-height:100%"><head><style>' +
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '@media print{a.ts-btn{background:#097f0b!important;color:#FFE800!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
+    '</style></head><body style="margin:0;min-height:100%;background:' + EMAIL_BG + ';background-color:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
     '<div style="max-width:560px;margin:0 auto;padding:28px 22px">' +
     '<img src="https://turtleandsun.com/logo.png" width="246" height="94" alt="Turtle and Sun" style="width:246px;height:94px;display:block;margin-bottom:18px">' +
     inner +
@@ -326,6 +329,7 @@ function wrap(title, inner) {
     '</div></body></html>';
 }
 const BTN = 'display:inline-block;background:#097f0b;color:#FFE800;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px';
+const BTNCLS = 'ts-btn';
 
 const STARTER_TEMPLATES = [
   {
@@ -334,14 +338,14 @@ const STARTER_TEMPLATES = [
     html: wrap('Thank you', '<p style="font-size:16px;line-height:1.6">Hi {{customer_name}},</p>' +
       '<p style="font-size:16px;line-height:1.6">Thank you for your first Loveogram — it means the world to us. We hope it brings a big smile to whoever receives it.</p>' +
       '<p style="font-size:16px;line-height:1.6">Keep an eye on your inbox: your finished piece arrives by email. If anything looks off, just reply — love it or we will remake it.</p>' +
-      '<p style="margin:22px 0"><a href="{{site_url}}" style="' + BTN + '">Make another</a></p>')
+      '<p style="margin:22px 0"><a href="{{site_url}}" class="' + BTNCLS + '" style="' + BTN + '">Make another</a></p>')
   },
   {
     key: 'review_request', name: 'Review request (+ discount)', category: 'lifecycle',
     subject: 'How was your Loveogram, {{customer_name}}?',
     html: wrap('Review', '<p style="font-size:16px;line-height:1.6">Hi {{customer_name}},</p>' +
       '<p style="font-size:16px;line-height:1.6">We would love to hear how your Loveogram landed. A quick review helps other families discover us — and takes less than a minute.</p>' +
-      '<p style="margin:22px 0"><a href="{{review_url}}" style="' + BTN + '">Leave a review</a></p>' +
+      '<p style="margin:22px 0"><a href="{{review_url}}" class="' + BTNCLS + '" style="' + BTN + '">Leave a review</a></p>' +
       '<p style="font-size:15px;line-height:1.6;color:#555">As a thank you, here is <strong>50% off</strong> your next one with code <strong>{{code}}</strong>.</p>')
   },
   {
@@ -349,21 +353,21 @@ const STARTER_TEMPLATES = [
     subject: 'A little idea for your next Loveogram',
     html: wrap('Make another', '<p style="font-size:16px;line-height:1.6">Hi {{customer_name}},</p>' +
       '<p style="font-size:16px;line-height:1.6">Birthdays, anniversaries, a thank-you to someone special — a Loveogram turns a favourite photo into something they will keep. Who comes to mind?</p>' +
-      '<p style="margin:22px 0"><a href="{{site_url}}" style="' + BTN + '">Start a new one</a></p>')
+      '<p style="margin:22px 0"><a href="{{site_url}}" class="' + BTNCLS + '" style="' + BTN + '">Start a new one</a></p>')
   },
   {
     key: 'seasonal_christmas', name: 'Seasonal — Christmas', category: 'occasion',
     subject: 'A heartfelt gift, ready before Christmas 🎄',
     html: wrap('Christmas', '<p style="font-size:16px;line-height:1.6">Hi {{customer_name}},</p>' +
       '<p style="font-size:16px;line-height:1.6">The most loved gifts are the personal ones. Turn a treasured family photo into a Loveogram and give something no shop can sell — in time for Christmas.</p>' +
-      '<p style="margin:22px 0"><a href="{{site_url}}" style="' + BTN + '">Create a Christmas Loveogram</a></p>')
+      '<p style="margin:22px 0"><a href="{{site_url}}" class="' + BTNCLS + '" style="' + BTN + '">Create a Christmas Loveogram</a></p>')
   },
   {
     key: 'birthday', name: 'Birthday', category: 'occasion',
     subject: 'Make their birthday unforgettable 🎂',
     html: wrap('Birthday', '<p style="font-size:16px;line-height:1.6">Hi {{customer_name}},</p>' +
       '<p style="font-size:16px;line-height:1.6">Someone special has a birthday coming up. A Loveogram made from a favourite photo is the kind of gift people keep on the mantelpiece for years.</p>' +
-      '<p style="margin:22px 0"><a href="{{site_url}}" style="' + BTN + '">Make a birthday Loveogram</a></p>')
+      '<p style="margin:22px 0"><a href="{{site_url}}" class="' + BTNCLS + '" style="' + BTN + '">Make a birthday Loveogram</a></p>')
   }
 ];
 
