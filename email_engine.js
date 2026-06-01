@@ -317,7 +317,7 @@ async function ensureSeeds() {
 
 const EMAIL_BG = 'linear-gradient(180deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%)';
 function wrap(title, inner) {
-  return '<!doctype html><html><body style="margin:0;background:' + EMAIL_BG + ';background-color:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
+  return '<!doctype html><html style="min-height:100%"><body style="margin:0;min-height:100%;background:' + EMAIL_BG + ';background-color:#FBF6EC;font-family:Arial,Helvetica,sans-serif;color:#1C0A00">' +
     '<div style="max-width:560px;margin:0 auto;padding:28px 22px">' +
     '<img src="https://turtleandsun.com/logo.png" width="246" height="94" alt="Turtle and Sun" style="width:246px;height:94px;display:block;margin-bottom:18px">' +
     inner +
@@ -498,7 +498,7 @@ function register(app, helpers) {
       b += `
         <h2>Live preview</h2>
         <p class="muted">Sample values are filled in so you see the real email. Updates as you edit the HTML above.</p>
-        <iframe id="tplpreview" sandbox="" style="width:100%;height:520px;border:1px solid #e3dcc8;border-radius:10px;background:#fff"></iframe>
+        <iframe id="tplpreview" sandbox="" style="width:100%;height:520px;border:1px solid #e3dcc8;border-radius:10px;"></iframe>
         <h2>Edit with an AI (outside this app)</h2>
         <p class="muted">Copy the prompt + HTML, paste into ChatGPT or Claude (together with any competitor emails), ask for changes, then paste the new HTML back into the box above and Save.</p>
         <div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap">
