@@ -326,7 +326,7 @@ function wrap(title, inner) {
     '<a href="{{unsubscribe_url}}" style="color:#999;text-decoration:underline">Unsubscribe</a></p>' +
     '</div></body></html>';
 }
-const BTN = 'display:inline-block;background:#097f0b;color:#FFE800;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+const BTN = 'display:inline-block;background:#FFE800;color:#1C2A14;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact';
 const BTNCLS = 'ts-btn';
 
 const STARTER_TEMPLATES = [
