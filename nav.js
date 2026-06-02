@@ -120,7 +120,7 @@
         '<div class="ts-nav-wrap">' +
           '<div class="ts-nav">' +
             '<div class="ts-nav-panel-spacer"></div>' +
-            '<a href="/"><img src="/logo.png" alt="Turtle and Sun"></a>' +
+            '<a href="/"><img src="/logo.svg" alt="Turtle and Sun"></a>' +
             '<div class="ts-nav-gap"></div>' +
             '<div class="ts-nav-links">' +
               '<a href="/" class="ts-nav-link">Home</a>' +
