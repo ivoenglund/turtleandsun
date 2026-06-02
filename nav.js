@@ -10,7 +10,7 @@
     '.ts-nav-panel-spacer{width:260px;flex-shrink:0;}' +
     '.ts-nav-gap{display:none;}' +
     '.ts-nav > a{margin-left:60px;}' +
-    '.ts-nav a img{height:52px;width:auto;margin-top:-30px;display:block;}' +
+    '.ts-nav a img{height:40px;width:auto;margin-top:-22px;display:block;}' +
     '.ts-nav-links{display:flex;gap:28px;align-items:center;margin-left:75px;}' +
     '.ts-nav-link{font-family:\'Plus Jakarta Sans\',sans-serif;font-size:14px;font-weight:500;color:#1C0A00;text-decoration:none;opacity:0.7;}' +
     '.ts-nav-link:hover{opacity:1;}' +
