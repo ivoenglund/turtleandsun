@@ -3013,12 +3013,13 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         // Before: resize + vignette + label
         const beforeBuf = await dlBuffer(clip.before_url);
         const beforeResized = await sharp(beforeBuf)
-          .resize(W, photoH, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+          .resize(W, photoH, { fit: 'cover', position: 'top' }).jpeg({ quality: 92 }).toBuffer();
         const vignSvg = Buffer.from(
           `<svg width='${W}' height='${photoH}'><defs>` +
-          `<radialGradient id='v' cx='50%' cy='50%' r='70%'>` +
-          `<stop offset='0%' stop-color='black' stop-opacity='0'/>` +
-          `<stop offset='100%' stop-color='black' stop-opacity='0.82'/>` +
+          `<radialGradient id='v' cx='50%' cy='50%' r='90%'>` +
+          `<stop offset='0%'  stop-color='black' stop-opacity='0'/>` +
+          `<stop offset='48%' stop-color='black' stop-opacity='0'/>` +
+          `<stop offset='100%' stop-color='black' stop-opacity='0.90'/>` +
           `</radialGradient></defs>` +
           `<rect width='${W}' height='${photoH}' fill='url(#v)'/></svg>`
         );
