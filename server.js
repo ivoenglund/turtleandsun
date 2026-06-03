@@ -2775,7 +2775,26 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
       `[vbefore][vafter]concat=n=2:v=1:a=0[vout]`,
     ].join('');
 
+    // Ensure ffmpeg is available — download lazily on first use
     const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
+    if (!require('fs').existsSync(ffmpegBin)) {
+      console.log('[social-clip] ffmpeg not found, downloading now (this may take 1-2 min)...');
+      await new Promise((resolve) => {
+        require('child_process').execFile(
+          process.execPath, [require('path').join(__dirname, 'scripts/download-ffmpeg.js')],
+          { timeout: 180000 },
+          (err, stdout, stderr) => {
+            if (stdout) console.log(stdout);
+            if (stderr) console.warn(stderr);
+            resolve();
+          }
+        );
+      });
+      if (!require('fs').existsSync(ffmpegBin)) {
+        return res.status(503).json({ error: 'FFmpeg unavailable. The download may have failed — check Railway logs and try again.' });
+      }
+      console.log('[social-clip] ffmpeg ready');
+    }
     await new Promise((resolve, reject) => {
       execFile(ffmpegBin, [
         '-y',
