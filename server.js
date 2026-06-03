@@ -896,7 +896,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     ${section('\u{1F4C6} Occasions & campaigns',
       card('Gifting occasions', 'National occasions, live dates, markets — what the campaign agent runs on.', '/admin/occasions') +
       card('Campaign queue', 'What is queued to draft, print, and send.', '/admin/occasions/queue') +
-      card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email')
+      card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email') +
+      card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations')
     )}
 
     <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
