@@ -3,153 +3,243 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Social Clips — Admin</title>
-<script src="/nav.js?v=20260602a"></script>
+<title>Social Clips — Turtle and Sun Admin</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px;}
-.page-header{padding:16px 24px 10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;}
-.page-header h1{font-size:18px;font-weight:800;}
-.hint{font-size:12px;color:#888;}
-.info-bar{padding:10px 24px 12px;background:#fff8ee;border-bottom:1px solid #e3dcc8;font-size:12px;color:#555;line-height:1.6;}
-.info-bar strong{color:#1C0A00;}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;padding:20px 24px;}
-.card{background:#fff;border-radius:12px;overflow:hidden;border:1.5px solid #e3dcc8;}
-.card-header{padding:10px 14px 6px;display:flex;align-items:center;gap:8px;}
-.card-title{font-weight:700;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.concept-tag{font-size:10px;font-weight:700;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:8px;}
-.media-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 10px 10px;}
-.media-cell{position:relative;aspect-ratio:9/16;background:#eee;border-radius:8px;overflow:hidden;}
-.media-cell img,.media-cell video{width:100%;height:100%;object-fit:cover;display:block;}
-.media-label{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;}
-.media-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#bbb;background:#f5f5f5;}
-.card-footer{padding:8px 10px 10px;display:flex;flex-direction:column;gap:6px;}
-.clip-options{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-.clip-text-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
-.clip-text-row input[type=text]{flex:1;min-width:80px;padding:4px 8px;border-radius:6px;border:1px solid #ccc;font-size:11px;}
-.clip-options label{font-size:11px;color:#555;display:flex;align-items:center;gap:4px;}
-.btn-create{flex:1;padding:8px 14px;border-radius:8px;border:none;background:#1C2A14;color:#FFE800;font-weight:700;font-size:12px;cursor:pointer;}
-.btn-create:hover{background:#2d4a24;}
-.btn-create:disabled{opacity:0.5;cursor:not-allowed;}
-.btn-download{flex:1;padding:8px 14px;border-radius:8px;border:1.5px solid #1C2A14;background:#fff;color:#1C2A14;font-weight:700;font-size:12px;cursor:pointer;text-decoration:none;text-align:center;}
-.btn-download:hover{background:#f0f7ea;}
-.status{font-size:11px;color:#555;min-height:16px;padding:0 2px;}
-.status.error{color:#e53935;}
-.status.ok{color:#2e7d32;}
-.loading{text-align:center;padding:60px;color:#aaa;grid-column:1/-1;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px}
+.page{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.subtitle{color:#666;font-size:12px;margin-bottom:20px}
+h2{font-size:15px;font-weight:700;margin:24px 0 10px}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer}
+.btn-primary{background:#1C2A14;color:#FFE800}
+.btn-primary:hover{background:#2d4a24}
+.btn-primary:disabled{background:#aaa;color:#fff;cursor:not-allowed}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-danger{background:#c0392b;color:#fff}
+.btn-danger:hover{background:#a93226}
+.select-all-row{display:flex;align-items:center;gap:6px;font-size:11px;color:#555}
+.triplets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.triplet-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);position:relative}
+.triplet-card .check-wrap{position:absolute;top:8px;left:8px;z-index:2}
+.triplet-card .check-wrap input{width:18px;height:18px;cursor:pointer}
+.triplet-card.selected{outline:2px solid #1C2A14}
+.media-row{display:flex;height:90px;gap:1px;background:#eee}
+.media-thumb{flex:1;overflow:hidden;background:#f5f5f5;display:flex;align-items:center;justify-content:center}
+.media-thumb img,.media-thumb video{width:100%;height:100%;object-fit:cover}
+.media-thumb.empty{font-size:10px;color:#bbb}
+.card-info{padding:8px 10px}
+.card-info .concept{font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-info .triplet-num{font-size:10px;color:#888}
+.card-missing{font-size:10px;color:#c0392b;margin-top:2px}
+.clips-table{width:100%;border-collapse:collapse;font-size:12px}
+.clips-table th{text-align:left;padding:6px 8px;border-bottom:2px solid #ddd;font-weight:700;color:#555}
+.clips-table td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:middle}
+.clips-table tr:hover td{background:#f9f7f3}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.badge-pending{background:#e0e0e0;color:#555}
+.badge-processing{background:#fff3cd;color:#856404}
+.badge-done{background:#d4edda;color:#155724}
+.badge-error{background:#f8d7da;color:#721c24}
+.pub-icons{display:flex;gap:4px}
+.pub-icon{font-size:14px;opacity:.3}
+.pub-icon.active{opacity:1}
+.thumb-tiny{width:36px;height:64px;object-fit:cover;border-radius:4px;cursor:pointer}
+a.detail-link{color:#1C2A14;font-weight:700;text-decoration:none}
+a.detail-link:hover{text-decoration:underline}
+.empty-state{text-align:center;padding:32px;color:#aaa;font-size:13px}
+.flash{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:12px}
+.flash-ok{background:#d4edda;color:#155724}
+.flash-err{background:#f8d7da;color:#721c24}
 </style>
 </head>
-<body class="ts-nav-loggedin ts-nav-admin">
-<div class="sun"></div>
-<script src="/currency.js?v=20260526a"></script>
-
-<div class="page-header">
+<body>
+<div class="page">
   <h1>Social Clips</h1>
-  <span class="hint"><a href="/admin" style="color:#3A6B20;text-decoration:none;">← Admin</a> &nbsp;·&nbsp; Before → After clips ready for TikTok, Instagram Reels, and YouTube Shorts (9:16).</span>
-</div>
+  <p class="subtitle">Select triplets to queue &rarr; open each clip to configure scenes and generate &rarr; publish to channels.</p>
 
-<div class="info-bar">
-  <strong>How it works:</strong> Pick a triplet or duplet, hit Create Clip. The server stitches the before photo + after video into a 9:16 MP4 with BEFORE / AFTER labels and your logo. Download and upload directly to TikTok, Instagram, and YouTube — same file works for all three.
-</div>
+  <div id="flash" style="display:none" class="flash"></div>
 
-<div id="grid" class="grid"><div class="loading">Loading…</div></div>
+  <h2>Triplets &mdash; select to queue</h2>
+  <div class="toolbar">
+    <label class="select-all-row"><input type="checkbox" id="select-all"> Select all</label>
+    <button class="btn btn-primary" id="btn-queue" disabled onclick="queueSelected()">Queue selected &#9658;</button>
+    <span id="sel-count" style="font-size:11px;color:#888"></span>
+  </div>
+  <div class="triplets-grid" id="triplets-grid">
+    <div class="empty-state">Loading&hellip;</div>
+  </div>
+
+  <h2>Clips library</h2>
+  <div class="toolbar">
+    <button class="btn btn-sm btn-primary" onclick="loadClips()">&#8635; Refresh</button>
+  </div>
+  <table class="clips-table">
+    <thead>
+      <tr>
+        <th>Preview</th>
+        <th>Concept</th>
+        <th>Status</th>
+        <th>Published</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="clips-tbody">
+      <tr><td colspan="6" class="empty-state">Loading&hellip;</td></tr>
+    </tbody>
+  </table>
+</div>
 
 <script>
-async function loadTriplets() {
-  const r = await fetch('/admin/api/social-clips/triplets').then(r => r.json()).catch(() => ({ rows: [] }));
-  const grid = document.getElementById('grid');
-  if (!r.rows || !r.rows.length) {
-    grid.innerHTML = '<div class="loading">No triplets found. Add some in the Triplets admin.</div>';
-    return;
-  }
-  grid.innerHTML = r.rows.map(t => {
-    const hasVideo  = !!t.video_url;
-    const hasBefore = !!t.before_url;
-    const canCreate = hasBefore && hasVideo;
-    const isDuplet  = hasBefore && hasVideo && !t.image_url;
-    const type      = isDuplet ? 'Duplet' : (hasBefore && hasVideo ? 'Triplet' : 'Incomplete');
+let selected = new Set();
+let tripletsData = [];
 
-    return `<div class="card" id="card-${t.id}">
-      <div class="card-header">
-        <div class="card-title">${escHtml(t.concept_name || 'Concept')} — #${t.id}</div>
-        <span class="concept-tag">${escHtml(type)}</span>
+async function init() {
+  await Promise.all([loadTriplets(), loadClips()]);
+}
+
+async function loadTriplets() {
+  const r = await fetch('/admin/api/social-clips/triplets');
+  const data = await r.json();
+  tripletsData = data;
+  renderTriplets(data);
+}
+
+function renderTriplets(triplets) {
+  const grid = document.getElementById('triplets-grid');
+  if (!triplets.length) { grid.innerHTML = '<div class="empty-state">No triplets found.</div>'; return; }
+  grid.innerHTML = triplets.map(t => {
+    const hasBefore = !!t.before_url;
+    const hasVideo  = !!t.video_url;
+    const canQueue  = hasBefore && hasVideo;
+    return `
+    <div class="triplet-card${selected.has(t.id) ? ' selected' : ''}" id="tc-${t.id}">
+      <div class="check-wrap">
+        <input type="checkbox" ${selected.has(t.id) ? 'checked' : ''} ${canQueue ? '' : 'disabled'}
+               onchange="toggleSelect(${t.id}, this.checked)">
       </div>
       <div class="media-row">
-        <div class="media-cell">
-          ${hasBefore
-            ? `<img src="${escAttr(t.before_url)}" loading="lazy">`
-            : '<div class="media-empty">No before</div>'}
-          <span class="media-label">BEFORE</span>
+        <div class="media-thumb${hasBefore ? '' : ' empty'}">
+          ${hasBefore ? `<img src="${escHtml(t.before_url)}" loading="lazy">` : 'No before'}
         </div>
-        <div class="media-cell">
+        <div class="media-thumb${hasVideo ? '' : ' empty'}">
           ${hasVideo
-            ? `<video src="${escAttr(t.video_url)}" preload="metadata" muted loop autoplay playsinline></video>`
-            : '<div class="media-empty">No video</div>'}
-          <span class="media-label">AFTER</span>
+            ? `<video src="${escHtml(t.video_url)}" muted playsinline preload="none"
+                 onmouseenter="this.play()" onmouseleave="this.pause()"></video>`
+            : 'No video'}
         </div>
       </div>
-      <div class="card-footer">
-        <div class="clip-text-row">
-          <input type="text" id="txt-before-${t.id}" value="BEFORE" placeholder="BEFORE label">
-          <input type="text" id="txt-after-${t.id}" value="AFTER" placeholder="AFTER label">
-          <input type="text" id="txt-concept-${t.id}" value="${escHtml(t.concept_name||'')}" placeholder="Concept name (top)">
-        </div>
-        <div class="clip-options">
-          <label><input type="checkbox" id="labels-${t.id}" checked> Labels</label>
-          <label><input type="checkbox" id="logo-${t.id}" checked> End card</label>
-        </div>
-        <div style="display:flex;gap:6px;">
-          ${canCreate
-            ? `<button class="btn-create" id="btn-${t.id}" onclick="createClip(${t.id}, '${escAttr(t.before_url)}', '${escAttr(t.video_url)}')">Create clip ▶</button>`
-            : `<button class="btn-create" disabled>Missing ${!hasBefore ? 'before image' : 'after video'}</button>`}
-        </div>
-        <div class="status" id="status-${t.id}"></div>
+      <div class="card-info">
+        <div class="concept">${escHtml(t.concept_name || '&mdash;')}</div>
+        <div class="triplet-num">Triplet #${t.triplet_number || t.id}</div>
+        ${!canQueue ? `<div class="card-missing">Missing ${!hasBefore ? 'before image' : 'after video'}</div>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-async function createClip(id, beforeUrl, videoUrl) {
-  const btn    = document.getElementById(`btn-${id}`);
-  const status = document.getElementById(`status-${id}`);
-  const showLabels  = document.getElementById(`labels-${id}`).checked;
-  const showLogo    = document.getElementById(`logo-${id}`).checked;
-  const lblBefore   = document.getElementById(`txt-before-${id}`)?.value || 'BEFORE';
-  const lblAfter    = document.getElementById(`txt-after-${id}`)?.value || 'AFTER';
-  const conceptName = document.getElementById(`txt-concept-${id}`)?.value || '';
-
-  btn.disabled = true;
-  btn.textContent = 'Creating… (up to 2 min)';
-  status.className = 'status';
-  status.textContent = 'Processing with FFmpeg…';
-
-  try {
-    const r = await fetch('/admin/api/social-clips/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ triplet_id: id, before_url: beforeUrl, video_url: videoUrl, concept_name: conceptName, label_before: lblBefore, label_after: lblAfter, show_labels: showLabels, show_logo: showLogo }),
-    });
-    const d = await r.json();
-    if (d.url) {
-      status.className = 'status ok';
-      status.innerHTML = `Done! <a href="${escAttr(d.url)}" download class="btn-download" style="display:inline-block;margin-top:4px;padding:6px 12px;">⬇ Download clip</a>`;
-      btn.textContent = 'Re-create';
-      btn.disabled = false;
-    } else {
-      throw new Error(d.error || 'Unknown error');
-    }
-  } catch (e) {
-    status.className = 'status error';
-    status.textContent = 'Error: ' + e.message;
-    btn.textContent = 'Retry';
-    btn.disabled = false;
-  }
+function toggleSelect(id, checked) {
+  if (checked) selected.add(id); else selected.delete(id);
+  const card = document.getElementById('tc-' + id);
+  if (card) card.classList.toggle('selected', checked);
+  updateSelCount();
 }
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escAttr(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function updateSelCount() {
+  const n = selected.size;
+  document.getElementById('sel-count').textContent = n ? n + ' selected' : '';
+  document.getElementById('btn-queue').disabled = n === 0;
+}
 
-NavBar.init({ requireAuth: true }).then(() => loadTriplets());
+document.getElementById('select-all').addEventListener('change', function() {
+  tripletsData.forEach(t => {
+    if (t.before_url && t.video_url) {
+      const cb = document.querySelector('#tc-' + t.id + ' input[type=checkbox]');
+      if (cb) { cb.checked = this.checked; toggleSelect(t.id, this.checked); }
+    }
+  });
+});
+
+async function queueSelected() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  const btn = document.getElementById('btn-queue');
+  btn.disabled = true;
+  btn.textContent = 'Queuing…';
+  try {
+    const r = await fetch('/admin/api/social-clips/queue', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ triplet_ids: ids }),
+    });
+    const d = await r.json();
+    if (d.created) {
+      showFlash('Queued ' + d.created.length + ' clip(s). Open each one below to generate.', 'ok');
+      selected.clear();
+      renderTriplets(tripletsData);
+      updateSelCount();
+      await loadClips();
+    } else {
+      showFlash(d.error || 'Unknown error', 'err');
+    }
+  } catch(e) { showFlash(e.message, 'err'); }
+  btn.textContent = 'Queue selected ►';
+  updateSelCount();
+}
+
+async function loadClips() {
+  const r = await fetch('/admin/api/social-clips');
+  const clips = await r.json();
+  const tbody = document.getElementById('clips-tbody');
+  if (!clips.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No clips yet &mdash; queue some above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = clips.map(c => `
+    <tr>
+      <td>${c.output_url
+        ? `<video class="thumb-tiny" src="${escHtml(c.output_url)}" muted playsinline preload="none"
+             onmouseenter="this.play()" onmouseleave="this.pause()" onclick="window.location='/admin/social-clips/${c.id}'"></video>`
+        : '&mdash;'}</td>
+      <td><a class="detail-link" href="/admin/social-clips/${c.id}">${escHtml(c.concept_name || '&mdash;')}</a></td>
+      <td>
+        <span class="badge badge-${c.status}">${c.status}</span>
+        ${c.error_msg ? `<div style="color:#c0392b;font-size:10px;margin-top:2px">${escHtml(c.error_msg.slice(0, 80))}</div>` : ''}
+      </td>
+      <td><div class="pub-icons">
+        <span class="pub-icon${c.published_tiktok ? ' active' : ''}" title="TikTok">&#127925;</span>
+        <span class="pub-icon${c.published_instagram ? ' active' : ''}" title="Instagram">&#128247;</span>
+        <span class="pub-icon${c.published_youtube ? ' active' : ''}" title="YouTube">&#9654;&#65039;</span>
+      </div></td>
+      <td>${new Date(c.created_at).toLocaleDateString()}</td>
+      <td style="display:flex;gap:4px">
+        <a class="btn btn-sm btn-primary" href="/admin/social-clips/${c.id}">Open</a>
+        <button class="btn btn-sm btn-danger" onclick="deleteClip(${c.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deleteClip(id) {
+  if (!confirm('Delete this clip?')) return;
+  await fetch('/admin/api/social-clips/' + id, { method: 'DELETE' });
+  await loadClips();
+}
+
+function showFlash(msg, type) {
+  const el = document.getElementById('flash');
+  el.textContent = msg;
+  el.className = 'flash flash-' + type;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
 </script>
 </body>
 </html>

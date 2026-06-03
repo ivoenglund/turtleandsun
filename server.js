@@ -2750,25 +2750,44 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
     const hasLogo = require('fs').existsSync(logoPath);
 
     // Text overlays
+    const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
     const beforeText = show_labels
-      ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='BEFORE':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+      ? `,drawtext=fontfile=${font}:text='${label_before.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
       : '';
     const afterText = show_labels
-      ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AFTER':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+      ? `,drawtext=fontfile=${font}:text='${label_after.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
       : '';
     const conceptText = show_labels
-      ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
+      ? `,drawtext=fontfile=${font}:text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
       : '';
 
-    const filter = [
+    // End card: cream background + brand text (+ logo overlay if logo.png exists)
+    const endCardEnabled = show_logo !== false;
+    const endDur = 3;
+    const ec1Text = `,drawtext=fontfile=${font}:text='Turtle and Sun':fontsize=64:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
+    const ec2Text = `,drawtext=fontfile=${font}:text='Remember to love':fontsize=40:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
+    // [2:v] is the logo (only added if file exists), else we use color source only.
+    // We always pass the logo as input; if missing we use a 1x1 transparent placeholder.
+    const endCardFilter = endCardEnabled
+      ? `color=c=#FFFEF5:size=1080x1920:rate=30:duration=${endDur}[ecbg];` +
+        `[ecbg]${ec1Text}${ec2Text},fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`
+      : '';
+
+    const filterParts = [
       `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
       `crop=1080:1920${beforeText},`,
       `fade=t=out:st=2.5:d=0.5[vbefore];`,
       `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
       `crop=1080:1920${afterText}${conceptText},`,
       `fade=t=in:st=0:d=0.5[vafter];`,
-      `[vbefore][vafter]concat=n=2:v=1:a=0[vout]`,
-    ].join('');
+    ];
+    if (endCardEnabled) {
+      filterParts.push(endCardFilter);
+      filterParts.push(`[vbefore][vafter][vendcard]concat=n=3:v=1:a=0[vout]`);
+    } else {
+      filterParts.push(`[vbefore][vafter]concat=n=2:v=1:a=0[vout]`);
+    }
+    const filter = filterParts.join('');
 
     // Ensure ffmpeg is available — download lazily on first use
     const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
@@ -2817,6 +2836,272 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
     res.status(500).json({ error: e.message });
   } finally {
     require('fs').rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+// =====================================================================
+// Social Clips — library CRUD + generation + publish stubs
+// =====================================================================
+
+// Serve the detail page
+app.get('/admin/social-clips/:id(\\d+)', requireRole('admin'), (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-social-clip-detail.html'));
+});
+
+// List all clips (with concept name, status, output URL)
+app.get('/admin/api/social-clips', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT sc.*, c.name AS concept_name_live
+      FROM social_clips sc
+      LEFT JOIN concepts c ON c.id = sc.concept_id
+      ORDER BY sc.created_at DESC
+      LIMIT 200
+    `);
+    res.json(rows);
+  } catch (e) {
+    console.error('[social-clips/list]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Queue one or more triplets — creates pending social_clip rows
+app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res) => {
+  const { triplet_ids } = req.body; // array of triplet IDs
+  if (!Array.isArray(triplet_ids) || triplet_ids.length === 0)
+    return res.status(400).json({ error: 'triplet_ids must be a non-empty array' });
+  try {
+    const { rows: triplets } = await pool.query(`
+      SELECT t.id, t.concept_id, c.name AS concept_name,
+             bm.url AS before_url, vm.url AS video_url
+      FROM concept_triplets t
+      JOIN concepts c ON c.id = t.concept_id
+      LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
+      LEFT JOIN concept_media vm ON vm.id = t.video_media_id  AND vm.active = TRUE
+      WHERE t.id = ANY($1::int[])
+    `, [triplet_ids]);
+    const created = [];
+    for (const t of triplets) {
+      const { rows: [row] } = await pool.query(`
+        INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url]);
+      created.push(row.id);
+    }
+    res.json({ created });
+  } catch (e) {
+    console.error('[social-clips/queue]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get a single clip
+app.get('/admin/api/social-clips/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM social_clips WHERE id = $1`, [parseInt(req.params.id)]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Update clip settings
+app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const {
+    label_before, before_duration_s, label_after, show_labels,
+    end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
+  } = req.body;
+  try {
+    const { rows } = await pool.query(`
+      UPDATE social_clips SET
+        label_before       = COALESCE($2, label_before),
+        before_duration_s  = COALESCE($3, before_duration_s),
+        label_after        = COALESCE($4, label_after),
+        show_labels        = COALESCE($5, show_labels),
+        end_card_enabled   = COALESCE($6, end_card_enabled),
+        end_card_line1     = COALESCE($7, end_card_line1),
+        end_card_line2     = COALESCE($8, end_card_line2),
+        show_logo          = COALESCE($9, show_logo),
+        end_card_duration_s= COALESCE($10, end_card_duration_s),
+        updated_at         = now()
+      WHERE id = $1
+      RETURNING *
+    `, [id, label_before, before_duration_s, label_after, show_labels,
+        end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Delete a clip
+app.delete('/admin/api/social-clips/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM social_clips WHERE id = $1`, [parseInt(req.params.id)]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Generate (or re-generate) a clip — reads settings from DB
+app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { execFile } = require('child_process');
+  const os    = require('os');
+  const pathM = require('path');
+
+  let clip;
+  try {
+    const { rows } = await pool.query(`SELECT * FROM social_clips WHERE id = $1`, [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    clip = rows[0];
+  } catch (e) { return res.status(500).json({ error: e.message }); }
+
+  if (!clip.before_url || !clip.after_video_url)
+    return res.status(400).json({ error: 'Missing before_url or after_video_url on this clip' });
+
+  // Mark processing immediately
+  await pool.query(`UPDATE social_clips SET status='processing', error_msg=NULL, updated_at=now() WHERE id=$1`, [id]);
+  res.json({ ok: true, message: 'Generation started — poll /admin/api/social-clips/' + id + ' for status' });
+
+  // Run generation in background (don't await in request)
+  (async () => {
+    const tmpDir = require('fs').mkdtempSync(pathM.join(os.tmpdir(), 'tns-clip-'));
+    const beforeFile = pathM.join(tmpDir, 'before.jpg');
+    const videoFile  = pathM.join(tmpDir, 'after.mp4');
+    const outFile    = pathM.join(tmpDir, 'clip.mp4');
+    try {
+      const _https = require('https');
+      const _http  = require('http');
+      const fs2 = require('fs');
+      async function dlFile(url, dest) {
+        return new Promise((resolve, reject) => {
+          const lib = url.startsWith('https') ? _https : _http;
+          const file = fs2.createWriteStream(dest);
+          lib.get(url, res2 => {
+            if (res2.statusCode >= 300 && res2.headers.location) {
+              file.close();
+              return dlFile(res2.headers.location, dest).then(resolve).catch(reject);
+            }
+            res2.pipe(file);
+            file.on('finish', () => { file.close(); resolve(); });
+          }).on('error', err => { fs2.unlink(dest, () => {}); reject(err); });
+        });
+      }
+      await dlFile(clip.before_url, beforeFile);
+      await dlFile(clip.after_video_url, videoFile);
+
+      const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+      const label = (clip.concept_name || 'LOVEOGRAM').toUpperCase();
+      const label_before = clip.label_before || 'BEFORE';
+      const label_after  = clip.label_after  || 'AFTER';
+      const show_labels  = clip.show_labels  !== false;
+      const beforeDur    = parseFloat(clip.before_duration_s) || 3;
+
+      const beforeText = show_labels
+        ? `,drawtext=fontfile=${font}:text='${label_before.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+        : '';
+      const afterText = show_labels
+        ? `,drawtext=fontfile=${font}:text='${label_after.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+        : '';
+      const conceptText = show_labels
+        ? `,drawtext=fontfile=${font}:text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
+        : '';
+
+      const endCardEnabled = clip.end_card_enabled !== false;
+      const endDur = parseFloat(clip.end_card_duration_s) || 3;
+      const ecLine1 = (clip.end_card_line1 || 'Turtle and Sun').replace(/'/g, "\\'");
+      const ecLine2 = (clip.end_card_line2 || 'Remember to love').replace(/'/g, "\\'");
+      const ec1Text = `,drawtext=fontfile=${font}:text='${ecLine1}':fontsize=64:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
+      const ec2Text = `,drawtext=fontfile=${font}:text='${ecLine2}':fontsize=40:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
+      const endCardFilter = endCardEnabled
+        ? `color=c=#FFFEF5:size=1080x1920:rate=30:duration=${endDur}[ecbg];` +
+          `[ecbg]${ec1Text}${ec2Text},fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`
+        : '';
+
+      const filterParts = [
+        `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
+        `crop=1080:1920${beforeText},`,
+        `fade=t=out:st=${beforeDur - 0.5}:d=0.5[vbefore];`,
+        `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
+        `crop=1080:1920${afterText}${conceptText},`,
+        `fade=t=in:st=0:d=0.5[vafter];`,
+      ];
+      if (endCardEnabled) {
+        filterParts.push(endCardFilter);
+        filterParts.push(`[vbefore][vafter][vendcard]concat=n=3:v=1:a=0[vout]`);
+      } else {
+        filterParts.push(`[vbefore][vafter]concat=n=2:v=1:a=0[vout]`);
+      }
+      const filter = filterParts.join('');
+
+      const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
+      if (!require('fs').existsSync(ffmpegBin)) {
+        await new Promise((resolve) => {
+          require('child_process').execFile(
+            process.execPath, [require('path').join(__dirname, 'scripts/download-ffmpeg.js')],
+            { timeout: 180000 }, (err, stdout, stderr) => { resolve(); }
+          );
+        });
+      }
+      if (!require('fs').existsSync(ffmpegBin)) throw new Error('FFmpeg unavailable');
+
+      await new Promise((resolve, reject) => {
+        execFile(ffmpegBin, [
+          '-y',
+          '-loop', '1', '-t', String(beforeDur), '-framerate', '30', '-i', beforeFile,
+          '-i', videoFile,
+          '-filter_complex', filter,
+          '-map', '[vout]',
+          '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          outFile,
+        ], { timeout: 180000 }, (err, stdout, stderr) => {
+          if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(-800)));
+          resolve();
+        });
+      });
+
+      const { uploadBuffer } = require('./storage');
+      const clipBuf = require('fs').readFileSync(outFile);
+      const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip' });
+      await pool.query(`UPDATE social_clips SET status='done', output_url=$2, updated_at=now() WHERE id=$1`, [id, r2.url]);
+    } catch (e) {
+      console.error('[social-clip generate]', e.message);
+      await pool.query(`UPDATE social_clips SET status='error', error_msg=$2, updated_at=now() WHERE id=$1`, [id, e.message]);
+    } finally {
+      require('fs').rmSync(tmpDir, { recursive: true, force: true });
+    }
+  })();
+});
+
+// Publish stub — records intent; actual API calls TBD when channel tokens are configured
+app.post('/admin/api/social-clips/:id(\\d+)/publish', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { channels } = req.body; // ['tiktok','instagram','youtube']
+  if (!Array.isArray(channels) || channels.length === 0)
+    return res.status(400).json({ error: 'channels must be a non-empty array' });
+  try {
+    const { rows } = await pool.query(`SELECT * FROM social_clips WHERE id=$1`, [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (!rows[0].output_url) return res.status(400).json({ error: 'Clip not generated yet' });
+    // TODO: wire up real TikTok / Instagram / YouTube upload APIs
+    // For now, mark the columns so the UI shows intent
+    const updates = [];
+    if (channels.includes('tiktok'))    updates.push(`published_tiktok=TRUE`);
+    if (channels.includes('instagram')) updates.push(`published_instagram=TRUE`);
+    if (channels.includes('youtube'))   updates.push(`published_youtube=TRUE`);
+    if (updates.length) {
+      await pool.query(`UPDATE social_clips SET ${updates.join(',')}, updated_at=now() WHERE id=$1`, [id]);
+    }
+    res.json({ ok: true, note: 'Channel upload APIs not yet wired — marked as published locally.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

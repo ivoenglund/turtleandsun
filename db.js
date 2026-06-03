@@ -609,6 +609,74 @@ async function initDb() {
     console.log('Seeded Talking Pet — Birthday concept');
   }
 
+  // ====================================================================
+  // Social Clips — DB-backed clip library with per-channel stats (2026-06-03)
+  // ====================================================================
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_clips (
+      id                    SERIAL PRIMARY KEY,
+      triplet_id            INTEGER REFERENCES concept_triplets(id) ON DELETE SET NULL,
+      concept_id            INTEGER REFERENCES concepts(id) ON DELETE SET NULL,
+      concept_name          TEXT,
+
+      -- Source URLs snapshotted at queue time
+      before_url            TEXT,
+      after_video_url       TEXT,
+
+      -- Scene 1 settings
+      label_before          TEXT        NOT NULL DEFAULT 'BEFORE',
+      before_duration_s     NUMERIC     NOT NULL DEFAULT 3,
+
+      -- Scene 2 settings
+      label_after           TEXT        NOT NULL DEFAULT 'AFTER',
+      show_labels           BOOLEAN     NOT NULL DEFAULT TRUE,
+
+      -- Scene 3 — end card
+      end_card_enabled      BOOLEAN     NOT NULL DEFAULT TRUE,
+      end_card_line1        TEXT        NOT NULL DEFAULT 'Turtle and Sun',
+      end_card_line2        TEXT        NOT NULL DEFAULT 'Remember to love',
+      show_logo             BOOLEAN     NOT NULL DEFAULT TRUE,
+      end_card_duration_s   NUMERIC     NOT NULL DEFAULT 3,
+
+      -- Output
+      output_url            TEXT,
+      status                TEXT        NOT NULL DEFAULT 'pending'
+                              CHECK (status IN ('pending','processing','done','error')),
+      error_msg             TEXT,
+
+      -- Publishing
+      published_tiktok      BOOLEAN     NOT NULL DEFAULT FALSE,
+      published_instagram   BOOLEAN     NOT NULL DEFAULT FALSE,
+      published_youtube     BOOLEAN     NOT NULL DEFAULT FALSE,
+      tiktok_video_id       TEXT,
+      instagram_media_id    TEXT,
+      youtube_video_id      TEXT,
+      tiktok_post_url       TEXT,
+      instagram_post_url    TEXT,
+      youtube_post_url      TEXT,
+
+      -- Per-channel stats (refreshed on demand / scheduled)
+      tiktok_views          INTEGER,
+      tiktok_likes          INTEGER,
+      tiktok_shares         INTEGER,
+      tiktok_comments        INTEGER,
+      instagram_views       INTEGER,
+      instagram_likes       INTEGER,
+      instagram_shares      INTEGER,
+      instagram_comments    INTEGER,
+      youtube_views         INTEGER,
+      youtube_likes         INTEGER,
+      youtube_comments      INTEGER,
+      stats_refreshed_at    TIMESTAMPTZ,
+
+      created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS social_clips_status_idx   ON social_clips(status);
+    CREATE INDEX IF NOT EXISTS social_clips_triplet_idx  ON social_clips(triplet_id);
+    CREATE INDEX IF NOT EXISTS social_clips_concept_idx  ON social_clips(concept_id);
+  `);
+
   console.log('Database tables ready');
 }
 
