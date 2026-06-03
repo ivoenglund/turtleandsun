@@ -2756,8 +2756,9 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
       `[vbefore][vafter]concat=n=2:v=1:a=0[vout]`,
     ].join('');
 
+    const ffmpegBin = (() => { try { return require('ffmpeg-static'); } catch { return 'ffmpeg'; } })();
     await new Promise((resolve, reject) => {
-      execFile('ffmpeg', [
+      execFile(ffmpegBin, [
         '-y',
         '-loop', '1', '-i', beforeFile,
         '-i', videoFile,
