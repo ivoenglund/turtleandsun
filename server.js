@@ -2764,7 +2764,7 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
     // End card: cream background + brand text (+ logo overlay if logo.png exists)
     const endCardEnabled = show_logo !== false;
     const endDur = 3;
-    const ec1Text = `,drawtext=fontfile=${font}:text='Turtle and Sun':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
+    const ec1Text = `drawtext=fontfile=${font}:text='Turtle and Sun':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
     const ec2Text = `,drawtext=fontfile=${font}:text='Remember to love':fontsize=40:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
     // [2:v] is the logo (only added if file exists), else we use color source only.
     // We always pass the logo as input; if missing we use a 1x1 transparent placeholder.
@@ -3017,7 +3017,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const endDur = parseFloat(clip.end_card_duration_s) || 3;
       const ecLine1 = (clip.end_card_line1 || 'Turtle and Sun').replace(/'/g, "\\'");
       const ecLine2 = (clip.end_card_line2 || 'Remember to love').replace(/'/g, "\\'");
-      const ec1Text = `,drawtext=fontfile=${font}:text='${ecLine1}':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
+      const ec1Text = `drawtext=fontfile=${font}:text='${ecLine1}':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
       const ec2Text = `,drawtext=fontfile=${font}:text='${ecLine2}':fontsize=40:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
       const endCardFilter = endCardEnabled
         ? `color=c=#FFFEF5:size=1080x1920:rate=30:duration=${endDur}[ecbg];` +
