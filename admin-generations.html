@@ -154,9 +154,18 @@ async function load(page) {
 
     return `<div class="card${isFlagged?' flagged':''}${isFailed?' failed':''}" id="card-${g.id}">
       ${isFlagged ? '<span class="flag-badge">⚑ Flagged</span>' : ''}
-      ${thumbUrl
-        ? `<img class="thumb" src="${esc(thumbUrl)}" onclick="openLb('${esc(thumbUrl)}',${isVideo})" onerror="this.style.display='none'">`
-        : `<div class="thumb-placeholder">${isFailed ? '✗ Failed' : 'Pending…'}</div>`}
+      ${!thumbUrl
+        ? `<div class="thumb-placeholder">${isFailed ? '✗ Failed' : 'Pending…'}</div>`
+        : isVideo
+          ? `<div style="position:relative;cursor:pointer;" onclick="openLb('${esc(thumbUrl)}',true)">
+               <video class="thumb" src="${esc(thumbUrl)}" preload="metadata" muted playsinline style="pointer-events:none;"></video>
+               <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+                 <div style="width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;">
+                   <div style="width:0;height:0;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:16px solid #fff;margin-left:3px;"></div>
+                 </div>
+               </div>
+             </div>`
+          : `<img class="thumb" src="${esc(thumbUrl)}" onclick="openLb('${esc(thumbUrl)}',false)" onerror="this.style.display='none'">`}
       <div class="card-body">
         <div class="card-title" title="${esc(g.concept_name||g.product||'')}">
           ${esc(g.concept_name || g.product || 'Unknown')}
