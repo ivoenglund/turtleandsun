@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Loveograms — Turtle and Sun</title>
+<title>My Archive — Turtle and Sun</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -78,8 +78,8 @@ body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:linear-gradient
     <!-- Drag-in drop zone -->
     <div class="dropzone" id="dropzone">
       <div class="dropzone-icon">🐢</div>
-      <p><strong>Drop a photo here</strong> to start a new Loveogram</p>
-      <p style="margin-top:4px;font-size:12px;">or <a href="/" style="color:#1C2A14;font-weight:700;">browse styles →</a></p>
+      <p><strong>Drop a photo here</strong> to add it to your archive</p>
+      <p style="margin-top:4px;font-size:12px;">Drag a saved photo here to create a new Loveogram</p>
     </div>
 
     <!-- Gallery -->
@@ -129,10 +129,18 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') closeLightbox()
 function makeDraggable(card, url, filename) {
   card.setAttribute('draggable', 'true');
   card.addEventListener('dragstart', e => {
+    // text/plain carries the URL for internal drop-to-create
+    e.dataTransfer.setData('text/plain', url);
     const ext = url.match(/\.(mp4|webm|mov)(\?|$)/i) ? 'video/mp4' : 'image/jpeg';
     e.dataTransfer.setData('DownloadURL', `${ext}:${filename}:${url}`);
     e.dataTransfer.effectAllowed = 'copy';
   });
+}
+
+async function deleteOrder(id) {
+  if (!confirm('Remove this from your archive?')) return;
+  await fetch(`/api/account/order/${id}`, { method: 'DELETE' });
+  document.getElementById('card-' + id)?.remove();
 }
 
 function renderGallery(orders) {
@@ -175,6 +183,7 @@ function renderGallery(orders) {
           ${viewUrl ? `<a class="lv-btn" href="/api/download?url=${encodeURIComponent(viewUrl)}&filename=loveogram-${o.id}${isVideo?'.mp4':'.jpg'}">↓ Download</a>` : ''}
           ${imgUrl  ? `<a class="lv-btn" href="/print/loveogram?url=${encodeURIComponent(imgUrl)}" target="_blank">Print</a>` : ''}
           ${!viewUrl ? `<span style="font-size:12px;color:#aaa;">Processing…</span>` : ''}
+          <button class="lv-btn" style="border-color:#e53935;color:#e53935;margin-left:auto;" onclick="deleteOrder(${o.id})">✕ Delete</button>
         </div>
       </div>
     </div>`;
@@ -199,11 +208,18 @@ function renderGallery(orders) {
   dz.addEventListener('drop', async e => {
     e.preventDefault();
     dz.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith('image/')) {
-      alert('Please drop an image file to start a new Loveogram.');
+
+    // Internal drag — card from archive dragged to dropzone → create Loveogram
+    const internalUrl = e.dataTransfer.getData('text/plain');
+    if (internalUrl && internalUrl.startsWith('http')) {
+      sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: internalUrl, ts: Date.now() }));
+      window.location.href = '/';
       return;
     }
+
+    // External file drop → save to archive
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
     dz.querySelector('p').textContent = 'Uploading…';
     try {
       const fd = new FormData();
@@ -211,24 +227,15 @@ function renderGallery(orders) {
       const r = await fetch('/upload', { method: 'POST', body: fd });
       const j = await r.json();
       if (!j.url) throw new Error(j.error || 'Upload failed');
-      // Ask what to do with the photo
-      const makeLoveogram = confirm('Photo uploaded!\n\nClick OK to create a new Loveogram from this photo.\nClick Cancel to save it to your archive only.');
-      if (makeLoveogram) {
-        sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: j.url, ts: Date.now() }));
-        window.location.href = '/';
-      } else {
-        // Save to archive — store as a photo-only order entry via API
-        await fetch('/api/account/archive-photo', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ url: j.url, filename: file.name })
-        });
-        load(); // reload gallery
-        dz.querySelector('p').innerHTML = '<strong>Drop a photo here</strong> to start a new Loveogram';
-      }
+      await fetch('/api/account/archive-photo', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ url: j.url, filename: file.name })
+      });
+      load();
+      dz.querySelector('p').innerHTML = '<strong>Drop a photo here</strong> to add it to your archive';
     } catch(err) {
       dz.querySelector('p').textContent = 'Upload failed — try again.';
-      console.error(err);
     }
   });
   dz.addEventListener('click', () => window.location.href = '/');
@@ -239,7 +246,7 @@ async function load() {
     const res = await fetch('/api/account/data');
     if (res.status === 401) { location.href = '/login'; return; }
     const { user, orders } = await res.json();
-    document.getElementById('welcomeMsg').textContent = 'My Loveograms';
+    document.getElementById('welcomeMsg').textContent = 'My Archive';
     document.getElementById('emailLine').textContent = user.email;
     renderGallery(orders);
     document.getElementById('loading').style.display = 'none';

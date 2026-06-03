@@ -4813,6 +4813,14 @@ app.post('/api/account/archive-photo', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.delete('/api/account/order/:id', requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await pool.query('DELETE FROM orders WHERE id=$1 AND email=$2', [id, req.user.email]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/download', requireAuth, async (req, res) => {
   const url = String(req.query.url || '');
   const filename = String(req.query.filename || 'loveogram');
