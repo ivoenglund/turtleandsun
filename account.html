@@ -58,6 +58,12 @@ body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:linear-gradient
 @media(max-width:600px){.main{padding:20px 16px 40px;}.gallery{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;}}
 </style>
 <script src="/nav.js?v=20260602a"></script>
+<style>
+/* Align nav logo with page content left edge */
+.ts-nav-panel-spacer{display:none!important;}
+.ts-nav-wrap{max-width:960px;margin:0 auto;padding:0 40px;}
+.ts-nav > a{margin-left:0!important;}
+</style>
 </head>
 <body>
 <div class="main">
@@ -69,10 +75,7 @@ body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:linear-gradient
         <h2 id="welcomeMsg">My Loveograms</h2>
         <p id="emailLine"></p>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <a href="/account/review" style="font-size:13px;font-weight:700;color:#1C2A14;text-decoration:none;border:1.5px solid #1C2A14;border-radius:8px;padding:8px 14px;background:rgba(255,255,255,0.4);">&#9733; Leave a review</a>
-        <a href="/" class="btn-new">+ New Loveogram</a>
-      </div>
+      <a href="/account/review" style="font-size:13px;font-weight:700;color:#1C2A14;text-decoration:none;border:1.5px solid #1C2A14;border-radius:8px;padding:8px 14px;background:rgba(255,255,255,0.4);">&#9733; Leave a review</a>
     </div>
 
     <!-- Drag-in drop zone -->
