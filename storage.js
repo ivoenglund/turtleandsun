@@ -132,7 +132,8 @@ async function downloadAndStore({ remoteUrl, kind = 'order', orderId = null }) {
     ? `orders/${orderId}/${kind === 'order-input' ? 'input' : 'output'}${ct.includes('mp4') ? '.mp4' : ct.includes('webm') ? '.webm' : ct.includes('png') ? '.png' : '.jpg'}`
     : null;
 
-  return uploadBuffer({ buffer, contentType: ct, kind: 'order', originalName: key ? key.split('/').pop() : undefined });
+  const result = await uploadBuffer({ buffer, contentType: ct, kind: 'order', originalName: key ? key.split('/').pop() : undefined });
+  return { ...result, bytes: buffer.length };
 }
 
 module.exports = { uploadBuffer, uploadStream, downloadAndStore };

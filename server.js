@@ -2422,6 +2422,31 @@ app.get('/gallery', async (req, res) => {
   }
 });
 
+// ---- Quality warning email -----------------------------------------------
+async function sendQualityWarning({ orderId, email, concept, reason, thumbUrl }) {
+  try {
+    const adminUrl = `https://turtleandsun.com/admin/generations`;
+    const html = `<div style="font-family:Arial,sans-serif;max-width:600px;padding:24px;">
+      <h2 style="color:#e53935;">&#9888; Loveogram quality warning</h2>
+      <p><strong>Reason:</strong> ${reason}</p>
+      <p><strong>Order:</strong> #${orderId || '?'} &mdash; ${email || 'unknown email'}</p>
+      <p><strong>Concept:</strong> ${concept || '?'}</p>
+      ${thumbUrl ? `<p><img src="${thumbUrl}" style="max-width:200px;border-radius:8px;display:block;margin:12px 0;"></p>` : ''}
+      <p><a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#1C2A14;color:#FFE800;text-decoration:none;border-radius:8px;font-weight:700;">Review in admin &rarr;</a></p>
+    </div>`;
+    await resend.emails.send({
+      from: 'Turtle and Sun <hello@turtleandsun.com>',
+      to: 'hello@turtleandsun.com',
+      subject: `⚠️ Quality warning — Order #${orderId || '?'} — ${reason}`,
+      html,
+    });
+    console.warn('[quality] warning sent for order', orderId, '—', reason);
+  } catch(e) {
+    console.error('[quality] failed to send warning email:', e.message);
+  }
+}
+
+
 async function generateVideo(portrait_url) {
   const result = await fal.subscribe('fal-ai/kling-video/v3/pro/image-to-video', {
     input: {
@@ -2499,6 +2524,7 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
         const r2img = await downloadAndStore({ remoteUrl: imageUrl, kind: 'order', orderId });
         await pool.query('UPDATE orders SET output_asset_url=$1, asset_status=$2 WHERE id=$3', [r2img.url, 'stored', orderId]);
         imageUrl = r2img.url;
+        if (r2img.bytes < 51200) sendQualityWarning({ orderId, email, concept: concept && concept.name, reason: 'Image too small (' + r2img.bytes + ' bytes) - may be blank', thumbUrl: r2img.url });
       } catch(e) { console.warn('[asset] R2 image store failed:', e.message); }
     }
   }
@@ -2569,6 +2595,7 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
         const r2vid = await downloadAndStore({ remoteUrl: videoUrl, kind: 'order', orderId });
         await pool.query('UPDATE orders SET output_video_asset_url=$1, asset_status=$2 WHERE id=$3', [r2vid.url, 'stored', orderId]);
         videoUrl = r2vid.url;
+        if (r2vid.bytes < 512000) sendQualityWarning({ orderId, email, concept: concept && concept.name, reason: 'Video too small (' + Math.round(r2vid.bytes/1024) + 'KB) - may be corrupted', thumbUrl: null });
       } catch(e) { console.warn('[asset] R2 video store failed:', e.message); }
     }
   }
