@@ -2764,8 +2764,8 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
     // End card: cream background + brand text (+ logo overlay if logo.png exists)
     const endCardEnabled = show_logo !== false;
     const endDur = 3;
-    const ec1Text = `,drawtext=fontfile=${font}:text='Turtle and Sun':fontsize=64:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
-    const ec2Text = `,drawtext=fontfile=${font}:text='Remember to love':fontsize=40:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
+    const ec1Text = `,drawtext=fontfile=${font}:text='Turtle and Sun':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
+    const ec2Text = `,drawtext=fontfile=${font}:text='Remember to love':fontsize=40:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
     // [2:v] is the logo (only added if file exists), else we use color source only.
     // We always pass the logo as input; if missing we use a 1x1 transparent placeholder.
     const endCardFilter = endCardEnabled
@@ -2811,7 +2811,7 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
     }
     await new Promise((resolve, reject) => {
       execFile(ffmpegBin, [
-        '-y',
+        '-y', '-loglevel', 'error',
         '-loop', '1', '-t', '3', '-framerate', '30', '-i', beforeFile,
         '-i', videoFile,
         '-filter_complex', filter,
@@ -2820,7 +2820,7 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
         '-movflags', '+faststart',
         outFile,
       ], { timeout: 120000 }, (err, stdout, stderr) => {
-        if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(-800))); }
+        if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(0, 1200))); }
         resolve();
       });
     });
@@ -3017,8 +3017,8 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const endDur = parseFloat(clip.end_card_duration_s) || 3;
       const ecLine1 = (clip.end_card_line1 || 'Turtle and Sun').replace(/'/g, "\\'");
       const ecLine2 = (clip.end_card_line2 || 'Remember to love').replace(/'/g, "\\'");
-      const ec1Text = `,drawtext=fontfile=${font}:text='${ecLine1}':fontsize=64:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
-      const ec2Text = `,drawtext=fontfile=${font}:text='${ecLine2}':fontsize=40:fontcolor=#1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
+      const ec1Text = `,drawtext=fontfile=${font}:text='${ecLine1}':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
+      const ec2Text = `,drawtext=fontfile=${font}:text='${ecLine2}':fontsize=40:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
       const endCardFilter = endCardEnabled
         ? `color=c=#FFFEF5:size=1080x1920:rate=30:duration=${endDur}[ecbg];` +
           `[ecbg]${ec1Text}${ec2Text},fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`
@@ -3053,7 +3053,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
       await new Promise((resolve, reject) => {
         execFile(ffmpegBin, [
-          '-y',
+          '-y', '-loglevel', 'error',
           '-loop', '1', '-t', String(beforeDur), '-framerate', '30', '-i', beforeFile,
           '-i', videoFile,
           '-filter_complex', filter,
@@ -3062,7 +3062,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           '-movflags', '+faststart',
           outFile,
         ], { timeout: 180000 }, (err, stdout, stderr) => {
-          if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(-800)));
+          if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(0, 1200)));
           resolve();
         });
       });
