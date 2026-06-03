@@ -48,6 +48,10 @@ body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13p
 .tag-triplet{background:#fff3e0;color:#e65100;}
 .tag-none{background:#f5f5f5;color:#aaa;}
 .card-url{font-size:9px;color:#ccc;word-break:break-all;margin-top:3px;line-height:1.3;}
+.card-footer{display:flex;justify-content:flex-end;margin-top:6px;}
+.btn-delete{padding:3px 9px;border-radius:6px;border:1.5px solid #e53935;background:#fff;color:#e53935;font-size:10px;font-weight:700;cursor:pointer;}
+.btn-delete:hover{background:#e53935;color:#fff;}
+.btn-delete:disabled{opacity:0.4;cursor:not-allowed;}
 .loading{text-align:center;padding:60px;color:#aaa;grid-column:1/-1;}
 .pagination{display:flex;gap:8px;justify-content:center;padding:20px;}
 .pagination button{padding:7px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:13px;}
@@ -216,6 +220,11 @@ async function load(p = 1) {
   document.getElementById('grid').innerHTML = slice.map(r => {
     const needsMig = ['cloudinary','fal'].includes(storageOf(r.url));
     const tbl = TABLE_LABELS[r._type] || r._type;
+    const canDelete = ['concept_media','orders_input','generations'].includes(r._type);
+    const dbId = r.meta && (r.meta.media_id || r.meta.order_id || r.meta.gen_id);
+    const deleteBtn = canDelete && dbId
+      ? `<button class="btn-delete" onclick="deleteAsset('${r._type}',${dbId},this)" title="Delete from R2 and DB">Delete</button>`
+      : '';
     return `<div class="card${needsMig?' needs-migration':''}">
       <div class="thumb-wrap">
         ${thumbContent(r.url)}
@@ -227,6 +236,7 @@ async function load(p = 1) {
         <div class="card-owner">👤 ${escHtml(r.owner || '—')}</div>
         <div class="shown-tags">${shownTags(r.shown_in)}</div>
         <div class="card-url">${r.url ? r.url.slice(-55) : 'No URL'}</div>
+        ${deleteBtn ? '<div class="card-footer">' + deleteBtn + '</div>' : ''}
       </div>
     </div>`;
   }).join('');
@@ -256,6 +266,30 @@ async function runBackfill() {
 function debounceLoad() {
   clearTimeout(debTimer);
   debTimer = setTimeout(() => load(1), 350);
+}
+
+async function deleteAsset(type, id, btn) {
+  if (!confirm('Delete this asset from R2 and the database? This cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch(`/admin/api/assets/${type}/${id}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) {
+      btn.closest('.card').remove();
+      // update total count
+      const cur = parseInt(document.getElementById('statTotal').querySelector('.num').textContent) || 0;
+      document.getElementById('statTotal').querySelector('.num').textContent = Math.max(0, cur - 1);
+    } else {
+      alert(d.error || 'Delete failed');
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Delete';
+  }
 }
 
 function openLb(url, type) {

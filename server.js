@@ -20,7 +20,7 @@ const { fal } = require('@fal-ai/client');
 const Stripe = require('stripe');
 const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
-const { uploadStream, downloadAndStore } = require('./storage');
+const { uploadStream, downloadAndStore, deleteFromR2 } = require('./storage');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
 const generation = require('./generation');
@@ -2867,6 +2867,53 @@ app.post('/admin/api/generations/:id/regenerate', requireRole('admin'), async (r
 });
 
 
+// Delete an asset: removes from R2 and clears the DB reference.
+// Orders output/video are protected — cannot be deleted.
+// Body: { type, id }
+// type: 'concept_media' | 'orders_input' | 'generations'
+app.delete('/admin/api/assets/:type/:id', requireRole('admin'), async (req, res) => {
+  const { type, id } = req.params;
+  const numId = parseInt(id);
+  if (!numId) return res.status(400).json({ error: 'Invalid id' });
+
+  try {
+    if (type === 'concept_media') {
+      const r = await pool.query('SELECT url FROM concept_media WHERE id=$1', [numId]);
+      if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+      const url = r.rows[0].url;
+      await pool.query('DELETE FROM concept_media WHERE id=$1', [numId]);
+      if (url && url.includes(process.env.R2_PUBLIC_URL || 'r2')) {
+        await deleteFromR2(url).catch(e => console.warn('[delete] R2 concept_media', e.message));
+      }
+      return res.json({ ok: true });
+    }
+
+    if (type === 'orders_input') {
+      const r = await pool.query('SELECT input_asset_url FROM orders WHERE id=$1', [numId]);
+      if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+      const url = r.rows[0].input_asset_url;
+      await pool.query('UPDATE orders SET input_asset_url=NULL WHERE id=$1', [numId]);
+      if (url) await deleteFromR2(url).catch(e => console.warn('[delete] R2 orders_input', e.message));
+      return res.json({ ok: true });
+    }
+
+    if (type === 'generations') {
+      const r = await pool.query('SELECT output_url FROM generations WHERE id=$1', [numId]);
+      if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+      const url = r.rows[0].output_url;
+      await pool.query('DELETE FROM generations WHERE id=$1', [numId]);
+      if (url) await deleteFromR2(url).catch(e => console.warn('[delete] R2 generation', e.message));
+      return res.json({ ok: true });
+    }
+
+    // orders_output and orders_video are protected
+    return res.status(403).json({ error: 'Customer Loveograms cannot be deleted.' });
+  } catch (e) {
+    console.error('[admin/assets delete]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Admin backfill: migrate all fal.ai/Kling URLs to R2
 // GET /admin/api/backfill-assets?dry=1  -- preview counts only
 // POST /admin/api/backfill-assets       -- run the migration
@@ -5573,6 +5620,7 @@ app.post('/admin/concepts/test-video', requireRole('admin'), async (req, res) =>
   try {
     const { portrait_url, video_prompt, fal_video_model, user_input_value, concept_slug, video_input_extras, orientation } = req.body;
     if (!portrait_url) return res.status(400).json({ error: 'portrait_url is required' });
+    if (!portrait_url) return res.status(400).json({ error: 'portrait_url is required' });
     if (!video_prompt || !String(video_prompt).trim()) return res.status(400).json({ error: 'video_prompt is required' });
     const modelId = (fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video';
     const finalPrompt = applyUserInput(video_prompt, testConcept(req.body), user_input_value);
@@ -5600,12 +5648,10 @@ app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
   }
 });
 
-// Sentry Express error handler
 if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app);
 }
 
-// Daily cleanup of old, unflagged visits at 03:00 UTC
 cron.schedule('0 3 * * *', async () => {
   try {
     const result = await pool.query(
@@ -5617,10 +5663,8 @@ cron.schedule('0 3 * * *', async () => {
   }
 }, { timezone: 'UTC' });
 
-// Daily operational digest email to admin at 06:00 UTC
 cron.schedule('0 6 * * *', () => sendDailyDigest().catch((err) => console.error('[digest] cron error:', err.message)), { timezone: 'UTC' });
 
-// FX rates refresh
 scheduleFxRefresh(cron);
 
 initDb()

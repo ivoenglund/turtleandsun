@@ -136,4 +136,26 @@ async function downloadAndStore({ remoteUrl, kind = 'order', orderId = null }) {
   return { ...result, bytes: buffer.length };
 }
 
-module.exports = { uploadBuffer, uploadStream, downloadAndStore };
+// Delete an object from R2 by its public URL or key.
+// Returns { ok: true } or throws.
+async function deleteFromR2(urlOrKey) {
+  if (!s3) throw new Error('R2 not configured');
+  let key = urlOrKey;
+  if (urlOrKey.startsWith('http')) {
+    // Strip the public base URL to get the key
+    const base = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
+    if (base && urlOrKey.startsWith(base + '/')) {
+      key = urlOrKey.slice(base.length + 1);
+    } else {
+      // Fallback: take everything after the first slash following the host
+      const m = urlOrKey.match(/^https?:\/\/[^/]+\/(.+)$/);
+      if (!m) throw new Error('Cannot derive R2 key from URL: ' + urlOrKey);
+      key = m[1];
+    }
+  }
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  return { ok: true, key };
+}
+
+module.exports = { uploadBuffer, uploadStream, downloadAndStore, deleteFromR2 };
