@@ -1722,7 +1722,7 @@ app.get('/api/account/contacts', requireAuth, async (req, res) => {
 app.get('/api/account/data', requireAuth, async (req, res) => {
   try {
     const orders = await pool.query(
-      'SELECT id, product, status, amount, result_url, result_video_url, created_at FROM orders WHERE email = $1 ORDER BY created_at DESC',
+      'SELECT id, product, status, amount, result_url, result_video_url, output_asset_url, output_video_asset_url, input_asset_url, created_at FROM orders WHERE email = $1 ORDER BY created_at DESC',
       [req.user.email]
     );
     res.json({ user: { email: req.user.email, roles: req.user.roles }, orders: orders.rows });
