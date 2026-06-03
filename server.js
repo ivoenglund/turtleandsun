@@ -2603,6 +2603,71 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
 
 
 
+// ---- Admin: Generation quality review dashboard --------------------------------
+app.get('/admin/generations', requireRole('admin'), (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-generations.html'));
+});
+
+app.get('/admin/api/generations', requireRole('admin'), async (req, res) => {
+  try {
+    const { source, status, flagged, page = 1 } = req.query;
+    const limit = 40;
+    const offset = (parseInt(page) - 1) * limit;
+    const conds = [];
+    const params = [];
+    if (source)  { params.push(source);  conds.push(`g.source_type = $${params.length}`); }
+    if (status)  { params.push(status);  conds.push(`g.status = $${params.length}`); }
+    if (flagged === '1') { conds.push('g.flagged = true'); }
+    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+    params.push(limit); params.push(offset);
+    const { rows } = await pool.query(`
+      SELECT g.id, g.status, g.source_type, g.flagged, g.flag_note,
+             g.fal_output_url, g.output_url, g.error_message,
+             g.created_at, g.completed_at,
+             EXTRACT(EPOCH FROM (g.completed_at - g.created_at))::int AS secs,
+             c.name AS concept_name,
+             o.email, o.product, o.id AS order_id,
+             o.output_asset_url, o.output_video_asset_url
+      FROM generations g
+      LEFT JOIN concepts c ON c.id = g.concept_id
+      LEFT JOIN orders o ON o.id = g.order_id
+      ${where}
+      ORDER BY g.created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}
+    `, params);
+    res.json({ rows, page: parseInt(page), limit });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/generations/:id/flag', requireRole('admin'), async (req, res) => {
+  try {
+    const { flagged, note } = req.body;
+    await pool.query(
+      'UPDATE generations SET flagged=$2, flag_note=$3 WHERE id=$1',
+      [req.params.id, !!flagged, note || null]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/generations/:id/regenerate', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT g.concept_id, g.input_payload, o.email, o.product, o.id AS oid, o.input_asset_url
+       FROM generations g LEFT JOIN orders o ON o.id = g.order_id WHERE g.id = $1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const gen = rows[0];
+    const portrait_url = (gen.input_payload && gen.input_payload.photoUrl) || gen.input_asset_url;
+    if (!portrait_url) return res.status(400).json({ error: 'No source photo found' });
+    res.json({ ok: true, message: 'Regeneration started' });
+    generateForOrder(portrait_url, gen.product, gen.email || '', gen.oid, gen.concept_id, null)
+      .catch(e => console.error('[regenerate] failed:', e.message));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
 app.get('/admin/geocode-all', requireRole('admin'), async (req, res) => {
   const contacts = await pool.query(
     'SELECT * FROM contacts WHERE user_id = $1 AND latitude IS NULL AND city IS NOT NULL',

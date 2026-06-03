@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generation Review — Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px;}
+.topbar{background:#1C2A14;color:#FFE800;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.topbar a{color:#FFE800;text-decoration:none;font-size:13px;opacity:0.7;}
+.topbar a:hover{opacity:1;}
+.topbar h1{font-size:16px;font-weight:700;flex:1;}
+.filters{padding:16px 24px;background:#fff;border-bottom:1px solid #e3dcc8;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.filters select,.filters button{padding:7px 12px;border-radius:8px;border:1px solid #ccc;font-size:13px;cursor:pointer;}
+.filters button{background:#1C2A14;color:#FFE800;border:none;font-weight:700;}
+.filters .count{color:#888;font-size:12px;margin-left:auto;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:20px 24px;}
+.card{background:#fff;border-radius:10px;overflow:hidden;border:1.5px solid #e3dcc8;position:relative;}
+.card.flagged{border-color:#e53935;}
+.card.failed{border-color:#ff9800;}
+.thumb{width:100%;aspect-ratio:9/16;object-fit:cover;display:block;background:#eee;cursor:pointer;}
+.thumb-placeholder{width:100%;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;font-size:12px;color:#aaa;background:#f5f5f5;}
+.card-body{padding:10px 12px;}
+.card-title{font-weight:700;font-size:13px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-meta{font-size:11px;color:#888;margin-bottom:8px;line-height:1.5;}
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.btn{padding:5px 10px;border-radius:7px;border:1.5px solid #1C2A14;background:#fff;color:#1C2A14;font-size:11px;font-weight:700;cursor:pointer;}
+.btn:hover{background:#f0f7ea;}
+.btn.danger{border-color:#e53935;color:#e53935;}
+.btn.danger:hover{background:#fff5f5;}
+.btn.danger.active{background:#e53935;color:#fff;}
+.btn.regen{background:#1C2A14;color:#FFE800;}
+.btn.regen:hover{background:#2d4a24;}
+.badge{display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-right:4px;}
+.badge-success{background:#c8e6c9;color:#1b5e20;}
+.badge-failed{background:#ffccbc;color:#bf360c;}
+.badge-pending{background:#fff3cd;color:#856404;}
+.badge-order{background:#e3f2fd;color:#0d47a1;}
+.badge-flagged{background:#e53935;color:#fff;}
+.flag-badge{position:absolute;top:8px;right:8px;background:#e53935;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.loading{text-align:center;padding:60px;color:#aaa;}
+.pagination{display:flex;gap:8px;justify-content:center;padding:20px;}
+.pagination button{padding:7px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:13px;}
+.pagination button.active{background:#1C2A14;color:#FFE800;border-color:#1C2A14;}
+/* Lightbox */
+.lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:999;align-items:center;justify-content:center;}
+.lb.open{display:flex;}
+.lb-inner{position:relative;max-width:90vw;max-height:90vh;}
+.lb-inner img,.lb-inner video{max-width:90vw;max-height:88vh;border-radius:8px;display:block;}
+.lb-close{position:absolute;top:-34px;right:0;background:none;border:none;color:#fff;font-size:26px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Generation Review</h1>
+  <a href="/admin">← Admin</a>
+</div>
+
+<div class="filters">
+  <select id="fSource" onchange="load(1)">
+    <option value="">All sources</option>
+    <option value="customer_order">Customer orders</option>
+    <option value="admin_test">Admin tests</option>
+    <option value="preview">Previews</option>
+    <option value="lab_batch">Lab batch</option>
+  </select>
+  <select id="fStatus" onchange="load(1)">
+    <option value="">All statuses</option>
+    <option value="success">Success</option>
+    <option value="failed">Failed</option>
+    <option value="pending">Pending</option>
+  </select>
+  <select id="fFlagged" onchange="load(1)">
+    <option value="">All</option>
+    <option value="1">Flagged only</option>
+  </select>
+  <span class="count" id="countLine"></span>
+</div>
+
+<div id="grid" class="grid"><div class="loading">Loading…</div></div>
+<div id="pagination" class="pagination"></div>
+
+<div class="lb" id="lb" onclick="closeLb()">
+  <div class="lb-inner" onclick="event.stopPropagation()">
+    <button class="lb-close" onclick="closeLb()">×</button>
+    <div id="lbContent"></div>
+  </div>
+</div>
+
+<script>
+let currentPage = 1;
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtDate(s){return s?new Date(s).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'}):'—';}
+function fmtSecs(s){if(!s||s<0)return '—';if(s<60)return s+'s';return Math.round(s/60)+'m '+( s%60)+'s';}
+
+function openLb(url, isVideo) {
+  document.getElementById('lbContent').innerHTML = isVideo
+    ? `<video src="${esc(url)}" controls autoplay style="max-width:90vw;max-height:88vh;border-radius:8px;display:block;"></video>`
+    : `<img src="${esc(url)}" style="max-width:90vw;max-height:88vh;border-radius:8px;display:block;">`;
+  document.getElementById('lb').classList.add('open');
+}
+function closeLb(){
+  document.getElementById('lb').classList.remove('open');
+  document.getElementById('lbContent').innerHTML='';
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLb(); });
+
+async function toggleFlag(id, currentlyFlagged) {
+  const newState = !currentlyFlagged;
+  const note = newState ? (prompt('Optional note (leave blank to skip):') || null) : null;
+  await fetch(`/admin/api/generations/${id}/flag`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ flagged: newState, note })
+  });
+  load(currentPage);
+}
+
+async function regenerate(id) {
+  if (!confirm('Trigger a new generation for this order? It will send a new delivery email.')) return;
+  const r = await fetch(`/admin/api/generations/${id}/regenerate`, { method:'POST' });
+  const j = await r.json();
+  alert(j.ok ? 'Regeneration started.' : 'Error: ' + j.error);
+}
+
+async function load(page) {
+  currentPage = page || 1;
+  document.getElementById('grid').innerHTML = '<div class="loading">Loading…</div>';
+  const source  = document.getElementById('fSource').value;
+  const status  = document.getElementById('fStatus').value;
+  const flagged = document.getElementById('fFlagged').value;
+  const params  = new URLSearchParams({ page: currentPage });
+  if (source)  params.set('source', source);
+  if (status)  params.set('status', status);
+  if (flagged) params.set('flagged', flagged);
+
+  const r = await fetch('/admin/api/generations?' + params);
+  const { rows, limit } = await r.json();
+
+  document.getElementById('countLine').textContent = rows.length + ' shown';
+
+  if (!rows.length) {
+    document.getElementById('grid').innerHTML = '<div class="loading">No results.</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('grid').innerHTML = rows.map(g => {
+    const thumbUrl = g.output_asset_url || g.fal_output_url || g.output_url || null;
+    const isVideo  = thumbUrl && /\.(mp4|webm|mov)(\?|$)/i.test(thumbUrl);
+    const isFailed = g.status === 'failed';
+    const isFlagged = g.flagged;
+
+    return `<div class="card${isFlagged?' flagged':''}${isFailed?' failed':''}" id="card-${g.id}">
+      ${isFlagged ? '<span class="flag-badge">⚑ Flagged</span>' : ''}
+      ${thumbUrl
+        ? `<img class="thumb" src="${esc(thumbUrl)}" onclick="openLb('${esc(thumbUrl)}',${isVideo})" onerror="this.style.display='none'">`
+        : `<div class="thumb-placeholder">${isFailed ? '✗ Failed' : 'Pending…'}</div>`}
+      <div class="card-body">
+        <div class="card-title" title="${esc(g.concept_name||g.product||'')}">
+          ${esc(g.concept_name || g.product || 'Unknown')}
+        </div>
+        <div class="card-meta">
+          <span class="badge badge-${g.status}">${g.status}</span>
+          <span class="badge badge-order">${esc(g.source_type||'')}</span>
+          ${g.email ? '<br>' + esc(g.email) : ''}
+          <br>${fmtDate(g.created_at)} · ${fmtSecs(g.secs)}
+          ${g.flag_note ? `<br><span style="color:#e53935">⚑ ${esc(g.flag_note)}</span>` : ''}
+          ${g.error_message ? `<br><span style="color:#e53935;font-size:10px;">${esc(g.error_message.slice(0,80))}</span>` : ''}
+        </div>
+        <div class="card-actions">
+          ${thumbUrl ? `<button class="btn" onclick="openLb('${esc(thumbUrl)}',${isVideo})">View</button>` : ''}
+          <button class="btn danger${isFlagged?' active':''}" onclick="toggleFlag(${g.id},${isFlagged})">${isFlagged?'Unflag':'Flag'}</button>
+          ${g.order_id ? `<button class="btn regen" onclick="regenerate(${g.id})">↺ Regen</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Pagination
+  const hasMore = rows.length === limit;
+  const pag = document.getElementById('pagination');
+  pag.innerHTML = '';
+  if (currentPage > 1) {
+    const pb = document.createElement('button');
+    pb.textContent = '← Prev';
+    pb.onclick = () => load(currentPage - 1);
+    pag.appendChild(pb);
+  }
+  if (hasMore) {
+    const nb = document.createElement('button');
+    nb.textContent = 'Next →';
+    nb.onclick = () => load(currentPage + 1);
+    pag.appendChild(nb);
+  }
+}
+
+load(1);
+</script>
+</body>
+</html>
