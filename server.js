@@ -2668,6 +2668,17 @@ app.get('/admin/social-clips', requireRole('admin'), (req, res) => {
   res.sendFile(require('path').join(__dirname, 'admin-social-clips.html'));
 });
 
+app.get('/admin/api/social-clips/ffmpeg-check', requireRole('admin'), (req, res) => {
+  let ffmpegPath = null, error = null, exists = false;
+  try {
+    ffmpegPath = require('ffmpeg-static');
+  } catch(e) { error = e.message; }
+  if (ffmpegPath) {
+    exists = require('fs').existsSync(ffmpegPath);
+  }
+  res.json({ ffmpegPath, exists, error, platform: process.platform, arch: process.arch });
+});
+
 app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
