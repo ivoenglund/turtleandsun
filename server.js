@@ -2761,9 +2761,8 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
       : '';
 
     const filter = [
-      // Before segment: scale+crop to 9:16, hold 3s, fade out at 2.5s
-      `[0:v]loop=loop=-1:size=1:start=0,trim=duration=3,setpts=PTS-STARTPTS,`,
-      `scale=1080:1920:force_original_aspect_ratio=increase,`,
+      // Before: image input already limited to 3s via -t 3 input flag
+      `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,`,
       `crop=1080:1920${beforeText},`,
       `fade=t=out:st=2.5:d=0.5[vbefore];`,
       // After segment: scale+crop to 9:16, fade in
@@ -2797,13 +2796,12 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
     await new Promise((resolve, reject) => {
       execFile(ffmpegBin, [
         '-y',
-        '-loop', '1', '-i', beforeFile,
+        '-loop', '1', '-t', '3', '-framerate', '30', '-i', beforeFile,
         '-i', videoFile,
         '-filter_complex', filter,
         '-map', '[vout]',
         '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
         '-movflags', '+faststart',
-        '-t', '30',        // safety cap: max 30s total
         outFile,
       ], { timeout: 120000 }, (err, stdout, stderr) => {
         if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(-800))); }
