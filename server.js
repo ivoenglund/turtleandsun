@@ -2681,17 +2681,14 @@ app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {
     // Orders — output image
     if (table === 'orders_output' || !table) {
       const r = await pool.query(
-        `SELECT o.id, o.email, o.product, o.status, o.result_url, o.output_asset_url, o.created_at,
-                c.name AS concept_name
-         FROM orders o
-         LEFT JOIN concepts c ON c.id = o.concept_id
-         WHERE o.result_url IS NOT NULL
-         ORDER BY o.created_at DESC LIMIT $1`, [lim]);
+        `SELECT id, email, product, status, result_url, output_asset_url, created_at
+         FROM orders WHERE result_url IS NOT NULL
+         ORDER BY created_at DESC LIMIT $1`, [lim]);
       const mapped = r.rows.map(x => ({
         _type: 'orders_output',
         url: x.output_asset_url || x.result_url,
         owner: x.email,
-        name: [x.concept_name || x.product || 'Order', `#${x.id}`].filter(Boolean).join(' '),
+        name: `${x.product || 'Order'} #${x.id}`,
         shown_in: ['customer_account'],
         meta: { order_id: x.id, product: x.product, status: x.status, date: x.created_at }
       }));
@@ -2702,17 +2699,14 @@ app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {
     // Orders — output video
     if (table === 'orders_video' || !table) {
       const r = await pool.query(
-        `SELECT o.id, o.email, o.product, o.status, o.result_video_url, o.output_video_asset_url, o.created_at,
-                c.name AS concept_name
-         FROM orders o
-         LEFT JOIN concepts c ON c.id = o.concept_id
-         WHERE o.result_video_url IS NOT NULL
-         ORDER BY o.created_at DESC LIMIT $1`, [lim]);
+        `SELECT id, email, product, status, result_video_url, output_video_asset_url, created_at
+         FROM orders WHERE result_video_url IS NOT NULL
+         ORDER BY created_at DESC LIMIT $1`, [lim]);
       const mapped = r.rows.map(x => ({
         _type: 'orders_video',
         url: x.output_video_asset_url || x.result_video_url,
         owner: x.email,
-        name: [x.concept_name || x.product || 'Order', `#${x.id}`, '(video)'].filter(Boolean).join(' '),
+        name: `${x.product || 'Order'} #${x.id} (video)`,
         shown_in: ['customer_account'],
         meta: { order_id: x.id, product: x.product, status: x.status, date: x.created_at }
       }));
@@ -2723,17 +2717,14 @@ app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {
     // Orders — input photo (customer uploaded)
     if (table === 'orders_input' || !table) {
       const r = await pool.query(
-        `SELECT o.id, o.email, o.input_asset_url, o.created_at,
-                c.name AS concept_name
-         FROM orders o
-         LEFT JOIN concepts c ON c.id = o.concept_id
-         WHERE o.input_asset_url IS NOT NULL
-         ORDER BY o.created_at DESC LIMIT $1`, [lim]);
+        `SELECT id, email, input_asset_url, created_at
+         FROM orders WHERE input_asset_url IS NOT NULL
+         ORDER BY created_at DESC LIMIT $1`, [lim]);
       const mapped = r.rows.map(x => ({
         _type: 'orders_input',
         url: x.input_asset_url,
         owner: x.email,
-        name: `Upload for Order #${x.id}${x.concept_name ? ' · ' + x.concept_name : ''}`,
+        name: `Upload for Order #${x.id}`,
         shown_in: [],
         meta: { order_id: x.id, date: x.created_at }
       }));
@@ -2755,7 +2746,7 @@ app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {
         _type: 'generations',
         url: x.output_url,
         owner: x.email || x.source_type || 'admin',
-        name: [x.concept_name || 'Generation', `#${x.id}`].filter(Boolean).join(' '),
+        name: `${x.concept_name || 'Generation'} #${x.id}`,
         shown_in: x.source_type === 'customer_order' ? ['customer_account'] : [],
         meta: { gen_id: x.id, source_type: x.source_type, date: x.created_at }
       }));
