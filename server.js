@@ -898,7 +898,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Campaign queue', 'What is queued to draft, print, and send.', '/admin/occasions/queue') +
       card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email') +
       card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
-      card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets')
+      card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets') +
+      card('Social clips', 'Create before/after clips for TikTok, Instagram Reels, and YouTube Shorts.', '/admin/social-clips')
     )}
 
     <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
@@ -2659,6 +2660,131 @@ app.get('/admin/generations', requireRole('admin'), (req, res) => {
 // Asset storage browser — shows every file with R2 / Cloudinary / fal.ai badge
 app.get('/admin/assets', requireRole('admin'), (req, res) => {
   res.sendFile(require('path').join(__dirname, 'admin-assets.html'));
+});
+
+// ─── Social clip maker ────────────────────────────────────────────────────────
+
+app.get('/admin/social-clips', requireRole('admin'), (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-social-clips.html'));
+});
+
+app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT t.id, t.concept_id, t.triplet_number, c.name AS concept_name,
+             bm.url AS before_url, im.url AS image_url, vm.url AS video_url
+      FROM concept_triplets t
+      LEFT JOIN concepts c ON c.id = t.concept_id
+      LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
+      LEFT JOIN concept_media im ON im.id = t.image_media_id  AND im.active = TRUE
+      LEFT JOIN concept_media vm ON vm.id = t.video_media_id  AND vm.active = TRUE
+      WHERE t.active = TRUE
+      ORDER BY c.name ASC, t.sort_order ASC, t.triplet_number ASC
+    `);
+    res.json({ rows });
+  } catch (e) {
+    console.error('[social-clips/triplets]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res) => {
+  const { before_url, video_url, concept_name, show_labels = true, show_logo = true } = req.body;
+  if (!before_url || !video_url) return res.status(400).json({ error: 'before_url and video_url are required' });
+
+  const { execFile } = require('child_process');
+  const os   = require('os');
+  const pathM = require('path');
+
+  const tmpDir = require('fs').mkdtempSync(pathM.join(os.tmpdir(), 'tns-clip-'));
+  const beforeFile = pathM.join(tmpDir, 'before.jpg');
+  const videoFile  = pathM.join(tmpDir, 'after.mp4');
+  const outFile    = pathM.join(tmpDir, 'clip.mp4');
+
+  try {
+    // Download source files
+    const _https = require('https');
+    const _http  = require('http');
+    const fs2 = require('fs');
+
+    async function dlFile(url, dest) {
+      return new Promise((resolve, reject) => {
+        const lib = url.startsWith('https') ? _https : _http;
+        const file = fs2.createWriteStream(dest);
+        lib.get(url, res2 => {
+          if (res2.statusCode >= 300 && res2.headers.location) {
+            file.close();
+            return dlFile(res2.headers.location, dest).then(resolve).catch(reject);
+          }
+          res2.pipe(file);
+          file.on('finish', () => { file.close(); resolve(); });
+        }).on('error', err => { fs2.unlink(dest, () => {}); reject(err); });
+      });
+    }
+
+    await dlFile(before_url, beforeFile);
+    await dlFile(video_url, videoFile);
+
+    // Build FFmpeg filter chain
+    // Output: 1080x1920 (9:16), before image for 3s, crossfade 0.5s, after video
+    const label = concept_name ? concept_name.toUpperCase() : 'LOVEOGRAM';
+    const logoPath = pathM.join(__dirname, 'public', 'logo.png');
+    const hasLogo = require('fs').existsSync(logoPath);
+
+    // Text overlays
+    const beforeText = show_labels
+      ? `,drawtext=text='BEFORE':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+      : '';
+    const afterText = show_labels
+      ? `,drawtext=text='AFTER':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+      : '';
+    const conceptText = show_labels
+      ? `,drawtext=text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
+      : '';
+
+    const filter = [
+      // Before segment: scale+crop to 9:16, hold 3s, fade out at 2.5s
+      `[0:v]loop=loop=-1:size=1:start=0,trim=duration=3,setpts=PTS-STARTPTS,`,
+      `scale=1080:1920:force_original_aspect_ratio=increase,`,
+      `crop=1080:1920${beforeText},`,
+      `fade=t=out:st=2.5:d=0.5[vbefore];`,
+      // After segment: scale+crop to 9:16, fade in
+      `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,`,
+      `crop=1080:1920${afterText}${conceptText},`,
+      `fade=t=in:st=0:d=0.5[vafter];`,
+      // Concat
+      `[vbefore][vafter]concat=n=2:v=1:a=0[vout]`,
+    ].join('');
+
+    await new Promise((resolve, reject) => {
+      execFile('ffmpeg', [
+        '-y',
+        '-loop', '1', '-i', beforeFile,
+        '-i', videoFile,
+        '-filter_complex', filter,
+        '-map', '[vout]',
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        '-t', '30',        // safety cap: max 30s total
+        outFile,
+      ], { timeout: 120000 }, (err, stdout, stderr) => {
+        if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(0, 200))); }
+        resolve();
+      });
+    });
+
+    // Upload clip to R2
+    const { uploadBuffer } = require('./storage');
+    const clipBuf = require('fs').readFileSync(outFile);
+    const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip' });
+
+    res.json({ url: r2.url });
+  } catch (e) {
+    console.error('[social-clip create]', e.message);
+    res.status(500).json({ error: e.message });
+  } finally {
+    require('fs').rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {

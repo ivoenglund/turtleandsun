@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Social Clips — Admin</title>
+<script src="/nav.js?v=20260602a"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px;}
+.page-header{padding:16px 24px 10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;}
+.page-header h1{font-size:18px;font-weight:800;}
+.hint{font-size:12px;color:#888;}
+.info-bar{padding:10px 24px 12px;background:#fff8ee;border-bottom:1px solid #e3dcc8;font-size:12px;color:#555;line-height:1.6;}
+.info-bar strong{color:#1C0A00;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;padding:20px 24px;}
+.card{background:#fff;border-radius:12px;overflow:hidden;border:1.5px solid #e3dcc8;}
+.card-header{padding:10px 14px 6px;display:flex;align-items:center;gap:8px;}
+.card-title{font-weight:700;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.concept-tag{font-size:10px;font-weight:700;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:8px;}
+.media-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 10px 10px;}
+.media-cell{position:relative;aspect-ratio:9/16;background:#eee;border-radius:8px;overflow:hidden;}
+.media-cell img,.media-cell video{width:100%;height:100%;object-fit:cover;display:block;}
+.media-label{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+.media-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#bbb;background:#f5f5f5;}
+.card-footer{padding:8px 10px 10px;display:flex;flex-direction:column;gap:6px;}
+.clip-options{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.clip-options label{font-size:11px;color:#555;display:flex;align-items:center;gap:4px;}
+.btn-create{flex:1;padding:8px 14px;border-radius:8px;border:none;background:#1C2A14;color:#FFE800;font-weight:700;font-size:12px;cursor:pointer;}
+.btn-create:hover{background:#2d4a24;}
+.btn-create:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-download{flex:1;padding:8px 14px;border-radius:8px;border:1.5px solid #1C2A14;background:#fff;color:#1C2A14;font-weight:700;font-size:12px;cursor:pointer;text-decoration:none;text-align:center;}
+.btn-download:hover{background:#f0f7ea;}
+.status{font-size:11px;color:#555;min-height:16px;padding:0 2px;}
+.status.error{color:#e53935;}
+.status.ok{color:#2e7d32;}
+.loading{text-align:center;padding:60px;color:#aaa;grid-column:1/-1;}
+</style>
+</head>
+<body class="ts-nav-loggedin ts-nav-admin">
+<div class="sun"></div>
+<script src="/currency.js?v=20260526a"></script>
+
+<div class="page-header">
+  <h1>Social Clips</h1>
+  <span class="hint"><a href="/admin" style="color:#3A6B20;text-decoration:none;">← Admin</a> &nbsp;·&nbsp; Before → After clips ready for TikTok, Instagram Reels, and YouTube Shorts (9:16).</span>
+</div>
+
+<div class="info-bar">
+  <strong>How it works:</strong> Pick a triplet or duplet, hit Create Clip. The server stitches the before photo + after video into a 9:16 MP4 with BEFORE / AFTER labels and your logo. Download and upload directly to TikTok, Instagram, and YouTube — same file works for all three.
+</div>
+
+<div id="grid" class="grid"><div class="loading">Loading…</div></div>
+
+<script>
+async function loadTriplets() {
+  const r = await fetch('/admin/api/social-clips/triplets').then(r => r.json()).catch(() => ({ rows: [] }));
+  const grid = document.getElementById('grid');
+  if (!r.rows || !r.rows.length) {
+    grid.innerHTML = '<div class="loading">No triplets found. Add some in the Triplets admin.</div>';
+    return;
+  }
+  grid.innerHTML = r.rows.map(t => {
+    const hasVideo  = !!t.video_url;
+    const hasBefore = !!t.before_url;
+    const canCreate = hasBefore && hasVideo;
+    const isDuplet  = hasBefore && hasVideo && !t.image_url;
+    const type      = isDuplet ? 'Duplet' : (hasBefore && hasVideo ? 'Triplet' : 'Incomplete');
+
+    return `<div class="card" id="card-${t.id}">
+      <div class="card-header">
+        <div class="card-title">${escHtml(t.concept_name || 'Concept')} — #${t.id}</div>
+        <span class="concept-tag">${escHtml(type)}</span>
+      </div>
+      <div class="media-row">
+        <div class="media-cell">
+          ${hasBefore
+            ? `<img src="${escAttr(t.before_url)}" loading="lazy">`
+            : '<div class="media-empty">No before</div>'}
+          <span class="media-label">BEFORE</span>
+        </div>
+        <div class="media-cell">
+          ${hasVideo
+            ? `<video src="${escAttr(t.video_url)}" preload="metadata" muted loop autoplay playsinline></video>`
+            : '<div class="media-empty">No video</div>'}
+          <span class="media-label">AFTER</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="clip-options">
+          <label><input type="checkbox" id="labels-${t.id}" checked> BEFORE / AFTER labels</label>
+          <label><input type="checkbox" id="logo-${t.id}" checked> Logo end card</label>
+        </div>
+        <div style="display:flex;gap:6px;">
+          ${canCreate
+            ? `<button class="btn-create" id="btn-${t.id}" onclick="createClip(${t.id}, '${escAttr(t.before_url)}', '${escAttr(t.video_url)}', '${escAttr(t.concept_name||'')}')">Create clip ▶</button>`
+            : `<button class="btn-create" disabled>Missing ${!hasBefore ? 'before image' : 'after video'}</button>`}
+        </div>
+        <div class="status" id="status-${t.id}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function createClip(id, beforeUrl, videoUrl, conceptName) {
+  const btn    = document.getElementById(`btn-${id}`);
+  const status = document.getElementById(`status-${id}`);
+  const showLabels = document.getElementById(`labels-${id}`).checked;
+  const showLogo   = document.getElementById(`logo-${id}`).checked;
+
+  btn.disabled = true;
+  btn.textContent = 'Creating… (up to 2 min)';
+  status.className = 'status';
+  status.textContent = 'Processing with FFmpeg…';
+
+  try {
+    const r = await fetch('/admin/api/social-clips/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triplet_id: id, before_url: beforeUrl, video_url: videoUrl, concept_name: conceptName, show_labels: showLabels, show_logo: showLogo }),
+    });
+    const d = await r.json();
+    if (d.url) {
+      status.className = 'status ok';
+      status.innerHTML = `Done! <a href="${escAttr(d.url)}" download class="btn-download" style="display:inline-block;margin-top:4px;padding:6px 12px;">⬇ Download clip</a>`;
+      btn.textContent = 'Re-create';
+      btn.disabled = false;
+    } else {
+      throw new Error(d.error || 'Unknown error');
+    }
+  } catch (e) {
+    status.className = 'status error';
+    status.textContent = 'Error: ' + e.message;
+    btn.textContent = 'Retry';
+    btn.disabled = false;
+  }
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+NavBar.init({ requireAuth: true }).then(() => loadTriplets());
+</script>
+</body>
+</html>
