@@ -2661,7 +2661,8 @@ app.get('/admin/api/generations', requireRole('admin'), async (req, res) => {
              EXTRACT(EPOCH FROM (g.completed_at - g.created_at))::int AS secs,
              c.name AS concept_name,
              o.email, o.product, o.id AS order_id,
-             o.output_asset_url, o.output_video_asset_url
+             o.output_asset_url, o.output_video_asset_url,
+             COALESCE(o.input_asset_url, g.input_payload->>'photoUrl') AS input_photo_url
       FROM generations g
       LEFT JOIN concepts c ON c.id = g.concept_id
       LEFT JOIN orders o ON o.id = g.order_id
