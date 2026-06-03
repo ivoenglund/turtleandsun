@@ -2663,34 +2663,150 @@ app.get('/admin/assets', requireRole('admin'), (req, res) => {
 
 app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {
   try {
-    const { table, limit = 500 } = req.query;
+    const { table, search, storage, shown_in, limit = 500 } = req.query;
     const lim = Math.min(parseInt(limit) || 500, 2000);
     let rows = [];
+
+    // Build set of concept_media IDs that appear in triplets
+    const tripletMediaIds = new Set();
+    const tripletRows = await pool.query(
+      `SELECT before_media_id, image_media_id, video_media_id FROM concept_triplets WHERE active = TRUE`
+    );
+    for (const t of tripletRows.rows) {
+      if (t.before_media_id) tripletMediaIds.add(t.before_media_id);
+      if (t.image_media_id)  tripletMediaIds.add(t.image_media_id);
+      if (t.video_media_id)  tripletMediaIds.add(t.video_media_id);
+    }
+
+    // Orders — output image
     if (table === 'orders_output' || !table) {
-      const r = await pool.query(`SELECT id, email, product, result_url, output_asset_url, created_at FROM orders WHERE result_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
-      if (table === 'orders_output') return res.json({ rows: r.rows });
-      rows = rows.concat(r.rows.map(x => ({ _type: 'orders_output', ...x })));
+      const r = await pool.query(
+        `SELECT o.id, o.email, o.product, o.status, o.result_url, o.output_asset_url, o.created_at,
+                c.name AS concept_name
+         FROM orders o
+         LEFT JOIN concepts c ON c.id = o.concept_id
+         WHERE o.result_url IS NOT NULL
+         ORDER BY o.created_at DESC LIMIT $1`, [lim]);
+      const mapped = r.rows.map(x => ({
+        _type: 'orders_output',
+        url: x.output_asset_url || x.result_url,
+        owner: x.email,
+        name: [x.concept_name || x.product || 'Order', `#${x.id}`].filter(Boolean).join(' '),
+        shown_in: ['customer_account'],
+        meta: { order_id: x.id, product: x.product, status: x.status, date: x.created_at }
+      }));
+      if (table === 'orders_output') return res.json({ rows: mapped });
+      rows = rows.concat(mapped);
     }
+
+    // Orders — output video
     if (table === 'orders_video' || !table) {
-      const r = await pool.query(`SELECT id, email, product, result_video_url, output_video_asset_url, created_at FROM orders WHERE result_video_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
-      if (table === 'orders_video') return res.json({ rows: r.rows });
-      rows = rows.concat(r.rows.map(x => ({ _type: 'orders_video', ...x })));
+      const r = await pool.query(
+        `SELECT o.id, o.email, o.product, o.status, o.result_video_url, o.output_video_asset_url, o.created_at,
+                c.name AS concept_name
+         FROM orders o
+         LEFT JOIN concepts c ON c.id = o.concept_id
+         WHERE o.result_video_url IS NOT NULL
+         ORDER BY o.created_at DESC LIMIT $1`, [lim]);
+      const mapped = r.rows.map(x => ({
+        _type: 'orders_video',
+        url: x.output_video_asset_url || x.result_video_url,
+        owner: x.email,
+        name: [x.concept_name || x.product || 'Order', `#${x.id}`, '(video)'].filter(Boolean).join(' '),
+        shown_in: ['customer_account'],
+        meta: { order_id: x.id, product: x.product, status: x.status, date: x.created_at }
+      }));
+      if (table === 'orders_video') return res.json({ rows: mapped });
+      rows = rows.concat(mapped);
     }
+
+    // Orders — input photo (customer uploaded)
     if (table === 'orders_input' || !table) {
-      const r = await pool.query(`SELECT id, email, input_asset_url, created_at FROM orders WHERE input_asset_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
-      if (table === 'orders_input') return res.json({ rows: r.rows });
-      rows = rows.concat(r.rows.map(x => ({ _type: 'orders_input', ...x })));
+      const r = await pool.query(
+        `SELECT o.id, o.email, o.input_asset_url, o.created_at,
+                c.name AS concept_name
+         FROM orders o
+         LEFT JOIN concepts c ON c.id = o.concept_id
+         WHERE o.input_asset_url IS NOT NULL
+         ORDER BY o.created_at DESC LIMIT $1`, [lim]);
+      const mapped = r.rows.map(x => ({
+        _type: 'orders_input',
+        url: x.input_asset_url,
+        owner: x.email,
+        name: `Upload for Order #${x.id}${x.concept_name ? ' · ' + x.concept_name : ''}`,
+        shown_in: [],
+        meta: { order_id: x.id, date: x.created_at }
+      }));
+      if (table === 'orders_input') return res.json({ rows: mapped });
+      rows = rows.concat(mapped);
     }
+
+    // Generations
     if (table === 'generations' || !table) {
-      const r = await pool.query(`SELECT id, source_type, output_url, created_at FROM generations WHERE output_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
-      if (table === 'generations') return res.json({ rows: r.rows });
-      rows = rows.concat(r.rows.map(x => ({ _type: 'generations', ...x })));
+      const r = await pool.query(
+        `SELECT g.id, g.source_type, g.output_url, g.created_at,
+                c.name AS concept_name, o.email
+         FROM generations g
+         LEFT JOIN concepts c ON c.id = g.concept_id
+         LEFT JOIN orders o ON o.id = g.order_id
+         WHERE g.output_url IS NOT NULL
+         ORDER BY g.created_at DESC LIMIT $1`, [lim]);
+      const mapped = r.rows.map(x => ({
+        _type: 'generations',
+        url: x.output_url,
+        owner: x.email || x.source_type || 'admin',
+        name: [x.concept_name || 'Generation', `#${x.id}`].filter(Boolean).join(' '),
+        shown_in: x.source_type === 'customer_order' ? ['customer_account'] : [],
+        meta: { gen_id: x.id, source_type: x.source_type, date: x.created_at }
+      }));
+      if (table === 'generations') return res.json({ rows: mapped });
+      rows = rows.concat(mapped);
     }
+
+    // Concept media (gallery)
     if (table === 'concept_media' || !table) {
-      const r = await pool.query(`SELECT id, concept_id, kind, url FROM concept_media WHERE url IS NOT NULL AND active = TRUE ORDER BY id DESC LIMIT $1`, [lim]);
-      if (table === 'concept_media') return res.json({ rows: r.rows });
-      rows = rows.concat(r.rows.map(x => ({ _type: 'concept_media', ...x })));
+      const r = await pool.query(
+        `SELECT cm.id, cm.concept_id, cm.kind, cm.url, cm.is_primary, cm.active,
+                c.name AS concept_name, c.active AS concept_active
+         FROM concept_media cm
+         LEFT JOIN concepts c ON c.id = cm.concept_id
+         WHERE cm.url IS NOT NULL AND cm.active = TRUE
+         ORDER BY cm.id DESC LIMIT $1`, [lim]);
+      const mapped = r.rows.map(x => {
+        const shownIn = [];
+        if (x.concept_active) shownIn.push('front_gallery');
+        if (tripletMediaIds.has(x.id)) shownIn.push('triplet');
+        return {
+          _type: 'concept_media',
+          url: x.url,
+          owner: 'admin',
+          name: `${x.concept_name || 'Concept'} — ${x.kind || 'media'} #${x.id}`,
+          shown_in: shownIn,
+          meta: { media_id: x.id, concept_id: x.concept_id, kind: x.kind, is_primary: x.is_primary }
+        };
+      });
+      if (table === 'concept_media') return res.json({ rows: mapped });
+      rows = rows.concat(mapped);
     }
+
+    // Apply filters
+    if (search) {
+      const q = search.toLowerCase();
+      rows = rows.filter(r => (r.owner||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q));
+    }
+    if (storage) {
+      rows = rows.filter(r => {
+        const u = r.url || '';
+        if (storage === 'r2') return !u.includes('cloudinary') && !u.includes('fal.') && !u.includes('fal.run');
+        if (storage === 'cloudinary') return u.includes('cloudinary');
+        if (storage === 'fal') return u.includes('fal.') || u.includes('fal.run');
+        return true;
+      });
+    }
+    if (shown_in) {
+      rows = rows.filter(r => (r.shown_in||[]).includes(shown_in));
+    }
+
     res.json({ rows });
   } catch (e) {
     console.error('[admin/assets]', e.message);
