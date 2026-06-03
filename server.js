@@ -4796,6 +4796,37 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
   }
 });
 
+// General download proxy for customer assets — serves R2 files with
+// Content-Disposition: attachment so Chrome enterprise policies don't block them.
+// Only allows URLs from our own R2 bucket.
+app.get('/api/download', requireAuth, async (req, res) => {
+  const url = String(req.query.url || '');
+  const filename = String(req.query.filename || 'loveogram');
+  const R2_PUBLIC = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
+  // Security: only proxy our own R2 URLs
+  if (!url || (!url.startsWith(R2_PUBLIC) && !url.includes('.r2.dev/') && !url.includes('cloudinary.com'))) {
+    return res.status(403).send('Forbidden');
+  }
+  try {
+    const upstream = await fetch(url);
+    if (!upstream.ok) return res.status(502).send('Upstream error');
+    const ext = url.split('?')[0].split('.').pop().toLowerCase();
+    const mime = ext === 'mp4' ? 'video/mp4' : ext === 'webm' ? 'video/webm' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/"/g,'')}"`);
+    if (upstream.headers.get('content-length')) res.setHeader('Content-Length', upstream.headers.get('content-length'));
+    const reader = upstream.body.getReader();
+    res.on('close', () => { try { reader.cancel(); } catch(e){} });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+    res.end();
+  } catch(e) { res.status(500).send('Download failed: ' + e.message); }
+});
+
+
 // Download proxy. Streams an R2 file through the app with Content-Disposition:
 // attachment, so an enterprise-managed Chrome that blocks direct downloads from
 // the R2 origin will still allow it (since it comes from turtleandsun.com).

@@ -172,7 +172,7 @@ function renderGallery(orders) {
         <div class="lv-date">${fmtDate(o.created_at)}</div>
         <div class="lv-actions">
           ${viewUrl ? `<button class="lv-btn primary" onclick="openLightbox('${esc(viewUrl)}',${isVideo})">${isVideo?'▶ Play':'View'}</button>` : ''}
-          ${viewUrl ? `<a class="lv-btn" href="${esc(viewUrl)}" download target="_blank">↓ Download</a>` : ''}
+          ${viewUrl ? `<a class="lv-btn" href="/api/download?url=${encodeURIComponent(viewUrl)}&filename=loveogram-${o.id}${isVideo?'.mp4':'.jpg'}">↓ Download</a>` : ''}
           ${imgUrl  ? `<a class="lv-btn" href="/print/loveogram?url=${encodeURIComponent(imgUrl)}" target="_blank">Print</a>` : ''}
           ${!viewUrl ? `<span style="font-size:12px;color:#aaa;">Processing…</span>` : ''}
         </div>
