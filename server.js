@@ -4799,14 +4799,35 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
 // General download proxy for customer assets — serves R2 files with
 // Content-Disposition: attachment so Chrome enterprise policies don't block them.
 // Only allows URLs from our own R2 bucket.
+// Save an uploaded photo to the account archive without creating a Loveogram
+app.post('/api/account/archive-photo', requireAuth, async (req, res) => {
+  try {
+    const { url, filename } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'url required' });
+    await pool.query(
+      `INSERT INTO orders (email, product, status, input_asset_url, output_asset_url, asset_status, amount)
+       VALUES ($1, 'archive', 'archive', $2, $2, 'stored', 0)`,
+      [req.user.email, url]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/download', requireAuth, async (req, res) => {
   const url = String(req.query.url || '');
   const filename = String(req.query.filename || 'loveogram');
   const R2_PUBLIC = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
-  // Security: only proxy our own R2 URLs
-  if (!url || (!url.startsWith(R2_PUBLIC) && !url.includes('.r2.dev/') && !url.includes('cloudinary.com'))) {
-    return res.status(403).send('Forbidden');
-  }
+  // Security: only proxy trusted asset domains
+  const trusted = !url ? false : (
+    (R2_PUBLIC && url.startsWith(R2_PUBLIC)) ||
+    url.includes('.r2.dev/') ||
+    url.includes('cloudinary.com') ||
+    url.includes('fal.media') ||
+    url.includes('fal.run') ||
+    url.includes('v3.fal.media') ||
+    url.includes('storage.googleapis.com')
+  );
+  if (!trusted) return res.status(403).send('Forbidden');
   try {
     const upstream = await fetch(url);
     if (!upstream.ok) return res.status(502).send('Upstream error');

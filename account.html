@@ -211,9 +211,21 @@ function renderGallery(orders) {
       const r = await fetch('/upload', { method: 'POST', body: fd });
       const j = await r.json();
       if (!j.url) throw new Error(j.error || 'Upload failed');
-      // Store URL in sessionStorage so the landing page widget picks it up automatically
-      sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: j.url, ts: Date.now() }));
-      window.location.href = '/';
+      // Ask what to do with the photo
+      const makeLoveogram = confirm('Photo uploaded!\n\nClick OK to create a new Loveogram from this photo.\nClick Cancel to save it to your archive only.');
+      if (makeLoveogram) {
+        sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: j.url, ts: Date.now() }));
+        window.location.href = '/';
+      } else {
+        // Save to archive — store as a photo-only order entry via API
+        await fetch('/api/account/archive-photo', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ url: j.url, filename: file.name })
+        });
+        load(); // reload gallery
+        dz.querySelector('p').innerHTML = '<strong>Drop a photo here</strong> to start a new Loveogram';
+      }
     } catch(err) {
       dz.querySelector('p').textContent = 'Upload failed — try again.';
       console.error(err);
