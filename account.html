@@ -79,7 +79,6 @@ body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:linear-gradient
     <div class="dropzone" id="dropzone">
       <div class="dropzone-icon">🐢</div>
       <p><strong>Drop a photo here</strong> to add it to your archive</p>
-      <p style="margin-top:4px;font-size:12px;">Drag a saved photo here to create a new Loveogram</p>
     </div>
 
     <!-- Gallery -->
@@ -137,6 +136,11 @@ function makeDraggable(card, url, filename) {
   });
 }
 
+function createFromArchive(url) {
+  sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: url, ts: Date.now() }));
+  window.location.href = '/';
+}
+
 async function deleteOrder(id) {
   if (!confirm('Remove this from your archive?')) return;
   await fetch(`/api/account/order/${id}`, { method: 'DELETE' });
@@ -183,7 +187,8 @@ function renderGallery(orders) {
           ${viewUrl ? `<a class="lv-btn" href="/api/download?url=${encodeURIComponent(viewUrl)}&filename=loveogram-${o.id}${isVideo?'.mp4':'.jpg'}">↓ Download</a>` : ''}
           ${imgUrl  ? `<a class="lv-btn" href="/print/loveogram?url=${encodeURIComponent(imgUrl)}" target="_blank">Print</a>` : ''}
           ${!viewUrl ? `<span style="font-size:12px;color:#aaa;">Processing…</span>` : ''}
-          <button class="lv-btn" style="border-color:#e53935;color:#e53935;margin-left:auto;" onclick="deleteOrder(${o.id})">✕ Delete</button>
+          ${(o.input_asset_url || imgUrl) ? `<button class="lv-btn" onclick="createFromArchive('${esc(o.input_asset_url || imgUrl)}')">+ New Loveogram</button>` : ''}
+          <button class="lv-btn" style="border-color:#e53935;color:#e53935;" onclick="deleteOrder(${o.id})">✕</button>
         </div>
       </div>
     </div>`;
@@ -208,14 +213,6 @@ function renderGallery(orders) {
   dz.addEventListener('drop', async e => {
     e.preventDefault();
     dz.classList.remove('drag-over');
-
-    // Internal drag — card from archive dragged to dropzone → create Loveogram
-    const internalUrl = e.dataTransfer.getData('text/plain');
-    if (internalUrl && internalUrl.startsWith('http')) {
-      sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: internalUrl, ts: Date.now() }));
-      window.location.href = '/';
-      return;
-    }
 
     // External file drop → save to archive
     const file = e.dataTransfer.files[0];
