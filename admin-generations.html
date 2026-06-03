@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Generation Review — Admin</title>
+<script src="/nav.js?v=20260602a"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px;}
-.topbar{background:#1C2A14;color:#FFE800;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-.topbar a{color:#FFE800;text-decoration:none;font-size:13px;opacity:0.7;}
-.topbar a:hover{opacity:1;}
-.topbar h1{font-size:16px;font-weight:700;flex:1;}
-.filters{padding:16px 24px;background:#fff;border-bottom:1px solid #e3dcc8;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.page-header{padding:16px 24px 10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;}
+.page-header h1{font-size:18px;font-weight:800;}
+.page-header .hint{font-size:12px;color:#888;line-height:1.5;}
+.filters{padding:10px 24px 12px;background:#fff;border-bottom:1px solid #e3dcc8;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
 .filters select,.filters button{padding:7px 12px;border-radius:8px;border:1px solid #ccc;font-size:13px;cursor:pointer;}
 .filters button{background:#1C2A14;color:#FFE800;border:none;font-weight:700;}
 .filters .count{color:#888;font-size:12px;margin-left:auto;}
@@ -52,9 +52,9 @@ body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13p
 </style>
 </head>
 <body>
-<div class="topbar">
+<div class="page-header">
   <h1>Generation Review</h1>
-  <a href="/admin">← Admin</a>
+  <span class="hint"><a href="/admin" style="color:#3A6B20;text-decoration:none;">← Admin</a> &nbsp;·&nbsp; Flag bad outputs · ↺ Regen sends customer a new email · if it looks fine, move on</span>
 </div>
 
 <div class="filters">
@@ -205,7 +205,7 @@ async function load(page) {
   }
 }
 
-load(1);
+NavBar.init({ requireAuth: true }).then(() => load(1));
 </script>
 </body>
 </html>
