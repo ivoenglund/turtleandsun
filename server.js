@@ -2724,17 +2724,20 @@ app.get('/admin/api/backfill-assets', requireRole('admin'), async (req, res) => 
   try {
     const falPattern = '%fal%';
     const externalPattern = '%cloudinary%';
-    const [orders_img, orders_vid, gens, media] = await Promise.all([
-      pool.query(`SELECT COUNT(*) FROM orders WHERE (result_url ILIKE $1) AND (output_asset_url IS NULL OR output_asset_url ILIKE $1)`, [falPattern]),
-      pool.query(`SELECT COUNT(*) FROM orders WHERE (result_video_url ILIKE $1) AND (output_video_asset_url IS NULL OR output_video_asset_url ILIKE $1)`, [falPattern]),
-      pool.query(`SELECT COUNT(*) FROM generations WHERE fal_output_url IS NOT NULL AND (output_url IS NULL OR output_url ILIKE $1)`, [falPattern]),
+    const anyExt = '%';
+    const [orders_img, orders_vid, gens, media, uploads] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM orders WHERE (result_url ILIKE $1 OR result_url ILIKE $2) AND (output_asset_url IS NULL OR output_asset_url ILIKE $1 OR output_asset_url ILIKE $2)`, [falPattern, externalPattern]),
+      pool.query(`SELECT COUNT(*) FROM orders WHERE (result_video_url ILIKE $1 OR result_video_url ILIKE $2) AND (output_video_asset_url IS NULL OR output_video_asset_url ILIKE $1 OR output_video_asset_url ILIKE $2)`, [falPattern, externalPattern]),
+      pool.query(`SELECT COUNT(*) FROM generations WHERE fal_output_url IS NOT NULL AND (output_url IS NULL OR output_url ILIKE $1 OR output_url ILIKE $2)`, [falPattern, externalPattern]),
       pool.query(`SELECT COUNT(*) FROM concept_media WHERE (url ILIKE $1 OR url ILIKE $2) AND active = TRUE`, [falPattern, externalPattern]),
+      pool.query(`SELECT COUNT(*) FROM orders WHERE input_asset_url ILIKE $1`, [externalPattern]),
     ]);
     res.json({
       orders_images_pending: parseInt(orders_img.rows[0].count),
       orders_videos_pending: parseInt(orders_vid.rows[0].count),
       generations_pending: parseInt(gens.rows[0].count),
       concept_media_pending: parseInt(media.rows[0].count),
+      source_photos_on_cloudinary: parseInt(uploads.rows[0].count),
       message: 'POST to this endpoint to run the backfill'
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
