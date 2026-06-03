@@ -103,4 +103,36 @@ async function uploadStream(buffer, options = {}) {
   return { secure_url: url, url }; // cloudinary returns secure_url
 }
 
-module.exports = { uploadBuffer, uploadStream };
+// Download a remote URL (fal.ai CDN etc.) and store it in R2.
+// Returns { url, key } — the R2 public URL.
+async function downloadAndStore({ remoteUrl, kind = 'order', orderId = null }) {
+  const https = require('https');
+  const http  = require('http');
+  const urlMod = require('url');
+
+  const parsed = urlMod.parse(remoteUrl);
+  const lib = parsed.protocol === 'https:' ? https : http;
+
+  const buffer = await new Promise((resolve, reject) => {
+    lib.get(remoteUrl, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+
+  const ct = remoteUrl.match(/\.mp4(\?|$)/i)  ? 'video/mp4'
+           : remoteUrl.match(/\.webm(\?|$)/i) ? 'video/webm'
+           : remoteUrl.match(/\.png(\?|$)/i)  ? 'image/png'
+           : remoteUrl.match(/\.webp(\?|$)/i) ? 'image/webp'
+           : 'image/jpeg';
+
+  const key = orderId
+    ? `orders/${orderId}/${kind === 'order-input' ? 'input' : 'output'}${ct.includes('mp4') ? '.mp4' : ct.includes('webm') ? '.webm' : ct.includes('png') ? '.png' : '.jpg'}`
+    : null;
+
+  return uploadBuffer({ buffer, contentType: ct, kind: 'order', originalName: key ? key.split('/').pop() : undefined });
+}
+
+module.exports = { uploadBuffer, uploadStream, downloadAndStore };

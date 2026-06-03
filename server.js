@@ -20,7 +20,7 @@ const { fal } = require('@fal-ai/client');
 const Stripe = require('stripe');
 const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
-const { uploadStream } = require('./storage');
+const { uploadStream, downloadAndStore } = require('./storage');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
 const generation = require('./generation');
@@ -340,7 +340,11 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
     // Deliver portrait — no re-generation needed
     console.log('Delivering for order:', orderId);
-    generateForOrder(portrait_url || image_url, product, email || '', orderId, concept_id, customer_name).catch(async (err) => {
+    // Save input photo (already in R2 from upload step)
+      if (orderId && (image_url || portrait_url)) {
+        pool.query('UPDATE orders SET input_asset_url=$1 WHERE id=$2', [image_url || portrait_url, orderId]).catch(e => console.warn('[asset] input save failed:', e.message));
+      }
+      generateForOrder(portrait_url || image_url, product, email || '', orderId, concept_id, customer_name).catch(async (err) => {
       console.error('Delivery error for session:', session.id, err.message);
 
       // Record the failure so it can be retried from the admin panel
@@ -2491,6 +2495,11 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
     console.log('Using preview portrait as final image:', imageUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_url = $1 WHERE id = $2', [imageUrl, orderId]);
+      try {
+        const r2img = await downloadAndStore({ remoteUrl: imageUrl, kind: 'order', orderId });
+        await pool.query('UPDATE orders SET output_asset_url=$1, asset_status=$2 WHERE id=$3', [r2img.url, 'stored', orderId]);
+        imageUrl = r2img.url;
+      } catch(e) { console.warn('[asset] R2 image store failed:', e.message); }
     }
   }
 
@@ -2556,6 +2565,11 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
     console.log('Generated video:', videoUrl);
     if (orderId) {
       await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
+      try {
+        const r2vid = await downloadAndStore({ remoteUrl: videoUrl, kind: 'order', orderId });
+        await pool.query('UPDATE orders SET output_video_asset_url=$1, asset_status=$2 WHERE id=$3', [r2vid.url, 'stored', orderId]);
+        videoUrl = r2vid.url;
+      } catch(e) { console.warn('[asset] R2 video store failed:', e.message); }
     }
   }
 
@@ -2567,24 +2581,24 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
 
 async function sendResultEmail(email, product, imageUrl, videoUrl) {
   const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#FFF9E6;padding:40px 32px;border-radius:12px;">
-      <h1 style="font-size:26px;color:#1C0A00;margin-bottom:8px;">Your Loveogram is ready! &#128081;</h1>
-      <p style="font-size:16px;color:#3C2000;margin-bottom:24px;">Thank you for your order. Your portrait has been created and is ready to download.</p>
-      ${imageUrl ? `<p style="margin:16px 0;"><a href="${imageUrl}" style="display:inline-block;padding:12px 24px;background:#3A6B20;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download your Loveogram</a></p>` : ''}
-      ${videoUrl ? `<p style="margin:16px 0;"><a href="${videoUrl}" style="display:inline-block;padding:12px 24px;background:#1C2A14;color:white;text-decoration:none;border-radius:8px;font-weight:700;font-family:Arial,sans-serif;">Download your Loveogram Video</a></p>` : ''}
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:linear-gradient(180deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);padding:40px 32px;border-radius:12px;">
+      <img src="https://turtleandsun.com/logo.png" alt="Turtle and Sun" style="width:200px;height:auto;display:block;margin-bottom:20px;">
+      <h1 style="font-size:26px;color:#1C2A14;margin-bottom:8px;">Your Loveogram is ready! &#128081;</h1>
+      <p style="font-size:16px;color:#1C0A00;margin-bottom:24px;">It's waiting for you in your account. Click below to view and download it.</p>
+      <p style="margin:24px 0;"><a href="https://turtleandsun.com/account" style="display:inline-block;padding:14px 28px;background:#81C784;color:#000;text-decoration:none;border-radius:10px;border:2px solid #000;font-weight:700;font-family:Arial,sans-serif;font-size:16px;">View your Loveogram →</a></p>
       <hr style="border:none;border-top:1px solid rgba(0,0,0,0.1);margin:32px 0 16px;" />
-      <p style="font-size:13px;color:#888;margin:0;">Questions? This inbox isn't monitored &#8212; write to <a href="mailto:hello@turtleandsun.com" style="color:#3A6B20;">hello@turtleandsun.com</a> and we'll reply.</p>
-      <p style="font-size:13px;color:#888;margin-top:8px;">&#8212; Turtle and Sun</p>
+      <p style="font-size:13px;color:#555;margin:0;">Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:#1C2A14;">hello@turtleandsun.com</a></p>
+      <p style="font-size:13px;color:#555;margin-top:8px;">&#8212; Turtle and Sun</p>
     </div>
   `;
 
   await resend.emails.send({
-    from: 'Turtle and Sun <noreply@turtleandsun.com>',
+    from: 'Turtle and Sun <hello@turtleandsun.com>',
     to: email,
-    subject: 'Your Loveogram is ready! 🎨',
+    subject: 'Your Loveogram is ready! 🐢',
     html,
   });
-  console.log('Email sent to', email);
+  console.log('Result email sent to', email);
 }
 
 
