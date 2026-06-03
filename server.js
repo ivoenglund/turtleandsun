@@ -2699,7 +2699,7 @@ app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, re
       WHERE t.active = TRUE
       ORDER BY c.name ASC, t.sort_order ASC, t.triplet_number ASC
     `);
-    res.json({ rows });
+    res.json(rows);
   } catch (e) {
     console.error('[social-clips/triplets]', e.message);
     res.status(500).json({ error: e.message });
