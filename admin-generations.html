@@ -147,7 +147,7 @@ async function load(page) {
   }
 
   document.getElementById('grid').innerHTML = rows.map(g => {
-    const thumbUrl = g.output_asset_url || g.fal_output_url || g.output_url || null;
+    const thumbUrl = g.output_asset_url || g.thumb_url || g.output_url || null;
     const isVideo  = thumbUrl && /\.(mp4|webm|mov)(\?|$)/i.test(thumbUrl);
     const isFailed = g.status === 'failed';
     const isFlagged = g.flagged;

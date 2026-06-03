@@ -2665,6 +2665,7 @@ app.get('/admin/api/generations', requireRole('admin'), async (req, res) => {
     params.push(limit); params.push(offset);
     const { rows } = await pool.query(`
       SELECT g.id, g.status, g.source_type, g.flagged, g.flag_note,
+             COALESCE(CASE WHEN g.output_url NOT ILIKE '%fal%' THEN g.output_url END, g.fal_output_url) AS thumb_url,
              g.fal_output_url, g.output_url, g.error_message,
              g.created_at, g.completed_at,
              EXTRACT(EPOCH FROM (g.completed_at - g.created_at))::int AS secs,
@@ -2709,6 +2710,80 @@ app.post('/admin/api/generations/:id/regenerate', requireRole('admin'), async (r
     generateForOrder(portrait_url, gen.product, gen.email || '', gen.oid, gen.concept_id, null)
       .catch(e => console.error('[regenerate] failed:', e.message));
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// Admin backfill: migrate all fal.ai/Kling URLs to R2
+// GET /admin/api/backfill-assets?dry=1  -- preview counts only
+// POST /admin/api/backfill-assets       -- run the migration
+app.get('/admin/api/backfill-assets', requireRole('admin'), async (req, res) => {
+  try {
+    const falPattern = '%fal%';
+    const [orders_img, orders_vid, gens] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM orders WHERE (result_url ILIKE $1) AND (output_asset_url IS NULL OR output_asset_url ILIKE $1)`, [falPattern]),
+      pool.query(`SELECT COUNT(*) FROM orders WHERE (result_video_url ILIKE $1) AND (output_video_asset_url IS NULL OR output_video_asset_url ILIKE $1)`, [falPattern]),
+      pool.query(`SELECT COUNT(*) FROM generations WHERE fal_output_url IS NOT NULL AND (output_url IS NULL OR output_url ILIKE $1)`, [falPattern]),
+    ]);
+    res.json({
+      orders_images_pending: parseInt(orders_img.rows[0].count),
+      orders_videos_pending: parseInt(orders_vid.rows[0].count),
+      generations_pending: parseInt(gens.rows[0].count),
+      message: 'POST to this endpoint to run the backfill'
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/backfill-assets', requireRole('admin'), async (req, res) => {
+  res.json({ ok: true, message: 'Backfill started in background — check server logs' });
+  // Run async
+  (async () => {
+    let done = 0, failed = 0;
+    const falPattern = '%fal%';
+
+    // 1. Order images
+    const { rows: imgRows } = await pool.query(
+      `SELECT id, result_url FROM orders WHERE result_url ILIKE $1 AND (output_asset_url IS NULL OR output_asset_url ILIKE $1) LIMIT 200`,
+      [falPattern]
+    );
+    for (const o of imgRows) {
+      try {
+        const r2 = await downloadAndStore({ remoteUrl: o.result_url, kind: 'order', orderId: o.id });
+        await pool.query('UPDATE orders SET output_asset_url=$1, asset_status=$2 WHERE id=$3', [r2.url, 'stored', o.id]);
+        done++;
+        console.log('[backfill] order image', o.id, '->', r2.url);
+      } catch(e) { failed++; console.warn('[backfill] order image', o.id, 'failed:', e.message); }
+    }
+
+    // 2. Order videos
+    const { rows: vidRows } = await pool.query(
+      `SELECT id, result_video_url FROM orders WHERE result_video_url ILIKE $1 AND (output_video_asset_url IS NULL OR output_video_asset_url ILIKE $1) LIMIT 200`,
+      [falPattern]
+    );
+    for (const o of vidRows) {
+      try {
+        const r2 = await downloadAndStore({ remoteUrl: o.result_video_url, kind: 'order', orderId: o.id });
+        await pool.query('UPDATE orders SET output_video_asset_url=$1, asset_status=$2 WHERE id=$3', [r2.url, 'stored', o.id]);
+        done++;
+        console.log('[backfill] order video', o.id, '->', r2.url);
+      } catch(e) { failed++; console.warn('[backfill] order video', o.id, 'failed:', e.message); }
+    }
+
+    // 3. Generations
+    const { rows: genRows } = await pool.query(
+      `SELECT id, fal_output_url FROM generations WHERE fal_output_url IS NOT NULL AND (output_url IS NULL OR output_url ILIKE $1) LIMIT 500`,
+      [falPattern]
+    );
+    for (const g of genRows) {
+      try {
+        const r2 = await downloadAndStore({ remoteUrl: g.fal_output_url, kind: 'order' });
+        await pool.query('UPDATE generations SET output_url=$1 WHERE id=$2', [r2.url, g.id]);
+        done++;
+        console.log('[backfill] generation', g.id, '->', r2.url);
+      } catch(e) { failed++; console.warn('[backfill] generation', g.id, 'failed:', e.message); }
+    }
+
+    console.log(`[backfill] complete: ${done} migrated, ${failed} failed`);
+  })().catch(e => console.error('[backfill] fatal:', e.message));
 });
 
 
