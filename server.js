@@ -2707,7 +2707,7 @@ app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, re
 });
 
 app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res) => {
-  const { before_url, video_url, concept_name, show_labels = true, show_logo = true } = req.body;
+  const { before_url, video_url, concept_name, label_before = 'BEFORE', label_after = 'AFTER', show_labels = true, show_logo = true } = req.body;
   if (!before_url || !video_url) return res.status(400).json({ error: 'before_url and video_url are required' });
 
   const { execFile } = require('child_process');
