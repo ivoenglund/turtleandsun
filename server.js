@@ -3018,7 +3018,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           `<svg width='${W}' height='${photoH}'><defs>` +
           `<radialGradient id='v' cx='50%' cy='50%' r='70%'>` +
           `<stop offset='0%' stop-color='black' stop-opacity='0'/>` +
-          `<stop offset='100%' stop-color='black' stop-opacity='0.55'/>` +
+          `<stop offset='100%' stop-color='black' stop-opacity='0.82'/>` +
           `</radialGradient></defs>` +
           `<rect width='${W}' height='${photoH}' fill='url(#v)'/></svg>`
         );
@@ -3102,9 +3102,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const filter = [
         `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
         overlayFilter,
-        `,fade=t=out:st=${Math.max(videoDur - 0.5, 0)}:d=0.5[vafter];`,
+        `[vafter];`,
         `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,`,
-        `fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`,
+        `fade=t=in:st=0:d=0.3[vendcard];`,
         `[vafter][vendcard]concat=n=2:v=1:a=0[vout]`,
       ].join('');
 
@@ -3114,8 +3114,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           '-i', videoFile,
           '-loop', '1', '-t', String(endDur + 1), '-framerate', '30', '-i', endCardFile,
           '-filter_complex', filter,
-          '-map', '[vout]',
+          '-map', '[vout]', '-map', '0:a?',
           '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac', '-b:a', '128k', '-shortest',
           '-movflags', '+faststart',
           outFile,
         ], { timeout: 180000 }, (err, stdout, stderr) => {
