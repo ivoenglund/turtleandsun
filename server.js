@@ -2761,15 +2761,12 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
       : '';
 
     const filter = [
-      // Before: image input already limited to 3s via -t 3 input flag
-      `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,`,
+      `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
       `crop=1080:1920${beforeText},`,
       `fade=t=out:st=2.5:d=0.5[vbefore];`,
-      // After segment: scale+crop to 9:16, fade in
-      `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,`,
+      `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
       `crop=1080:1920${afterText}${conceptText},`,
       `fade=t=in:st=0:d=0.5[vafter];`,
-      // Concat
       `[vbefore][vafter]concat=n=2:v=1:a=0[vout]`,
     ].join('');
 
