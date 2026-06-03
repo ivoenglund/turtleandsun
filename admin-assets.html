@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asset Storage — Admin</title>
+<script src="/nav.js?v=20260602a"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px;}
+.page-header{padding:16px 24px 10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;}
+.page-header h1{font-size:18px;font-weight:800;}
+.page-header .hint{font-size:12px;color:#888;line-height:1.5;}
+.summary-bar{display:flex;gap:14px;flex-wrap:wrap;padding:10px 24px 12px;background:#fff;border-bottom:1px solid #e3dcc8;align-items:center;}
+.summary-stat{display:flex;flex-direction:column;align-items:center;min-width:80px;}
+.summary-stat .num{font-size:22px;font-weight:800;line-height:1;}
+.summary-stat .label{font-size:10px;color:#888;margin-top:2px;text-align:center;}
+.summary-stat.warn .num{color:#e53935;}
+.summary-stat.good .num{color:#2e7d32;}
+.summary-stat.ok .num{color:#e65100;}
+.summary-divider{width:1px;background:#e3dcc8;height:36px;}
+.backfill-btn{margin-left:auto;padding:8px 16px;border-radius:8px;border:none;background:#1C2A14;color:#FFE800;font-weight:700;font-size:13px;cursor:pointer;}
+.backfill-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.backfill-msg{font-size:12px;color:#555;margin-left:8px;}
+.filters{padding:10px 24px 12px;background:#fff8ee;border-bottom:1px solid #e3dcc8;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.filters select,.filters input{padding:7px 12px;border-radius:8px;border:1px solid #ccc;font-size:13px;}
+.filters .count{color:#888;font-size:12px;margin-left:auto;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;padding:20px 24px;}
+.card{background:#fff;border-radius:10px;overflow:hidden;border:1.5px solid #e3dcc8;position:relative;}
+.card.needs-migration{border-color:#e53935;}
+.thumb-wrap{width:100%;aspect-ratio:1/1;background:#eee;overflow:hidden;position:relative;}
+.thumb-wrap img,.thumb-wrap video{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+.thumb-wrap .no-thumb{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#aaa;background:#f5f5f5;}
+.storage-badge{position:absolute;top:6px;left:6px;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;letter-spacing:.3px;}
+.badge-r2{background:#c8e6c9;color:#1b5e20;}
+.badge-cloudinary{background:#fff3cd;color:#7b5e00;}
+.badge-fal{background:#ffccbc;color:#bf360c;}
+.badge-other{background:#e3f2fd;color:#0d47a1;}
+.table-type{position:absolute;top:6px;right:6px;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(0,0,0,0.5);color:#fff;}
+.card-body{padding:8px 10px;}
+.card-title{font-weight:700;font-size:12px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-meta{font-size:10px;color:#888;line-height:1.5;}
+.card-url{font-size:9px;color:#bbb;word-break:break-all;margin-top:3px;line-height:1.3;}
+.loading{text-align:center;padding:60px;color:#aaa;}
+.pagination{display:flex;gap:8px;justify-content:center;padding:20px;}
+.pagination button{padding:7px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:13px;}
+.pagination button.active{background:#1C2A14;color:#FFE800;border-color:#1C2A14;}
+/* Lightbox */
+.lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:999;align-items:center;justify-content:center;}
+.lb.open{display:flex;}
+.lb-inner{position:relative;max-width:90vw;max-height:90vh;}
+.lb-inner img,.lb-inner video{max-width:90vw;max-height:88vh;border-radius:8px;display:block;}
+.lb-close{position:absolute;top:-34px;right:0;background:none;border:none;color:#fff;font-size:26px;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Asset Storage</h1>
+  <span class="hint"><a href="/admin" style="color:#3A6B20;text-decoration:none;">← Admin</a> &nbsp;·&nbsp; Shows where every file lives — R2 (good), Cloudinary (old), fal.ai (temporary). Migrate anything not on R2.</span>
+</div>
+
+<!-- Summary bar -->
+<div class="summary-bar">
+  <div class="summary-stat good" id="statR2"><div class="num">—</div><div class="label">On R2</div></div>
+  <div class="summary-divider"></div>
+  <div class="summary-stat ok" id="statCloudinary"><div class="num">—</div><div class="label">On Cloudinary</div></div>
+  <div class="summary-divider"></div>
+  <div class="summary-stat warn" id="statFal"><div class="num">—</div><div class="label">On fal.ai</div></div>
+  <div class="summary-divider"></div>
+  <div class="summary-stat" id="statTotal"><div class="num">—</div><div class="label">Total</div></div>
+  <button class="backfill-btn" id="migrateBtn" onclick="runBackfill()">Migrate all to R2</button>
+  <span class="backfill-msg" id="backfillMsg"></span>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <select id="fTable" onchange="load(1)">
+    <option value="">All tables</option>
+    <option value="orders_output">Orders — output</option>
+    <option value="orders_video">Orders — video</option>
+    <option value="orders_input">Orders — input photo</option>
+    <option value="generations">Generations</option>
+    <option value="concept_media">Concept media</option>
+  </select>
+  <select id="fStorage" onchange="load(1)">
+    <option value="">All storage</option>
+    <option value="r2">R2 only</option>
+    <option value="cloudinary">Cloudinary only</option>
+    <option value="fal">fal.ai only</option>
+    <option value="other">Other</option>
+  </select>
+  <span class="count" id="countLine"></span>
+</div>
+
+<div id="grid" class="grid"><div class="loading">Loading…</div></div>
+
+<div class="pagination" id="pagination"></div>
+
+<!-- Lightbox -->
+<div class="lb" id="lb" onclick="closeLb()">
+  <div class="lb-inner" onclick="e=>e.stopPropagation()">
+    <button class="lb-close" onclick="closeLb()">✕</button>
+    <img id="lbImg" src="" style="display:none">
+    <video id="lbVid" controls style="display:none"></video>
+  </div>
+</div>
+
+<script>
+let page = 1;
+const PER_PAGE = 48;
+
+function storageOf(url) {
+  if (!url) return 'none';
+  if (url.includes('r2.cloudflarestorage.com') || url.includes('turtleandsun-media') || url.includes('pub-') || url.includes('.r2.dev') || /https:\/\/[^/]+\/[a-z]+\/[a-z0-9-]+\/(orders|outputs|uploads|concept-media|generations)\//.test(url)) return 'r2';
+  if (url.includes('cloudinary.com') || url.includes('res.cloudinary')) return 'cloudinary';
+  if (url.includes('fal.ai') || url.includes('fal.run') || url.includes('kling') || url.includes('v3.fal.media') || url.includes('storage.googleapis.com')) return 'fal';
+  // R2 custom domain heuristic — short domain not cloudinary/fal
+  return 'r2'; // default for unknown — assume stored on our infra
+}
+
+function badgeHtml(url) {
+  const s = storageOf(url);
+  const labels = {r2:'R2', cloudinary:'Cloudinary', fal:'fal.ai', none:'No URL', other:'Other'};
+  const classes = {r2:'badge-r2', cloudinary:'badge-cloudinary', fal:'badge-fal', none:'badge-other', other:'badge-other'};
+  return `<span class="storage-badge ${classes[s]||'badge-other'}">${labels[s]||s}</span>`;
+}
+
+function isVideo(url) {
+  if (!url) return false;
+  return /\.(mp4|webm|mov|avi)(\?|$)/i.test(url) || url.includes('/video/') || url.includes('video_');
+}
+
+function thumbHtml(url, label) {
+  if (!url) return `<div class="no-thumb">No file</div>`;
+  if (isVideo(url)) {
+    return `<video src="${url}" preload="metadata" muted onclick="openLb('${url}','video')" style="width:100%;height:100%;object-fit:cover;cursor:pointer;"></video>`;
+  }
+  return `<img src="${url}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" onclick="openLb('${url}','img')">
+          <div class="no-thumb" style="display:none">Image error</div>`;
+}
+
+async function loadSummary() {
+  try {
+    const d = await fetch('/admin/api/backfill-assets').then(r=>r.json());
+    // pending counts from backfill endpoint
+    const totalOld = (d.orders_images_pending||0)+(d.orders_videos_pending||0)+(d.generations_pending||0)+(d.concept_media_pending||0)+(d.source_photos_on_cloudinary||0);
+    document.getElementById('statFal').querySelector('.num').textContent = d.orders_images_pending + d.orders_videos_pending + d.generations_pending;
+    document.getElementById('statCloudinary').querySelector('.num').textContent = (d.concept_media_pending||0) + (d.source_photos_on_cloudinary||0);
+    document.getElementById('statR2').querySelector('.num').textContent = totalOld > 0 ? '…' : '✓ All';
+    if (totalOld === 0) {
+      document.getElementById('statR2').querySelector('.num').textContent = '✓ All';
+      document.getElementById('migrateBtn').textContent = 'All migrated ✓';
+      document.getElementById('migrateBtn').disabled = true;
+    }
+  } catch(e) { console.warn('summary load failed', e); }
+}
+
+async function load(p=1) {
+  page = p;
+  const table = document.getElementById('fTable').value;
+  const storage = document.getElementById('fStorage').value;
+  document.getElementById('grid').innerHTML = '<div class="loading">Loading…</div>';
+
+  // Build all assets from multiple endpoints
+  const rows = await fetchAllAssets(table);
+
+  // Filter by storage
+  const filtered = rows.filter(r => {
+    if (!storage) return true;
+    return storageOf(r.url) === storage;
+  });
+
+  document.getElementById('countLine').textContent = `${filtered.length} assets`;
+  document.getElementById('statTotal').querySelector('.num').textContent = rows.length;
+
+  // Paginate
+  const start = (page-1)*PER_PAGE;
+  const slice = filtered.slice(start, start+PER_PAGE);
+
+  if (!slice.length) {
+    document.getElementById('grid').innerHTML = '<div class="loading">No assets found.</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('grid').innerHTML = slice.map(r => {
+    const needsMigration = ['cloudinary','fal'].includes(storageOf(r.url));
+    return `<div class="card${needsMigration?' needs-migration':''}">
+      <div class="thumb-wrap">
+        ${thumbHtml(r.url, r.label)}
+        ${badgeHtml(r.url)}
+        <span class="table-type">${r.table}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-title">${escHtml(r.label)}</div>
+        <div class="card-meta">${escHtml(r.meta||'')}</div>
+        <div class="card-url">${r.url ? r.url.slice(-60) : 'No URL'}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Pagination
+  const pages = Math.ceil(filtered.length / PER_PAGE);
+  if (pages <= 1) { document.getElementById('pagination').innerHTML=''; return; }
+  document.getElementById('pagination').innerHTML = Array.from({length:pages},(_,i)=>
+    `<button class="${i+1===page?'active':''}" onclick="load(${i+1})">${i+1}</button>`
+  ).join('');
+}
+
+async function fetchAllAssets(tableFilter) {
+  const rows = [];
+  try {
+    // orders — output image
+    if (!tableFilter || tableFilter === 'orders_output') {
+      const d = await fetch('/admin/api/assets?table=orders_output&limit=500').then(r=>r.json()).catch(()=>({rows:[]}));
+      (d.rows||[]).forEach(r => rows.push({table:'order-img', url: r.output_asset_url || r.result_url, label:`Order #${r.id}`, meta:`${r.product||''} · ${r.email||''} · ${fmtDate(r.created_at)}`}));
+    }
+    // orders — video
+    if (!tableFilter || tableFilter === 'orders_video') {
+      const d = await fetch('/admin/api/assets?table=orders_video&limit=500').then(r=>r.json()).catch(()=>({rows:[]}));
+      (d.rows||[]).forEach(r => { if(r.output_video_asset_url || r.result_video_url) rows.push({table:'order-vid', url: r.output_video_asset_url || r.result_video_url, label:`Order #${r.id} (vid)`, meta:`${r.product||''} · ${r.email||''} · ${fmtDate(r.created_at)}`}); });
+    }
+    // orders — input photo
+    if (!tableFilter || tableFilter === 'orders_input') {
+      const d = await fetch('/admin/api/assets?table=orders_input&limit=500').then(r=>r.json()).catch(()=>({rows:[]}));
+      (d.rows||[]).forEach(r => { if(r.input_asset_url) rows.push({table:'order-photo', url: r.input_asset_url, label:`Order #${r.id} (photo)`, meta:`${r.email||''} · ${fmtDate(r.created_at)}`}); });
+    }
+    // generations
+    if (!tableFilter || tableFilter === 'generations') {
+      const d = await fetch('/admin/api/assets?table=generations&limit=500').then(r=>r.json()).catch(()=>({rows:[]}));
+      (d.rows||[]).forEach(r => rows.push({table:'generation', url: r.output_url, label:`Gen #${r.id}`, meta:`${r.source_type||''} · ${fmtDate(r.created_at)}`}));
+    }
+    // concept_media
+    if (!tableFilter || tableFilter === 'concept_media') {
+      const d = await fetch('/admin/api/assets?table=concept_media&limit=500').then(r=>r.json()).catch(()=>({rows:[]}));
+      (d.rows||[]).forEach(r => rows.push({table:'gallery', url: r.url, label:`Media #${r.id}`, meta:`concept ${r.concept_id||''} · ${r.kind||''}`}));
+    }
+  } catch(e) { console.warn('fetchAllAssets error', e); }
+  return rows;
+}
+
+async function runBackfill() {
+  const btn = document.getElementById('migrateBtn');
+  const msg = document.getElementById('backfillMsg');
+  btn.disabled = true;
+  msg.textContent = 'Running… (this takes up to a minute)';
+  try {
+    const d = await fetch('/admin/api/backfill-assets', {method:'POST'}).then(r=>r.json());
+    msg.textContent = d.message || 'Started. Refresh in 60 seconds.';
+    setTimeout(()=>{ loadSummary(); load(page); msg.textContent='Done — counts refreshed.'; }, 8000);
+  } catch(e) {
+    msg.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function openLb(url, type) {
+  const lb = document.getElementById('lb');
+  const img = document.getElementById('lbImg');
+  const vid = document.getElementById('lbVid');
+  if (type === 'video') { img.style.display='none'; vid.style.display='block'; vid.src=url; vid.play().catch(()=>{}); }
+  else { vid.style.display='none'; vid.src=''; img.style.display='block'; img.src=url; }
+  lb.classList.add('open');
+}
+function closeLb() {
+  document.getElementById('lb').classList.remove('open');
+  document.getElementById('lbVid').pause();
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLb(); });
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(s) { if(!s) return ''; return new Date(s).toLocaleDateString('sv-SE'); }
+
+loadSummary();
+load(1);
+</script>
+</body>
+</html>

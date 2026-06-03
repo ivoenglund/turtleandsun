@@ -897,7 +897,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Gifting occasions', 'National occasions, live dates, markets — what the campaign agent runs on.', '/admin/occasions') +
       card('Campaign queue', 'What is queued to draft, print, and send.', '/admin/occasions/queue') +
       card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email') +
-      card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations')
+      card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
+      card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets')
     )}
 
     <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
@@ -2653,6 +2654,48 @@ async function sendResultEmail(email, product, imageUrl, videoUrl) {
 // ---- Admin: Generation quality review dashboard --------------------------------
 app.get('/admin/generations', requireRole('admin'), (req, res) => {
   res.sendFile(require('path').join(__dirname, 'admin-generations.html'));
+});
+
+// Asset storage browser — shows every file with R2 / Cloudinary / fal.ai badge
+app.get('/admin/assets', requireRole('admin'), (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-assets.html'));
+});
+
+app.get('/admin/api/assets', requireRole('admin'), async (req, res) => {
+  try {
+    const { table, limit = 500 } = req.query;
+    const lim = Math.min(parseInt(limit) || 500, 2000);
+    let rows = [];
+    if (table === 'orders_output' || !table) {
+      const r = await pool.query(`SELECT id, email, product, result_url, output_asset_url, created_at FROM orders WHERE result_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
+      if (table === 'orders_output') return res.json({ rows: r.rows });
+      rows = rows.concat(r.rows.map(x => ({ _type: 'orders_output', ...x })));
+    }
+    if (table === 'orders_video' || !table) {
+      const r = await pool.query(`SELECT id, email, product, result_video_url, output_video_asset_url, created_at FROM orders WHERE result_video_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
+      if (table === 'orders_video') return res.json({ rows: r.rows });
+      rows = rows.concat(r.rows.map(x => ({ _type: 'orders_video', ...x })));
+    }
+    if (table === 'orders_input' || !table) {
+      const r = await pool.query(`SELECT id, email, input_asset_url, created_at FROM orders WHERE input_asset_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
+      if (table === 'orders_input') return res.json({ rows: r.rows });
+      rows = rows.concat(r.rows.map(x => ({ _type: 'orders_input', ...x })));
+    }
+    if (table === 'generations' || !table) {
+      const r = await pool.query(`SELECT id, source_type, output_url, created_at FROM generations WHERE output_url IS NOT NULL ORDER BY created_at DESC LIMIT $1`, [lim]);
+      if (table === 'generations') return res.json({ rows: r.rows });
+      rows = rows.concat(r.rows.map(x => ({ _type: 'generations', ...x })));
+    }
+    if (table === 'concept_media' || !table) {
+      const r = await pool.query(`SELECT id, concept_id, kind, url FROM concept_media WHERE url IS NOT NULL AND active = TRUE ORDER BY id DESC LIMIT $1`, [lim]);
+      if (table === 'concept_media') return res.json({ rows: r.rows });
+      rows = rows.concat(r.rows.map(x => ({ _type: 'concept_media', ...x })));
+    }
+    res.json({ rows });
+  } catch (e) {
+    console.error('[admin/assets]', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/admin/api/generations', requireRole('admin'), async (req, res) => {
@@ -5450,8 +5493,7 @@ app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
   }
 });
 
-// Sentry Express error handler — after all routes, before any catch-all handler.
-// v10 equivalent of the old Sentry.Handlers.errorHandler() middleware.
+// Sentry Express error handler
 if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app);
 }
@@ -5468,11 +5510,10 @@ cron.schedule('0 3 * * *', async () => {
   }
 }, { timezone: 'UTC' });
 
-// Daily operational digest email to admin at 06:00 UTC (07:00/08:00 CET)
+// Daily operational digest email to admin at 06:00 UTC
 cron.schedule('0 6 * * *', () => sendDailyDigest().catch((err) => console.error('[digest] cron error:', err.message)), { timezone: 'UTC' });
 
-// FX rates refresh — fires once at boot and daily at 04:00 UTC.
-// Implementation in fx_cron.js. Pricing engine (pricing.js) reads from fx_rates.
+// FX rates refresh
 scheduleFxRefresh(cron);
 
 initDb()
