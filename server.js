@@ -2671,20 +2671,19 @@ app.get('/admin/social-clips', requireRole('admin'), (req, res) => {
 app.get('/admin/api/social-clips/ffmpeg-check', requireRole('admin'), (req, res) => {
   const { execSync } = require('child_process');
   const fs2 = require('fs');
-  let which = null, exists = false, version = null;
-  const candidates = [
-    process.env.FFMPEG_PATH,
-    '/tmp/ffmpeg',
-    '/usr/bin/ffmpeg',
-    '/usr/local/bin/ffmpeg',
-    '/nix/var/nix/profiles/default/bin/ffmpeg',
-  ].filter(Boolean);
+  let which = null, exists = false, version = null, nixSearch = null;
   try { which = execSync('which ffmpeg 2>/dev/null').toString().trim(); } catch {}
+  try { nixSearch = execSync('find /nix -name ffmpeg -type f 2>/dev/null | head -3').toString().trim(); } catch {}
+  const candidates = [
+    process.env.FFMPEG_PATH, which, '/tmp/ffmpeg',
+    '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg',
+    nixSearch ? nixSearch.split('\n')[0] : null,
+  ].filter(Boolean);
   for (const p of candidates) {
-    if (fs2.existsSync(p)) { exists = true; which = which || p; break; }
+    if (fs2.existsSync(p)) { exists = true; which = p; break; }
   }
   try { version = execSync(`${which || 'ffmpeg'} -version 2>&1`).toString().split('\n')[0]; } catch(e) { version = e.message; }
-  res.json({ which, exists, version, platform: process.platform, arch: process.arch, tmpFfmpeg: fs2.existsSync('/tmp/ffmpeg') });
+  res.json({ which, exists, version, nixSearch, platform: process.platform, arch: process.arch });
 });
 
 app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, res) => {
