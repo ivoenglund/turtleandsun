@@ -2723,15 +2723,18 @@ app.post('/admin/api/generations/:id/regenerate', requireRole('admin'), async (r
 app.get('/admin/api/backfill-assets', requireRole('admin'), async (req, res) => {
   try {
     const falPattern = '%fal%';
-    const [orders_img, orders_vid, gens] = await Promise.all([
+    const externalPattern = '%cloudinary%';
+    const [orders_img, orders_vid, gens, media] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM orders WHERE (result_url ILIKE $1) AND (output_asset_url IS NULL OR output_asset_url ILIKE $1)`, [falPattern]),
       pool.query(`SELECT COUNT(*) FROM orders WHERE (result_video_url ILIKE $1) AND (output_video_asset_url IS NULL OR output_video_asset_url ILIKE $1)`, [falPattern]),
       pool.query(`SELECT COUNT(*) FROM generations WHERE fal_output_url IS NOT NULL AND (output_url IS NULL OR output_url ILIKE $1)`, [falPattern]),
+      pool.query(`SELECT COUNT(*) FROM concept_media WHERE (url ILIKE $1 OR url ILIKE $2) AND active = TRUE`, [falPattern, externalPattern]),
     ]);
     res.json({
       orders_images_pending: parseInt(orders_img.rows[0].count),
       orders_videos_pending: parseInt(orders_vid.rows[0].count),
       generations_pending: parseInt(gens.rows[0].count),
+      concept_media_pending: parseInt(media.rows[0].count),
       message: 'POST to this endpoint to run the backfill'
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -2784,6 +2787,21 @@ app.post('/admin/api/backfill-assets', requireRole('admin'), async (req, res) =>
         done++;
         console.log('[backfill] generation', g.id, '->', r2.url);
       } catch(e) { failed++; console.warn('[backfill] generation', g.id, 'failed:', e.message); }
+    }
+
+    // 4. Concept media (gallery showcase images)
+    const { rows: mediaRows } = await pool.query(
+      `SELECT id, url, kind FROM concept_media WHERE (url ILIKE $1 OR url ILIKE $2) AND active = TRUE LIMIT 200`,
+      [falPattern, '%cloudinary%']
+    );
+    for (const m of mediaRows) {
+      try {
+        const isVid = m.kind === 'video' || /\.(mp4|webm|mov)($|\?)/.test(m.url);
+        const r2 = await downloadAndStore({ remoteUrl: m.url, kind: 'concept_media' });
+        await pool.query('UPDATE concept_media SET url=$1 WHERE id=$2', [r2.url, m.id]);
+        done++;
+        console.log('[backfill] concept_media', m.id, '->', r2.url);
+      } catch(e) { failed++; console.warn('[backfill] concept_media', m.id, 'failed:', e.message); }
     }
 
     console.log(`[backfill] complete: ${done} migrated, ${failed} failed`);
