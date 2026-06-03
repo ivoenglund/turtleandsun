@@ -2669,14 +2669,22 @@ app.get('/admin/social-clips', requireRole('admin'), (req, res) => {
 });
 
 app.get('/admin/api/social-clips/ffmpeg-check', requireRole('admin'), (req, res) => {
-  let ffmpegPath = null, error = null, exists = false;
-  try {
-    ffmpegPath = require('ffmpeg-static');
-  } catch(e) { error = e.message; }
-  if (ffmpegPath) {
-    exists = require('fs').existsSync(ffmpegPath);
+  const { execSync } = require('child_process');
+  const fs2 = require('fs');
+  let which = null, exists = false, version = null;
+  const candidates = [
+    process.env.FFMPEG_PATH,
+    '/tmp/ffmpeg',
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    '/nix/var/nix/profiles/default/bin/ffmpeg',
+  ].filter(Boolean);
+  try { which = execSync('which ffmpeg 2>/dev/null').toString().trim(); } catch {}
+  for (const p of candidates) {
+    if (fs2.existsSync(p)) { exists = true; which = which || p; break; }
   }
-  res.json({ ffmpegPath, exists, error, platform: process.platform, arch: process.arch });
+  try { version = execSync(`${which || 'ffmpeg'} -version 2>&1`).toString().split('\n')[0]; } catch(e) { version = e.message; }
+  res.json({ which, exists, version, platform: process.platform, arch: process.arch, tmpFfmpeg: fs2.existsSync('/tmp/ffmpeg') });
 });
 
 app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, res) => {
@@ -2767,7 +2775,7 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
       `[vbefore][vafter]concat=n=2:v=1:a=0[vout]`,
     ].join('');
 
-    const ffmpegBin = (() => { try { return require('ffmpeg-static'); } catch { return 'ffmpeg'; } })();
+    const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
     await new Promise((resolve, reject) => {
       execFile(ffmpegBin, [
         '-y',
