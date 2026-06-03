@@ -2751,13 +2751,13 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
 
     // Text overlays
     const beforeText = show_labels
-      ? `,drawtext=text='BEFORE':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+      ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='BEFORE':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
       : '';
     const afterText = show_labels
-      ? `,drawtext=text='AFTER':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
+      ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AFTER':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
       : '';
     const conceptText = show_labels
-      ? `,drawtext=text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
+      ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
       : '';
 
     const filter = [
@@ -2806,7 +2806,7 @@ app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res
         '-t', '30',        // safety cap: max 30s total
         outFile,
       ], { timeout: 120000 }, (err, stdout, stderr) => {
-        if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(0, 200))); }
+        if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(-800))); }
         resolve();
       });
     });
