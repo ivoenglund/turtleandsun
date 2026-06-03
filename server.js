@@ -2873,20 +2873,22 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
   try {
     const { rows: triplets } = await pool.query(`
       SELECT t.id, t.concept_id, c.name AS concept_name,
-             bm.url AS before_url, vm.url AS video_url
+             bm.url AS before_url, vm.url AS video_url,
+             im.url AS image_url
       FROM concept_triplets t
       JOIN concepts c ON c.id = t.concept_id
       LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
       LEFT JOIN concept_media vm ON vm.id = t.video_media_id  AND vm.active = TRUE
+      LEFT JOIN concept_media im ON im.id = t.image_media_id  AND im.active = TRUE
       WHERE t.id = ANY($1::int[])
     `, [triplet_ids]);
     const created = [];
     for (const t of triplets) {
       const { rows: [row] } = await pool.query(`
-        INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url, after_image_url)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
-      `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url]);
+      `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url, t.image_url]);
       created.push(row.id);
     }
     res.json({ created });
@@ -2913,6 +2915,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
   const {
     label_before, before_duration_s, label_after, show_labels,
     end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
+    video_overlay_text,
   } = req.body;
   try {
     const { rows } = await pool.query(`
@@ -2926,11 +2929,13 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         end_card_line2     = COALESCE($8, end_card_line2),
         show_logo          = COALESCE($9, show_logo),
         end_card_duration_s= COALESCE($10, end_card_duration_s),
+        video_overlay_text = COALESCE($11, video_overlay_text),
         updated_at         = now()
       WHERE id = $1
       RETURNING *
     `, [id, label_before, before_duration_s, label_after, show_labels,
-        end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s]);
+        end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
+        video_overlay_text]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -2969,93 +2974,145 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
   await pool.query(`UPDATE social_clips SET status='processing', error_msg=NULL, updated_at=now() WHERE id=$1`, [id]);
   res.json({ ok: true, message: 'Generation started — poll /admin/api/social-clips/' + id + ' for status' });
 
-  // Run generation in background (don't await in request)
+  // Run generation in background
   (async () => {
     const tmpDir = require('fs').mkdtempSync(pathM.join(os.tmpdir(), 'tns-clip-'));
-    const beforeFile = pathM.join(tmpDir, 'before.jpg');
-    const videoFile  = pathM.join(tmpDir, 'after.mp4');
-    const outFile    = pathM.join(tmpDir, 'clip.mp4');
+    const videoFile   = pathM.join(tmpDir, 'after.mp4');
+    const endCardFile = pathM.join(tmpDir, 'end_card.jpg');
+    const outFile     = pathM.join(tmpDir, 'clip.mp4');
     try {
       const _https = require('https');
       const _http  = require('http');
       const fs2 = require('fs');
-      async function dlFile(url, dest) {
+
+      async function dlBuffer(url) {
         return new Promise((resolve, reject) => {
           const lib = url.startsWith('https') ? _https : _http;
-          const file = fs2.createWriteStream(dest);
+          const chunks = [];
           lib.get(url, res2 => {
-            if (res2.statusCode >= 300 && res2.headers.location) {
-              file.close();
-              return dlFile(res2.headers.location, dest).then(resolve).catch(reject);
-            }
-            res2.pipe(file);
-            file.on('finish', () => { file.close(); resolve(); });
-          }).on('error', err => { fs2.unlink(dest, () => {}); reject(err); });
+            if (res2.statusCode >= 300 && res2.headers.location)
+              return dlBuffer(res2.headers.location).then(resolve).catch(reject);
+            res2.on('data', c => chunks.push(c));
+            res2.on('end', () => resolve(Buffer.concat(chunks)));
+          }).on('error', reject);
         });
       }
-      await dlFile(clip.before_url, beforeFile);
+      async function dlFile(url, dest) { fs2.writeFileSync(dest, await dlBuffer(url)); }
+
+      // ── 1. Build composite end card (before + panel PNG + after portrait) ──
+      const sharp = require('sharp');
+      const panelPath = pathM.join(__dirname, 'public', 'tns_end_card_panel.png');
+      const W = 1080, H = 1920;
+
+      if (fs2.existsSync(panelPath) && clip.before_url) {
+        const pm = await sharp(panelPath).metadata();
+        const panelH = Math.round(W * pm.height / pm.width);
+        const photoH = Math.floor((H - panelH) / 2);
+        const panelResized = await sharp(panelPath).resize(W, panelH, { fit: 'fill' }).png().toBuffer();
+
+        // Before: resize + vignette + label
+        const beforeBuf = await dlBuffer(clip.before_url);
+        const beforeResized = await sharp(beforeBuf)
+          .resize(W, photoH, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+        const vignSvg = Buffer.from(
+          `<svg width='${W}' height='${photoH}'><defs>` +
+          `<radialGradient id='v' cx='50%' cy='50%' r='70%'>` +
+          `<stop offset='0%' stop-color='black' stop-opacity='0'/>` +
+          `<stop offset='100%' stop-color='black' stop-opacity='0.55'/>` +
+          `</radialGradient></defs>` +
+          `<rect width='${W}' height='${photoH}' fill='url(#v)'/></svg>`
+        );
+        const beforeVignetted = await sharp(beforeResized)
+          .composite([{ input: vignSvg, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
+        const beforeLabel = Buffer.from(
+          `<svg width='${W}' height='${photoH}'>` +
+          `<rect x='${W-165}' y='28' width='135' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
+          `<text x='${W-98}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>BEFORE</text>` +
+          `</svg>`
+        );
+        const beforeFinal = await sharp(beforeVignetted)
+          .composite([{ input: beforeLabel, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
+
+        // After portrait
+        let afterFinal;
+        if (clip.after_image_url) {
+          const afterBuf = await dlBuffer(clip.after_image_url);
+          const afterResized = await sharp(afterBuf)
+            .resize(W, photoH, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+          const afterLabel = Buffer.from(
+            `<svg width='${W}' height='${photoH}'>` +
+            `<rect x='${W-140}' y='28' width='110' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
+            `<text x='${W-85}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>AFTER</text>` +
+            `</svg>`
+          );
+          afterFinal = await sharp(afterResized)
+            .composite([{ input: afterLabel, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
+        } else {
+          afterFinal = await sharp({ create: { width: W, height: photoH, channels: 3, background: { r: 20, g: 20, b: 20 } } })
+            .jpeg().toBuffer();
+        }
+
+        const composite = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+          .composite([
+            { input: beforeFinal,  top: 0,               left: 0 },
+            { input: panelResized, top: photoH,           left: 0 },
+            { input: afterFinal,   top: photoH + panelH,  left: 0 },
+          ]).jpeg({ quality: 90 }).toBuffer();
+        fs2.writeFileSync(endCardFile, composite);
+      } else {
+        // Fallback: dark card if panel PNG missing
+        const fb = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 28, g: 42, b: 20 } } }).jpeg().toBuffer();
+        fs2.writeFileSync(endCardFile, fb);
+        console.warn('[social-clip] public/tns_end_card_panel.png not found — upload it to enable the branded end card');
+      }
+
+      // ── 2. Download the after video ──
       await dlFile(clip.after_video_url, videoFile);
 
-      const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
-      const label = (clip.concept_name || 'LOVEOGRAM').toUpperCase();
-      const label_before = clip.label_before || 'BEFORE';
-      const label_after  = clip.label_after  || 'AFTER';
-      const show_labels  = clip.show_labels  !== false;
-      const beforeDur    = parseFloat(clip.before_duration_s) || 3;
-
-      const beforeText = show_labels
-        ? `,drawtext=fontfile=${font}:text='${label_before.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
-        : '';
-      const afterText = show_labels
-        ? `,drawtext=fontfile=${font}:text='${label_after.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
-        : '';
-      const conceptText = show_labels
-        ? `,drawtext=fontfile=${font}:text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
-        : '';
-
-      const endCardEnabled = clip.end_card_enabled !== false;
-      const endDur = parseFloat(clip.end_card_duration_s) || 3;
-      const ecLine1 = (clip.end_card_line1 || 'Turtle and Sun').replace(/'/g, "\\'");
-      const ecLine2 = (clip.end_card_line2 || 'Remember to love').replace(/'/g, "\\'");
-      const ec1Text = `drawtext=fontfile=${font}:text='${ecLine1}':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
-      const ec2Text = `,drawtext=fontfile=${font}:text='${ecLine2}':fontsize=40:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
-      const endCardFilter = endCardEnabled
-        ? `color=c=#FFFEF5:size=1080x1920:rate=30:duration=${endDur}[ecbg];` +
-          `[ecbg]${ec1Text}${ec2Text},fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`
-        : '';
-
-      const filterParts = [
-        `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
-        `crop=1080:1920${beforeText},`,
-        `fade=t=out:st=${beforeDur - 0.5}:d=0.5[vbefore];`,
-        `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
-        `crop=1080:1920${afterText}${conceptText},`,
-        `fade=t=in:st=0:d=0.5[vafter];`,
-      ];
-      if (endCardEnabled) {
-        filterParts.push(endCardFilter);
-        filterParts.push(`[vbefore][vafter][vendcard]concat=n=3:v=1:a=0[vout]`);
-      } else {
-        filterParts.push(`[vbefore][vafter]concat=n=2:v=1:a=0[vout]`);
-      }
-      const filter = filterParts.join('');
-
+      // ── 3. Probe video duration ──
       const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
-      if (!require('fs').existsSync(ffmpegBin)) {
+      if (!fs2.existsSync(ffmpegBin)) {
         await new Promise((resolve) => {
           require('child_process').execFile(
-            process.execPath, [require('path').join(__dirname, 'scripts/download-ffmpeg.js')],
-            { timeout: 180000 }, (err, stdout, stderr) => { resolve(); }
+            process.execPath, [pathM.join(__dirname, 'scripts/download-ffmpeg.js')],
+            { timeout: 180000 }, () => resolve()
           );
         });
       }
-      if (!require('fs').existsSync(ffmpegBin)) throw new Error('FFmpeg unavailable');
+      if (!fs2.existsSync(ffmpegBin)) throw new Error('FFmpeg unavailable');
+
+      let videoDur = 5;
+      try {
+        const probe = require('child_process').execSync(
+          `${ffmpegBin} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile}" 2>&1`,
+          { encoding: 'utf8' }
+        );
+        videoDur = parseFloat(probe.trim()) || 5;
+      } catch(e2) { console.warn('[social-clip] probe failed, assuming 5s:', e2.message); }
+
+      // ── 4. Build FFmpeg filter: after video (with overlay) → end card ──
+      const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+      const rawOverlay = (clip.video_overlay_text || '').trim();
+      const overlayEsc = rawOverlay.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:');
+      const overlayFilter = overlayEsc
+        ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=80:shadowcolor=black@0.85:shadowx=3:shadowy=3`
+        : '';
+      const endDur = parseFloat(clip.end_card_duration_s) || 4;
+
+      const filter = [
+        `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
+        overlayFilter,
+        `,fade=t=out:st=${Math.max(videoDur - 0.5, 0)}:d=0.5[vafter];`,
+        `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,`,
+        `fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`,
+        `[vafter][vendcard]concat=n=2:v=1:a=0[vout]`,
+      ].join('');
 
       await new Promise((resolve, reject) => {
         execFile(ffmpegBin, [
           '-y', '-loglevel', 'error',
-          '-loop', '1', '-t', String(beforeDur), '-framerate', '30', '-i', beforeFile,
           '-i', videoFile,
+          '-loop', '1', '-t', String(endDur + 1), '-framerate', '30', '-i', endCardFile,
           '-filter_complex', filter,
           '-map', '[vout]',
           '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
@@ -3067,10 +3124,21 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         });
       });
 
+      // Upload clip + end card to R2
       const { uploadBuffer } = require('./storage');
-      const clipBuf = require('fs').readFileSync(outFile);
+      const clipBuf = fs2.readFileSync(outFile);
       const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip' });
-      await pool.query(`UPDATE social_clips SET status='done', output_url=$2, updated_at=now() WHERE id=$1`, [id, r2.url]);
+      let endCardR2Url = null;
+      try {
+        const ecBuf = fs2.readFileSync(endCardFile);
+        const ecR2 = await uploadBuffer({ buffer: ecBuf, contentType: 'image/jpeg', kind: 'social-clip-endcard' });
+        endCardR2Url = ecR2.url;
+      } catch(e2) { console.warn('[social-clip] end card R2 upload failed:', e2.message); }
+
+      await pool.query(
+        `UPDATE social_clips SET status='done', output_url=$2, end_card_url=$3, updated_at=now() WHERE id=$1`,
+        [id, r2.url, endCardR2Url]
+      );
     } catch (e) {
       console.error('[social-clip generate]', e.message);
       await pool.query(`UPDATE social_clips SET status='error', error_msg=$2, updated_at=now() WHERE id=$1`, [id, e.message]);

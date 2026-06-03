@@ -14,7 +14,6 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .meta{font-size:11px;color:#888;margin-bottom:20px}
 .layout{display:grid;grid-template-columns:280px 1fr;gap:20px}
 @media(max-width:700px){.layout{grid-template-columns:1fr}}
-/* Video preview panel */
 .preview-panel{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .preview-panel h2{font-size:13px;font-weight:700;margin-bottom:10px}
 .video-box{background:#000;border-radius:8px;overflow:hidden;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center}
@@ -35,7 +34,6 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .badge-done{background:#d4edda;color:#155724}
 .badge-error{background:#f8d7da;color:#721c24}
 .download-link{display:block;margin-top:8px;font-size:11px;color:#1C2A14;word-break:break-all}
-/* Settings panel */
 .settings-panel{display:flex;flex-direction:column;gap:14px}
 .scene-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .scene-card h2{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -45,9 +43,10 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .field input[type=text],.field input[type=number]{width:100%;padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:12px}
 .field input[type=checkbox]{width:16px;height:16px;cursor:pointer;vertical-align:middle}
 .field .check-label{font-size:12px;margin-left:4px;cursor:pointer;vertical-align:middle}
-.scene-thumb{width:100%;aspect-ratio:9/16;background:#000;border-radius:6px;overflow:hidden;margin-bottom:10px;max-height:120px;object-fit:cover}
+.field .hint{font-size:10px;color:#aaa;margin-top:3px}
+.scene-thumb{width:100%;border-radius:6px;overflow:hidden;margin-bottom:10px;max-height:120px;object-fit:cover;background:#000;display:block}
+.end-card-preview{width:100%;border-radius:6px;margin-bottom:8px;display:block;max-height:140px;object-fit:contain;background:#111}
 .save-row{margin-top:4px}
-/* Publish card */
 .publish-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .publish-card h2{font-size:13px;font-weight:700;margin-bottom:10px}
 .channel-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0}
@@ -56,7 +55,6 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .channel-name{flex:1;font-size:12px;font-weight:600}
 .channel-status{font-size:11px;color:#888}
 .channel-status.published{color:#155724;font-weight:700}
-/* Stats card */
 .stats-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .stats-card h2{font-size:13px;font-weight:700;margin-bottom:10px}
 .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -65,7 +63,6 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .stat-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px}
 .stat-val{font-weight:700}
 .no-stats{font-size:11px;color:#aaa;text-align:center;padding:12px}
-/* Flash */
 .flash{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:12px}
 .flash-ok{background:#d4edda;color:#155724}
 .flash-err{background:#f8d7da;color:#721c24}
@@ -129,56 +126,28 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
     <!-- RIGHT: scene settings -->
     <div class="settings-panel">
 
-      <!-- Scene 1 -->
+      <!-- Scene 1: After video -->
       <div class="scene-card">
-        <h2><span class="scene-num">1</span> Before (still image)</h2>
+        <h2><span class="scene-num">1</span> Loveogram video</h2>
         <div id="scene1-thumb"></div>
         <div class="field">
-          <label>Label text</label>
-          <input type="text" id="label_before" value="BEFORE">
-        </div>
-        <div class="field">
-          <label>Duration (seconds)</label>
-          <input type="number" id="before_duration_s" value="3" min="1" max="10" step="0.5">
-        </div>
-        <div class="field">
-          <input type="checkbox" id="show_labels" checked>
-          <label class="check-label" for="show_labels">Show labels on all scenes</label>
+          <label>Overlay text (top of video)</label>
+          <input type="text" id="video_overlay_text" placeholder="e.g. Make your own →" value="">
+          <div class="hint">Leave blank for no overlay. A/B test different lines to see what converts.</div>
         </div>
       </div>
 
-      <!-- Scene 2 -->
+      <!-- Scene 2: End card composite -->
       <div class="scene-card">
-        <h2><span class="scene-num">2</span> After (Loveogram video)</h2>
-        <div id="scene2-thumb"></div>
-        <div class="field">
-          <label>Label text</label>
-          <input type="text" id="label_after" value="AFTER">
-        </div>
-      </div>
-
-      <!-- Scene 3 -->
-      <div class="scene-card">
-        <h2><span class="scene-num">3</span> End card (brand)</h2>
-        <div class="field">
-          <input type="checkbox" id="end_card_enabled" checked>
-          <label class="check-label" for="end_card_enabled">Include end card</label>
-        </div>
-        <div class="field">
-          <label>Line 1</label>
-          <input type="text" id="end_card_line1" value="Turtle and Sun">
-        </div>
-        <div class="field">
-          <label>Line 2</label>
-          <input type="text" id="end_card_line2" value="Remember to love">
-        </div>
-        <div class="field">
-          <input type="checkbox" id="show_logo" checked>
-          <label class="check-label" for="show_logo">Show logo</label>
-        </div>
+        <h2><span class="scene-num">2</span> End card (composite)</h2>
+        <div id="end-card-preview-wrap"></div>
         <div class="field">
           <label>Duration (seconds)</label>
-          <input type="number" id="end_card_duration_s" value="3" min="1" max="8" step="0.5">
+          <input type="number" id="end_card_duration_s" value="4" min="1" max="10" step="0.5">
+        </div>
+        <div class="field hint" style="margin-bottom:0">
+          End card = before photo + branded panel + after portrait, composited automatically.<br>
+          To update branding, replace <strong>public/tns_end_card_panel.png</strong> and regenerate.
         </div>
       </div>
 
@@ -208,15 +177,14 @@ function renderClip() {
     'Created ' + new Date(clip.created_at).toLocaleString() +
     ' · updated ' + new Date(clip.updated_at).toLocaleString();
 
-  // Status badge
   document.getElementById('status-badge').innerHTML =
     `<span class="badge badge-${clip.status}">${clip.status}</span>`;
 
-  // Video preview
+  // Output video preview
   const box = document.getElementById('video-box');
   const dl  = document.getElementById('download-link');
   if (clip.output_url) {
-    box.innerHTML = `<video src="${escHtml(clip.output_url)}" controls playsinline style="width:100%;height:100%;object-fit:contain"></video>`;
+    box.innerHTML = `<video src="${esc(clip.output_url)}" controls playsinline style="width:100%;height:100%;object-fit:contain"></video>`;
     dl.href = clip.output_url;
     dl.style.display = 'block';
     dl.textContent = '↓ Download MP4';
@@ -225,30 +193,29 @@ function renderClip() {
     dl.style.display = 'none';
   }
 
-  // Scene thumbnails
+  // Scene 1: after video thumbnail
   const s1 = document.getElementById('scene1-thumb');
-  s1.innerHTML = clip.before_url
-    ? `<img src="${escHtml(clip.before_url)}" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px">`
-    : '';
-  const s2 = document.getElementById('scene2-thumb');
-  s2.innerHTML = clip.after_video_url
-    ? `<video src="${escHtml(clip.after_video_url)}" muted playsinline preload="none"
+  s1.innerHTML = clip.after_video_url
+    ? `<video src="${esc(clip.after_video_url)}" muted playsinline preload="metadata"
          onmouseenter="this.play()" onmouseleave="this.pause()"
-         style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px"></video>`
+         class="scene-thumb"></video>`
     : '';
 
-  // Settings fields
-  document.getElementById('label_before').value       = clip.label_before || 'BEFORE';
-  document.getElementById('before_duration_s').value  = clip.before_duration_s || 3;
-  document.getElementById('label_after').value        = clip.label_after || 'AFTER';
-  document.getElementById('show_labels').checked      = clip.show_labels !== false;
-  document.getElementById('end_card_enabled').checked = clip.end_card_enabled !== false;
-  document.getElementById('end_card_line1').value     = clip.end_card_line1 || 'Turtle and Sun';
-  document.getElementById('end_card_line2').value     = clip.end_card_line2 || 'Remember to love';
-  document.getElementById('show_logo').checked        = clip.show_logo !== false;
-  document.getElementById('end_card_duration_s').value = clip.end_card_duration_s || 3;
+  // Scene 2: end card preview
+  const ecWrap = document.getElementById('end-card-preview-wrap');
+  if (clip.end_card_url) {
+    ecWrap.innerHTML = `<img src="${esc(clip.end_card_url)}" class="end-card-preview" alt="End card preview">`;
+  } else if (clip.before_url) {
+    ecWrap.innerHTML = `<div style="font-size:11px;color:#aaa;margin-bottom:8px">End card will be generated from before + panel + after. Generate the clip to preview.</div>`;
+  } else {
+    ecWrap.innerHTML = '';
+  }
 
-  // Publishing checkboxes
+  // Settings
+  document.getElementById('video_overlay_text').value   = clip.video_overlay_text || '';
+  document.getElementById('end_card_duration_s').value  = clip.end_card_duration_s || 4;
+
+  // Publish checkboxes
   document.getElementById('ch-tiktok').checked    = !!clip.published_tiktok;
   document.getElementById('ch-instagram').checked = !!clip.published_instagram;
   document.getElementById('ch-youtube').checked   = !!clip.published_youtube;
@@ -259,10 +226,8 @@ function renderClip() {
   document.getElementById('st-instagram').outerHTML = pubSt('instagram');
   document.getElementById('st-youtube').outerHTML   = pubSt('youtube');
 
-  // Stats
   renderStats();
 
-  // Generate button state
   document.getElementById('btn-generate').disabled = clip.status === 'processing';
   document.getElementById('gen-status').textContent = clip.status === 'processing' ? 'Generating — auto-refreshing…' : '';
   if (clip.status === 'processing') {
@@ -297,14 +262,7 @@ function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
 
 async function saveSettings(thenGenerate) {
   const body = {
-    label_before:       document.getElementById('label_before').value,
-    before_duration_s:  parseFloat(document.getElementById('before_duration_s').value),
-    label_after:        document.getElementById('label_after').value,
-    show_labels:        document.getElementById('show_labels').checked,
-    end_card_enabled:   document.getElementById('end_card_enabled').checked,
-    end_card_line1:     document.getElementById('end_card_line1').value,
-    end_card_line2:     document.getElementById('end_card_line2').value,
-    show_logo:          document.getElementById('show_logo').checked,
+    video_overlay_text:  document.getElementById('video_overlay_text').value,
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value),
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
@@ -372,7 +330,7 @@ function showFlash(msg, type) {
   setTimeout(() => { el.style.display = 'none'; }, 7000);
 }
 
-function escHtml(s) {
+function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 

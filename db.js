@@ -609,6 +609,122 @@ async function initDb() {
     console.log('Seeded Talking Pet — Birthday concept');
   }
 
+  // Seed Father's Day Portrait concept. Seeded inactive — flip active=TRUE
+  // once gallery images (concept_media) are generated and attached.
+  // June 21 deadline: activate by ~June 14 to allow social promo time.
+  const fathersDayExists = await pool.query(
+    `SELECT 1 FROM concepts WHERE slug = 'fathers-day-portrait' LIMIT 1`
+  );
+  if (fathersDayExists.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO concepts (
+         slug, name, filter_category, input_type,
+         image_prompt, video_prompt,
+         fal_image_model, fal_video_model,
+         active, sort_order, description
+       ) VALUES (
+         $1, $2, $3, $4,
+         $5, $6,
+         $7, $8,
+         $9, $10, $11
+       )`,
+      [
+        'fathers-day-portrait',
+        "Father's Day Portrait",
+        'family,celebration',
+        'image_video',
+        // image_prompt
+        'Transform @Image1 into a warm, heroic heirloom oil painting portrait — the subject radiates strength, warmth, and gentle wisdom, like a beloved family patriarch. Rich warm tones, wood-panelled study backdrop with soft window light. Preserve the exact face and identity of the person in @Image1. Oil painting style, highly detailed, museum quality.',
+        // video_prompt
+        'The heirloom portrait gently comes to life — the subject\'s eyes soften with warmth, a subtle proud smile forming, warm candlelight flickering softly in the background. Cinematic depth of field, wood-panelled study atmosphere. Painterly and heartfelt. Preserve the exact face and identity of the subject.',
+        'fal-ai/kling-image/o1',
+        'fal-ai/kling-video/v3/pro/image-to-video',
+        false, /* activate when gallery images are ready — target June 14 */
+        3,
+        "The family photo you always wanted. Transform a favourite photo into a timeless heirloom portrait — a Father's Day gift they'll keep forever.",
+      ]
+    );
+    console.log("Seeded Father's Day Portrait concept");
+  }
+
+  // Seed Father's Day talking pet concepts (x3). All inactive until gallery
+  // media is attached. Activate by ~June 14. speech_text uses {name} placeholder
+  // for the dad's name (customer fills in at order time via user_input).
+  const fdTalkingSlugs = [
+    'fathers-day-talking-love',
+    'fathers-day-talking-funny',
+    'fathers-day-talking-proud',
+  ];
+  const fdTalkingExists = await pool.query(
+    `SELECT slug FROM concepts WHERE slug = ANY($1)`, [fdTalkingSlugs]
+  );
+  const existingSlugs = new Set(fdTalkingExists.rows.map(r => r.slug));
+
+  const fdTalkingConcepts = [
+    {
+      slug: 'fathers-day-talking-love',
+      name: "Father's Day — Heartfelt",
+      sort_order: 4,
+      description: "Your pet says what your heart already knows. A warm, loving Father's Day message straight from your furry best friend.",
+      speech_text: "Dad, I know I can't say it with words — but I want you to know. You are my whole world. Thank you for every walk, every cuddle, every moment. I love you, {name}. Happy Father's Day.",
+    },
+    {
+      slug: 'fathers-day-talking-funny',
+      name: "Father's Day — Funny",
+      sort_order: 5,
+      description: "Your pet has seen everything. The snoring, the bad jokes, the way you eat. And they still think you're the greatest.",
+      speech_text: "{name}, listen. I've seen everything. The snoring. The bad jokes. The way you eat. And I still think you're the greatest human on the planet. Don't tell anyone I said that. Happy Father's Day.",
+    },
+    {
+      slug: 'fathers-day-talking-proud',
+      name: "Father's Day — Short & Sweet",
+      sort_order: 6,
+      description: "Short, proud, and straight to the point. Because some dads deserve all the words and some just need three.",
+      speech_text: "World's best dad — right here. That's you, {name}. I'd fetch the whole world for you. Happy Father's Day.",
+    },
+  ];
+
+  for (const c of fdTalkingConcepts) {
+    if (existingSlugs.has(c.slug)) continue;
+    await pool.query(
+      `INSERT INTO concepts (
+         slug, name, filter_category, input_type,
+         image_prompt, video_prompt,
+         fal_video_model, talking_model, speech_text,
+         active, sort_order, description,
+         user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length
+       ) VALUES (
+         $1, $2, $3, $4,
+         $5, $6,
+         $7, $8, $9,
+         $10, $11, $12,
+         $13, $14, $15, $16, $17
+       )`,
+      [
+        c.slug,
+        c.name,
+        'pets,celebration,fathers-day,talking',
+        'talking',
+        // image_prompt: not used for talking but column is NOT NULL
+        'A warm portrait of @Image1 looking gently and joyfully at the camera.',
+        // video_prompt: visual scene description
+        'A friendly pet looks directly at the camera with bright, expressive eyes and a warm, loving expression. Soft natural light, shallow depth of field, cinematic and heartfelt atmosphere.',
+        'fal-ai/kling-video/v3/pro/image-to-video',
+        'fal-ai/kling-video/v3/pro/image-to-video__talking',
+        c.speech_text,
+        false, /* activate when gallery media ready — target June 14 */
+        c.sort_order,
+        c.description,
+        true,             // user_input_enabled — customer types the dad's name
+        "Dad's name",
+        'e.g. Michael',
+        'name',
+        30,
+      ]
+    );
+    console.log(`Seeded ${c.name} concept`);
+  }
+
   // ====================================================================
   // Social Clips — DB-backed clip library with per-channel stats (2026-06-03)
   // ====================================================================
@@ -675,6 +791,10 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS social_clips_status_idx   ON social_clips(status);
     CREATE INDEX IF NOT EXISTS social_clips_triplet_idx  ON social_clips(triplet_id);
     CREATE INDEX IF NOT EXISTS social_clips_concept_idx  ON social_clips(concept_id);
+
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS video_overlay_text TEXT DEFAULT 'Make your own →';
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS end_card_url TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS after_image_url TEXT;
   `);
 
   console.log('Database tables ready');
