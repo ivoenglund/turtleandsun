@@ -196,7 +196,7 @@ function renderGallery(orders) {
   const dz = document.getElementById('dropzone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => {
+  dz.addEventListener('drop', async e => {
     e.preventDefault();
     dz.classList.remove('drag-over');
     const file = e.dataTransfer.files[0];
@@ -204,12 +204,20 @@ function renderGallery(orders) {
       alert('Please drop an image file to start a new Loveogram.');
       return;
     }
-    // Store the file and redirect to the creation flow
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    sessionStorage.setItem('pendingUploadName', file.name);
-    // Redirect to home; the main widget will pick up the file via sessionStorage signal
-    window.location.href = '/?fromAccount=1';
+    dz.querySelector('p').textContent = 'Uploading…';
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const r = await fetch('/upload', { method: 'POST', body: fd });
+      const j = await r.json();
+      if (!j.url) throw new Error(j.error || 'Upload failed');
+      // Store URL in sessionStorage so the landing page widget picks it up automatically
+      sessionStorage.setItem('ts_state', JSON.stringify({ cloudinaryUrl: j.url, ts: Date.now() }));
+      window.location.href = '/';
+    } catch(err) {
+      dz.querySelector('p').textContent = 'Upload failed — try again.';
+      console.error(err);
+    }
   });
   dz.addEventListener('click', () => window.location.href = '/');
 })();
