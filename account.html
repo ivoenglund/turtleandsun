@@ -146,14 +146,27 @@ function renderGallery(orders) {
     const viewUrl = vidUrl || imgUrl;
     const isVideo = !!vidUrl;
     const label   = productLabel(o.product);
-    const thumbSrc = imgUrl || (vidUrl ? null : null);
 
-    return `<div class="lv-card" id="card-${o.id}" data-view-url="${esc(viewUrl||'')}" data-is-video="${isVideo}" data-dl-url="${esc(viewUrl||'')}" data-filename="loveogram-${o.id}${isVideo?'.mp4':'.jpg'}">
-      ${thumbSrc
-        ? `<img class="lv-thumb" src="${esc(thumbSrc)}" alt="${esc(label)}" loading="lazy" onclick="openLightbox('${esc(viewUrl)}',${isVideo})">`
-        : vidUrl
-          ? `<div class="lv-thumb-placeholder" onclick="openLightbox('${esc(vidUrl)}',true)" style="cursor:pointer;">▶ Video</div>`
-          : `<div class="lv-thumb-placeholder">Processing…</div>`}
+    let thumbHtml;
+    if (imgUrl && !isVideo) {
+      // Image — use <img>
+      thumbHtml = `<img class="lv-thumb" src="${esc(imgUrl)}" alt="${esc(label)}" loading="lazy" onclick="openLightbox('${esc(imgUrl)}',false)">`;
+    } else if (vidUrl) {
+      // Video — use <video preload="metadata"> so browser shows first frame
+      thumbHtml = `<div style="position:relative;cursor:pointer;" onclick="openLightbox('${esc(vidUrl)}',true)">
+        <video class="lv-thumb" src="${esc(vidUrl)}" preload="metadata" muted playsinline style="pointer-events:none;"></video>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;">
+            <div style="width:0;height:0;border-top:10px solid transparent;border-bottom:10px solid transparent;border-left:18px solid #fff;margin-left:4px;"></div>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      thumbHtml = `<div class="lv-thumb-placeholder">Processing…</div>`;
+    }
+
+    return `<div class="lv-card" id="card-${o.id}">
+      ${thumbHtml}
       <div class="lv-info">
         <div class="lv-name">${esc(label)}</div>
         <div class="lv-date">${fmtDate(o.created_at)}</div>
