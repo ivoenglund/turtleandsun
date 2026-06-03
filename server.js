@@ -2527,6 +2527,12 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
         imageUrl = r2img.url;
         if (r2img.bytes < 51200) sendQualityWarning({ orderId, email, concept: concept && concept.name, reason: 'Image too small (' + r2img.bytes + ' bytes) - may be blank', thumbUrl: r2img.url });
       } catch(e) { console.warn('[asset] R2 image store failed:', e.message); }
+      // Log to generations table so image orders appear in admin review
+      try {
+        const imgModelId = (concept && concept.fal_image_model) || 'image-reuse';
+        const imgLogged = await generation.logGenerationStart({ conceptId: concept && concept.id, modelId: imgModelId, inputPayload: { photoUrl: portrait_url }, sourceType: 'customer_order', userId, orderId });
+        await generation.logGenerationFinish(imgLogged.id, { falOutputUrl: imageUrl });
+      } catch(e) { console.warn('[gen-log] image log failed:', e.message); }
     }
   }
 
