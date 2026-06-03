@@ -2567,8 +2567,12 @@ async function generateForOrder(portrait_url, product, email, orderId, conceptId
       videoUrl = result.url;
       await generation.logGenerationFinish(logged.id, { falOutputUrl: videoUrl });
       console.log('[generateForOrder] talking video generated:', videoUrl);
+      try {
+        const r2t = await downloadAndStore({ remoteUrl: videoUrl, kind: 'order', orderId });
+        videoUrl = r2t.url;
+      } catch(e) { console.warn('[asset] R2 talking video store failed:', e.message); }
       if (orderId) {
-        await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, orderId]);
+        await pool.query('UPDATE orders SET result_video_url=$1, output_video_asset_url=$1 WHERE id=$2', [videoUrl, orderId]);
       }
     } catch (err) {
       await generation.logGenerationFailure(logged.id, err.message);
