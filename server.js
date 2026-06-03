@@ -1998,11 +1998,16 @@ app.post('/preview', async (req, res) => {
       orientation,
       inputExtras,
     });
+    let previewUrl = result.url;
+    try {
+      const r2prev = await downloadAndStore({ remoteUrl: result.url, kind: 'order' });
+      previewUrl = r2prev.url;
+    } catch(e) { console.warn('[preview] R2 store failed, using fal URL:', e.message); }
     await generation.logGenerationFinish(logged.id, {
-      outputUrl: null, // R2 rehosting happens at delivery time, not preview
+      outputUrl: previewUrl,
       falOutputUrl: result.url,
     });
-    res.json({ url: result.url });
+    res.json({ url: previewUrl });
   } catch (err) {
     console.error('Preview error:', JSON.stringify(err, null, 2));
     await generation.logGenerationFailure(logged.id, err.message);
@@ -2017,11 +2022,15 @@ app.post('/generate-video', async (req, res) => {
 
   try {
     console.log('Generating video for image:', image_url);
-    const videoUrl = await generateVideo(image_url);
+    let videoUrl = await generateVideo(image_url);
     console.log('Video generated:', videoUrl);
+    try {
+      const r2v = await downloadAndStore({ remoteUrl: videoUrl, kind: 'order', orderId: order_id || null });
+      videoUrl = r2v.url;
+    } catch(e) { console.warn('[gen-video] R2 store failed:', e.message); }
 
     if (order_id) {
-      await pool.query('UPDATE orders SET result_video_url = $1 WHERE id = $2', [videoUrl, order_id]);
+      await pool.query('UPDATE orders SET result_video_url=$1, output_video_asset_url=$1 WHERE id=$2', [videoUrl, order_id]);
     }
 
     if (email) {
