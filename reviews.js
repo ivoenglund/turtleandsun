@@ -103,6 +103,7 @@ function reviewPage(token, validToken) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&family=DM+Sans:wght@400&display=swap" rel="stylesheet">
 <style>${PAGE_CSS}</style></head><body><div class="wrap">
+<a href="/account" style="display:inline-block;margin-bottom:16px;color:#3A6B20;text-decoration:none;font-weight:600;">← My Archive</a>
 <h1>How was your Loveogram?</h1>
 <p class="sub">Your words help other families. It takes a minute — and a photo of your Loveogram makes it shine.</p>
 <div class="card" id="card">
@@ -119,7 +120,7 @@ function reviewPage(token, validToken) {
   </div>
   <div class="thanks" id="thanks" style="display:none">
     <h1>Thank you! 💛</h1><p class="sub">Your review is in — we read every one. We'll publish it shortly.</p>
-    <button onclick="location.href='/'">Back to Turtle and Sun</button>
+    <button onclick="location.href='/account'">Back to My Archive</button>
   </div>
 </div></div>
 <script>

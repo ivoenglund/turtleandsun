@@ -76,7 +76,7 @@
         '<a class="ts-nav-dd-link ts-nav-auth" href="/account/occasions">Print occasion list</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth" href="/print/calendar">Print calendar</a>' +
         '<div class="ts-nav-dd-sep ts-nav-auth"></div>' +
-        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-account" href="/account">Account settings</a>' +
+        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-account" href="/account">My Archive</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-nav-dd-logout" href="/auth/logout">Log out</a>' +
         '<a class="ts-nav-dd-link ts-nav-guest" href="/login">Log in</a>' +
       '</div>';
@@ -110,7 +110,7 @@
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/account/occasions">Print occasion list</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/print/calendar">Print calendar</a>' +
         '<div class="ts-nav-drawer-sep ts-nav-auth"></div>' +
-        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-account" href="/account">Account settings</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-account" href="/account">My Archive</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-nav-drawer-logout" href="/auth/logout">Log out</a>' +
         '<a class="ts-nav-drawer-link ts-nav-guest" href="/login">Log in</a>' +
       '</div>';
