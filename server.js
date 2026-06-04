@@ -3099,8 +3099,8 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           .jpeg({ quality: 92 }).toBuffer();
         const afterLabel = Buffer.from(
           `<svg width='${W}' height='${photoH}'>` +
-          `<rect x='${W-140}' y='28' width='110' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
-          `<text x='${W-85}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>AFTER</text>` +
+          `<text x='${W-32}' y='72' text-anchor='end' font-family='Arial' font-weight='bold' font-size='52' fill='rgba(0,0,0,0.65)' dx='3' dy='3'>AFTER</text>` +
+          `<text x='${W-32}' y='72' text-anchor='end' font-family='Arial' font-weight='bold' font-size='52' fill='white'>AFTER</text>` +
           `</svg>`
         );
         afterFinal = await sharp(afterCropped)

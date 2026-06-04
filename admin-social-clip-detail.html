@@ -142,8 +142,11 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
         </div>
         <div class="field">
           <label>Before photo — vertical offset (px)</label>
-          <input type="number" id="before_y_offset" value="0" min="-2000" max="2000" step="10">
-          <div class="hint">0 = top of photo. Positive = slide down. Steps of 50–100 work well.</div>
+          <input type="number" id="before_y_offset" value="0" min="0" max="2000" step="10" oninput="updateCropPreview('before')">
+          <div class="hint">0 = top of photo. Positive = slide crop window down.</div>
+          <div id="before-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;">
+            <img id="before-crop-live" style="width:100%;position:absolute;top:0;left:0;object-fit:cover;object-position:center top;">
+          </div>
         </div>
         <div class="field">
           <label>Vignette strength (0 = none, 100 = maximum)</label>
@@ -157,8 +160,11 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
         <h2><span class="scene-num">2</span> End card (composite)</h2>
         <div class="field">
           <label>After photo — vertical offset (px)</label>
-          <input type="number" id="after_y_offset" value="0" min="-2000" max="2000" step="10">
-          <div class="hint">0 = top of photo. Positive = slide down. Negative = slide up.</div>
+          <input type="number" id="after_y_offset" value="0" min="0" max="2000" step="10" oninput="updateCropPreview('after')">
+          <div class="hint">0 = top of photo. Positive = slide crop window down.</div>
+          <div id="after-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;">
+            <img id="after-crop-live" style="width:100%;position:absolute;top:0;left:0;object-fit:cover;object-position:center top;">
+          </div>
         </div>
         <div id="end-card-preview-wrap"></div>
         <div class="field">
@@ -235,6 +241,18 @@ function renderClip() {
   document.getElementById('video_overlay_text').value   = clip.video_overlay_text || '';
   document.getElementById('before_y_offset').value      = clip.before_y_offset  || 0;
   document.getElementById('after_y_offset').value       = clip.after_y_offset   || 0;
+  if (clip.before_url) {
+    const bImg = document.getElementById('before-crop-live');
+    bImg.src = clip.before_url;
+    document.getElementById('before-crop-wrap').style.display = 'block';
+    updateCropPreview('before');
+  }
+  if (clip.after_image_url) {
+    const aImg = document.getElementById('after-crop-live');
+    aImg.src = clip.after_image_url;
+    document.getElementById('after-crop-wrap').style.display = 'block';
+    updateCropPreview('after');
+  }
   document.getElementById('vignette_strength').value    = clip.vignette_strength != null ? clip.vignette_strength : 75;
   document.getElementById('end_card_duration_s').value  = clip.end_card_duration_s || 4;
 
@@ -362,6 +380,17 @@ function showFlash(msg, type) {
   el.className = 'flash flash-' + type;
   el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; }, 7000);
+}
+
+function updateCropPreview(which) {
+  const offset = Math.max(0, parseInt(document.getElementById(which + '_y_offset').value) || 0);
+  const img = document.getElementById(which + '-crop-live');
+  if (!img || !img.src) return;
+  // Approximate: shift image up by offset pixels scaled to preview size
+  // Preview is ~100% of card width (~450px), source is 1080px — scale ≈ 0.42
+  const scale = img.offsetWidth / 1080 || 0.4;
+  img.style.objectPosition = `center top`;
+  img.style.marginTop = `-${Math.round(offset * scale)}px`;
 }
 
 function esc(s) {
