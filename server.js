@@ -3001,6 +3001,10 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const drawTextFilter = overlayEsc
         ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=80:shadowcolor=black@0.85:shadowx=3:shadowy=3:line_spacing=8`
         : '';
+      // Variant 2: overlay text sits below the AFTER label (y=24+76+20=120)
+      const drawTextFilterV2 = overlayEsc
+        ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=120:shadowcolor=black@0.85:shadowx=3:shadowy=3:line_spacing=8`
+        : '';
 
       const clipStyle = parseInt(clip.clip_style) || 1;
 
@@ -3013,15 +3017,25 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         // revealing the video. Before photo stays visible above the panel.
         // When panel exits off top: before photo fully transparent → video full screen.
 
-        // Before photo — full 1920px height
+        // Before photo — full 1920px height with BEFORE label
         const beforeFull = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H);
-        fs2.writeFileSync(beforeFile, beforeFull);
+        const beforeWithLabel = await sharp(beforeFull)
+          .composite([{ input: makeLabel('BEFORE', W, H), blend: 'over' }])
+          .jpeg({ quality: 92 }).toBuffer();
+        fs2.writeFileSync(beforeFile, beforeWithLabel);
         fs2.writeFileSync(panelFile, panelBuf);
+
+        // AFTER label — transparent PNG overlay for the video (same pill style as BEFORE)
+        const afterLabelFile = pathM.join(tmpDir, 'after_label.png');
+        const afterLabelPng = await sharp({
+          create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+        }).composite([{ input: makeLabel('AFTER', W, H), blend: 'over' }]).png().toBuffer();
+        fs2.writeFileSync(afterLabelFile, afterLabelPng);
 
         // Timing
         const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.0);
         const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 1.0);
-        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);
+        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 3.0);
         const speed  = H / riseD;
         const exitD  = panelH / speed;
         const totalAnimTime = riseD + pauseD + exitD; // panel start → panel fully gone
@@ -3047,10 +3061,19 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         //   [1:v] before photo + white/black alpha mask → alphamerge → [vbefore]
         //   [vbase][vbefore] overlay → [v1]
         //   [2:v] panel → overlay at panelY → [vout]
+        // filter_complex:
+        //   [0:v] video + AFTER label overlay + overlay text below label
+        //   [3:v] after label PNG (transparent, AFTER pill top-right)
+        //   [canvas][vvideo] → [vbase] (video rising with panel)
+        //   [1:v] before photo (with BEFORE label baked in) + alpha mask → [vbefore]
+        //   [vbase][vbefore] → [v1]
+        //   [2:v] panel → [vout]
         const filter2 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vcanvas];`,
-          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`,
-          drawTextFilter,
+          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}[vraw];`,
+          `[3:v]fps=30,scale=${W}:${H}[vlabel];`,
+          `[vraw][vlabel]overlay=0:0`,
+          drawTextFilterV2,
           `[vvideo];`,
           `[vcanvas][vvideo]overlay=0:'${videoY}'[vbase];`,
           `[1:v]fps=30,scale=${W}:${H}[vbefore_raw];`,
@@ -3069,6 +3092,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             '-i', videoFile,
             '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', beforeFile,
             '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', panelFile,
+            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', afterLabelFile,
             '-filter_complex', filter2,
             '-map', '[vout]', '-map', '0:a?',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',

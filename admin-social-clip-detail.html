@@ -150,7 +150,7 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           </div>
           <div class="field">
             <label>Pause at top (seconds)</label>
-            <input type="number" id="rise_pause_s" value="2" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
+            <input type="number" id="rise_pause_s" value="3" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
             <div class="hint">How long the panel holds before exiting off the top.</div>
           </div>
         </div>
@@ -416,7 +416,7 @@ function renderClip(initial) {
     document.getElementById('panel_url').value           = clip.panel_url || '';
     document.getElementById('show_before_s').value        = clip.show_before_s   != null ? clip.show_before_s   : 1.0;
     document.getElementById('rise_duration_s').value     = clip.rise_duration_s != null ? clip.rise_duration_s : 1.0;
-    document.getElementById('rise_pause_s').value        = clip.rise_pause_s    != null ? clip.rise_pause_s    : 2.0;
+    document.getElementById('rise_pause_s').value        = clip.rise_pause_s    != null ? clip.rise_pause_s    : 3.0;
     setStyle(parseInt(clip.clip_style) || 1, true /* silent */);
 
     // Before photo
@@ -503,7 +503,7 @@ async function saveNow(thenGenerate) {
     clip_style:          parseInt(document.getElementById('clip_style').value) || 1,
     show_before_s:       parseFloat(document.getElementById('show_before_s').value) || 1.0,
     rise_duration_s:     parseFloat(document.getElementById('rise_duration_s').value) || 1.0,
-    rise_pause_s:        parseFloat(document.getElementById('rise_pause_s').value) || 2.0,
+    rise_pause_s:        parseFloat(document.getElementById('rise_pause_s').value) || 3.0,
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
     method: 'PUT',
