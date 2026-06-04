@@ -135,6 +135,11 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
           <input type="text" id="video_overlay_text" placeholder="e.g. Make your own →" value="">
           <div class="hint">Leave blank for no overlay. A/B test different lines to see what converts.</div>
         </div>
+        <div class="field">
+          <label>Before photo — vertical offset (px)</label>
+          <input type="number" id="before_y_offset" value="0" min="-2000" max="2000" step="10">
+          <div class="hint">0 = top of photo. Positive = slide crop window down (show lower part). Negative = slide up.</div>
+        </div>
       </div>
 
       <!-- Scene 2: End card composite -->
@@ -213,6 +218,7 @@ function renderClip() {
 
   // Settings
   document.getElementById('video_overlay_text').value   = clip.video_overlay_text || '';
+  document.getElementById('before_y_offset').value      = clip.before_y_offset || 0;
   document.getElementById('end_card_duration_s').value  = clip.end_card_duration_s || 4;
 
   // Publish checkboxes
@@ -263,6 +269,7 @@ function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
 async function saveSettings(thenGenerate) {
   const body = {
     video_overlay_text:  document.getElementById('video_overlay_text').value,
+    before_y_offset:     parseInt(document.getElementById('before_y_offset').value) || 0,
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value),
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {

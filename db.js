@@ -795,6 +795,7 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS video_overlay_text TEXT DEFAULT 'Make your own →';
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS end_card_url TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS after_image_url TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS before_y_offset INTEGER DEFAULT 0;
   `);
 
   console.log('Database tables ready');

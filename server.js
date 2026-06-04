@@ -2916,6 +2916,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
     label_before, before_duration_s, label_after, show_labels,
     end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
     video_overlay_text,
+    before_y_offset,
   } = req.body;
   try {
     const { rows } = await pool.query(`
@@ -2930,12 +2931,13 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         show_logo          = COALESCE($9, show_logo),
         end_card_duration_s= COALESCE($10, end_card_duration_s),
         video_overlay_text = COALESCE($11, video_overlay_text),
+        before_y_offset    = COALESCE($12, before_y_offset),
         updated_at         = now()
       WHERE id = $1
       RETURNING *
     `, [id, label_before, before_duration_s, label_after, show_labels,
         end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
-        video_overlay_text]);
+        video_overlay_text, before_y_offset]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -3010,16 +3012,30 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const photoH = Math.floor((H - panelH) / 2);
         const panelResized = await sharp(panelPath).resize(W, panelH, { fit: 'fill' }).png().toBuffer();
 
-        // Before: resize + vignette + label
+        // Before: resize + optional y-offset crop + vignette + label
         const beforeBuf = await dlBuffer(clip.before_url);
-        const beforeResized = await sharp(beforeBuf)
-          .resize(W, photoH, { fit: 'cover', position: 'top' }).jpeg({ quality: 92 }).toBuffer();
+        const bMeta = await sharp(beforeBuf).metadata();
+        // Scale so image covers W×photoH, then apply y_offset to slide the crop window
+        const scaleToW = Math.round(bMeta.height * W / bMeta.width);
+        let bScaled;
+        if (scaleToW >= photoH) {
+          bScaled = await sharp(beforeBuf).resize({ width: W }).toBuffer();
+        } else {
+          bScaled = await sharp(beforeBuf).resize({ height: photoH }).toBuffer();
+        }
+        const bSMeta = await sharp(bScaled).metadata();
+        const maxY = Math.max(0, bSMeta.height - photoH);
+        const yOff = Math.max(0, Math.min(maxY, clip.before_y_offset || 0));
+        const xOff = Math.max(0, Math.floor((bSMeta.width - W) / 2));
+        const beforeResized = await sharp(bScaled)
+          .extract({ left: xOff, top: yOff, width: W, height: photoH })
+          .jpeg({ quality: 92 }).toBuffer();
         const vignSvg = Buffer.from(
           `<svg width='${W}' height='${photoH}'><defs>` +
           `<radialGradient id='v' cx='50%' cy='50%' r='90%'>` +
           `<stop offset='0%'  stop-color='black' stop-opacity='0'/>` +
-          `<stop offset='48%' stop-color='black' stop-opacity='0'/>` +
-          `<stop offset='100%' stop-color='black' stop-opacity='0.90'/>` +
+          `<stop offset='35%' stop-color='black' stop-opacity='0'/>` +
+          `<stop offset='100%' stop-color='black' stop-opacity='0.96'/>` +
           `</radialGradient></defs>` +
           `<rect width='${W}' height='${photoH}' fill='url(#v)'/></svg>`
         );
