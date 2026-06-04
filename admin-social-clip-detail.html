@@ -19,12 +19,11 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .video-box{background:#000;border-radius:8px;overflow:hidden;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center}
 .video-box video{width:100%;height:100%;object-fit:contain}
 .video-placeholder{color:#555;font-size:12px;text-align:center;padding:20px}
-.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer;display:inline-block}
+.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer}
 .btn-primary{background:#1C2A14;color:#FFE800}
 .btn-primary:hover{background:#2d4a24}
 .btn-primary:disabled{background:#aaa;color:#fff;cursor:not-allowed}
 .btn-sm{padding:5px 10px;font-size:11px}
-.btn-danger{background:#c0392b;color:#fff}
 .btn-outline{background:#fff;color:#1C2A14;border:1px solid #1C2A14}
 .btn-outline:hover{background:#f0f0e8}
 .generate-row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
@@ -36,22 +35,25 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .download-link{display:block;margin-top:8px;font-size:11px;color:#1C2A14;word-break:break-all}
 .settings-panel{display:flex;flex-direction:column;gap:14px}
 .scene-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-.scene-card h2{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.scene-card h2{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .scene-num{width:22px;height:22px;border-radius:50%;background:#1C2A14;color:#FFE800;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
-.field{margin-bottom:10px}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
 .field label{display:block;font-size:11px;color:#555;margin-bottom:3px;font-weight:600}
 .field input[type=text],.field input[type=number]{width:100%;padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:12px}
-.field input[type=checkbox]{width:16px;height:16px;cursor:pointer;vertical-align:middle}
-.field .check-label{font-size:12px;margin-left:4px;cursor:pointer;vertical-align:middle}
 .field .hint{font-size:10px;color:#aaa;margin-top:3px}
-.scene-thumb{width:100%;border-radius:6px;overflow:hidden;margin-bottom:10px;max-height:120px;object-fit:cover;background:#000;display:block}
-.end-card-preview{width:100%;border-radius:6px;margin-bottom:8px;display:block;max-height:140px;object-fit:contain;background:#111}
-.save-row{margin-top:4px}
+/* Crop preview */
+.crop-preview{margin-top:8px;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;cursor:ns-resize;user-select:none;position:relative}
+.crop-preview img{width:100%;height:auto;display:block;pointer-events:none;will-change:transform}
+.crop-label{font-size:10px;color:#aaa;margin-top:3px;text-align:center}
+/* Panel preview */
+.panel-preview{width:100%;border-radius:6px;margin:8px 0;display:block;max-height:80px;object-fit:cover;background:#1C2A14}
+/* Publish */
 .publish-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .publish-card h2{font-size:13px;font-weight:700;margin-bottom:10px}
 .channel-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0}
 .channel-row:last-child{border-bottom:none}
-.channel-icon{font-size:18px;width:24px;text-align:center}
+.channel-icon{font-size:16px;width:22px;text-align:center}
 .channel-name{flex:1;font-size:12px;font-weight:600}
 .channel-status{font-size:11px;color:#888}
 .channel-status.published{color:#155724;font-weight:700}
@@ -66,6 +68,7 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 .flash{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:12px}
 .flash-ok{background:#d4edda;color:#155724}
 .flash-err{background:#f8d7da;color:#721c24}
+.save-row{margin-top:4px}
 </style>
 </head>
 <body>
@@ -73,11 +76,10 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
   <a class="back" href="/admin/social-clips">&#8592; All clips</a>
   <h1 id="page-title">Loading&hellip;</h1>
   <div class="meta" id="page-meta"></div>
-
   <div id="flash" style="display:none" class="flash"></div>
 
   <div class="layout">
-    <!-- LEFT: preview -->
+    <!-- LEFT: video preview -->
     <div>
       <div class="preview-panel">
         <h2>Preview <span id="status-badge"></span></h2>
@@ -116,64 +118,62 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
           <label><input type="checkbox" id="ch-facebook"> <span class="channel-status" id="st-facebook">Not published</span></label>
         </div>
         <div style="margin-top:10px">
-          <button class="btn btn-primary btn-sm" id="btn-publish" onclick="publish()">Publish selected &#9658;</button>
-          <div style="font-size:10px;color:#aaa;margin-top:4px">Channel API keys not yet connected &mdash; publishing marks intent for now.</div>
+          <button class="btn btn-primary btn-sm" onclick="publish()">Publish selected &#9658;</button>
+          <div style="font-size:10px;color:#aaa;margin-top:4px">Channel APIs not yet connected — marks intent only.</div>
         </div>
       </div>
 
       <!-- Stats -->
       <div class="stats-card" style="margin-top:14px">
-        <h2>Channel stats <button class="btn btn-sm btn-outline" onclick="loadClip()" style="font-size:10px;padding:3px 8px">Refresh</button></h2>
+        <h2>Stats <button class="btn btn-sm btn-outline" onclick="loadClip()" style="font-size:10px;padding:3px 8px">Refresh</button></h2>
         <div id="stats-section"><div class="no-stats">No stats yet.</div></div>
       </div>
     </div>
 
-    <!-- RIGHT: scene settings -->
+    <!-- RIGHT: settings -->
     <div class="settings-panel">
 
-      <!-- Scene 1: After video -->
+      <!-- Scene 1 -->
       <div class="scene-card">
         <h2><span class="scene-num">1</span> Loveogram video</h2>
-        <div id="scene1-thumb"></div>
         <div class="field">
           <label>Overlay text (top of video)</label>
           <input type="text" id="video_overlay_text" placeholder="e.g. Make your own →" value="">
-          <div class="hint">Leave blank for no overlay. A/B test different lines to see what converts.</div>
+          <div class="hint">Leave blank for no overlay. A/B test lines to find what converts.</div>
         </div>
         <div class="field">
-          <label>Before photo — vertical offset (px)</label>
-          <input type="number" id="before_y_offset" value="0" min="0" max="2000" step="10" oninput="updateCropPreview('before')">
-          <div class="hint">0 = top of photo. Positive = slide crop window down.</div>
-          <div id="before-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;user-select:none;">
-            <img id="before-crop-live" style="width:100%;height:auto;display:block;pointer-events:none;">
+          <label>Before photo — drag to position</label>
+          <div class="crop-preview" id="before-crop-wrap" style="display:none">
+            <img id="before-crop-live" alt="Before photo">
           </div>
-        </div>
-        <div class="field">
-          <label>Vignette strength (0 = none, 100 = maximum)</label>
-          <input type="number" id="vignette_strength" value="75" min="0" max="100" step="5">
-          <div class="hint">Dark corners on the before photo. Regenerate to see effect.</div>
+          <div class="crop-label" id="before-crop-label"></div>
+          <input type="hidden" id="before_y_offset" value="0">
         </div>
       </div>
 
-      <!-- Scene 2: End card composite -->
+      <!-- Scene 2 -->
       <div class="scene-card">
-        <h2><span class="scene-num">2</span> End card (composite)</h2>
+        <h2><span class="scene-num">2</span> End card</h2>
+
         <div class="field">
-          <label>After photo — vertical offset (px)</label>
-          <input type="number" id="after_y_offset" value="0" min="0" max="2000" step="10" oninput="updateCropPreview('after')">
-          <div class="hint">0 = top of photo. Positive = slide crop window down.</div>
-          <div id="after-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;user-select:none;">
-            <img id="after-crop-live" style="width:100%;height:auto;display:block;pointer-events:none;">
-          </div>
+          <label>Panel image URL</label>
+          <input type="text" id="panel_url" placeholder="https://..." oninput="updatePanelPreview()">
+          <div class="hint">The branded middle section. Paste a URL — preview updates live.</div>
+          <img id="panel-preview" class="panel-preview" style="display:none" alt="Panel preview">
         </div>
-        <div id="end-card-preview-wrap"></div>
+
+        <div class="field">
+          <label>After photo — drag to position</label>
+          <div class="crop-preview" id="after-crop-wrap" style="display:none">
+            <img id="after-crop-live" alt="After photo">
+          </div>
+          <div class="crop-label" id="after-crop-label"></div>
+          <input type="hidden" id="after_y_offset" value="0">
+        </div>
+
         <div class="field">
           <label>Duration (seconds)</label>
           <input type="number" id="end_card_duration_s" value="4" min="1" max="10" step="0.5">
-        </div>
-        <div class="field hint" style="margin-bottom:0">
-          End card = before photo + branded panel + after portrait, composited automatically.<br>
-          To update branding, replace <strong>public/tns_end_card_panel.png</strong> and regenerate.
         </div>
       </div>
 
@@ -187,8 +187,7 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
 
 <script>
 const clipId = parseInt(location.pathname.split('/').pop());
-let clip = null;
-let polling = null;
+let clip = null, polling = null;
 
 async function loadClip() {
   const r = await fetch('/admin/api/social-clips/' + clipId);
@@ -200,70 +199,55 @@ async function loadClip() {
 function renderClip() {
   document.getElementById('page-title').textContent = (clip.concept_name || 'Clip') + ' #' + clip.id;
   document.getElementById('page-meta').textContent =
-    'Created ' + new Date(clip.created_at).toLocaleString() +
-    ' · updated ' + new Date(clip.updated_at).toLocaleString();
+    'Created ' + new Date(clip.created_at).toLocaleString() + ' · updated ' + new Date(clip.updated_at).toLocaleString();
+  document.getElementById('status-badge').innerHTML = `<span class="badge badge-${clip.status}">${clip.status}</span>`;
 
-  document.getElementById('status-badge').innerHTML =
-    `<span class="badge badge-${clip.status}">${clip.status}</span>`;
-
-  // Output video preview
   const box = document.getElementById('video-box');
   const dl  = document.getElementById('download-link');
   if (clip.output_url) {
     box.innerHTML = `<video src="${esc(clip.output_url)}" controls playsinline style="width:100%;height:100%;object-fit:contain"></video>`;
-    dl.href = clip.output_url;
-    dl.style.display = 'block';
-    dl.textContent = '↓ Download MP4';
+    dl.href = clip.output_url; dl.style.display = 'block'; dl.textContent = '↓ Download MP4';
   } else {
-    box.innerHTML = `<div class="video-placeholder">${clip.status === 'processing' ? 'Generating…' : 'Not generated yet'}</div>`;
+    box.innerHTML = `<div class="video-placeholder">${clip.status==='processing'?'Generating…':'Not generated yet'}</div>`;
     dl.style.display = 'none';
   }
 
-  // Scene 1: after video thumbnail
-  const s1 = document.getElementById('scene1-thumb');
-  s1.innerHTML = clip.after_video_url
-    ? `<video src="${esc(clip.after_video_url)}" muted playsinline preload="metadata"
-         onmouseenter="this.play()" onmouseleave="this.pause()"
-         class="scene-thumb"></video>`
-    : '';
-
-  // Scene 2: end card preview
-  const ecWrap = document.getElementById('end-card-preview-wrap');
-  if (clip.end_card_url) {
-    ecWrap.innerHTML = `<img src="${esc(clip.end_card_url)}" class="end-card-preview" alt="End card preview">`;
-  } else if (clip.before_url) {
-    ecWrap.innerHTML = `<div style="font-size:11px;color:#aaa;margin-bottom:8px">End card will be generated from before + panel + after. Generate the clip to preview.</div>`;
-  } else {
-    ecWrap.innerHTML = '';
-  }
-
   // Settings
-  document.getElementById('video_overlay_text').value   = clip.video_overlay_text || '';
-  document.getElementById('before_y_offset').value      = clip.before_y_offset  || 0;
-  document.getElementById('after_y_offset').value       = clip.after_y_offset   || 0;
+  document.getElementById('video_overlay_text').value  = clip.video_overlay_text || '';
+  document.getElementById('before_y_offset').value     = clip.before_y_offset  || 0;
+  document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
+  document.getElementById('panel_url').value           = clip.panel_url || '';
+  document.getElementById('end_card_duration_s').value = clip.end_card_duration_s || 4;
+
+  // Before crop preview
   if (clip.before_url) {
-    const bImg = document.getElementById('before-crop-live');
-    if (bImg.src !== clip.before_url) { bImg.src = clip.before_url; }
-    document.getElementById('before-crop-wrap').style.display = 'block';
+    const wrap = document.getElementById('before-crop-wrap');
+    const img  = document.getElementById('before-crop-live');
+    wrap.style.display = 'block';
+    if (img.dataset.src !== clip.before_url) { img.src = clip.before_url; img.dataset.src = clip.before_url; }
     updateCropPreview('before');
     initDragCrop('before');
   }
+
+  // After crop preview
   if (clip.after_image_url) {
-    const aImg = document.getElementById('after-crop-live');
-    if (aImg.src !== clip.after_image_url) { aImg.src = clip.after_image_url; }
-    document.getElementById('after-crop-wrap').style.display = 'block';
+    const wrap = document.getElementById('after-crop-wrap');
+    const img  = document.getElementById('after-crop-live');
+    wrap.style.display = 'block';
+    if (img.dataset.src !== clip.after_image_url) { img.src = clip.after_image_url; img.dataset.src = clip.after_image_url; }
     updateCropPreview('after');
     initDragCrop('after');
   }
-  document.getElementById('vignette_strength').value    = clip.vignette_strength != null ? clip.vignette_strength : 75;
-  document.getElementById('end_card_duration_s').value  = clip.end_card_duration_s || 4;
 
-  // Publish checkboxes
+  // Panel preview
+  updatePanelPreview();
+
+  // Publish
   document.getElementById('ch-tiktok').checked    = !!clip.published_tiktok;
   document.getElementById('ch-instagram').checked = !!clip.published_instagram;
   document.getElementById('ch-youtube').checked   = !!clip.published_youtube;
   document.getElementById('ch-facebook').checked  = !!clip.published_facebook;
-  const pubSt = id => clip['published_' + id]
+  const pubSt = id => clip['published_'+id]
     ? '<span class="channel-status published">Published</span>'
     : '<span class="channel-status">Not published</span>';
   document.getElementById('st-tiktok').outerHTML    = pubSt('tiktok');
@@ -274,7 +258,7 @@ function renderClip() {
   renderStats();
 
   document.getElementById('btn-generate').disabled = clip.status === 'processing';
-  document.getElementById('gen-status').textContent = clip.status === 'processing' ? 'Generating — will update when done…' : '';
+  document.getElementById('gen-status').textContent = clip.status==='processing' ? 'Generating — will update when done…' : '';
   if (clip.status === 'processing') {
     if (!polling) polling = setInterval(pollStatus, 6000);
   } else {
@@ -282,45 +266,88 @@ function renderClip() {
   }
 }
 
-function renderStats() {
-  const s = clip;
-  const hasAny = s.tiktok_views != null || s.instagram_views != null || s.youtube_views != null;
-  const el = document.getElementById('stats-section');
-  if (!hasAny) { el.innerHTML = '<div class="no-stats">No stats yet.</div>'; return; }
-  const block = (channel, icon, views, likes, shares, comments) => `
-    <div class="stat-block">
-      <div class="stat-channel">${icon} ${channel}</div>
-      <div class="stat-row"><span>Views</span><span class="stat-val">${fmt(views)}</span></div>
-      <div class="stat-row"><span>Likes</span><span class="stat-val">${fmt(likes)}</span></div>
-      <div class="stat-row"><span>Shares</span><span class="stat-val">${fmt(shares)}</span></div>
-      <div class="stat-row"><span>Comments</span><span class="stat-val">${fmt(comments)}</span></div>
-    </div>`;
-  el.innerHTML = '<div class="stats-grid">' +
-    block('TikTok',    '🎵', s.tiktok_views,    s.tiktok_likes,    s.tiktok_shares,    s.tiktok_comments) +
-    block('Instagram', '📸', s.instagram_views, s.instagram_likes, s.instagram_shares, s.instagram_comments) +
-    block('YouTube',   '▶',  s.youtube_views,   s.youtube_likes,   null,               s.youtube_comments) +
-    '</div>' +
-    (s.stats_refreshed_at ? `<div style="font-size:10px;color:#aaa;margin-top:6px">Last updated: ${new Date(s.stats_refreshed_at).toLocaleString()}</div>` : '');
+function updatePanelPreview() {
+  const url = document.getElementById('panel_url').value.trim();
+  const img = document.getElementById('panel-preview');
+  if (url) { img.src = url; img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
 }
 
-function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
+// ── Drag-to-position crop ──────────────────────────────────────────────────
+const dragState = {};
+function updateCropPreview(which) {
+  const offset = Math.max(0, parseInt(document.getElementById(which+'_y_offset').value) || 0);
+  const img = document.getElementById(which+'-crop-live');
+  if (!img) return;
+  const previewW = img.parentElement ? img.parentElement.offsetWidth : 400;
+  const scale = previewW / 1080 || 0.4;
+  img.style.transform = `translateY(-${Math.round(offset * scale)}px)`;
+  const lbl = document.getElementById(which+'-crop-label');
+  if (lbl) lbl.textContent = offset > 0 ? `offset: ${offset}px — drag to adjust` : 'Drag up to show lower part of photo';
+}
 
+function initDragCrop(which) {
+  if (dragState[which]) return; // already inited
+  dragState[which] = true;
+  const wrap  = document.getElementById(which+'-crop-wrap');
+  const input = document.getElementById(which+'_y_offset');
+  if (!wrap) return;
+
+  let dragging = false, startY = 0, startOff = 0;
+
+  const onStart = y => { dragging=true; startY=y; startOff=Math.max(0,parseInt(input.value)||0); };
+  const onMove  = y => {
+    if (!dragging) return;
+    const scale = 1080 / (wrap.offsetWidth || 400);
+    input.value = Math.max(0, Math.round(startOff + (startY - y) * scale));
+    updateCropPreview(which);
+  };
+  const onEnd = () => { dragging = false; };
+
+  wrap.addEventListener('mousedown',  e => { onStart(e.clientY); e.preventDefault(); });
+  document.addEventListener('mousemove',  e => onMove(e.clientY));
+  document.addEventListener('mouseup',    onEnd);
+  wrap.addEventListener('touchstart', e => { onStart(e.touches[0].clientY); e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchmove',  e => { if(dragging){ onMove(e.touches[0].clientY); e.preventDefault(); } }, {passive:false});
+  document.addEventListener('touchend',   onEnd);
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function renderStats() {
+  const s = clip;
+  const has = s.tiktok_views!=null || s.instagram_views!=null || s.youtube_views!=null;
+  const el = document.getElementById('stats-section');
+  if (!has) { el.innerHTML='<div class="no-stats">No stats yet.</div>'; return; }
+  const block=(ch,icon,v,l,sh,co)=>`<div class="stat-block"><div class="stat-channel">${icon} ${ch}</div>
+    <div class="stat-row"><span>Views</span><span class="stat-val">${fmt(v)}</span></div>
+    <div class="stat-row"><span>Likes</span><span class="stat-val">${fmt(l)}</span></div>
+    <div class="stat-row"><span>Shares</span><span class="stat-val">${fmt(sh)}</span></div>
+    <div class="stat-row"><span>Comments</span><span class="stat-val">${fmt(co)}</span></div></div>`;
+  el.innerHTML='<div class="stats-grid">'+
+    block('TikTok','🎵',s.tiktok_views,s.tiktok_likes,s.tiktok_shares,s.tiktok_comments)+
+    block('Instagram','📸',s.instagram_views,s.instagram_likes,s.instagram_shares,s.instagram_comments)+
+    block('YouTube','▶',s.youtube_views,s.youtube_likes,null,s.youtube_comments)+
+    '</div>'+(s.stats_refreshed_at?`<div style="font-size:10px;color:#aaa;margin-top:6px">Updated: ${new Date(s.stats_refreshed_at).toLocaleString()}</div>`:'');
+}
+function fmt(n){return n==null?'—':n.toLocaleString();}
+
+// ── Save / Generate / Publish ──────────────────────────────────────────────
 async function saveSettings(thenGenerate) {
   const body = {
     video_overlay_text:  document.getElementById('video_overlay_text').value,
-    before_y_offset:     parseInt(document.getElementById('before_y_offset').value)    || 0,
-    after_y_offset:      parseInt(document.getElementById('after_y_offset').value)     || 0,
-    vignette_strength:   parseInt(document.getElementById('vignette_strength').value)  ?? 75,
-    end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value),
+    before_y_offset:     parseInt(document.getElementById('before_y_offset').value) || 0,
+    after_y_offset:      parseInt(document.getElementById('after_y_offset').value)  || 0,
+    panel_url:           document.getElementById('panel_url').value.trim() || null,
+    end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 4,
   };
-  const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
-    method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+  const r = await fetch('/admin/api/social-clips/'+clipId+'/settings', {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body),
   });
   const d = await r.json();
   if (d.id) {
     clip = d;
     document.getElementById('save-status').textContent = 'Saved ✓';
-    setTimeout(() => { document.getElementById('save-status').textContent = ''; }, 3000);
+    setTimeout(()=>{document.getElementById('save-status').textContent='';}, 3000);
     if (thenGenerate) generate();
   } else {
     showFlash(d.error || 'Save failed', 'err');
@@ -330,98 +357,46 @@ async function saveSettings(thenGenerate) {
 async function generate() {
   const btn = document.getElementById('btn-generate');
   btn.disabled = true;
-  document.getElementById('gen-status').textContent = 'Starting generation…';
-  const r = await fetch('/admin/api/social-clips/' + clipId + '/generate', { method: 'POST' });
+  document.getElementById('gen-status').textContent = 'Starting…';
+  const r = await fetch('/admin/api/social-clips/'+clipId+'/generate', {method:'POST'});
   const d = await r.json();
   if (d.ok) {
-    document.getElementById('gen-status').textContent = 'Generating — auto-refreshing every 5s…';
-    clip.status = 'processing';
+    document.getElementById('gen-status').textContent = 'Generating — will update when done…';
     document.getElementById('status-badge').innerHTML = '<span class="badge badge-processing">processing</span>';
-    if (!polling) polling = setInterval(pollStatus, 5000);
+    if (!polling) polling = setInterval(pollStatus, 6000);
   } else {
-    showFlash(d.error || 'Failed to start', 'err');
-    btn.disabled = false;
+    showFlash(d.error||'Failed to start','err'); btn.disabled=false;
   }
 }
 
 async function pollStatus() {
-  const r = await fetch('/admin/api/social-clips/' + clipId);
+  const r = await fetch('/admin/api/social-clips/'+clipId);
   if (!r.ok) return;
   const fresh = await r.json();
-  if (fresh.status !== 'processing') {
-    clearInterval(polling);
-    polling = null;
-    clip = fresh;
-    renderClip();
-  }
+  if (fresh.status !== 'processing') { clearInterval(polling); polling=null; clip=fresh; renderClip(); }
 }
 
 async function publish() {
-  const channels = [];
-  if (document.getElementById('ch-tiktok').checked)    channels.push('tiktok');
-  if (document.getElementById('ch-instagram').checked) channels.push('instagram');
-  if (document.getElementById('ch-youtube').checked)   channels.push('youtube');
-  if (document.getElementById('ch-facebook').checked)  channels.push('facebook');
-  if (!channels.length) { showFlash('Select at least one channel', 'err'); return; }
-  if (!clip.output_url) { showFlash('Generate the clip first', 'err'); return; }
-  const r = await fetch('/admin/api/social-clips/' + clipId + '/publish', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ channels }),
+  const channels=[];
+  if(document.getElementById('ch-tiktok').checked)    channels.push('tiktok');
+  if(document.getElementById('ch-instagram').checked) channels.push('instagram');
+  if(document.getElementById('ch-youtube').checked)   channels.push('youtube');
+  if(document.getElementById('ch-facebook').checked)  channels.push('facebook');
+  if(!channels.length){showFlash('Select at least one channel','err');return;}
+  if(!clip.output_url){showFlash('Generate the clip first','err');return;}
+  const r = await fetch('/admin/api/social-clips/'+clipId+'/publish',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channels}),
   });
   const d = await r.json();
-  if (d.ok) {
-    showFlash('Marked as published on: ' + channels.join(', ') + '. ' + (d.note || ''), 'ok');
-    await loadClip();
-  } else {
-    showFlash(d.error || 'Publish failed', 'err');
-  }
+  d.ok ? (showFlash('Published: '+channels.join(', '),'ok'), loadClip()) : showFlash(d.error||'Failed','err');
 }
 
-function showFlash(msg, type) {
-  const el = document.getElementById('flash');
-  el.textContent = msg;
-  el.className = 'flash flash-' + type;
-  el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 7000);
+function showFlash(msg,type){
+  const el=document.getElementById('flash');
+  el.textContent=msg; el.className='flash flash-'+type; el.style.display='block';
+  setTimeout(()=>{el.style.display='none';},7000);
 }
-
-function updateCropPreview(which) {
-  const offset = Math.max(0, parseInt(document.getElementById(which + '_y_offset').value) || 0);
-  const img = document.getElementById(which + '-crop-live');
-  if (!img) return;
-  const previewW = img.parentElement ? img.parentElement.offsetWidth : 400;
-  const scale = previewW / 1080 || 0.4;
-  img.style.transform = `translateY(-${Math.round(offset * scale)}px)`;
-}
-
-function initDragCrop(which) {
-  const wrap = document.getElementById(which + '-crop-wrap');
-  const input = document.getElementById(which + '_y_offset');
-  if (!wrap) return;
-  wrap.style.cursor = 'ns-resize';
-  wrap.title = 'Drag up/down to adjust crop position';
-  let dragging = false, startY = 0, startOffset = 0;
-  const onStart = (y) => { dragging = true; startY = y; startOffset = Math.max(0, parseInt(input.value) || 0); };
-  const onMove  = (y) => {
-    if (!dragging) return;
-    const img = document.getElementById(which + '-crop-live');
-    const previewW = wrap.offsetWidth || 400;
-    const scale = 1080 / previewW;
-    const newOffset = Math.max(0, Math.round(startOffset + (startY - y) * scale));
-    input.value = newOffset;
-    updateCropPreview(which);
-  };
-  const onEnd = () => { dragging = false; };
-  wrap.addEventListener('mousedown',  (e) => { onStart(e.clientY); e.preventDefault(); });
-  document.addEventListener('mousemove',  (e) => onMove(e.clientY));
-  document.addEventListener('mouseup',    onEnd);
-  wrap.addEventListener('touchstart', (e) => { onStart(e.touches[0].clientY); e.preventDefault(); }, { passive: false });
-  document.addEventListener('touchmove',  (e) => { if (dragging) { onMove(e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
-  document.addEventListener('touchend',   onEnd);
-}
-
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 loadClip();
 </script>
