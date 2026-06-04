@@ -460,7 +460,7 @@ function renderClip(initial) {
   const btn = document.getElementById('btn-generate');
   btn.disabled = processing;
   btn.textContent = processing ? 'Generating…' : (clip.output_url ? 'Regenerate ▶' : 'Generate ▶');
-  document.getElementById('gen-status').textContent = processing ? 'Generating — will update when done…' : '';
+  document.getElementById('gen-status').textContent = processing ? 'Generating — will update when done…' : (clip.status === 'error' && clip.error_msg ? '⚠ ' + clip.error_msg : '');
   document.getElementById('gen-hint').textContent = clip.output_url && !processing ? 'Change any setting and hit Regenerate to create a new version.' : '';
 
   if (processing) {

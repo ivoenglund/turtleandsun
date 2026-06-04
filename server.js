@@ -3005,68 +3005,51 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const clipStyle = parseInt(clip.clip_style) || 1;
 
       if (clipStyle === 2) {
-        // ── Variant 2: Rise & Pause (full-screen wipe) ────────────────────
-        // 1. Before photo fills the entire screen for show_before_s seconds.
-        // 2. Panel enters from BELOW the frame (y=H) and rises.
-        // 3. As panel rises it wipes away the before photo, revealing the video.
-        // 4. Panel pauses when top edge = frame top (y=0), then exits off top.
-        // 5. After panel exits: before photo remains in top section, video below.
+        // ── Variant 2: Rise & Pause ────────────────────────────────────────
+        // Segment A: before photo full screen for show_before_s seconds.
+        // Hard cut to Segment B: video plays from frame 0, panel enters from
+        // below the frame (y=H) and immediately begins rising.
+        // Panel pauses when top edge = frame top (y=0), then exits.
+        // After panel exits: full-screen video.
 
-        // Prepare before photo — FULL frame height (1920px) for the wipe effect
+        // Before photo — full frame (1920px) for the static opening
         const beforeFull = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H);
         fs2.writeFileSync(beforeFile, beforeFull);
-
-        // Prepare panel image
         fs2.writeFileSync(panelFile, panelBuf);
 
         // Timing
-        const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.5);  // static before photo duration
-        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5); // panel travels H px (y=H→0)
-        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0); // hold at top
-        const speed  = H / riseD;        // px/s — panel travels full H pixels
-        const exitD  = panelH / speed;   // panel travels panelH px to exit
-        const imgDur = String(Math.ceil(showD + riseD + pauseD + exitD + 3));
+        const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.5);
+        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5); // panel travels H px
+        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);
+        const speed  = H / riseD;
+        const exitD  = panelH / speed;
+        const imgDur = String(Math.ceil(showD + 1));
 
-        // Panel y(t) — starts at H (off-screen below), waits showD, then rises
-        const panelYExpr = [
-          `if(lt(t,${showD}),${H},`,
-          `if(lt(t,${showD + riseD}),${H}-(t-${showD})*${speed},`,
-          `if(lt(t,${showD + riseD + pauseD}),0,`,
-          `0-(t-${showD + riseD + pauseD})*${speed}`,
-          `)))`,
-        ].join('');
-
-        // Cut line: how many pixels of before photo to show.
-        // Tracks panel_y directly — when panel exits top, before photo is fully gone.
-        const cutLineExpr = panelYExpr;
-
-        // geq filter: zero out before photo pixels below the cut line.
-        // Single-quoted values protect commas from filter_complex parsing.
-        const geqFilter = [
-          `geq=`,
-          `lum='if(gte(Y,${cutLineExpr}),0,lum(X,Y))':`,
-          `cb='if(gte(Y,${cutLineExpr}),128,cb(X,Y))':`,
-          `cr='if(gte(Y,${cutLineExpr}),128,cr(X,Y))'`,
+        // Panel y in Segment B timeline (t=0 = first frame after cut).
+        // Starts at y=H (off-screen below), rises to y=0, pauses, exits off top.
+        const panelYB = [
+          `if(lt(t,${riseD}),`,
+            `${H}-t*${speed},`,
+          `if(lt(t,${riseD + pauseD}),`,
+            `0,`,
+            `0-(t-${riseD + pauseD})*${speed}`,
+          `))`,
         ].join('');
 
         // filter_complex:
-        //  [intro]  black for show_before_s (prepended so video starts fresh when revealed)
-        //  [0:v]    after video, scaled 1080x1920 + optional overlay text
-        //  concat   → [vdelayed] (video starts at t=showD in the output)
-        //  [1:v]    before photo (full 1920px), masked below cut_line → [vbefore_masked]
-        //  [2:v]    panel image → [vpanel]
-        //  overlay stack: vdelayed ← vbefore_masked ← vpanel
+        //  [1:v] before photo, looped for showD seconds  → [vseg_a]
+        //  [0:v] after video + optional overlay text     → [vbase]
+        //  [2:v] panel image                             → [vpanel]
+        //  [vbase][vpanel] overlay with animated y       → [vseg_b]
+        //  [vseg_a][vseg_b] concat (A then B)            → [vout]
         const filter2 = [
-          `color=black:size=1080x1920:rate=30:d=${showD}[intro];`,
+          `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[vseg_a];`,
           `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
           drawTextFilter,
-          `[vscaled];`,
-          `[intro][vscaled]concat=n=2:v=1:a=0[vdelayed];`,
-          `[1:v]fps=30,scale=1080:1920[vbefore_full];`,
-          `[vbefore_full]${geqFilter}[vbefore_masked];`,
+          `[vbase];`,
           `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
-          `[vdelayed][vbefore_masked]overlay=0:0[v1];`,
-          `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
+          `[vbase][vpanel]overlay=0:'${panelYB}'[vseg_b];`,
+          `[vseg_a][vseg_b]concat=n=2:v=1:a=0[vout]`,
         ].join('');
 
         await new Promise((resolve, reject) => {
@@ -3074,11 +3057,10 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             '-y', '-loglevel', 'error',
             '-i', videoFile,
             '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', beforeFile,
-            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', panelFile,
+            '-loop', '1', '-t', String(Math.ceil(riseD + pauseD + exitD + 2)), '-framerate', '30', '-i', panelFile,
             '-filter_complex', filter2,
-            '-map', '[vout]', '-map', '0:a?',
+            '-map', '[vout]',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac', '-b:a', '128k', '-shortest',
             '-movflags', '+faststart',
             outFile,
           ], { timeout: 180000 }, (err, stdout, stderr) => {
