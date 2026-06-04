@@ -3022,39 +3022,39 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.5);
         const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5);
         const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);
-        const speed  = H / riseD;   // panel travels full H pixels
-        const exitD  = panelH / speed;
+        const speed  = H / riseD;
         const imgDur = '999'; // longer than any video; -shortest ends on video
 
-        // Panel y(t): waits showD, rises from H→0, pauses, exits off top
+        // Panel y(t): waits showD, rises H→0, pauses at exactly 0, then exits.
+        // max(0,...) clamps the rise so frame-timing imprecision can't overshoot past 0.
         const panelYExpr =
           `if(lt(t,${showD}),${H},` +
-          `if(lt(t,${showD + riseD}),${H}-(t-${showD})*${speed},` +
-          `if(lt(t,${showD + riseD + pauseD}),0,` +
-          `0-(t-${showD + riseD + pauseD})*${speed})))`;
+          `if(lt(t,${showD + riseD + pauseD}),` +
+            `max(0,${H}-(t-${showD})*${speed}),` +   // rise phase, clamped at 0 → also covers pause
+            `0-(t-${showD + riseD + pauseD})*${speed}` + // exit phase
+          `))`;
 
-        // Before photo alpha: fully opaque (255) above panel_y, transparent (0) below.
-        // Single-quoted geq values protect commas from filter_complex parsing.
-        // format=rgba required for alpha channel; overlay blends using it automatically.
-        const geqAlpha =
-          `format=rgba,` +
+        // Before photo alpha mask using yuva444p (planar, all planes full-res).
+        // geq: pass luma/chroma through unchanged; set alpha=255 above panel, 0 below.
+        // Single-quoted values protect commas inside expressions from filter_complex parsing.
+        const geqFilter =
+          `format=yuva444p,` +
           `geq=` +
-            `r='r(X,Y)':` +
-            `g='g(X,Y)':` +
-            `b='b(X,Y)':` +
+            `lum='p(X,Y)':` +
+            `cb='p(X,Y)':` +
+            `cr='p(X,Y)':` +
             `a='255*lt(Y,${panelYExpr})'`;
 
         // filter_complex:
-        //   [0:v] video (base, always playing)
-        //   [1:v] before photo → convert to RGBA → dynamic alpha → overlay on video
-        //   [2:v] panel → overlay on top with animated y
+        //   [0:v] video base (always playing, hidden under before photo initially)
+        //   [1:v] before photo → yuva444p → dynamic alpha → overlay on video
+        //   [2:v] panel → overlay on top with animated y position
         const filter2 = [
           `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
           drawTextFilter,
           `[vbase];`,
-          `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,`,
-          geqAlpha,
-          `[vbefore];`,
+          `[1:v]fps=30,scale=1080:1920[vbefore_raw];`,
+          `[vbefore_raw]${geqFilter}[vbefore];`,
           `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
           `[vbase][vbefore]overlay=0:0[v1];`,
           `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
