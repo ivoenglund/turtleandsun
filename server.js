@@ -3036,9 +3036,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           `)))`,
         ].join('');
 
-        // Cut line: how many pixels of before photo to show (shrinks as panel rises).
-        // = max(beforeH, panel_y) so it never goes below beforeH (before photo stays in top section).
-        const cutLineExpr = `max(${beforeH},${panelYExpr})`;
+        // Cut line: how many pixels of before photo to show.
+        // Tracks panel_y directly — when panel exits top, before photo is fully gone.
+        const cutLineExpr = panelYExpr;
 
         // geq filter: zero out before photo pixels below the cut line.
         // Single-quoted values protect commas from filter_complex parsing.
