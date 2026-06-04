@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Clip Detail — Turtle and Sun Admin</title>
+<script src="/nav.js?v=20260602a"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px}
@@ -458,18 +459,42 @@ async function saveNow(thenGenerate) {
   } else {
     setAutoSaveStatus('');
     showFlash(d.error || 'Save failed', 'err');
+    throw new Error(d.error || 'Save failed'); // abort generate() if called before it
   }
 }
 
 // ── Generate / Poll ────────────────────────────────────────
-async function generate() {
-  await saveNow(false);
+let _generateTimeout = null;
+function resetBtn() {
   const btn = document.getElementById('btn-generate');
+  if (btn) { btn.disabled = false; btn.textContent = (clip && clip.output_url) ? 'Regenerate ▶' : 'Generate ▶'; }
+  document.getElementById('gen-status').textContent = '';
+  clearTimeout(_generateTimeout);
+}
+
+async function generate() {
+  const btn = document.getElementById('btn-generate');
+  try {
+    await saveNow(false);
+  } catch(e) { return; } // save failed — abort, button never got disabled
+
   btn.disabled = true;
   btn.textContent = 'Generating…';
   document.getElementById('gen-status').textContent = 'Starting…';
-  const r = await fetch('/admin/api/social-clips/' + clipId + '/generate', { method: 'POST' });
-  const d = await r.json();
+
+  // Safety net — always re-enable after 4 minutes regardless
+  clearTimeout(_generateTimeout);
+  _generateTimeout = setTimeout(resetBtn, 4 * 60 * 1000);
+
+  let d;
+  try {
+    const r = await fetch('/admin/api/social-clips/' + clipId + '/generate', { method: 'POST' });
+    d = await r.json();
+  } catch(e) {
+    showFlash('Network error — try again', 'err');
+    resetBtn(); return;
+  }
+
   if (d.ok) {
     document.getElementById('gen-status').textContent = 'Generating — will update when done…';
     document.getElementById('status-badge').innerHTML  =
@@ -477,8 +502,7 @@ async function generate() {
     if (!polling) polling = setInterval(pollStatus, 6000);
   } else {
     showFlash(d.error || 'Failed to start', 'err');
-    btn.disabled = false;
-    btn.textContent = clip.output_url ? 'Regenerate ▶' : 'Generate ▶';
+    resetBtn();
   }
 }
 
@@ -488,8 +512,10 @@ async function pollStatus() {
   const fresh = await r.json();
   if (fresh.status !== 'processing') {
     clearInterval(polling); polling = null;
+    clearTimeout(_generateTimeout);
     clip = fresh;
-    renderClip(false); // _dirty guard prevents overwriting user's current drag positions
+    renderClip(false);
+    resetBtn();
   }
 }
 
