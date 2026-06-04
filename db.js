@@ -801,6 +801,7 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS published_facebook BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS facebook_post_url TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS panel_url TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS before_pct NUMERIC(5,2) DEFAULT 40;
   `);
 
   console.log('Database tables ready');

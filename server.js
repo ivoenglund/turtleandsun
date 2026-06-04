@@ -2940,29 +2940,21 @@ app.get('/admin/api/social-clips/:id(\\d+)', requireRole('admin'), async (req, r
 app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), async (req, res) => {
   const id = parseInt(req.params.id);
   const {
-    video_overlay_text, before_y_offset, after_y_offset, panel_url, end_card_duration_s,
+    video_overlay_text, before_y_offset, after_y_offset, panel_url, end_card_duration_s, before_pct,
   } = req.body;
   try {
     const { rows } = await pool.query(`
       UPDATE social_clips SET
-        label_before       = COALESCE($2, label_before),
-        before_duration_s  = COALESCE($3, before_duration_s),
-        label_after        = COALESCE($4, label_after),
-        show_labels        = COALESCE($5, show_labels),
-        end_card_enabled   = COALESCE($6, end_card_enabled),
-        end_card_line1     = COALESCE($7, end_card_line1),
-        end_card_line2     = COALESCE($8, end_card_line2),
-        show_logo          = COALESCE($9, show_logo),
-        end_card_duration_s= COALESCE($10, end_card_duration_s),
-        video_overlay_text = COALESCE($2,  video_overlay_text),
-        before_y_offset    = COALESCE($3,  before_y_offset),
-        after_y_offset     = COALESCE($4,  after_y_offset),
-        panel_url          = COALESCE($5,  panel_url),
-        end_card_duration_s= COALESCE($6,  end_card_duration_s),
+        video_overlay_text = COALESCE($2, video_overlay_text),
+        before_y_offset    = COALESCE($3, before_y_offset),
+        after_y_offset     = COALESCE($4, after_y_offset),
+        panel_url          = $5,
+        end_card_duration_s= COALESCE($6, end_card_duration_s),
+        before_pct         = COALESCE($7, before_pct),
         updated_at         = now()
       WHERE id = $1
       RETURNING *
-    `, [id, video_overlay_text, before_y_offset, after_y_offset, panel_url || null, end_card_duration_s]);
+    `, [id, video_overlay_text ?? null, before_y_offset ?? null, after_y_offset ?? null, panel_url ?? null, end_card_duration_s ?? null, before_pct ?? null]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -3048,7 +3040,10 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         panelBuf = await sharp({ create: { width: W, height: panelH, channels: 3, background: { r: 28, g: 42, b: 20 } } }).png().toBuffer();
         console.warn('[social-clip] panel load failed, using dark fallback:', pe.message);
       }
-      const photoH = Math.floor((H - panelH) / 2);
+      const _beforePct = parseFloat(clip.before_pct) || 40;
+      const beforeH = Math.max(100, Math.round(H * _beforePct / 100));
+      const afterH  = Math.max(100, H - panelH - beforeH);
+      const photoH  = beforeH; // kept for cropPhoto compat below
 
       // Label SVG helper — green pill matching landing page .ts-label style
       function makeLabel(text, w, h) {
@@ -3065,32 +3060,32 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       }
 
       // Crop helper — scale with headroom then extract at y-offset
-      async function cropPhoto(buf, yOff) {
+      async function cropPhoto(buf, yOff, cropH) {
         const meta = await sharp(buf).metadata();
-        const minH = photoH + 400;
+        const minH = cropH + 400;
         const scaleToW = Math.round(meta.height * W / meta.width);
         let scaled = scaleToW >= minH
           ? await sharp(buf).resize({ width: W }).toBuffer()
           : await sharp(buf).resize({ height: minH }).toBuffer();
         const sm = await sharp(scaled).metadata();
-        const maxY = Math.max(0, sm.height - photoH);
+        const maxY = Math.max(0, sm.height - cropH);
         const top  = Math.max(0, Math.min(maxY, yOff || 0));
         const left = Math.max(0, Math.floor((sm.width - W) / 2));
-        return sharp(scaled).extract({ left, top, width: W, height: photoH }).jpeg({ quality: 92 }).toBuffer();
+        return sharp(scaled).extract({ left, top, width: W, height: cropH }).jpeg({ quality: 92 }).toBuffer();
       }
 
       // Before photo
-      const beforeCropped = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset);
+      const beforeCropped = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
       const beforeFinal = await sharp(beforeCropped)
-        .composite([{ input: makeLabel('BEFORE', W, photoH), blend: 'over' }])
+        .composite([{ input: makeLabel('BEFORE', W, beforeH), blend: 'over' }])
         .jpeg({ quality: 92 }).toBuffer();
 
       // After portrait
       let afterFinal;
       if (clip.after_image_url) {
-        const afterCropped = await cropPhoto(await dlBuffer(clip.after_image_url), clip.after_y_offset);
+        const afterCropped = await cropPhoto(await dlBuffer(clip.after_image_url), clip.after_y_offset, afterH);
         afterFinal = await sharp(afterCropped)
-          .composite([{ input: makeLabel('AFTER', W, photoH), blend: 'over' }])
+          .composite([{ input: makeLabel('AFTER', W, afterH), blend: 'over' }])
           .jpeg({ quality: 92 }).toBuffer();
       } else {
         afterFinal = await sharp({ create: { width: W, height: photoH, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
@@ -3098,9 +3093,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
       const composite = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
         .composite([
-          { input: beforeFinal, top: 0,              left: 0 },
-          { input: panelBuf,    top: photoH,          left: 0 },
-          { input: afterFinal,  top: photoH + panelH, left: 0 },
+          { input: beforeFinal, top: 0,               left: 0 },
+          { input: panelBuf,    top: beforeH,          left: 0 },
+          { input: afterFinal,  top: beforeH + panelH, left: 0 },
         ]).jpeg({ quality: 90 }).toBuffer();
       fs2.writeFileSync(endCardFile, composite);
 

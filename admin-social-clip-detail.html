@@ -16,20 +16,25 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 @media(max-width:680px){.layout{grid-template-columns:1fr}}
 .card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
 .card:last-child{margin-bottom:0}
-.card h2{font-size:12px;font-weight:700;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;color:#555}
+.card h2{font-size:11px;font-weight:700;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;color:#555}
 
 /* ── Composite preview ────────────────────────────────────── */
-.composite{width:100%;aspect-ratio:9/16;position:relative;overflow:hidden;border-radius:10px;background:#111;border:2px solid #2a2a2a;touch-action:none}
+.composite{width:100%;aspect-ratio:9/16;position:relative;overflow:hidden;border-radius:10px;background:#111;border:2px solid #2a2a2a;user-select:none;touch-action:none}
 .cp-section{position:absolute;left:0;width:100%;overflow:hidden}
-.cp-section img{position:absolute;left:0;width:100%;pointer-events:none;display:block}
-.cp-label{position:absolute;top:10px;right:10px;background:#3A6B20;color:#fff;font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:2px;pointer-events:none}
-#cp-before{top:0;cursor:ns-resize}
-#cp-after{cursor:ns-resize}
-#cp-panel{background:#1C2A14;display:flex;align-items:center;justify-content:center;cursor:copy;border-top:2px solid #333;border-bottom:2px solid #333;transition:background .15s}
-#cp-panel.drag-over{background:#2d4a24;border-color:#FFE800}
-#cp-panel img{position:static;width:100%;height:100%;object-fit:cover;pointer-events:none}
-.panel-drop-hint{font-size:9px;color:#FFE800;opacity:.7;position:absolute;pointer-events:none;text-align:center;padding:4px}
-.cp-processing-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;border-radius:8px}
+.cp-photo img{position:absolute;left:0;width:100%;pointer-events:none;display:block}
+.cp-photo{cursor:ns-resize}
+.cp-label{position:absolute;top:10px;right:10px;background:#3A6B20;color:#fff;font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:2px;pointer-events:none;z-index:2}
+
+/* Panel section */
+#cp-panel{background:#1C2A14;cursor:ns-resize;z-index:3;display:flex;align-items:center;justify-content:center;transition:background .15s}
+#cp-panel.drag-over{background:#2d4a24;border:2px dashed #FFE800}
+#cp-panel img{width:100%;height:100%;object-fit:cover;pointer-events:none;display:block}
+/* Drag handle bars on panel top and bottom */
+.panel-handle{position:absolute;left:0;width:100%;height:10px;z-index:10;cursor:ns-resize;display:flex;align-items:center;justify-content:center}
+.panel-handle-top{top:0}
+.panel-handle-bot{bottom:0}
+.panel-handle-bar{width:32px;height:3px;border-radius:2px;background:rgba(255,228,0,.6)}
+.panel-drop-hint{position:absolute;pointer-events:none;text-align:center;font-size:9px;color:#FFE800;opacity:.7;padding:4px;z-index:4}
 
 /* ── Generated video ──────────────────────────────────────── */
 .video-wrap{background:#000;border-radius:8px;overflow:hidden;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
@@ -37,7 +42,7 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .video-placeholder{color:#555;font-size:11px;text-align:center;padding:16px}
 
 /* ── Controls ─────────────────────────────────────────────── */
-.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer;transition:background .1s}
+.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer}
 .btn-primary{background:#1C2A14;color:#FFE800}.btn-primary:hover{background:#2d4a24}
 .btn-primary:disabled{background:#aaa;color:#fff;cursor:not-allowed}
 .btn-outline{background:#fff;color:#1C2A14;border:1px solid #1C2A14}.btn-outline:hover{background:#f0f0e8}
@@ -49,7 +54,7 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .badge-done{background:#d4edda;color:#155724}.badge-error{background:#f8d7da;color:#721c24}
 .field{margin-bottom:12px}.field:last-child{margin-bottom:0}
 .field label{display:block;font-size:11px;color:#555;margin-bottom:3px;font-weight:600}
-.field input[type=text],.field input[type=number],.field textarea{width:100%;padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:12px;font-family:inherit}
+.field input[type=text],.field input[type=number]{width:100%;padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:12px}
 .field .hint{font-size:10px;color:#aaa;margin-top:3px}
 .channel-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0}
 .channel-row:last-child{border-bottom:none}
@@ -65,8 +70,6 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .flash{padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:12px}
 .flash-ok{background:#d4edda;color:#155724}.flash-err{background:#f8d7da;color:#721c24}
 .gen-status{font-size:11px;color:#888;margin-top:4px}
-.panel-file-input{display:none}
-.panel-upload-btn{font-size:10px;color:#555;cursor:pointer;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -85,29 +88,35 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
     <!-- LEFT: composite live preview -->
     <div>
       <div class="card" style="padding:10px">
-        <h2>Live preview — drag photos to position</h2>
-
-        <!-- The composite mockup -->
+        <h2>Live preview — drag to frame &amp; position</h2>
         <div class="composite" id="composite">
-          <div class="cp-section" id="cp-before">
+          <!-- Before photo -->
+          <div class="cp-section cp-photo" id="cp-before">
             <img id="cp-before-img" alt="">
             <div class="cp-label">BEFORE</div>
           </div>
+          <!-- Panel (draggable up/down + drop zone for new image) -->
           <div class="cp-section" id="cp-panel">
             <img id="cp-panel-img" alt="" style="display:none">
-            <div class="panel-drop-hint" id="panel-drop-hint">Drop new panel here<br>or <span class="panel-upload-btn" onclick="document.getElementById('panel-file-input').click()">browse</span></div>
+            <div class="panel-drop-hint" id="panel-drop-hint">Drop panel image here</div>
+            <div class="panel-handle panel-handle-top"><div class="panel-handle-bar"></div></div>
+            <div class="panel-handle panel-handle-bot"><div class="panel-handle-bar"></div></div>
           </div>
-          <div class="cp-section" id="cp-after">
+          <!-- After photo -->
+          <div class="cp-section cp-photo" id="cp-after">
             <img id="cp-after-img" alt="">
             <div class="cp-label">AFTER</div>
           </div>
         </div>
-        <input type="file" id="panel-file-input" class="panel-file-input" accept="image/*" onchange="handlePanelFile(this.files[0])">
-        <div style="font-size:10px;color:#aaa;text-align:center;margin-top:6px">Drag before/after photos up-down to frame · Drop new panel image in the middle</div>
+        <input type="file" id="panel-file-input" style="display:none" accept="image/*" onchange="handlePanelFile(this.files[0])">
+        <div style="font-size:10px;color:#aaa;text-align:center;margin-top:6px">
+          Drag before/after up-down to frame · Drag panel up-down to resize ·
+          <span style="cursor:pointer;text-decoration:underline" onclick="document.getElementById('panel-file-input').click()">Replace panel image</span>
+        </div>
       </div>
     </div>
 
-    <!-- RIGHT: generated video + settings -->
+    <!-- RIGHT -->
     <div>
 
       <!-- Generated video -->
@@ -136,9 +145,10 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           <label>End card duration (seconds)</label>
           <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
         </div>
-        <!-- Hidden offset fields — updated by drag -->
+        <!-- Hidden state fields — updated by drag interactions -->
         <input type="hidden" id="before_y_offset" value="0">
         <input type="hidden" id="after_y_offset" value="0">
+        <input type="hidden" id="before_pct" value="40">
         <input type="hidden" id="panel_url" value="">
       </div>
 
@@ -162,73 +172,70 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
       </div>
 
     </div>
-  </div><!-- /layout -->
+  </div>
 </div>
 
 <script>
 const clipId = parseInt(location.pathname.split('/').pop());
 let clip = null, polling = null, saveTimer = null;
+let _dirty = false; // true while user has unsaved changes — blocks renderClip from overwriting
 
-// ── Proportions (updated when panel image loads) ───────────
-let _beforePct = 40, _panelPct = 20, _afterPct = 40;
+// ── Proportions ────────────────────────────────────────────
+// before_pct: % of total height given to before section (panel height is fixed by image ratio)
+// after section gets the remainder.
+let _panelPct = 20; // updated when panel image loads
 
-function computeProportions(panelNatW, panelNatH) {
-  if (!panelNatW || !panelNatH) return;
+function getPanelPct(panelNatW, panelNatH) {
+  if (!panelNatW || !panelNatH) return _panelPct;
   const panelPx = Math.round(1080 * panelNatH / panelNatW);
-  const photoPx = Math.floor((1920 - panelPx) / 2);
-  const total = 1920;
-  _panelPct  = Math.max(8, Math.min(40, Math.round(panelPx / total * 100)));
-  _beforePct = Math.round(photoPx / total * 100);
-  _afterPct  = 100 - _panelPct - _beforePct;
+  return Math.max(5, Math.min(40, Math.round(panelPx / 1920 * 100)));
 }
 
-function applyProportions() {
+function getBeforePct() { return parseFloat(document.getElementById('before_pct').value) || 40; }
+
+function applyProportions(beforePct) {
+  if (beforePct === undefined) beforePct = getBeforePct();
+  const afterPct = Math.max(5, 100 - _panelPct - beforePct);
   const before = document.getElementById('cp-before');
   const panel  = document.getElementById('cp-panel');
   const after  = document.getElementById('cp-after');
-  before.style.height = _beforePct + '%';
-  before.style.top    = '0%';
-  panel.style.top     = _beforePct + '%';
-  panel.style.height  = _panelPct  + '%';
-  after.style.top     = (_beforePct + _panelPct) + '%';
-  after.style.height  = _afterPct  + '%';
+  before.style.height = beforePct + '%';
+  before.style.top    = '0';
+  panel.style.top     = beforePct + '%';
+  panel.style.height  = _panelPct + '%';
+  after.style.top     = (beforePct + _panelPct) + '%';
+  after.style.height  = afterPct + '%';
+  applyPhotoOffset('before');
+  applyPhotoOffset('after');
 }
 
-// ── Image positioning ──────────────────────────────────────
-// offset is in "1080px-wide coordinate space" pixels (same as server)
-function applyOffset(which) {
+// ── Photo offset (y positioning within section) ────────────
+function applyPhotoOffset(which) {
   const offset = Math.max(0, parseInt(document.getElementById(which + '_y_offset').value) || 0);
   const img    = document.getElementById('cp-' + which + '-img');
   const wrap   = document.getElementById('cp-' + which);
   if (!img || !wrap) return;
-  // Scale: composite preview width / 1080
-  const scale = wrap.offsetWidth / 1080;
+  const scale = (wrap.offsetWidth || 300) / 1080;
   img.style.top = '-' + Math.round(offset * scale) + 'px';
 }
 
-// ── Drag-to-reposition ─────────────────────────────────────
-const _dragState = {};
-function initSectionDrag(which) {
-  if (_dragState[which]) return;
-  _dragState[which] = true;
+// ── Drag: reposition before/after photo ───────────────────
+const _photoDrag = {};
+function initPhotoDrag(which) {
+  if (_photoDrag[which]) return;
+  _photoDrag[which] = true;
   const wrap  = document.getElementById('cp-' + which);
   const input = document.getElementById(which + '_y_offset');
-  if (!wrap) return;
   let active = false, startY = 0, startOff = 0;
-
-  const onStart = y => {
-    active   = true;
-    startY   = y;
-    startOff = Math.max(0, parseInt(input.value) || 0);
-  };
-  const onMove = y => {
+  const onStart = y => { active = true; startY = y; startOff = Math.max(0, parseInt(input.value) || 0); };
+  const onMove  = y => {
     if (!active) return;
     const scale = 1080 / (wrap.offsetWidth || 300);
     input.value = Math.max(0, Math.round(startOff + (startY - y) * scale));
-    applyOffset(which);
+    applyPhotoOffset(which);
+    _dirty = true;
   };
   const onEnd = () => { if (active) { active = false; scheduleAutoSave(); } };
-
   wrap.addEventListener('mousedown',  e => { if (e.button === 0) { onStart(e.clientY); e.preventDefault(); } });
   document.addEventListener('mousemove', e => onMove(e.clientY));
   document.addEventListener('mouseup',   onEnd);
@@ -237,15 +244,42 @@ function initSectionDrag(which) {
   document.addEventListener('touchend', onEnd);
 }
 
+// ── Drag: move panel up/down (changes before_pct) ─────────
+function initPanelDrag() {
+  const panel  = document.getElementById('cp-panel');
+  const input  = document.getElementById('before_pct');
+  const composite = document.getElementById('composite');
+  let active = false, startY = 0, startPct = 40;
+
+  const onStart = y => {
+    active   = true;
+    startY   = y;
+    startPct = getBeforePct();
+  };
+  const onMove = y => {
+    if (!active) return;
+    const H    = composite.offsetHeight || 500;
+    const delta = (startY - y) / H * 100; // px → % of composite height (drag up = negative delta)
+    // Dragging panel UP → panel moves up → before_pct decreases
+    const newPct = Math.max(5, Math.min(100 - _panelPct - 5, startPct - delta));
+    input.value = newPct.toFixed(1);
+    applyProportions(newPct);
+    _dirty = true;
+  };
+  const onEnd = () => { if (active) { active = false; scheduleAutoSave(); } };
+
+  panel.addEventListener('mousedown',  e => { if (e.button === 0) { onStart(e.clientY); e.preventDefault(); } });
+  document.addEventListener('mousemove', e => onMove(e.clientY));
+  document.addEventListener('mouseup',   onEnd);
+  panel.addEventListener('touchstart',  e => { onStart(e.touches[0].clientY); e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove', e => { if (active) { onMove(e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
+  document.addEventListener('touchend', onEnd);
+}
+
 // ── Panel drop zone ────────────────────────────────────────
 function initPanelDrop() {
   const panel = document.getElementById('cp-panel');
-
-  panel.addEventListener('dragover', e => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    panel.classList.add('drag-over');
-  });
+  panel.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; panel.classList.add('drag-over'); });
   panel.addEventListener('dragleave', () => panel.classList.remove('drag-over'));
   panel.addEventListener('drop', e => {
     e.preventDefault();
@@ -257,7 +291,7 @@ function initPanelDrop() {
 
 async function handlePanelFile(file) {
   if (!file) return;
-  setAutoSaveStatus('Uploading panel…');
+  setAutoSaveStatus('Uploading…');
   try {
     const r = await fetch('/admin/api/social-clips/panel-image', {
       method: 'POST',
@@ -266,12 +300,10 @@ async function handlePanelFile(file) {
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Upload failed');
-    // Cache-bust the URL for display
-    const previewUrl = d.url + '?v=' + Date.now();
-    setPanelImage(previewUrl);
-    // Store null so generation uses the server file, or use the URL
+    // Use cache-busted URL for preview; clear panel_url so server uses the file
+    setPanelImage(d.url + '?v=' + Date.now());
     document.getElementById('panel_url').value = '';
-    // Also save the clip to clear any old panel_url
+    _dirty = true;
     scheduleAutoSave();
     setAutoSaveStatus('✓ Panel updated');
     setTimeout(() => setAutoSaveStatus(''), 2500);
@@ -286,10 +318,8 @@ function setPanelImage(url) {
   const hint = document.getElementById('panel-drop-hint');
   if (url) {
     img.onload = () => {
-      computeProportions(img.naturalWidth, img.naturalHeight);
+      _panelPct = getPanelPct(img.naturalWidth, img.naturalHeight);
       applyProportions();
-      applyOffset('before');
-      applyOffset('after');
     };
     img.src = url;
     img.style.display = 'block';
@@ -298,6 +328,8 @@ function setPanelImage(url) {
     img.src = '';
     img.style.display = 'none';
     hint.style.display = 'flex';
+    _panelPct = 20;
+    applyProportions();
   }
 }
 
@@ -305,21 +337,21 @@ function setPanelImage(url) {
 async function loadClip() {
   const r = await fetch('/admin/api/social-clips/' + clipId);
   if (!r.ok) { document.getElementById('page-title').textContent = 'Clip not found'; return; }
-  clip = await r.json();
+  const fresh = await r.json();
 
-  // Fetch panel URL if not set on clip
-  if (!clip.panel_url) {
+  if (!fresh.panel_url) {
     try {
       const pr = await fetch('/admin/api/social-clips/panel-url');
       const pd = await pr.json();
-      if (pd.url) clip.panel_url = pd.url;
+      if (pd.url) fresh.panel_url = pd.url;
     } catch(e) {}
   }
 
-  renderClip();
+  clip = fresh;
+  renderClip(true /* initial */);
 }
 
-function renderClip() {
+function renderClip(initial) {
   document.getElementById('page-title').textContent = (clip.concept_name || 'Clip') + ' #' + clip.id;
   document.getElementById('page-meta').textContent =
     'Created ' + new Date(clip.created_at).toLocaleString() +
@@ -340,53 +372,48 @@ function renderClip() {
     dl.style.display = 'none';
   }
 
-  // Settings fields
-  document.getElementById('video_overlay_text').value  = clip.video_overlay_text || '';
-  document.getElementById('end_card_duration_s').value = clip.end_card_duration_s || 4;
-  document.getElementById('before_y_offset').value     = clip.before_y_offset  || 0;
-  document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
-  document.getElementById('panel_url').value           = clip.panel_url || '';
+  // Text settings — only update from DB if not dirty
+  if (initial || !_dirty) {
+    document.getElementById('video_overlay_text').value  = clip.video_overlay_text || '';
+    document.getElementById('end_card_duration_s').value = clip.end_card_duration_s || 4;
+    document.getElementById('before_y_offset').value     = clip.before_y_offset  || 0;
+    document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
+    document.getElementById('before_pct').value          = clip.before_pct != null ? clip.before_pct : 40;
+    document.getElementById('panel_url').value           = clip.panel_url || '';
 
-  // Before photo in composite
-  const beforeImg = document.getElementById('cp-before-img');
-  if (clip.before_url) {
-    if (beforeImg.dataset.src !== clip.before_url) {
+    // Before photo
+    const beforeImg = document.getElementById('cp-before-img');
+    if (clip.before_url && beforeImg.dataset.src !== clip.before_url) {
       beforeImg.src = clip.before_url;
       beforeImg.dataset.src = clip.before_url;
     }
-    initSectionDrag('before');
-  }
+    if (clip.before_url) initPhotoDrag('before');
 
-  // After photo in composite
-  const afterImg = document.getElementById('cp-after-img');
-  if (clip.after_image_url) {
-    if (afterImg.dataset.src !== clip.after_image_url) {
+    // After photo
+    const afterImg = document.getElementById('cp-after-img');
+    if (clip.after_image_url && afterImg.dataset.src !== clip.after_image_url) {
       afterImg.src = clip.after_image_url;
       afterImg.dataset.src = clip.after_image_url;
     }
-    initSectionDrag('after');
+    if (clip.after_image_url) initPhotoDrag('after');
+
+    // Panel
+    const panelUrl = clip.panel_url || '/public/tns_end_card_panel.png?v=' + Date.now();
+    setPanelImage(panelUrl);
+
+    requestAnimationFrame(() => {
+      applyProportions();
+      applyPhotoOffset('before');
+      applyPhotoOffset('after');
+    });
   }
 
-  // Panel image
-  const panelUrl = clip.panel_url || '/public/tns_end_card_panel.png?v=' + Date.now();
-  setPanelImage(panelUrl);
-
-  // Apply offsets once images are laid out
-  requestAnimationFrame(() => {
-    applyProportions();
-    applyOffset('before');
-    applyOffset('after');
-  });
-
-  // Publish checkboxes
+  // Publish
   ['tiktok','instagram','youtube','facebook'].forEach(ch => {
     const cb = document.getElementById('ch-' + ch);
     const st = document.getElementById('st-' + ch);
     if (cb) cb.checked = !!clip['published_' + ch];
-    if (st) {
-      st.textContent = clip['published_' + ch] ? 'Published' : 'Not published';
-      st.className   = 'channel-status' + (clip['published_' + ch] ? ' pub' : '');
-    }
+    if (st) { st.textContent = clip['published_' + ch] ? 'Published' : 'Not published'; st.className = 'channel-status' + (clip['published_' + ch] ? ' pub' : ''); }
   });
 
   renderStats();
@@ -402,11 +429,10 @@ function renderClip() {
 }
 
 // ── Auto-save ──────────────────────────────────────────────
-function setAutoSaveStatus(msg) {
-  document.getElementById('auto-save-status').textContent = msg;
-}
+function setAutoSaveStatus(msg) { document.getElementById('auto-save-status').textContent = msg; }
 
 function scheduleAutoSave() {
+  _dirty = true;
   clearTimeout(saveTimer);
   setAutoSaveStatus('…');
   saveTimer = setTimeout(saveNow, 800);
@@ -420,6 +446,7 @@ async function saveNow(thenGenerate) {
     after_y_offset:      parseInt(document.getElementById('after_y_offset').value)  || 0,
     panel_url:           document.getElementById('panel_url').value.trim() || null,
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 4,
+    before_pct:          parseFloat(document.getElementById('before_pct').value) || 40,
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
     method: 'PUT',
@@ -429,6 +456,7 @@ async function saveNow(thenGenerate) {
   const d = await r.json();
   if (d.id) {
     clip = d;
+    _dirty = false;
     setAutoSaveStatus('✓ Saved');
     setTimeout(() => setAutoSaveStatus(''), 2000);
     if (thenGenerate) generate();
@@ -440,7 +468,7 @@ async function saveNow(thenGenerate) {
 
 // ── Generate / Poll ────────────────────────────────────────
 async function generate() {
-  await saveNow(false); // flush any pending changes first
+  await saveNow(false);
   document.getElementById('btn-generate').disabled = true;
   document.getElementById('gen-status').textContent = 'Starting…';
   const r = await fetch('/admin/api/social-clips/' + clipId + '/generate', { method: 'POST' });
@@ -462,7 +490,8 @@ async function pollStatus() {
   const fresh = await r.json();
   if (fresh.status !== 'processing') {
     clearInterval(polling); polling = null;
-    clip = fresh; renderClip();
+    clip = fresh;
+    renderClip(false); // _dirty guard prevents overwriting user's current drag positions
   }
 }
 
@@ -502,7 +531,6 @@ function renderStats() {
 }
 function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
 
-// ── Helpers ────────────────────────────────────────────────
 function showFlash(msg, type) {
   const el = document.getElementById('flash');
   el.textContent = msg; el.className = 'flash flash-' + type; el.style.display = 'block';
@@ -513,8 +541,9 @@ function esc(s) {
 }
 
 // ── Boot ───────────────────────────────────────────────────
-applyProportions(); // set default layout before images load
+applyProportions(40);
 initPanelDrop();
+initPanelDrag();
 loadClip();
 </script>
 </body>
