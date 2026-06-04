@@ -110,6 +110,11 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
           <span class="channel-name">YouTube Shorts</span>
           <label><input type="checkbox" id="ch-youtube"> <span class="channel-status" id="st-youtube">Not published</span></label>
         </div>
+        <div class="channel-row">
+          <span class="channel-icon">&#128420;</span>
+          <span class="channel-name">Facebook</span>
+          <label><input type="checkbox" id="ch-facebook"> <span class="channel-status" id="st-facebook">Not published</span></label>
+        </div>
         <div style="margin-top:10px">
           <button class="btn btn-primary btn-sm" id="btn-publish" onclick="publish()">Publish selected &#9658;</button>
           <div style="font-size:10px;color:#aaa;margin-top:4px">Channel API keys not yet connected &mdash; publishing marks intent for now.</div>
@@ -138,7 +143,12 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
         <div class="field">
           <label>Before photo — vertical offset (px)</label>
           <input type="number" id="before_y_offset" value="0" min="-2000" max="2000" step="10">
-          <div class="hint">0 = top of photo. Positive = slide crop window down (show lower part). Negative = slide up.</div>
+          <div class="hint">0 = top of photo. Positive = slide down. Steps of 50–100 work well.</div>
+        </div>
+        <div class="field">
+          <label>Vignette strength (0 = none, 100 = maximum)</label>
+          <input type="number" id="vignette_strength" value="75" min="0" max="100" step="5">
+          <div class="hint">Dark corners on the before photo. Regenerate to see effect.</div>
         </div>
       </div>
 
@@ -223,20 +233,23 @@ function renderClip() {
 
   // Settings
   document.getElementById('video_overlay_text').value   = clip.video_overlay_text || '';
-  document.getElementById('before_y_offset').value      = clip.before_y_offset || 0;
-  document.getElementById('after_y_offset').value       = clip.after_y_offset  || 0;
+  document.getElementById('before_y_offset').value      = clip.before_y_offset  || 0;
+  document.getElementById('after_y_offset').value       = clip.after_y_offset   || 0;
+  document.getElementById('vignette_strength').value    = clip.vignette_strength != null ? clip.vignette_strength : 75;
   document.getElementById('end_card_duration_s').value  = clip.end_card_duration_s || 4;
 
   // Publish checkboxes
   document.getElementById('ch-tiktok').checked    = !!clip.published_tiktok;
   document.getElementById('ch-instagram').checked = !!clip.published_instagram;
   document.getElementById('ch-youtube').checked   = !!clip.published_youtube;
+  document.getElementById('ch-facebook').checked  = !!clip.published_facebook;
   const pubSt = id => clip['published_' + id]
     ? '<span class="channel-status published">Published</span>'
     : '<span class="channel-status">Not published</span>';
   document.getElementById('st-tiktok').outerHTML    = pubSt('tiktok');
   document.getElementById('st-instagram').outerHTML = pubSt('instagram');
   document.getElementById('st-youtube').outerHTML   = pubSt('youtube');
+  document.getElementById('st-facebook').outerHTML  = pubSt('facebook');
 
   renderStats();
 
@@ -275,8 +288,9 @@ function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
 async function saveSettings(thenGenerate) {
   const body = {
     video_overlay_text:  document.getElementById('video_overlay_text').value,
-    before_y_offset:     parseInt(document.getElementById('before_y_offset').value) || 0,
-    after_y_offset:      parseInt(document.getElementById('after_y_offset').value)  || 0,
+    before_y_offset:     parseInt(document.getElementById('before_y_offset').value)    || 0,
+    after_y_offset:      parseInt(document.getElementById('after_y_offset').value)     || 0,
+    vignette_strength:   parseInt(document.getElementById('vignette_strength').value)  ?? 75,
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value),
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
@@ -327,6 +341,7 @@ async function publish() {
   if (document.getElementById('ch-tiktok').checked)    channels.push('tiktok');
   if (document.getElementById('ch-instagram').checked) channels.push('instagram');
   if (document.getElementById('ch-youtube').checked)   channels.push('youtube');
+  if (document.getElementById('ch-facebook').checked)  channels.push('facebook');
   if (!channels.length) { showFlash('Select at least one channel', 'err'); return; }
   if (!clip.output_url) { showFlash('Generate the clip first', 'err'); return; }
   const r = await fetch('/admin/api/social-clips/' + clipId + '/publish', {

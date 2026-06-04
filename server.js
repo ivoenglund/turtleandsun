@@ -2918,6 +2918,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
     video_overlay_text,
     before_y_offset,
     after_y_offset,
+    vignette_strength,
   } = req.body;
   try {
     const { rows } = await pool.query(`
@@ -2934,12 +2935,13 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         video_overlay_text = COALESCE($11, video_overlay_text),
         before_y_offset    = COALESCE($12, before_y_offset),
         after_y_offset     = COALESCE($13, after_y_offset),
+        vignette_strength  = COALESCE($14, vignette_strength),
         updated_at         = now()
       WHERE id = $1
       RETURNING *
     `, [id, label_before, before_duration_s, label_after, show_labels,
         end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
-        video_overlay_text, before_y_offset, after_y_offset]);
+        video_overlay_text, before_y_offset, after_y_offset, vignette_strength]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -3008,95 +3010,106 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const panelPath = pathM.join(__dirname, 'public', 'tns_end_card_panel.png');
       const W = 1080, H = 1920;
 
-      if (fs2.existsSync(panelPath) && clip.before_url) {
+      // Load panel PNG or fall back to a solid dark bar
+      let panelBuf, panelH;
+      if (fs2.existsSync(panelPath)) {
         const pm = await sharp(panelPath).metadata();
-        const panelH = Math.round(W * pm.height / pm.width);
-        const photoH = Math.floor((H - panelH) / 2);
-        const panelResized = await sharp(panelPath).resize(W, panelH, { fit: 'fill' }).png().toBuffer();
+        panelH = Math.round(W * pm.height / pm.width);
+        panelBuf = await sharp(panelPath).resize(W, panelH, { fit: 'fill' }).png().toBuffer();
+      } else {
+        panelH = 380;
+        panelBuf = await sharp({ create: { width: W, height: panelH, channels: 3, background: { r: 28, g: 42, b: 20 } } }).png().toBuffer();
+        console.warn('[social-clip] public/tns_end_card_panel.png not found — using dark fallback. Upload to public/ to enable branded end card.');
+      }
+      const photoH = Math.floor((H - panelH) / 2);
 
-        // Before: resize + optional y-offset crop + vignette + label
-        const beforeBuf = await dlBuffer(clip.before_url);
-        const bMeta = await sharp(beforeBuf).metadata();
-        // Scale so image covers W×photoH, then apply y_offset to slide the crop window
-        const scaleToW = Math.round(bMeta.height * W / bMeta.width);
-        let bScaled;
-        if (scaleToW >= photoH) {
-          bScaled = await sharp(beforeBuf).resize({ width: W }).toBuffer();
-        } else {
-          bScaled = await sharp(beforeBuf).resize({ height: photoH }).toBuffer();
+      // Vignette via raw pixels — no SVG/librsvg dependency
+      async function makeVignette(w, h, strength, plateau) {
+        const px = Buffer.alloc(w * h * 4);
+        const norm = Math.sqrt(2);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const dx = (x - w / 2) / (w / 2);
+            const dy = (y - h / 2) / (h / 2);
+            const dist = Math.sqrt(dx * dx + dy * dy) / norm;
+            const t = Math.max(0, (dist - plateau) / (1.0 - plateau));
+            px[(y * w + x) * 4 + 3] = Math.round(Math.min(1, t) * strength * 255);
+          }
         }
-        const bSMeta = await sharp(bScaled).metadata();
-        const maxY = Math.max(0, bSMeta.height - photoH);
-        const yOff = Math.max(0, Math.min(maxY, clip.before_y_offset || 0));
-        const xOff = Math.max(0, Math.floor((bSMeta.width - W) / 2));
-        const beforeResized = await sharp(bScaled)
-          .extract({ left: xOff, top: yOff, width: W, height: photoH })
+        return sharp(px, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+      }
+      const vigStrength = Math.min(1, Math.max(0, (clip.vignette_strength != null ? clip.vignette_strength : 75) / 100));
+
+      // Before photo — always scale to have 400px headroom for y-offset control
+      const beforeBuf = await dlBuffer(clip.before_url);
+      const bMeta = await sharp(beforeBuf).metadata();
+      const bMinH = photoH + 400;
+      const bScaleToW = Math.round(bMeta.height * W / bMeta.width);
+      let bScaled;
+      if (bScaleToW >= bMinH) {
+        bScaled = await sharp(beforeBuf).resize({ width: W }).toBuffer();
+      } else {
+        bScaled = await sharp(beforeBuf).resize({ height: bMinH }).toBuffer();
+      }
+      const bSMeta = await sharp(bScaled).metadata();
+      const bMaxY = Math.max(0, bSMeta.height - photoH);
+      const bYOff = Math.max(0, Math.min(bMaxY, clip.before_y_offset || 0));
+      const bXOff = Math.max(0, Math.floor((bSMeta.width - W) / 2));
+      const beforeCropped = await sharp(bScaled)
+        .extract({ left: bXOff, top: bYOff, width: W, height: photoH })
+        .jpeg({ quality: 92 }).toBuffer();
+      const vignBefore = await makeVignette(W, photoH, vigStrength, 0.35);
+      const beforeVignetted = await sharp(beforeCropped)
+        .composite([{ input: vignBefore, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
+      const beforeLabel = Buffer.from(
+        `<svg width='${W}' height='${photoH}'>` +
+        `<rect x='${W-165}' y='28' width='135' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
+        `<text x='${W-98}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>BEFORE</text>` +
+        `</svg>`
+      );
+      const beforeFinal = await sharp(beforeVignetted)
+        .composite([{ input: beforeLabel, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
+
+      // After portrait — same offset approach
+      let afterFinal;
+      if (clip.after_image_url) {
+        const afterBuf = await dlBuffer(clip.after_image_url);
+        const aMeta = await sharp(afterBuf).metadata();
+        const aMinH = photoH + 400;
+        const aScaleToW = Math.round(aMeta.height * W / aMeta.width);
+        let aScaled;
+        if (aScaleToW >= aMinH) {
+          aScaled = await sharp(afterBuf).resize({ width: W }).toBuffer();
+        } else {
+          aScaled = await sharp(afterBuf).resize({ height: aMinH }).toBuffer();
+        }
+        const aSMeta = await sharp(aScaled).metadata();
+        const aMaxY = Math.max(0, aSMeta.height - photoH);
+        const aYOff = Math.max(0, Math.min(aMaxY, clip.after_y_offset || 0));
+        const aXOff = Math.max(0, Math.floor((aSMeta.width - W) / 2));
+        const afterCropped = await sharp(aScaled)
+          .extract({ left: aXOff, top: aYOff, width: W, height: photoH })
           .jpeg({ quality: 92 }).toBuffer();
-        const vignSvg = Buffer.from(
-          `<svg width='${W}' height='${photoH}'><defs>` +
-          `<radialGradient id='v' cx='50%' cy='50%' r='90%'>` +
-          `<stop offset='0%'  stop-color='black' stop-opacity='0'/>` +
-          `<stop offset='35%' stop-color='black' stop-opacity='0'/>` +
-          `<stop offset='100%' stop-color='black' stop-opacity='0.96'/>` +
-          `</radialGradient></defs>` +
-          `<rect width='${W}' height='${photoH}' fill='url(#v)'/></svg>`
-        );
-        const beforeVignetted = await sharp(beforeResized)
-          .composite([{ input: vignSvg, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
-        const beforeLabel = Buffer.from(
+        const afterLabel = Buffer.from(
           `<svg width='${W}' height='${photoH}'>` +
-          `<rect x='${W-165}' y='28' width='135' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
-          `<text x='${W-98}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>BEFORE</text>` +
+          `<rect x='${W-140}' y='28' width='110' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
+          `<text x='${W-85}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>AFTER</text>` +
           `</svg>`
         );
-        const beforeFinal = await sharp(beforeVignetted)
-          .composite([{ input: beforeLabel, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
-
-        // After portrait
-        let afterFinal;
-        if (clip.after_image_url) {
-          const afterBuf = await dlBuffer(clip.after_image_url);
-          const aMeta = await sharp(afterBuf).metadata();
-          const aScaleToW = Math.round(aMeta.height * W / aMeta.width);
-          let aScaled;
-          if (aScaleToW >= photoH) {
-            aScaled = await sharp(afterBuf).resize({ width: W }).toBuffer();
-          } else {
-            aScaled = await sharp(afterBuf).resize({ height: photoH }).toBuffer();
-          }
-          const aSMeta = await sharp(aScaled).metadata();
-          const aMaxY = Math.max(0, aSMeta.height - photoH);
-          const aYOff = Math.max(0, Math.min(aMaxY, clip.after_y_offset || 0));
-          const aXOff = Math.max(0, Math.floor((aSMeta.width - W) / 2));
-          const afterResized = await sharp(aScaled)
-            .extract({ left: aXOff, top: aYOff, width: W, height: photoH })
-            .jpeg({ quality: 92 }).toBuffer();
-          const afterLabel = Buffer.from(
-            `<svg width='${W}' height='${photoH}'>` +
-            `<rect x='${W-140}' y='28' width='110' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
-            `<text x='${W-85}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>AFTER</text>` +
-            `</svg>`
-          );
-          afterFinal = await sharp(afterResized)
-            .composite([{ input: afterLabel, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
-        } else {
-          afterFinal = await sharp({ create: { width: W, height: photoH, channels: 3, background: { r: 20, g: 20, b: 20 } } })
-            .jpeg().toBuffer();
-        }
-
-        const composite = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-          .composite([
-            { input: beforeFinal,  top: 0,               left: 0 },
-            { input: panelResized, top: photoH,           left: 0 },
-            { input: afterFinal,   top: photoH + panelH,  left: 0 },
-          ]).jpeg({ quality: 90 }).toBuffer();
-        fs2.writeFileSync(endCardFile, composite);
+        afterFinal = await sharp(afterCropped)
+          .composite([{ input: afterLabel, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
       } else {
-        // Fallback: dark card if panel PNG missing
-        const fb = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 28, g: 42, b: 20 } } }).jpeg().toBuffer();
-        fs2.writeFileSync(endCardFile, fb);
-        console.warn('[social-clip] public/tns_end_card_panel.png not found — upload it to enable the branded end card');
+        afterFinal = await sharp({ create: { width: W, height: photoH, channels: 3, background: { r: 20, g: 20, b: 20 } } })
+          .jpeg().toBuffer();
       }
+
+      const composite = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+        .composite([
+          { input: beforeFinal,  top: 0,               left: 0 },
+          { input: panelBuf,     top: photoH,           left: 0 },
+          { input: afterFinal,   top: photoH + panelH,  left: 0 },
+        ]).jpeg({ quality: 90 }).toBuffer();
+      fs2.writeFileSync(endCardFile, composite);
 
       // ── 2. Download the after video ──
       await dlFile(clip.after_video_url, videoFile);
