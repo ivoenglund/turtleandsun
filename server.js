@@ -2898,6 +2898,33 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
   }
 });
 
+// Upload a new panel image -- saves to public/tns_end_card_panel.png (global fallback)
+app.post('/admin/api/social-clips/panel-image', requireRole('admin'),
+  express.raw({ type: ['image/png','image/jpeg','image/webp','image/gif'], limit: '15mb' }),
+  (req, res) => {
+    try {
+      const fs2 = require('fs');
+      const dir = path.join(__dirname, 'public');
+      if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
+      fs2.writeFileSync(path.join(dir, 'tns_end_card_panel.png'), req.body);
+      res.json({ ok: true, url: '/public/tns_end_card_panel.png' });
+    } catch(e) {
+      console.error('[panel-image upload]', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  }
+);
+
+// Most recently used panel URL (for auto-populating clips that don't have one yet)
+app.get('/admin/api/social-clips/panel-url', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT panel_url FROM social_clips WHERE panel_url IS NOT NULL ORDER BY updated_at DESC LIMIT 1`
+    );
+    res.json({ url: rows.length ? rows[0].panel_url : null });
+  } catch(e) { res.json({ url: null }); }
+});
+
 // Get a single clip
 app.get('/admin/api/social-clips/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
