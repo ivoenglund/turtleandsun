@@ -2917,6 +2917,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
     end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
     video_overlay_text,
     before_y_offset,
+    after_y_offset,
   } = req.body;
   try {
     const { rows } = await pool.query(`
@@ -2932,12 +2933,13 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         end_card_duration_s= COALESCE($10, end_card_duration_s),
         video_overlay_text = COALESCE($11, video_overlay_text),
         before_y_offset    = COALESCE($12, before_y_offset),
+        after_y_offset     = COALESCE($13, after_y_offset),
         updated_at         = now()
       WHERE id = $1
       RETURNING *
     `, [id, label_before, before_duration_s, label_after, show_labels,
         end_card_enabled, end_card_line1, end_card_line2, show_logo, end_card_duration_s,
-        video_overlay_text, before_y_offset]);
+        video_overlay_text, before_y_offset, after_y_offset]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -3054,8 +3056,21 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         let afterFinal;
         if (clip.after_image_url) {
           const afterBuf = await dlBuffer(clip.after_image_url);
-          const afterResized = await sharp(afterBuf)
-            .resize(W, photoH, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
+          const aMeta = await sharp(afterBuf).metadata();
+          const aScaleToW = Math.round(aMeta.height * W / aMeta.width);
+          let aScaled;
+          if (aScaleToW >= photoH) {
+            aScaled = await sharp(afterBuf).resize({ width: W }).toBuffer();
+          } else {
+            aScaled = await sharp(afterBuf).resize({ height: photoH }).toBuffer();
+          }
+          const aSMeta = await sharp(aScaled).metadata();
+          const aMaxY = Math.max(0, aSMeta.height - photoH);
+          const aYOff = Math.max(0, Math.min(aMaxY, clip.after_y_offset || 0));
+          const aXOff = Math.max(0, Math.floor((aSMeta.width - W) / 2));
+          const afterResized = await sharp(aScaled)
+            .extract({ left: aXOff, top: aYOff, width: W, height: photoH })
+            .jpeg({ quality: 92 }).toBuffer();
           const afterLabel = Buffer.from(
             `<svg width='${W}' height='${photoH}'>` +
             `<rect x='${W-140}' y='28' width='110' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
