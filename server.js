@@ -3034,27 +3034,28 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             `0-(t-${showD + riseD + pauseD})*${speed}` + // exit phase
           `))`;
 
-        // Before photo alpha mask using yuva444p (planar, all planes full-res).
-        // geq: pass luma/chroma through unchanged; set alpha=255 above panel, 0 below.
-        // Single-quoted values protect commas inside expressions from filter_complex parsing.
-        const geqFilter =
-          `format=yuva444p,` +
-          `geq=` +
-            `lum='p(X,Y)':` +
-            `cb='p(X,Y)':` +
-            `cr='p(X,Y)':` +
-            `a='255*lt(Y,${panelYExpr})'`;
+        // Mask approach — no geq needed:
+        // A white color source overlaid with a black rectangle at max(0, panel_y)
+        // produces a grayscale mask: white above panel (before photo opaque),
+        // black at/below panel (before photo transparent, video shows through).
+        // alphamerge applies this mask as the before photo's alpha channel.
 
         // filter_complex:
-        //   [0:v] video base (always playing, hidden under before photo initially)
-        //   [1:v] before photo → yuva444p → dynamic alpha → overlay on video
-        //   [2:v] panel → overlay on top with animated y position
+        //   [0:v] video base (always playing)
+        //   color white + color black overlay → [mask] (white=opaque, black=transparent)
+        //   [1:v] before photo + [mask] → alphamerge → [vbefore] (before photo with alpha)
+        //   [vbase][vbefore] overlay → [v1]
+        //   [2:v] panel → overlay on [v1] with animated y → [vout]
+        const maskY = `max(0,${panelYExpr})`; // black rect starts here; max(0,...) handles exit phase
         const filter2 = [
           `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
           drawTextFilter,
           `[vbase];`,
           `[1:v]fps=30,scale=1080:1920[vbefore_raw];`,
-          `[vbefore_raw]${geqFilter}[vbefore];`,
+          `color=white:s=1080x1920:r=30,fps=30[cwhite];`,
+          `color=black:s=1080x1920:r=30,fps=30[cblack];`,
+          `[cwhite][cblack]overlay=0:'${maskY}'[mask];`,
+          `[vbefore_raw][mask]alphamerge[vbefore];`,
           `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
           `[vbase][vbefore]overlay=0:0[v1];`,
           `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
