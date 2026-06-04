@@ -24,7 +24,8 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .cp-section{position:absolute;left:0;width:100%;overflow:hidden}
 .cp-photo img{position:absolute;left:0;width:100%;pointer-events:none;display:block}
 .cp-photo{cursor:ns-resize}
-.cp-label{position:absolute;top:10px;right:10px;background:#3A6B20;color:#fff;font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:2px;pointer-events:none;z-index:2}
+.cp-label{position:absolute;top:10px;right:10px;background:#3A6B20;color:#fff;font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;letter-spacing:2px;pointer-events:none;z-index:5}
+#cp-after .cp-label{top:auto;bottom:10px}
 
 /* Panel section */
 #cp-panel{background:#1C2A14;cursor:ns-resize;z-index:3;display:flex;align-items:center;justify-content:center;transition:background .15s}
@@ -630,7 +631,7 @@ function esc(s) {
 applyProportions(40);
 initPanelDrop();
 initPanelDrag();
-loadClip();
+NavBar.init({ requireAuth: true }).then(() => loadClip());
 </script>
 </body>
 </html>

@@ -2936,15 +2936,17 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const photoH  = beforeH; // kept for cropPhoto compat below
 
       // Label SVG helper — green pill matching landing page .ts-label style
-      function makeLabel(text, w, h) {
-        const isAfter = text === 'AFTER';
+      // atBottom: true → place pill near bottom of frame (for AFTER label on full-frame video)
+      function makeLabel(text, w, h, atBottom) {
         const chars = text.length;
         const pw = chars * 23 + 80; // approx pill width
         const px = w - 28 - pw;
+        const ry = atBottom ? h - 100 : 24;
+        const ty = atBottom ? h - 50  : 74;
         return Buffer.from(
           `<svg width='${w}' height='${h}'>` +
-          `<rect x='${px}' y='24' width='${pw}' height='76' rx='38' fill='#3A6B20'/>` +
-          `<text x='${px + pw/2}' y='74' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='36' fill='white' letter-spacing='4'>${text}</text>` +
+          `<rect x='${px}' y='${ry}' width='${pw}' height='76' rx='38' fill='#3A6B20'/>` +
+          `<text x='${px + pw/2}' y='${ty}' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='36' fill='white' letter-spacing='4'>${text}</text>` +
           `</svg>`
         );
       }
@@ -3132,7 +3134,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const afterLabelFile3 = pathM.join(tmpDir, 'after_label.png');
         fs2.writeFileSync(afterLabelFile3,
           await sharp({ create: { width: W, height: H, channels: 4, background: { r:0,g:0,b:0,alpha:0 } } })
-            .composite([{ input: makeLabel('AFTER', W, H), blend: 'over' }]).png().toBuffer()
+            .composite([{ input: makeLabel('AFTER', W, H, true /* bottom */), blend: 'over' }]).png().toBuffer()
         );
 
         const compShowD = Math.max(0.5, parseFloat(clip.end_card_duration_s) || 4);
