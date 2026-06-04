@@ -119,6 +119,30 @@ async function toggleFlag(id, currentlyFlagged) {
   load(currentPage);
 }
 
+async function genThumb(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try {
+    const r = await fetch(`/admin/api/generations/${id}/tiktok-thumbnail`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    btn.textContent = '✓ Done';
+    btn.style.background = '#e8f5e9';
+    // Insert a download link next to the button
+    const link = document.createElement('a');
+    link.href = d.url;
+    link.target = '_blank';
+    link.download = '';
+    link.className = 'btn';
+    link.textContent = '↓ Download';
+    btn.parentNode.insertBefore(link, btn.nextSibling);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'TikTok Thumb';
+    alert('Thumbnail error: ' + e.message);
+  }
+}
+
 async function regenerate(id) {
   if (!confirm('Trigger a new generation for this order? It will send a new delivery email.')) return;
   const r = await fetch(`/admin/api/generations/${id}/regenerate`, { method:'POST' });
@@ -149,8 +173,10 @@ async function load(page) {
   }
 
   document.getElementById('grid').innerHTML = rows.map(g => {
-    const thumbUrl = g.output_asset_url || g.thumb_url || g.output_url || null;
-    const isVideo  = thumbUrl && /\.(mp4|webm|mov)(\?|$)/i.test(thumbUrl);
+    const thumbUrl  = g.output_asset_url || g.thumb_url || g.output_url || null;
+    const isVideo   = thumbUrl && /\.(mp4|webm|mov)(\?|$)/i.test(thumbUrl);
+    const videoUrl  = g.output_video_asset_url || (isVideo ? thumbUrl : null);
+    const hasTikTok = !!g.tiktok_thumbnail_url;
     const isFailed = g.status === 'failed';
     const isFlagged = g.flagged;
 
@@ -185,6 +211,9 @@ async function load(page) {
           ${thumbUrl ? `<button class="btn" onclick="openLb('${esc(thumbUrl)}',${isVideo})">View</button>` : ''}
           <button class="btn danger${isFlagged?' active':''}" onclick="toggleFlag(${g.id},${isFlagged})">${isFlagged?'Unflag':'Flag'}</button>
           ${g.order_id ? `<button class="btn regen" onclick="regenerate(${g.id})">↺ Regen</button>` : ''}
+          ${videoUrl ? (hasTikTok
+            ? `<a class="btn" href="${esc(g.tiktok_thumbnail_url)}" target="_blank" download style="background:#e8f5e9;">↓ TikTok Thumb</a>`
+            : `<button class="btn" onclick="genThumb(${g.id},this)">TikTok Thumb</button>`) : ''}
         </div>
       </div>
     </div>`;

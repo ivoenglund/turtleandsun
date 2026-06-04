@@ -40,11 +40,12 @@ if (ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_K
 // future lifecycle rules treat customer uploads and gallery media differently.
 function folderFor(kind) {
   switch (kind) {
-    case 'upload':         return 'uploads';        // customer-uploaded source photos
-    case 'concept_media':  return 'concept-media';  // before/after/example media on concepts
-    case 'gallery':        return 'gallery';        // public gallery items
-    case 'order':          return 'orders';         // rehosted order outputs (future)
-    default:               return 'misc';
+    case 'upload':              return 'uploads';           // customer-uploaded source photos
+    case 'concept_media':       return 'concept-media';     // before/after/example media on concepts
+    case 'gallery':             return 'gallery';           // public gallery items
+    case 'order':               return 'orders';            // rehosted order outputs (future)
+    case 'tiktok-thumbnail':    return 'tiktok-thumbnails'; // branded TikTok thumbnail JPEGs
+    default:                    return 'misc';
   }
 }
 

@@ -3362,7 +3362,8 @@ app.get('/admin/api/generations', requireRole('admin'), async (req, res) => {
              c.name AS concept_name,
              o.email, o.product, o.id AS order_id,
              o.output_asset_url, o.output_video_asset_url,
-             COALESCE(o.input_asset_url, g.input_payload->>'photoUrl') AS input_photo_url
+             COALESCE(o.input_asset_url, g.input_payload->>'photoUrl') AS input_photo_url,
+             g.tiktok_thumbnail_url
       FROM generations g
       LEFT JOIN concepts c ON c.id = g.concept_id
       LEFT JOIN orders o ON o.id = g.order_id
@@ -3402,6 +3403,122 @@ app.post('/admin/api/generations/:id/regenerate', requireRole('admin'), async (r
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── TikTok Thumbnail Generator ─────────────────────────────────────────────
+// Extract a frame from the order's output video, overlay the concept name +
+// logo, and save a 1080×1920 JPEG to R2. Stored on generations.tiktok_thumbnail_url.
+app.post('/admin/api/generations/:id/tiktok-thumbnail', requireRole('admin'), async (req, res) => {
+  const os2    = require('os');
+  const pathM2 = require('path');
+  const fs3    = require('fs');
+  const { execFile: execFile2 } = require('child_process');
+  const sharp2 = require('sharp');
+  const { uploadBuffer: uploadBuf2 } = require('./storage');
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT g.id, g.output_url, g.fal_output_url, g.tiktok_thumbnail_url,
+             c.name AS concept_name,
+             o.output_video_asset_url
+      FROM generations g
+      LEFT JOIN concepts c ON c.id = g.concept_id
+      LEFT JOIN orders o ON o.id = g.order_id
+      WHERE g.id = $1
+    `, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const gen = rows[0];
+
+    // Determine video source URL
+    const isVidUrl = u => u && /\.(mp4|webm|mov)(\?|$)/i.test(u);
+    const videoUrl = gen.output_video_asset_url
+      || (isVidUrl(gen.output_url)     ? gen.output_url     : null)
+      || (isVidUrl(gen.fal_output_url) ? gen.fal_output_url : null);
+    if (!videoUrl) return res.status(400).json({ error: 'No video output found for this generation' });
+
+    const tmpDir    = fs3.mkdtempSync(pathM2.join(os2.tmpdir(), 'tns-thumb-'));
+    const videoFile = pathM2.join(tmpDir, 'video.mp4');
+    const frameFile = pathM2.join(tmpDir, 'frame.jpg');
+
+    try {
+      // Download video to tmp
+      const https2  = require('https');
+      const http2   = require('http');
+      const urlMod2 = require('url');
+      const parsed2 = urlMod2.parse(videoUrl);
+      const lib2    = parsed2.protocol === 'https:' ? https2 : http2;
+      await new Promise((resolve, reject) => {
+        const ws = fs3.createWriteStream(videoFile);
+        lib2.get(videoUrl, r2 => { r2.pipe(ws); ws.on('finish', resolve); ws.on('error', reject); })
+            .on('error', reject);
+      });
+
+      // Extract frame at 1.5s
+      const ffmpegBin2 = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
+      if (!fs3.existsSync(ffmpegBin2)) throw new Error('FFmpeg not available — check FFMPEG_PATH or run /admin/api/social-clips/ffmpeg-check');
+      await new Promise((resolve, reject) => {
+        execFile2(ffmpegBin2, [
+          '-ss', '00:00:01.5',
+          '-i', videoFile,
+          '-vframes', '1',
+          '-q:v', '2',
+          '-y', frameFile,
+        ], { timeout: 30000 }, (err, _out, stderr) => {
+          if (err) reject(new Error('ffmpeg frame: ' + (stderr || err.message).slice(0, 400)));
+          else resolve();
+        });
+      });
+
+      // Composite: frame → logo (bottom-left above bar) + concept name bar (bottom)
+      const W = 1080, H = 1920;
+      const barH = 180;
+      const conceptName = (gen.concept_name || 'Loveogram')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const barSvg = Buffer.from(
+        `<svg width="${W}" height="${barH}" xmlns="http://www.w3.org/2000/svg">` +
+        `<rect width="${W}" height="${barH}" fill="#1C2A14" opacity="0.88"/>` +
+        `<text x="${W / 2}" y="${Math.round(barH * 0.60)}" font-family="Georgia,serif" font-size="60" font-weight="bold" fill="#FFE800" text-anchor="middle">${conceptName}</text>` +
+        `<text x="${W / 2}" y="${Math.round(barH * 0.85)}" font-family="sans-serif" font-size="28" fill="#FBF6EC" text-anchor="middle" opacity="0.75">turtleandsun.com</text>` +
+        `</svg>`
+      );
+
+      const composites = [{ input: barSvg, top: H - barH, left: 0 }];
+
+      const logoPath = pathM2.join(__dirname, 'public', 'logo.png');
+      if (fs3.existsSync(logoPath)) {
+        const logoW   = 220;
+        const logoBuf = await sharp2(logoPath).resize(logoW).toBuffer();
+        const logoMeta = await sharp2(logoBuf).metadata();
+        const logoH   = logoMeta.height || 85;
+        const logoPad = 28;
+        composites.push({ input: logoBuf, top: H - barH - logoH - logoPad, left: logoPad });
+      }
+
+      const outBuf = await sharp2(frameFile)
+        .resize(W, H, { fit: 'cover', position: 'centre' })
+        .composite(composites)
+        .jpeg({ quality: 92 })
+        .toBuffer();
+
+      // Upload to R2
+      const { url } = await uploadBuf2({
+        buffer: outBuf,
+        contentType: 'image/jpeg',
+        kind: 'tiktok-thumbnail',
+        originalName: `tiktok-thumb-${gen.id}.jpg`,
+      });
+
+      // Persist URL
+      await pool.query('UPDATE generations SET tiktok_thumbnail_url=$2 WHERE id=$1', [gen.id, url]);
+
+      res.json({ ok: true, url });
+    } finally {
+      fs3.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  } catch (e) {
+    console.error('[tiktok-thumb] error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // Delete an asset: removes from R2 and clears the DB reference.
 // Orders output/video are protected — cannot be deleted.

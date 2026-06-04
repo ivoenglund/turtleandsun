@@ -245,6 +245,7 @@ async function initDb() {
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS asset_status VARCHAR(20) DEFAULT 'pending';
     ALTER TABLE generations ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE generations ADD COLUMN IF NOT EXISTS flag_note TEXT;
+    ALTER TABLE generations ADD COLUMN IF NOT EXISTS tiktok_thumbnail_url TEXT;
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'sek';
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS style_name VARCHAR(255);
     ALTER TABLE prompts ADD COLUMN IF NOT EXISTS description TEXT;
