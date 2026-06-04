@@ -3023,24 +3023,29 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       }
       const photoH = Math.floor((H - panelH) / 2);
 
-      // Vignette: direct pixel multiplication — no blend modes, no SVG, guaranteed to work
+      // Vignette: direct pixel multiplication — no blend modes, no SVG
       async function applyVignette(imgBuf, w, h, strength, plateau) {
-        const { data } = await sharp(imgBuf).raw().toBuffer({ resolveWithObject: true });
+        const raw = await sharp(imgBuf).raw().toBuffer({ resolveWithObject: true });
+        const aw = raw.info.width, ah = raw.info.height, ch = raw.info.channels;
+        // Explicit writable copy — Sharp's internal buffer may be read-only
+        const data = Buffer.allocUnsafe(raw.data.length);
+        raw.data.copy(data);
         const norm = Math.sqrt(2);
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const dx = (x - w / 2) / (w / 2);
-            const dy = (y - h / 2) / (h / 2);
+        for (let y = 0; y < ah; y++) {
+          for (let x = 0; x < aw; x++) {
+            const dx = (x - aw / 2) / (aw / 2);
+            const dy = (y - ah / 2) / (ah / 2);
             const dist = Math.sqrt(dx * dx + dy * dy) / norm;
             const t = Math.max(0, (dist - plateau) / (1.0 - plateau));
             const f = 1 - Math.min(1, t) * strength;
-            const i = (y * w + x) * 3;
+            const i = (y * aw + x) * ch;
             data[i]   = Math.round(data[i]   * f);
             data[i+1] = Math.round(data[i+1] * f);
             data[i+2] = Math.round(data[i+2] * f);
           }
         }
-        return sharp(data, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
+        console.log(`[vignette] strength=${strength.toFixed(2)} size=${aw}x${ah} corner=${data[0]}`);
+        return sharp(data, { raw: { width: aw, height: ah, channels: ch } }).jpeg({ quality: 92 }).toBuffer();
       }
       const vigStrength = Math.min(1, Math.max(0, (clip.vignette_strength != null ? clip.vignette_strength : 75) / 100));
 
