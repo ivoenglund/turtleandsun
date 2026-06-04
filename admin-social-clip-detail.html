@@ -144,8 +144,8 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
           <label>Before photo — vertical offset (px)</label>
           <input type="number" id="before_y_offset" value="0" min="0" max="2000" step="10" oninput="updateCropPreview('before')">
           <div class="hint">0 = top of photo. Positive = slide crop window down.</div>
-          <div id="before-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;">
-            <img id="before-crop-live" style="width:100%;position:absolute;top:0;left:0;object-fit:cover;object-position:center top;">
+          <div id="before-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;user-select:none;">
+            <img id="before-crop-live" style="width:100%;height:auto;display:block;pointer-events:none;">
           </div>
         </div>
         <div class="field">
@@ -162,8 +162,8 @@ h1{font-size:19px;font-weight:700;margin-bottom:4px}
           <label>After photo — vertical offset (px)</label>
           <input type="number" id="after_y_offset" value="0" min="0" max="2000" step="10" oninput="updateCropPreview('after')">
           <div class="hint">0 = top of photo. Positive = slide crop window down.</div>
-          <div id="after-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;">
-            <img id="after-crop-live" style="width:100%;position:absolute;top:0;left:0;object-fit:cover;object-position:center top;">
+          <div id="after-crop-wrap" style="margin-top:8px;display:none;width:100%;aspect-ratio:1080/688;overflow:hidden;border-radius:6px;background:#111;position:relative;user-select:none;">
+            <img id="after-crop-live" style="width:100%;height:auto;display:block;pointer-events:none;">
           </div>
         </div>
         <div id="end-card-preview-wrap"></div>
@@ -243,15 +243,17 @@ function renderClip() {
   document.getElementById('after_y_offset').value       = clip.after_y_offset   || 0;
   if (clip.before_url) {
     const bImg = document.getElementById('before-crop-live');
-    bImg.src = clip.before_url;
+    if (bImg.src !== clip.before_url) { bImg.src = clip.before_url; }
     document.getElementById('before-crop-wrap').style.display = 'block';
     updateCropPreview('before');
+    initDragCrop('before');
   }
   if (clip.after_image_url) {
     const aImg = document.getElementById('after-crop-live');
-    aImg.src = clip.after_image_url;
+    if (aImg.src !== clip.after_image_url) { aImg.src = clip.after_image_url; }
     document.getElementById('after-crop-wrap').style.display = 'block';
     updateCropPreview('after');
+    initDragCrop('after');
   }
   document.getElementById('vignette_strength').value    = clip.vignette_strength != null ? clip.vignette_strength : 75;
   document.getElementById('end_card_duration_s').value  = clip.end_card_duration_s || 4;
@@ -385,12 +387,36 @@ function showFlash(msg, type) {
 function updateCropPreview(which) {
   const offset = Math.max(0, parseInt(document.getElementById(which + '_y_offset').value) || 0);
   const img = document.getElementById(which + '-crop-live');
-  if (!img || !img.src) return;
-  // Approximate: shift image up by offset pixels scaled to preview size
-  // Preview is ~100% of card width (~450px), source is 1080px — scale ≈ 0.42
-  const scale = img.offsetWidth / 1080 || 0.4;
-  img.style.objectPosition = `center top`;
-  img.style.marginTop = `-${Math.round(offset * scale)}px`;
+  if (!img) return;
+  const previewW = img.parentElement ? img.parentElement.offsetWidth : 400;
+  const scale = previewW / 1080 || 0.4;
+  img.style.transform = `translateY(-${Math.round(offset * scale)}px)`;
+}
+
+function initDragCrop(which) {
+  const wrap = document.getElementById(which + '-crop-wrap');
+  const input = document.getElementById(which + '_y_offset');
+  if (!wrap) return;
+  wrap.style.cursor = 'ns-resize';
+  wrap.title = 'Drag up/down to adjust crop position';
+  let dragging = false, startY = 0, startOffset = 0;
+  const onStart = (y) => { dragging = true; startY = y; startOffset = Math.max(0, parseInt(input.value) || 0); };
+  const onMove  = (y) => {
+    if (!dragging) return;
+    const img = document.getElementById(which + '-crop-live');
+    const previewW = wrap.offsetWidth || 400;
+    const scale = 1080 / previewW;
+    const newOffset = Math.max(0, Math.round(startOffset + (startY - y) * scale));
+    input.value = newOffset;
+    updateCropPreview(which);
+  };
+  const onEnd = () => { dragging = false; };
+  wrap.addEventListener('mousedown',  (e) => { onStart(e.clientY); e.preventDefault(); });
+  document.addEventListener('mousemove',  (e) => onMove(e.clientY));
+  document.addEventListener('mouseup',    onEnd);
+  wrap.addEventListener('touchstart', (e) => { onStart(e.touches[0].clientY); e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove',  (e) => { if (dragging) { onMove(e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
+  document.addEventListener('touchend',   onEnd);
 }
 
 function esc(s) {

@@ -3070,8 +3070,8 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const beforeVignetted = await applyVignette(beforeCropped, W, photoH, vigStrength, 0.35);
       const beforeLabel = Buffer.from(
         `<svg width='${W}' height='${photoH}'>` +
-        `<rect x='${W-165}' y='28' width='135' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
-        `<text x='${W-98}' y='61' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='28' fill='white'>BEFORE</text>` +
+        `<rect x='${W-276}' y='28' width='244' height='76' rx='38' fill='rgba(28,10,0,0.88)'/>` +
+        `<text x='${W-154}' y='78' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='38' fill='white' letter-spacing='4'>BEFORE</text>` +
         `</svg>`
       );
       const beforeFinal = await sharp(beforeVignetted)
@@ -3099,8 +3099,8 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           .jpeg({ quality: 92 }).toBuffer();
         const afterLabel = Buffer.from(
           `<svg width='${W}' height='${photoH}'>` +
-          `<text x='${W-32}' y='72' text-anchor='end' font-family='Arial' font-weight='bold' font-size='52' fill='rgba(0,0,0,0.65)' dx='3' dy='3'>AFTER</text>` +
-          `<text x='${W-32}' y='72' text-anchor='end' font-family='Arial' font-weight='bold' font-size='52' fill='white'>AFTER</text>` +
+          `<rect x='${W-244}' y='28' width='212' height='76' rx='38' fill='#3A6B20'/>` +
+          `<text x='${W-138}' y='78' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='38' fill='white' letter-spacing='5'>AFTER</text>` +
           `</svg>`
         );
         afterFinal = await sharp(afterCropped)
