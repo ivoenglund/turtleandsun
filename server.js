@@ -3137,31 +3137,19 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
         const compShowD = Math.max(0.5, parseFloat(clip.end_card_duration_s) || 4);
         const riseD3    = Math.max(0.1, parseFloat(clip.rise_duration_s)     || 1.0);
-        const pauseD3   = Math.max(0,   parseFloat(clip.rise_pause_s)        || 3.0);
         const speed3    = beforeH / riseD3;   // panel travels beforeH px (not H)
-        const exitD3    = panelH / speed3;
 
-        // Panel y: holds at beforeH for compShowD, then rises to 0, pauses, exits.
-        const panelY3 =
-          `if(lt(t,${compShowD}),${beforeH},` +
-          `if(lt(t,${compShowD + riseD3 + pauseD3}),` +
-            `max(0,${beforeH}-(t-${compShowD})*${speed3}),` +
-            `0-(t-${compShowD + riseD3 + pauseD3})*${speed3}` +
-          `))`;
+        // Panel y: holds at beforeH for compShowD, then rises straight off screen — no pause.
+        const panelY3 = `if(lt(t,${compShowD}),${beforeH},${beforeH}-(t-${compShowD})*${speed3})`;
 
         const maskY3  = `max(0,${panelY3})`;
         const videoY3 = `max(0,${panelY3}+${panelH})`;
 
-        const afterYOff3 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
         const filter3 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
-          `[0:v]fps=30`,
-          afterYOff3 > 0 ? `,crop=${W}:${H - afterYOff3}:0:${afterYOff3},pad=${W}:${H}:0:0` : ``,
-          `[vr3];`,
+          `[0:v]fps=30[vr3];`,
           `[3:v]fps=30,scale=${W}:${H}[vl3];`,
-          `[vr3][vl3]overlay=0:0`,
-          drawTextFilterV2,
-          `[vv3];`,
+          `[vr3][vl3]overlay=0:0[vv3];`,
           `[vc3][vv3]overlay=0:'${videoY3}'[vb3];`,
           `[1:v]fps=30,scale=${W}:${H}[vbr3];`,
           `color=white:s=${W}x${H}:r=30,fps=30[cw3];`,
