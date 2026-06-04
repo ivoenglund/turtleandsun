@@ -3117,9 +3117,25 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       // ── 4. Build FFmpeg filter: after video (with overlay) → end card ──
       const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
       const rawOverlay = (clip.video_overlay_text || '').trim();
-      const overlayEsc = rawOverlay.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:');
+      // Word-wrap at ~24 chars per line so long text breaks neatly
+      function wrapText(txt, max) {
+        const words = txt.split(' '), lines = [];
+        let line = '';
+        for (const w of words) {
+          if (line && (line + ' ' + w).length > max) { lines.push(line); line = w; }
+          else { line = line ? line + ' ' + w : w; }
+        }
+        if (line) lines.push(line);
+        return lines.join('\n');
+      }
+      const wrappedOverlay = rawOverlay ? wrapText(rawOverlay, 24) : '';
+      const overlayEsc = wrappedOverlay
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\' ")
+        .replace(/:/g, '\\:')
+        .replace(/\n/g, '\\n');
       const overlayFilter = overlayEsc
-        ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=80:shadowcolor=black@0.85:shadowx=3:shadowy=3`
+        ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=80:shadowcolor=black@0.85:shadowx=3:shadowy=3:line_spacing=8`
         : '';
       const endDur = parseFloat(clip.end_card_duration_s) || 4;
 

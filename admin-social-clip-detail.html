@@ -135,6 +135,7 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           <button class="btn btn-primary" id="btn-generate" onclick="generate()">Generate ▶</button>
         </div>
         <div class="gen-status" id="gen-status"></div>
+        <div style="font-size:10px;color:#aaa;margin-top:4px" id="gen-hint"></div>
       </div>
 
       <!-- Publish -->
@@ -408,10 +409,14 @@ function renderClip(initial) {
 
   renderStats();
 
-  document.getElementById('btn-generate').disabled = clip.status === 'processing';
-  document.getElementById('gen-status').textContent = clip.status === 'processing' ? 'Generating — will update when done…' : '';
+  const processing = clip.status === 'processing';
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = processing;
+  btn.textContent = processing ? 'Generating…' : (clip.output_url ? 'Regenerate ▶' : 'Generate ▶');
+  document.getElementById('gen-status').textContent = processing ? 'Generating — will update when done…' : '';
+  document.getElementById('gen-hint').textContent = clip.output_url && !processing ? 'Change any setting and hit Regenerate to create a new version.' : '';
 
-  if (clip.status === 'processing') {
+  if (processing) {
     if (!polling) polling = setInterval(pollStatus, 6000);
   } else {
     if (polling) { clearInterval(polling); polling = null; }
@@ -459,7 +464,9 @@ async function saveNow(thenGenerate) {
 // ── Generate / Poll ────────────────────────────────────────
 async function generate() {
   await saveNow(false);
-  document.getElementById('btn-generate').disabled = true;
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
   document.getElementById('gen-status').textContent = 'Starting…';
   const r = await fetch('/admin/api/social-clips/' + clipId + '/generate', { method: 'POST' });
   const d = await r.json();
@@ -470,7 +477,8 @@ async function generate() {
     if (!polling) polling = setInterval(pollStatus, 6000);
   } else {
     showFlash(d.error || 'Failed to start', 'err');
-    document.getElementById('btn-generate').disabled = false;
+    btn.disabled = false;
+    btn.textContent = clip.output_url ? 'Regenerate ▶' : 'Generate ▶';
   }
 }
 
