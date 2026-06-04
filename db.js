@@ -480,6 +480,51 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_currencies_active ON currencies (active, sort_order);
   `);
 
+  // Social clips — before/after video clips for TikTok, Reels, Shorts.
+  // Rows are created by queuing a concept_triplet; generation happens in-process via ffmpeg.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_clips (
+      id                  SERIAL PRIMARY KEY,
+      triplet_id          INTEGER REFERENCES concept_triplets(id) ON DELETE SET NULL,
+      concept_id          INTEGER REFERENCES concepts(id) ON DELETE SET NULL,
+      concept_name        TEXT,
+      before_url          TEXT,
+      after_video_url     TEXT,
+      after_image_url     TEXT,
+      status              TEXT NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending','processing','done','error')),
+      output_url          TEXT,
+      end_card_url        TEXT,
+      panel_url           TEXT,
+      video_overlay_text  TEXT,
+      before_y_offset     INTEGER NOT NULL DEFAULT 0,
+      after_y_offset      INTEGER NOT NULL DEFAULT 0,
+      before_pct          NUMERIC(6,2) NOT NULL DEFAULT 40,
+      end_card_duration_s NUMERIC(6,2) NOT NULL DEFAULT 4,
+      published_tiktok    BOOLEAN NOT NULL DEFAULT FALSE,
+      published_instagram BOOLEAN NOT NULL DEFAULT FALSE,
+      published_youtube   BOOLEAN NOT NULL DEFAULT FALSE,
+      published_facebook  BOOLEAN NOT NULL DEFAULT FALSE,
+      tiktok_views        INTEGER,
+      tiktok_likes        INTEGER,
+      tiktok_shares       INTEGER,
+      tiktok_comments     INTEGER,
+      instagram_views     INTEGER,
+      instagram_likes     INTEGER,
+      instagram_shares    INTEGER,
+      instagram_comments  INTEGER,
+      youtube_views       INTEGER,
+      youtube_likes       INTEGER,
+      youtube_comments    INTEGER,
+      stats_refreshed_at  TIMESTAMPTZ,
+      error_msg           TEXT,
+      created_at          TIMESTAMPTZ DEFAULT NOW(),
+      updated_at          TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_social_clips_status     ON social_clips (status);
+    CREATE INDEX IF NOT EXISTS idx_social_clips_created_at ON social_clips (created_at DESC);
+  `);
+
   // Seed the four launch currencies if the table is empty. After seeding,
   // edits happen via /admin/currencies. The seed payloads match the legacy
   // hardcoded CHARM_LADDERS + FALLBACK_RATES exactly so behavior is

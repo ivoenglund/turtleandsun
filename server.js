@@ -2945,13 +2945,13 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
   try {
     const { rows } = await pool.query(`
       UPDATE social_clips SET
-        video_overlay_text = COALESCE($2, video_overlay_text),
-        before_y_offset    = COALESCE($3, before_y_offset),
-        after_y_offset     = COALESCE($4, after_y_offset),
-        panel_url          = $5,
-        end_card_duration_s= COALESCE($6, end_card_duration_s),
-        before_pct         = COALESCE($7, before_pct),
-        updated_at         = now()
+        video_overlay_text  = $2,
+        before_y_offset     = COALESCE($3, before_y_offset),
+        after_y_offset      = COALESCE($4, after_y_offset),
+        panel_url           = $5,
+        end_card_duration_s = COALESCE($6, end_card_duration_s),
+        before_pct          = COALESCE($7, before_pct),
+        updated_at          = now()
       WHERE id = $1
       RETURNING *
     `, [id, video_overlay_text ?? null, before_y_offset ?? null, after_y_offset ?? null, panel_url ?? null, end_card_duration_s ?? null, before_pct ?? null]);
