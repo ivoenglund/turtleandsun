@@ -2921,7 +2921,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         if (rawPanel) {
           const pm = await sharp(rawPanel).metadata();
           panelH = Math.round(W * pm.height / pm.width);
-          panelBuf = await sharp(rawPanel).resize(W, panelH, { fit: 'fill' }).png().toBuffer();
+          panelBuf = await sharp(rawPanel).resize(W, panelH, { fit: 'cover' }).png().toBuffer();
         } else {
           throw new Error('no panel source');
         }
@@ -3017,9 +3017,13 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         // revealing the video. Before photo stays visible above the panel.
         // When panel exits off top: before photo fully transparent → video full screen.
 
-        // Before photo — full 1920px height with BEFORE label
-        const beforeFull = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H);
-        const beforeWithLabel = await sharp(beforeFull)
+        // Before photo — crop exactly as variant 1 (no zoom), then pad to H with black.
+        // This makes the top beforeH rows match the composite preview exactly.
+        const beforeCropped2 = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
+        const beforePadded2  = await sharp({ create: { width: W, height: H, channels: 3, background: { r:0,g:0,b:0 } } })
+          .composite([{ input: beforeCropped2, top: 0, left: 0 }])
+          .jpeg({ quality: 92 }).toBuffer();
+        const beforeWithLabel = await sharp(beforePadded2)
           .composite([{ input: makeLabel('BEFORE', W, H), blend: 'over' }])
           .jpeg({ quality: 92 }).toBuffer();
         fs2.writeFileSync(beforeFile, beforeWithLabel);
@@ -3068,9 +3072,12 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         //   [1:v] before photo (with BEFORE label baked in) + alpha mask → [vbefore]
         //   [vbase][vbefore] → [v1]
         //   [2:v] panel → [vout]
+        const afterYOff2 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
         const filter2 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vcanvas];`,
-          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}[vraw];`,
+          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`,
+          afterYOff2 > 0 ? `,crop=${W}:${H - afterYOff2}:0:${afterYOff2},pad=${W}:${H}:0:0` : ``,
+          `[vraw];`,
           `[3:v]fps=30,scale=${W}:${H}[vlabel];`,
           `[vraw][vlabel]overlay=0:0`,
           drawTextFilterV2,
@@ -3112,9 +3119,12 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         // Phase 2: panel rises from beforeH→0, video follows, fills full screen.
         // Same alphamerge+overlay mechanism as style 2, panel just starts at beforeH.
 
-        const beforeWithLabel3 = await sharp(
-          await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H)
-        ).composite([{ input: makeLabel('BEFORE', W, H), blend: 'over' }])
+        const beforeCropped3 = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
+        const beforePadded3  = await sharp({ create: { width: W, height: H, channels: 3, background: { r:0,g:0,b:0 } } })
+          .composite([{ input: beforeCropped3, top: 0, left: 0 }])
+          .jpeg({ quality: 92 }).toBuffer();
+        const beforeWithLabel3 = await sharp(beforePadded3)
+          .composite([{ input: makeLabel('BEFORE', W, H), blend: 'over' }])
           .jpeg({ quality: 92 }).toBuffer();
         fs2.writeFileSync(beforeFile, beforeWithLabel3);
         fs2.writeFileSync(panelFile, panelBuf);
@@ -3142,9 +3152,12 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const maskY3  = `max(0,${panelY3})`;
         const videoY3 = `max(0,${panelY3}+${panelH})`;
 
+        const afterYOff3 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
         const filter3 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
-          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}[vr3];`,
+          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`,
+          afterYOff3 > 0 ? `,crop=${W}:${H - afterYOff3}:0:${afterYOff3},pad=${W}:${H}:0:0` : ``,
+          `[vr3];`,
           `[3:v]fps=30,scale=${W}:${H}[vl3];`,
           `[vr3][vl3]overlay=0:0`,
           drawTextFilterV2,
