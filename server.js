@@ -3075,7 +3075,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const afterYOff2 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
         const filter2 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vcanvas];`,
-          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`,
+          `[0:v]fps=30,scale=${W}:${H}`,
           afterYOff2 > 0 ? `,crop=${W}:${H - afterYOff2}:0:${afterYOff2},pad=${W}:${H}:0:0` : ``,
           `[vraw];`,
           `[3:v]fps=30,scale=${W}:${H}[vlabel];`,
@@ -3155,7 +3155,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const afterYOff3 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
         const filter3 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
-          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`,
+          `[0:v]fps=30,scale=${W}:${H}`,
           afterYOff3 > 0 ? `,crop=${W}:${H - afterYOff3}:0:${afterYOff3},pad=${W}:${H}:0:0` : ``,
           `[vr3];`,
           `[3:v]fps=30,scale=${W}:${H}[vl3];`,
@@ -3222,10 +3222,10 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
         const endDur = parseFloat(clip.end_card_duration_s) || 4;
         const filter1 = [
-          `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
+          `[0:v]fps=30,scale=1080:1920`,
           drawTextFilter,
           `[vafter];`,
-          `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,`,
+          `[1:v]scale=1080:1920,fps=30,`,
           `fade=t=in:st=0:d=0.3[vendcard];`,
           `[vafter][vendcard]concat=n=2:v=1:a=0[vout]`,
         ].join('');
