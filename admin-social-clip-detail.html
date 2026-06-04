@@ -128,23 +128,22 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
         <a id="download-link" style="display:none" class="download-link" target="_blank">↓ Download MP4</a>
         <div class="btn-row" style="margin-top:10px">
           <button class="btn btn-primary" id="btn-generate" onclick="generate()">Generate ▶</button>
-          <button class="btn btn-outline btn-sm" onclick="saveNow(true)">Save &amp; regenerate</button>
         </div>
         <div class="gen-status" id="gen-status"></div>
-      </div>
 
-      <!-- Settings -->
-      <div class="card">
-        <h2>Settings</h2>
-        <div class="field">
-          <label>Overlay text (shown on video)</label>
-          <input type="text" id="video_overlay_text" placeholder="e.g. Make your own at turtleandsun.com" oninput="scheduleAutoSave()">
-          <div class="hint">Leave blank for no overlay.</div>
+        <!-- Settings — live here, below the video -->
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #f0f0f0">
+          <div class="field">
+            <label>Overlay text (shown on video)</label>
+            <input type="text" id="video_overlay_text" placeholder="e.g. Make your own at turtleandsun.com" oninput="scheduleAutoSave()">
+            <div class="hint">Leave blank for no overlay.</div>
+          </div>
+          <div class="field">
+            <label>End card duration (seconds)</label>
+            <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
+          </div>
         </div>
-        <div class="field">
-          <label>End card duration (seconds)</label>
-          <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
-        </div>
+
         <!-- Hidden state fields — updated by drag interactions -->
         <input type="hidden" id="before_y_offset" value="0">
         <input type="hidden" id="after_y_offset" value="0">
