@@ -114,6 +114,24 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           <span style="cursor:pointer;text-decoration:underline" onclick="document.getElementById('panel-file-input').click()">Replace panel image</span>
         </div>
       </div>
+
+      <!-- Settings — under the composite preview -->
+      <div class="card">
+        <div class="field">
+          <label>Overlay text (shown on video)</label>
+          <input type="text" id="video_overlay_text" placeholder="e.g. Make your own at turtleandsun.com" oninput="scheduleAutoSave()">
+          <div class="hint">Leave blank for no overlay.</div>
+        </div>
+        <div class="field">
+          <label>End card duration (seconds)</label>
+          <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
+        </div>
+        <!-- Hidden state fields — updated by drag interactions -->
+        <input type="hidden" id="before_y_offset" value="0">
+        <input type="hidden" id="after_y_offset" value="0">
+        <input type="hidden" id="before_pct" value="40">
+        <input type="hidden" id="panel_url" value="">
+      </div>
     </div>
 
     <!-- RIGHT -->
@@ -131,24 +149,6 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
         </div>
         <div class="gen-status" id="gen-status"></div>
 
-        <!-- Settings — live here, below the video -->
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #f0f0f0">
-          <div class="field">
-            <label>Overlay text (shown on video)</label>
-            <input type="text" id="video_overlay_text" placeholder="e.g. Make your own at turtleandsun.com" oninput="scheduleAutoSave()">
-            <div class="hint">Leave blank for no overlay.</div>
-          </div>
-          <div class="field">
-            <label>End card duration (seconds)</label>
-            <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
-          </div>
-        </div>
-
-        <!-- Hidden state fields — updated by drag interactions -->
-        <input type="hidden" id="before_y_offset" value="0">
-        <input type="hidden" id="after_y_offset" value="0">
-        <input type="hidden" id="before_pct" value="40">
-        <input type="hidden" id="panel_url" value="">
       </div>
 
       <!-- Publish -->
