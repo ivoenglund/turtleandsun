@@ -3155,7 +3155,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const afterYOff3 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
         const filter3 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
-          `[0:v]fps=30,scale=${W}:${H}`,
+          `[0:v]fps=30`,
           afterYOff3 > 0 ? `,crop=${W}:${H - afterYOff3}:0:${afterYOff3},pad=${W}:${H}:0:0` : ``,
           `[vr3];`,
           `[3:v]fps=30,scale=${W}:${H}[vl3];`,
