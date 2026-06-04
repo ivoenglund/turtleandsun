@@ -123,13 +123,12 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
         <div class="field">
           <label>Style</label>
           <div class="style-btn-row" id="style-btn-row">
-            <button class="style-btn" id="style-btn-1" onclick="setStyle(1)">1</button>
-            <button class="style-btn" id="style-btn-2" onclick="setStyle(2)">2</button>
-            <button class="style-btn" id="style-btn-3" onclick="setStyle(3)">3</button>
+            <button class="style-btn" id="style-btn-1" onclick="setStyle(1)">A</button>
+            <button class="style-btn" id="style-btn-3" onclick="setStyle(3)">B</button>
           </div>
         </div>
 
-        <!-- Duration: styles 1 and 3 (label changes) -->
+        <!-- Duration: Style A (end card) and Style B (show composite) -->
         <div id="dur-fields">
           <div class="field">
             <label id="dur-label">End card duration (seconds)</label>
@@ -137,17 +136,8 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           </div>
         </div>
 
-        <!-- Show before: style 2 only -->
-        <div id="v2-only-fields" style="display:none">
-          <div class="field">
-            <label>Show before (seconds)</label>
-            <input type="number" id="show_before_s" value="1" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
-            <div class="hint">How long the before photo shows alone before the panel starts rising.</div>
-          </div>
-        </div>
-
-        <!-- Rise duration: styles 2 and 3 -->
-        <div id="v23-fields" style="display:none">
+        <!-- Rise duration: Style B only -->
+        <div id="vb-fields" style="display:none">
           <div class="field">
             <label>Rise duration (seconds)</label>
             <input type="number" id="rise_duration_s" value="1" min="0.1" max="5" step="0.1" oninput="scheduleAutoSave()">
@@ -410,7 +400,7 @@ function renderClip(initial) {
     document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
     document.getElementById('before_pct').value          = clip.before_pct != null ? clip.before_pct : 40;
     document.getElementById('panel_url').value           = clip.panel_url || '';
-    document.getElementById('show_before_s').value        = clip.show_before_s   != null ? clip.show_before_s   : 1.0;
+
     document.getElementById('rise_duration_s').value     = clip.rise_duration_s != null ? clip.rise_duration_s : 1.0;
     document.getElementById('rise_pause_s').value        = clip.rise_pause_s    != null ? clip.rise_pause_s    : 3.0;
     setStyle(parseInt(clip.clip_style) || 1, true /* silent */);
@@ -468,17 +458,16 @@ function renderClip(initial) {
 
 // ── Style selector ────────────────────────────────────────
 function setStyle(n, silent) {
+  // Map old style 2 clips to style A (1) on load
+  if (n === 2) n = 1;
   document.getElementById('clip_style').value = n;
   document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('style-btn-' + n);
   if (btn) btn.classList.add('active');
-  // Duration field: styles 1 and 3 (different label)
-  document.getElementById('dur-fields').style.display = (n === 1 || n === 3) ? '' : 'none';
+  // Duration label differs between A and B
   document.getElementById('dur-label').textContent = n === 3 ? 'Show composite (seconds)' : 'End card duration (seconds)';
-  // Show-before: style 2 only
-  document.getElementById('v2-only-fields').style.display = n === 2 ? '' : 'none';
-  // Rise/pause: styles 2 and 3
-  document.getElementById('v23-fields').style.display = (n === 2 || n === 3) ? '' : 'none';
+  // Rise duration: Style B only
+  document.getElementById('vb-fields').style.display = n === 3 ? '' : 'none';
   if (!silent) { _dirty = true; scheduleAutoSave(); }
 }
 
@@ -502,7 +491,7 @@ async function saveNow(thenGenerate) {
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 4,
     before_pct:          parseFloat(document.getElementById('before_pct').value) || 40,
     clip_style:          parseInt(document.getElementById('clip_style').value) || 1,
-    show_before_s:       parseFloat(document.getElementById('show_before_s').value) || 1.0,
+
     rise_duration_s:     parseFloat(document.getElementById('rise_duration_s').value) || 1.0,
     rise_pause_s:        parseFloat(document.getElementById('rise_pause_s').value) || 3.0,
   };

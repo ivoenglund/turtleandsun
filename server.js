@@ -3008,113 +3008,10 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=120:shadowcolor=black@0.85:shadowx=3:shadowy=3:line_spacing=8`
         : '';
 
+      // clip_style DB values: 1 = Style A (static end card), 3 = Style B (composite → rise & wipe)
       const clipStyle = parseInt(clip.clip_style) || 1;
 
-      if (clipStyle === 2) {
-        // ── Variant 2: Rise & Pause ────────────────────────────────────────
-        // Video plays full-screen from the start (hidden under before photo).
-        // Before photo fills screen and is fully opaque while panel hasn't started.
-        // Panel enters from below (y=H), rises upward.
-        // As panel rises: before photo fades out below the panel (alpha=0 where Y>=panel_y),
-        // revealing the video. Before photo stays visible above the panel.
-        // When panel exits off top: before photo fully transparent → video full screen.
-
-        // Before photo — crop exactly as variant 1 (no zoom), then pad to H with black.
-        // This makes the top beforeH rows match the composite preview exactly.
-        const beforeCropped2 = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
-        const beforePadded2  = await sharp({ create: { width: W, height: H, channels: 3, background: { r:0,g:0,b:0 } } })
-          .composite([{ input: beforeCropped2, top: 0, left: 0 }])
-          .jpeg({ quality: 92 }).toBuffer();
-        const beforeWithLabel = await sharp(beforePadded2)
-          .composite([{ input: makeLabel('BEFORE', W, H), blend: 'over' }])
-          .jpeg({ quality: 92 }).toBuffer();
-        fs2.writeFileSync(beforeFile, beforeWithLabel);
-        fs2.writeFileSync(panelFile, panelBuf);
-
-        // AFTER label — transparent PNG overlay for the video (same pill style as BEFORE)
-        const afterLabelFile = pathM.join(tmpDir, 'after_label.png');
-        const afterLabelPng = await sharp({
-          create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
-        }).composite([{ input: makeLabel('AFTER', W, H), blend: 'over' }]).png().toBuffer();
-        fs2.writeFileSync(afterLabelFile, afterLabelPng);
-
-        // Timing
-        const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.0);
-        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 1.0);
-        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 3.0);
-        const speed  = H / riseD;
-        const exitD  = panelH / speed;
-        const totalAnimTime = riseD + pauseD + exitD; // panel start → panel fully gone
-        const imgDur = '999'; // longer than any video; -shortest ends on video
-
-        // Panel y(t): waits showD, rises H→0 (clamped), pauses, exits off top.
-        const panelYExpr =
-          `if(lt(t,${showD}),${H},` +
-          `if(lt(t,${showD + riseD + pauseD}),` +
-            `max(0,${H}-(t-${showD})*${speed}),` +
-            `0-(t-${showD + riseD + pauseD})*${speed}` +
-          `))`;
-
-        // Video rises with the panel — no zoom, natural size (1080x1920).
-        // Video top edge sits at the panel bottom edge and rises at the same rate.
-        // max(0,...) clamps once panel exits so video settles full-screen at y=0.
-        const maskY  = `max(0,${panelYExpr})`;
-        const videoY = `max(0,${panelYExpr}+${panelH})`;
-
-        // filter_complex:
-        //   [0:v] video — natural size, rises with panel (y = videoY)
-        //   [canvas][vvideo] overlay → [vbase]
-        //   [1:v] before photo + white/black alpha mask → alphamerge → [vbefore]
-        //   [vbase][vbefore] overlay → [v1]
-        //   [2:v] panel → overlay at panelY → [vout]
-        // filter_complex:
-        //   [0:v] video + AFTER label overlay + overlay text below label
-        //   [3:v] after label PNG (transparent, AFTER pill top-right)
-        //   [canvas][vvideo] → [vbase] (video rising with panel)
-        //   [1:v] before photo (with BEFORE label baked in) + alpha mask → [vbefore]
-        //   [vbase][vbefore] → [v1]
-        //   [2:v] panel → [vout]
-        const afterYOff2 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
-        const filter2 = [
-          `color=black:s=${W}x${H}:r=30,fps=30[vcanvas];`,
-          `[0:v]fps=30,scale=${W}:${H}`,
-          afterYOff2 > 0 ? `,crop=${W}:${H - afterYOff2}:0:${afterYOff2},pad=${W}:${H}:0:0` : ``,
-          `[vraw];`,
-          `[3:v]fps=30,scale=${W}:${H}[vlabel];`,
-          `[vraw][vlabel]overlay=0:0`,
-          drawTextFilterV2,
-          `[vvideo];`,
-          `[vcanvas][vvideo]overlay=0:'${videoY}'[vbase];`,
-          `[1:v]fps=30,scale=${W}:${H}[vbefore_raw];`,
-          `color=white:s=${W}x${H}:r=30,fps=30[cwhite];`,
-          `color=black:s=${W}x${H}:r=30,fps=30[cblack];`,
-          `[cwhite][cblack]overlay=0:'${maskY}'[mask];`,
-          `[vbefore_raw][mask]alphamerge[vbefore];`,
-          `[2:v]fps=30,scale=${W}:${panelH}[vpanel];`,
-          `[vbase][vbefore]overlay=0:0[v1];`,
-          `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
-        ].join('');
-
-        await new Promise((resolve, reject) => {
-          execFile(ffmpegBin, [
-            '-y', '-loglevel', 'error',
-            '-i', videoFile,
-            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', beforeFile,
-            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', panelFile,
-            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', afterLabelFile,
-            '-filter_complex', filter2,
-            '-map', '[vout]', '-map', '0:a?',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac', '-b:a', '128k', '-shortest',
-            '-movflags', '+faststart',
-            outFile,
-          ], { timeout: 180000 }, (err, stdout, stderr) => {
-            if (err) return reject(new Error('FFmpeg v2: ' + (stderr || err.message).slice(0, 1200)));
-            resolve();
-          });
-        });
-
-      } else if (clipStyle === 3) {
+      if (clipStyle === 3) {
         // ── Style 3: Composite → Rise & Wipe ──────────────────────────────
         // Phase 1: composite layout (before top / panel middle / video bottom)
         //          plays for end_card_duration_s seconds using configured before_pct.
@@ -3225,9 +3122,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
         const endDur = parseFloat(clip.end_card_duration_s) || 4;
         const filter1 = [
-          `[0:v]fps=30,scale=1080:1920`,
-          drawTextFilter,
-          `[vafter];`,
+          `[0:v]fps=30,scale=1080:1920[vafter];`,
           `[1:v]scale=1080:1920,fps=30,`,
           `fade=t=in:st=0:d=0.3[vendcard];`,
           `[vafter][vendcard]concat=n=2:v=1:a=0[vout]`,
