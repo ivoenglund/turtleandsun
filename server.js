@@ -3019,44 +3019,53 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         fs2.writeFileSync(panelFile, panelBuf);
 
         // Timing
-        const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.5);
-        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5);
+        const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.0);
+        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 1.0);
         const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);
         const speed  = H / riseD;
+        const exitD  = panelH / speed;
+        const totalAnimTime = riseD + pauseD + exitD; // panel start → panel fully gone
         const imgDur = '999'; // longer than any video; -shortest ends on video
 
-        // Panel y(t): waits showD, rises H→0, pauses at exactly 0, then exits.
-        // max(0,...) clamps the rise so frame-timing imprecision can't overshoot past 0.
+        // Panel y(t): waits showD, rises H→0 (clamped), pauses, exits off top.
         const panelYExpr =
           `if(lt(t,${showD}),${H},` +
           `if(lt(t,${showD + riseD + pauseD}),` +
-            `max(0,${H}-(t-${showD})*${speed}),` +   // rise phase, clamped at 0 → also covers pause
-            `0-(t-${showD + riseD + pauseD})*${speed}` + // exit phase
+            `max(0,${H}-(t-${showD})*${speed}),` +
+            `0-(t-${showD + riseD + pauseD})*${speed}` +
           `))`;
 
-        // Mask approach — no geq needed:
-        // A white color source overlaid with a black rectangle at max(0, panel_y)
-        // produces a grayscale mask: white above panel (before photo opaque),
-        // black at/below panel (before photo transparent, video shows through).
-        // alphamerge applies this mask as the before photo's alpha channel.
+        // Video scroll: scaled taller than the frame, scrolls upward as panel animates.
+        // Starts showing the bottom of the video; ends showing the top.
+        const scrollAmt  = Math.round(H * 0.3);        // 576px extra height (~30%)
+        const videoH     = H + scrollAmt;               // 2496px
+        const scrollRate = scrollAmt / Math.max(0.1, totalAnimTime); // px/s
+        // scroll y: -scrollAmt (bottom) → 0 (top) over totalAnimTime, starting at showD
+        const scrollYExpr =
+          `if(lt(t,${showD}),-${scrollAmt},` +
+          `max(-${scrollAmt},min(0,-${scrollAmt}+(t-${showD})*${scrollRate})))`;
+
+        // Mask: white above panel → before photo opaque; black at/below panel → transparent.
+        const maskY = `max(0,${panelYExpr})`;
 
         // filter_complex:
-        //   [0:v] video base (always playing)
-        //   color white + color black overlay → [mask] (white=opaque, black=transparent)
-        //   [1:v] before photo + [mask] → alphamerge → [vbefore] (before photo with alpha)
+        //   [0:v] video — scaled taller (-2:videoH crops to 1080 wide), scrolls upward
+        //   [canvas][vtall] overlay with scroll y → [vbase]
+        //   [1:v] before photo + white/black mask → alphamerge → [vbefore]
         //   [vbase][vbefore] overlay → [v1]
-        //   [2:v] panel → overlay on [v1] with animated y → [vout]
-        const maskY = `max(0,${panelYExpr})`; // black rect starts here; max(0,...) handles exit phase
+        //   [2:v] panel → overlay at animated y → [vout]
         const filter2 = [
-          `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
+          `color=black:s=${W}x${H}:r=30,fps=30[vcanvas];`,
+          `[0:v]fps=30,scale=-2:${videoH},crop=${W}:${videoH}`,
           drawTextFilter,
-          `[vbase];`,
-          `[1:v]fps=30,scale=1080:1920[vbefore_raw];`,
-          `color=white:s=1080x1920:r=30,fps=30[cwhite];`,
-          `color=black:s=1080x1920:r=30,fps=30[cblack];`,
+          `[vtall];`,
+          `[vcanvas][vtall]overlay=0:'${scrollYExpr}'[vbase];`,
+          `[1:v]fps=30,scale=${W}:${H}[vbefore_raw];`,
+          `color=white:s=${W}x${H}:r=30,fps=30[cwhite];`,
+          `color=black:s=${W}x${H}:r=30,fps=30[cblack];`,
           `[cwhite][cblack]overlay=0:'${maskY}'[mask];`,
           `[vbefore_raw][mask]alphamerge[vbefore];`,
-          `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
+          `[2:v]fps=30,scale=${W}:${panelH}[vpanel];`,
           `[vbase][vbefore]overlay=0:0[v1];`,
           `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
         ].join('');

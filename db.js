@@ -519,8 +519,8 @@ async function initDb() {
       stats_refreshed_at  TIMESTAMPTZ,
       error_msg           TEXT,
       clip_style          INTEGER NOT NULL DEFAULT 1,
-      show_before_s       NUMERIC(6,2) NOT NULL DEFAULT 1.5,
-      rise_duration_s     NUMERIC(6,2) NOT NULL DEFAULT 0.5,
+      show_before_s       NUMERIC(6,2) NOT NULL DEFAULT 1.0,
+      rise_duration_s     NUMERIC(6,2) NOT NULL DEFAULT 1.0,
       rise_pause_s        NUMERIC(6,2) NOT NULL DEFAULT 2.0,
       created_at          TIMESTAMPTZ DEFAULT NOW(),
       updated_at          TIMESTAMPTZ DEFAULT NOW()
@@ -529,8 +529,8 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_social_clips_created_at ON social_clips (created_at DESC);
     -- Migration: add new columns to existing tables
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS clip_style      INTEGER      NOT NULL DEFAULT 1;
-    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS show_before_s   NUMERIC(6,2) NOT NULL DEFAULT 1.5;
-    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS rise_duration_s NUMERIC(6,2) NOT NULL DEFAULT 0.5;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS show_before_s   NUMERIC(6,2) NOT NULL DEFAULT 1.0;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS rise_duration_s NUMERIC(6,2) NOT NULL DEFAULT 1.0;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS rise_pause_s    NUMERIC(6,2) NOT NULL DEFAULT 2.0;
   `);
 

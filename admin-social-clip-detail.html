@@ -140,12 +140,12 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
         <div id="v2-fields" style="display:none">
           <div class="field">
             <label>Show before (seconds)</label>
-            <input type="number" id="show_before_s" value="1.5" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
+            <input type="number" id="show_before_s" value="1" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
             <div class="hint">How long the before photo shows alone before the panel starts rising.</div>
           </div>
           <div class="field">
             <label>Rise duration (seconds)</label>
-            <input type="number" id="rise_duration_s" value="0.5" min="0.1" max="5" step="0.1" oninput="scheduleAutoSave()">
+            <input type="number" id="rise_duration_s" value="1" min="0.1" max="5" step="0.1" oninput="scheduleAutoSave()">
             <div class="hint">How fast the panel rises from bottom to top.</div>
           </div>
           <div class="field">
@@ -414,8 +414,8 @@ function renderClip(initial) {
     document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
     document.getElementById('before_pct').value          = clip.before_pct != null ? clip.before_pct : 40;
     document.getElementById('panel_url').value           = clip.panel_url || '';
-    document.getElementById('show_before_s').value        = clip.show_before_s   != null ? clip.show_before_s   : 1.5;
-    document.getElementById('rise_duration_s').value     = clip.rise_duration_s != null ? clip.rise_duration_s : 0.5;
+    document.getElementById('show_before_s').value        = clip.show_before_s   != null ? clip.show_before_s   : 1.0;
+    document.getElementById('rise_duration_s').value     = clip.rise_duration_s != null ? clip.rise_duration_s : 1.0;
     document.getElementById('rise_pause_s').value        = clip.rise_pause_s    != null ? clip.rise_pause_s    : 2.0;
     setStyle(parseInt(clip.clip_style) || 1, true /* silent */);
 
@@ -501,8 +501,8 @@ async function saveNow(thenGenerate) {
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 4,
     before_pct:          parseFloat(document.getElementById('before_pct').value) || 40,
     clip_style:          parseInt(document.getElementById('clip_style').value) || 1,
-    show_before_s:       parseFloat(document.getElementById('show_before_s').value) || 1.5,
-    rise_duration_s:     parseFloat(document.getElementById('rise_duration_s').value) || 0.5,
+    show_before_s:       parseFloat(document.getElementById('show_before_s').value) || 1.0,
+    rise_duration_s:     parseFloat(document.getElementById('rise_duration_s').value) || 1.0,
     rise_pause_s:        parseFloat(document.getElementById('rise_pause_s').value) || 2.0,
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
