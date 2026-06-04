@@ -3134,7 +3134,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const afterLabelFile3 = pathM.join(tmpDir, 'after_label.png');
         fs2.writeFileSync(afterLabelFile3,
           await sharp({ create: { width: W, height: H, channels: 4, background: { r:0,g:0,b:0,alpha:0 } } })
-            .composite([{ input: makeLabel('AFTER', W, H, true /* bottom */), blend: 'over' }]).png().toBuffer()
+            .composite([{ input: makeLabel('AFTER', W, H), blend: 'over' }]).png().toBuffer()
         );
 
         const compShowD = Math.max(0.5, parseFloat(clip.end_card_duration_s) || 4);
