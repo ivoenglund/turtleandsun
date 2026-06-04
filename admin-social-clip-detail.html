@@ -15,9 +15,9 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .auto-save{font-size:11px;color:#3A6B20;font-weight:600;min-width:60px}
 .layout{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
 @media(max-width:680px){.layout{grid-template-columns:1fr}}
-.card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
+.card{background:#fff;border-radius:10px;padding:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px}
 .card:last-child{margin-bottom:0}
-.card h2{font-size:11px;font-weight:700;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;color:#555}
+.card h2{font-size:11px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;color:#555}
 
 /* ── Composite preview ────────────────────────────────────── */
 .composite{width:100%;aspect-ratio:9/16;position:relative;overflow:hidden;border-radius:10px;background:#111;border:2px solid #2a2a2a;user-select:none;touch-action:none}
@@ -43,7 +43,7 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .video-placeholder{color:#555;font-size:11px;text-align:center;padding:16px}
 
 /* ── Controls ─────────────────────────────────────────────── */
-.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer}
+.btn{padding:5px 12px;border-radius:8px;border:none;font-weight:700;font-size:12px;cursor:pointer}
 .btn-primary{background:#1C2A14;color:#FFE800}.btn-primary:hover{background:#2d4a24}
 .btn-primary:disabled{background:#aaa;color:#fff;cursor:not-allowed}
 .btn-outline{background:#fff;color:#1C2A14;border:1px solid #1C2A14}.btn-outline:hover{background:#f0f0e8}
@@ -53,9 +53,9 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
 .badge-pending{background:#e0e0e0;color:#555}.badge-processing{background:#fff3cd;color:#856404}
 .badge-done{background:#d4edda;color:#155724}.badge-error{background:#f8d7da;color:#721c24}
-.field{margin-bottom:12px}.field:last-child{margin-bottom:0}
-.field label{display:block;font-size:11px;color:#555;margin-bottom:3px;font-weight:600}
-.field input[type=text],.field input[type=number]{width:100%;padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:12px}
+.field{margin-bottom:8px}.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:11px;color:#555;margin-bottom:2px;font-weight:600}
+.field input[type=text],.field input[type=number]{width:100%;padding:4px 7px;border-radius:6px;border:1px solid #ccc;font-size:12px}
 .field .hint{font-size:10px;color:#aaa;margin-top:3px}
 .channel-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0}
 .channel-row:last-child{border-bottom:none}
@@ -146,25 +146,16 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           </div>
         </div>
 
-        <!-- Rise/pause: styles 2 and 3 -->
+        <!-- Rise duration: styles 2 and 3 -->
         <div id="v23-fields" style="display:none">
           <div class="field">
             <label>Rise duration (seconds)</label>
             <input type="number" id="rise_duration_s" value="1" min="0.1" max="5" step="0.1" oninput="scheduleAutoSave()">
-            <div class="hint">How fast the panel rises to the top.</div>
-          </div>
-          <div class="field">
-            <label>Pause at top (seconds)</label>
-            <input type="number" id="rise_pause_s" value="3" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
-            <div class="hint">How long the panel holds before exiting.</div>
           </div>
         </div>
 
-        <div class="field">
-          <label>Overlay text (shown on video)</label>
-          <input type="text" id="video_overlay_text" placeholder="Leave blank for no text" oninput="scheduleAutoSave()">
-          <div class="hint">Leave blank for no overlay.</div>
-        </div>
+        <input type="hidden" id="video_overlay_text" value="">
+        <input type="hidden" id="rise_pause_s" value="0">
         <input type="hidden" id="before_y_offset" value="0">
         <input type="hidden" id="after_y_offset" value="0">
         <input type="hidden" id="before_pct" value="40">
