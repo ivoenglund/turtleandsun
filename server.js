@@ -2941,6 +2941,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
   const id = parseInt(req.params.id);
   const {
     video_overlay_text, before_y_offset, after_y_offset, panel_url, end_card_duration_s, before_pct,
+    clip_style, rise_duration_s, rise_pause_s,
   } = req.body;
   try {
     const { rows } = await pool.query(`
@@ -2951,10 +2952,23 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         panel_url           = $5,
         end_card_duration_s = COALESCE($6, end_card_duration_s),
         before_pct          = COALESCE($7, before_pct),
+        clip_style          = COALESCE($8, clip_style),
+        rise_duration_s     = COALESCE($9, rise_duration_s),
+        rise_pause_s        = COALESCE($10, rise_pause_s),
         updated_at          = now()
       WHERE id = $1
       RETURNING *
-    `, [id, video_overlay_text ?? null, before_y_offset ?? null, after_y_offset ?? null, panel_url ?? null, end_card_duration_s ?? null, before_pct ?? null]);
+    `, [id,
+        video_overlay_text ?? null,
+        before_y_offset ?? null,
+        after_y_offset ?? null,
+        panel_url ?? null,
+        end_card_duration_s ?? null,
+        before_pct ?? null,
+        clip_style ?? null,
+        rise_duration_s ?? null,
+        rise_pause_s ?? null,
+    ]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -2995,9 +3009,11 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
   // Run generation in background
   (async () => {
-    const tmpDir = require('fs').mkdtempSync(pathM.join(os.tmpdir(), 'tns-clip-'));
+    const tmpDir      = require('fs').mkdtempSync(pathM.join(os.tmpdir(), 'tns-clip-'));
     const videoFile   = pathM.join(tmpDir, 'after.mp4');
     const endCardFile = pathM.join(tmpDir, 'end_card.jpg');
+    const beforeFile  = pathM.join(tmpDir, 'before.jpg');
+    const panelFile   = pathM.join(tmpDir, 'panel.png');
     const outFile     = pathM.join(tmpDir, 'clip.mp4');
     try {
       const _https = require('https');
@@ -3074,35 +3090,10 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         return sharp(scaled).extract({ left, top, width: W, height: cropH }).jpeg({ quality: 92 }).toBuffer();
       }
 
-      // Before photo
-      const beforeCropped = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
-      const beforeFinal = await sharp(beforeCropped)
-        .composite([{ input: makeLabel('BEFORE', W, beforeH), blend: 'over' }])
-        .jpeg({ quality: 92 }).toBuffer();
-
-      // After portrait
-      let afterFinal;
-      if (clip.after_image_url) {
-        const afterCropped = await cropPhoto(await dlBuffer(clip.after_image_url), clip.after_y_offset, afterH);
-        afterFinal = await sharp(afterCropped)
-          .composite([{ input: makeLabel('AFTER', W, afterH), blend: 'over' }])
-          .jpeg({ quality: 92 }).toBuffer();
-      } else {
-        afterFinal = await sharp({ create: { width: W, height: photoH, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
-      }
-
-      const composite = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-        .composite([
-          { input: beforeFinal, top: 0,               left: 0 },
-          { input: panelBuf,    top: beforeH,          left: 0 },
-          { input: afterFinal,  top: beforeH + panelH, left: 0 },
-        ]).jpeg({ quality: 90 }).toBuffer();
-      fs2.writeFileSync(endCardFile, composite);
-
       // ── 2. Download the after video ──
       await dlFile(clip.after_video_url, videoFile);
 
-      // ── 3. Probe video duration ──
+      // ── 3. Ensure FFmpeg is available ──
       const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
       if (!fs2.existsSync(ffmpegBin)) {
         await new Promise((resolve) => {
@@ -3114,10 +3105,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       }
       if (!fs2.existsSync(ffmpegBin)) throw new Error('FFmpeg unavailable');
 
-      // ── 4. Build FFmpeg filter: after video (with overlay) → end card ──
+      // ── Shared: overlay text helper ──
       const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
       const rawOverlay = (clip.video_overlay_text || '').trim();
-      // Word-wrap at ~24 chars per line so long text breaks neatly
       function wrapText(txt, max) {
         const words = txt.split(' '), lines = [];
         let line = '';
@@ -3134,36 +3124,131 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         .replace(/'/g, "\\' ")
         .replace(/:/g, '\\:')
         .replace(/\n/g, '\\n');
-      const overlayFilter = overlayEsc
+      const drawTextFilter = overlayEsc
         ? `,drawtext=fontfile=${font}:text='${overlayEsc}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=80:shadowcolor=black@0.85:shadowx=3:shadowy=3:line_spacing=8`
         : '';
-      const endDur = parseFloat(clip.end_card_duration_s) || 4;
 
-      const filter = [
-        `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
-        overlayFilter,
-        `[vafter];`,
-        `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,`,
-        `fade=t=in:st=0:d=0.3[vendcard];`,
-        `[vafter][vendcard]concat=n=2:v=1:a=0[vout]`,
-      ].join('');
+      const clipStyle = parseInt(clip.clip_style) || 1;
 
-      await new Promise((resolve, reject) => {
-        execFile(ffmpegBin, [
-          '-y', '-loglevel', 'error',
-          '-i', videoFile,
-          '-loop', '1', '-t', String(endDur + 1), '-framerate', '30', '-i', endCardFile,
-          '-filter_complex', filter,
-          '-map', '[vout]', '-map', '0:a?',
-          '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac', '-b:a', '128k', '-shortest',
-          '-movflags', '+faststart',
-          outFile,
-        ], { timeout: 180000 }, (err, stdout, stderr) => {
-          if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(0, 1200)));
-          resolve();
+      if (clipStyle === 2) {
+        // ── Variant 2: Rise & Pause ────────────────────────────────────────
+        // After video plays from t=0. Before photo frozen on top (top section).
+        // Panel rises from configured position, pauses at top, then exits.
+
+        // Prepare before photo (cropped to beforeH, no label)
+        const beforeCropped2 = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
+        fs2.writeFileSync(beforeFile, beforeCropped2);
+
+        // Prepare panel image
+        fs2.writeFileSync(panelFile, panelBuf);
+
+        // Animation timing
+        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5);  // seconds panel travels beforeH px
+        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);  // seconds held at top
+        const speed  = beforeH / riseD;   // px/s  (same speed used for exit phase)
+        // Exit: panel travels panelH px at same speed
+        const exitD  = panelH / speed;
+        // Total image overlay duration (give plenty of headroom)
+        const imgDur = String(Math.ceil(riseD + pauseD + exitD + 2));
+
+        // Panel y(t): rises from beforeH → 0, pauses, then exits off top
+        // ffmpeg eval: negative y just clips above the frame
+        const panelY =
+          `if(lt(t,${riseD}),` +
+            `${beforeH}*(1-t/${riseD}),` +
+            `if(lt(t,${riseD + pauseD}),` +
+              `0,` +
+              `0-(t-${riseD + pauseD})*${speed}` +
+            `)` +
+          `)`;
+
+        // filter_complex:
+        //  [0:v] after video (base, plays from start)  +  optional overlay text
+        //  [1:v] before photo (top section, static)
+        //  [2:v] panel (animated upward)
+        const filter2 = [
+          `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
+          drawTextFilter,
+          `[vbase];`,
+          `[1:v]fps=30,scale=1080:${beforeH}[vbefore];`,
+          `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
+          `[vbase][vbefore]overlay=0:0[v1];`,
+          `[v1][vpanel]overlay=0:'${panelY}'[vout]`,
+        ].join('');
+
+        await new Promise((resolve, reject) => {
+          execFile(ffmpegBin, [
+            '-y', '-loglevel', 'error',
+            '-i', videoFile,
+            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', beforeFile,
+            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', panelFile,
+            '-filter_complex', filter2,
+            '-map', '[vout]', '-map', '0:a?',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k', '-shortest',
+            '-movflags', '+faststart',
+            outFile,
+          ], { timeout: 180000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error('FFmpeg v2: ' + (stderr || err.message).slice(0, 1200)));
+            resolve();
+          });
         });
-      });
+
+      } else {
+        // ── Variant 1: static end card concat (original) ──────────────────
+
+        // Before photo (with BEFORE label)
+        const beforeCropped = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
+        const beforeFinal = await sharp(beforeCropped)
+          .composite([{ input: makeLabel('BEFORE', W, beforeH), blend: 'over' }])
+          .jpeg({ quality: 92 }).toBuffer();
+
+        // After portrait (with AFTER label)
+        let afterFinal;
+        if (clip.after_image_url) {
+          const afterCropped = await cropPhoto(await dlBuffer(clip.after_image_url), clip.after_y_offset, afterH);
+          afterFinal = await sharp(afterCropped)
+            .composite([{ input: makeLabel('AFTER', W, afterH), blend: 'over' }])
+            .jpeg({ quality: 92 }).toBuffer();
+        } else {
+          afterFinal = await sharp({ create: { width: W, height: photoH, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
+        }
+
+        const composite = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+          .composite([
+            { input: beforeFinal, top: 0,               left: 0 },
+            { input: panelBuf,    top: beforeH,          left: 0 },
+            { input: afterFinal,  top: beforeH + panelH, left: 0 },
+          ]).jpeg({ quality: 90 }).toBuffer();
+        fs2.writeFileSync(endCardFile, composite);
+
+        const endDur = parseFloat(clip.end_card_duration_s) || 4;
+        const filter1 = [
+          `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
+          drawTextFilter,
+          `[vafter];`,
+          `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,`,
+          `fade=t=in:st=0:d=0.3[vendcard];`,
+          `[vafter][vendcard]concat=n=2:v=1:a=0[vout]`,
+        ].join('');
+
+        await new Promise((resolve, reject) => {
+          execFile(ffmpegBin, [
+            '-y', '-loglevel', 'error',
+            '-i', videoFile,
+            '-loop', '1', '-t', String(endDur + 1), '-framerate', '30', '-i', endCardFile,
+            '-filter_complex', filter1,
+            '-map', '[vout]', '-map', '0:a?',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k', '-shortest',
+            '-movflags', '+faststart',
+            outFile,
+          ], { timeout: 180000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(0, 1200)));
+            resolve();
+          });
+        });
+      } // end style branch
 
       // Upload clip + end card to R2
       const { uploadBuffer } = require('./storage');
@@ -3171,9 +3256,11 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip' });
       let endCardR2Url = null;
       try {
-        const ecBuf = fs2.readFileSync(endCardFile);
-        const ecR2 = await uploadBuffer({ buffer: ecBuf, contentType: 'image/jpeg', kind: 'social-clip-endcard' });
-        endCardR2Url = ecR2.url;
+        const ecBuf = fs2.existsSync(endCardFile) ? fs2.readFileSync(endCardFile) : null;
+        if (ecBuf) {
+          const ecR2 = await uploadBuffer({ buffer: ecBuf, contentType: 'image/jpeg', kind: 'social-clip-endcard' });
+          endCardR2Url = ecR2.url;
+        }
       } catch(e2) { console.warn('[social-clip] end card R2 upload failed:', e2.message); }
 
       await pool.query(

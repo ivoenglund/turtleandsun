@@ -518,11 +518,18 @@ async function initDb() {
       youtube_comments    INTEGER,
       stats_refreshed_at  TIMESTAMPTZ,
       error_msg           TEXT,
+      clip_style          INTEGER NOT NULL DEFAULT 1,
+      rise_duration_s     NUMERIC(6,2) NOT NULL DEFAULT 0.5,
+      rise_pause_s        NUMERIC(6,2) NOT NULL DEFAULT 2.0,
       created_at          TIMESTAMPTZ DEFAULT NOW(),
       updated_at          TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_social_clips_status     ON social_clips (status);
     CREATE INDEX IF NOT EXISTS idx_social_clips_created_at ON social_clips (created_at DESC);
+    -- Migration: add new columns to existing tables
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS clip_style      INTEGER      NOT NULL DEFAULT 1;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS rise_duration_s NUMERIC(6,2) NOT NULL DEFAULT 0.5;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS rise_pause_s    NUMERIC(6,2) NOT NULL DEFAULT 2.0;
   `);
 
   // Seed the four launch currencies if the table is empty. After seeding,

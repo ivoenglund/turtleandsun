@@ -71,6 +71,10 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .flash{padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:12px}
 .flash-ok{background:#d4edda;color:#155724}.flash-err{background:#f8d7da;color:#721c24}
 .gen-status{font-size:11px;color:#888;margin-top:4px}
+.style-btn-row{display:flex;gap:6px;flex-wrap:wrap}
+.style-btn{width:36px;height:36px;border-radius:8px;border:2px solid #ccc;background:#fff;font-weight:700;font-size:13px;cursor:pointer;color:#555}
+.style-btn:hover{border-color:#1C2A14;color:#1C2A14}
+.style-btn.active{background:#1C2A14;color:#FFE800;border-color:#1C2A14}
 </style>
 </head>
 <body>
@@ -115,19 +119,47 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 
       <!-- Settings -->
       <div class="card">
+        <!-- Style selector -->
+        <div class="field">
+          <label>Style</label>
+          <div class="style-btn-row" id="style-btn-row">
+            <button class="style-btn" id="style-btn-1" onclick="setStyle(1)">1</button>
+            <button class="style-btn" id="style-btn-2" onclick="setStyle(2)">2</button>
+          </div>
+        </div>
+
+        <!-- Variant 1 only -->
+        <div id="v1-fields">
+          <div class="field">
+            <label>End card duration (seconds)</label>
+            <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
+          </div>
+        </div>
+
+        <!-- Variant 2 only -->
+        <div id="v2-fields" style="display:none">
+          <div class="field">
+            <label>Rise duration (seconds)</label>
+            <input type="number" id="rise_duration_s" value="0.5" min="0.1" max="5" step="0.1" oninput="scheduleAutoSave()">
+            <div class="hint">How fast the panel slides up to the top.</div>
+          </div>
+          <div class="field">
+            <label>Pause at top (seconds)</label>
+            <input type="number" id="rise_pause_s" value="2" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
+            <div class="hint">How long the panel holds before exiting.</div>
+          </div>
+        </div>
+
         <div class="field">
           <label>Overlay text (shown on video)</label>
           <input type="text" id="video_overlay_text" placeholder="e.g. Make your own at turtleandsun.com" oninput="scheduleAutoSave()">
           <div class="hint">Leave blank for no overlay.</div>
         </div>
-        <div class="field">
-          <label>End card duration (seconds)</label>
-          <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
-        </div>
         <input type="hidden" id="before_y_offset" value="0">
         <input type="hidden" id="after_y_offset" value="0">
         <input type="hidden" id="before_pct" value="40">
         <input type="hidden" id="panel_url" value="">
+        <input type="hidden" id="clip_style" value="1">
       </div>
 
       <!-- Generate -->
@@ -377,6 +409,9 @@ function renderClip(initial) {
     document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
     document.getElementById('before_pct').value          = clip.before_pct != null ? clip.before_pct : 40;
     document.getElementById('panel_url').value           = clip.panel_url || '';
+    document.getElementById('rise_duration_s').value     = clip.rise_duration_s != null ? clip.rise_duration_s : 0.5;
+    document.getElementById('rise_pause_s').value        = clip.rise_pause_s    != null ? clip.rise_pause_s    : 2.0;
+    setStyle(parseInt(clip.clip_style) || 1, true /* silent */);
 
     // Before photo
     const beforeImg = document.getElementById('cp-before-img');
@@ -429,6 +464,17 @@ function renderClip(initial) {
   }
 }
 
+// ── Style selector ────────────────────────────────────────
+function setStyle(n, silent) {
+  document.getElementById('clip_style').value = n;
+  document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('style-btn-' + n);
+  if (btn) btn.classList.add('active');
+  document.getElementById('v1-fields').style.display = n === 1 ? '' : 'none';
+  document.getElementById('v2-fields').style.display = n === 2 ? '' : 'none';
+  if (!silent) { _dirty = true; scheduleAutoSave(); }
+}
+
 // ── Auto-save ──────────────────────────────────────────────
 function setAutoSaveStatus(msg) { document.getElementById('auto-save-status').textContent = msg; }
 
@@ -448,6 +494,9 @@ async function saveNow(thenGenerate) {
     panel_url:           document.getElementById('panel_url').value.trim() || null,
     end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 4,
     before_pct:          parseFloat(document.getElementById('before_pct').value) || 40,
+    clip_style:          parseInt(document.getElementById('clip_style').value) || 1,
+    rise_duration_s:     parseFloat(document.getElementById('rise_duration_s').value) || 0.5,
+    rise_pause_s:        parseFloat(document.getElementById('rise_pause_s').value) || 2.0,
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
     method: 'PUT',
