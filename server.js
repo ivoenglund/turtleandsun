@@ -3023,9 +3023,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       }
       const photoH = Math.floor((H - panelH) / 2);
 
-      // Vignette via raw pixels — no SVG/librsvg dependency
+      // Vignette: grayscale multiply — white=no change, dark=darken. No SVG/alpha needed.
       async function makeVignette(w, h, strength, plateau) {
-        const px = Buffer.alloc(w * h * 4);
+        const px = Buffer.alloc(w * h);
         const norm = Math.sqrt(2);
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
@@ -3033,10 +3033,11 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             const dy = (y - h / 2) / (h / 2);
             const dist = Math.sqrt(dx * dx + dy * dy) / norm;
             const t = Math.max(0, (dist - plateau) / (1.0 - plateau));
-            px[(y * w + x) * 4 + 3] = Math.round(Math.min(1, t) * strength * 255);
+            const darkness = Math.min(1, t) * strength;
+            px[y * w + x] = Math.round((1 - darkness) * 255);
           }
         }
-        return sharp(px, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+        return sharp(px, { raw: { width: w, height: h, channels: 1 } }).png().toBuffer();
       }
       const vigStrength = Math.min(1, Math.max(0, (clip.vignette_strength != null ? clip.vignette_strength : 75) / 100));
 
@@ -3060,7 +3061,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         .jpeg({ quality: 92 }).toBuffer();
       const vignBefore = await makeVignette(W, photoH, vigStrength, 0.35);
       const beforeVignetted = await sharp(beforeCropped)
-        .composite([{ input: vignBefore, blend: 'over' }]).jpeg({ quality: 92 }).toBuffer();
+        .composite([{ input: vignBefore, blend: 'multiply' }]).jpeg({ quality: 92 }).toBuffer();
       const beforeLabel = Buffer.from(
         `<svg width='${W}' height='${photoH}'>` +
         `<rect x='${W-165}' y='28' width='135' height='46' rx='8' fill='rgba(0,0,0,0.55)'/>` +
