@@ -125,39 +125,44 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           <div class="style-btn-row" id="style-btn-row">
             <button class="style-btn" id="style-btn-1" onclick="setStyle(1)">1</button>
             <button class="style-btn" id="style-btn-2" onclick="setStyle(2)">2</button>
+            <button class="style-btn" id="style-btn-3" onclick="setStyle(3)">3</button>
           </div>
         </div>
 
-        <!-- Variant 1 only -->
-        <div id="v1-fields">
+        <!-- Duration: styles 1 and 3 (label changes) -->
+        <div id="dur-fields">
           <div class="field">
-            <label>End card duration (seconds)</label>
-            <input type="number" id="end_card_duration_s" value="4" min="1" max="12" step="0.5" oninput="scheduleAutoSave()">
+            <label id="dur-label">End card duration (seconds)</label>
+            <input type="number" id="end_card_duration_s" value="4" min="1" max="30" step="0.5" oninput="scheduleAutoSave()">
           </div>
         </div>
 
-        <!-- Variant 2 only -->
-        <div id="v2-fields" style="display:none">
+        <!-- Show before: style 2 only -->
+        <div id="v2-only-fields" style="display:none">
           <div class="field">
             <label>Show before (seconds)</label>
             <input type="number" id="show_before_s" value="1" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
             <div class="hint">How long the before photo shows alone before the panel starts rising.</div>
           </div>
+        </div>
+
+        <!-- Rise/pause: styles 2 and 3 -->
+        <div id="v23-fields" style="display:none">
           <div class="field">
             <label>Rise duration (seconds)</label>
             <input type="number" id="rise_duration_s" value="1" min="0.1" max="5" step="0.1" oninput="scheduleAutoSave()">
-            <div class="hint">How fast the panel rises from bottom to top.</div>
+            <div class="hint">How fast the panel rises to the top.</div>
           </div>
           <div class="field">
             <label>Pause at top (seconds)</label>
             <input type="number" id="rise_pause_s" value="3" min="0" max="10" step="0.5" oninput="scheduleAutoSave()">
-            <div class="hint">How long the panel holds before exiting off the top.</div>
+            <div class="hint">How long the panel holds before exiting.</div>
           </div>
         </div>
 
         <div class="field">
           <label>Overlay text (shown on video)</label>
-          <input type="text" id="video_overlay_text" placeholder="e.g. Make your own at turtleandsun.com" oninput="scheduleAutoSave()">
+          <input type="text" id="video_overlay_text" placeholder="Leave blank for no text" oninput="scheduleAutoSave()">
           <div class="hint">Leave blank for no overlay.</div>
         </div>
         <input type="hidden" id="before_y_offset" value="0">
@@ -476,8 +481,13 @@ function setStyle(n, silent) {
   document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('style-btn-' + n);
   if (btn) btn.classList.add('active');
-  document.getElementById('v1-fields').style.display = n === 1 ? '' : 'none';
-  document.getElementById('v2-fields').style.display = n === 2 ? '' : 'none';
+  // Duration field: styles 1 and 3 (different label)
+  document.getElementById('dur-fields').style.display = (n === 1 || n === 3) ? '' : 'none';
+  document.getElementById('dur-label').textContent = n === 3 ? 'Show composite (seconds)' : 'End card duration (seconds)';
+  // Show-before: style 2 only
+  document.getElementById('v2-only-fields').style.display = n === 2 ? '' : 'none';
+  // Rise/pause: styles 2 and 3
+  document.getElementById('v23-fields').style.display = (n === 2 || n === 3) ? '' : 'none';
   if (!silent) { _dirty = true; scheduleAutoSave(); }
 }
 

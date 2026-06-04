@@ -3105,6 +3105,80 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           });
         });
 
+      } else if (clipStyle === 3) {
+        // ── Style 3: Composite → Rise & Wipe ──────────────────────────────
+        // Phase 1: composite layout (before top / panel middle / video bottom)
+        //          plays for end_card_duration_s seconds using configured before_pct.
+        // Phase 2: panel rises from beforeH→0, video follows, fills full screen.
+        // Same alphamerge+overlay mechanism as style 2, panel just starts at beforeH.
+
+        const beforeWithLabel3 = await sharp(
+          await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H)
+        ).composite([{ input: makeLabel('BEFORE', W, H), blend: 'over' }])
+          .jpeg({ quality: 92 }).toBuffer();
+        fs2.writeFileSync(beforeFile, beforeWithLabel3);
+        fs2.writeFileSync(panelFile, panelBuf);
+
+        const afterLabelFile3 = pathM.join(tmpDir, 'after_label.png');
+        fs2.writeFileSync(afterLabelFile3,
+          await sharp({ create: { width: W, height: H, channels: 4, background: { r:0,g:0,b:0,alpha:0 } } })
+            .composite([{ input: makeLabel('AFTER', W, H), blend: 'over' }]).png().toBuffer()
+        );
+
+        const compShowD = Math.max(0.5, parseFloat(clip.end_card_duration_s) || 4);
+        const riseD3    = Math.max(0.1, parseFloat(clip.rise_duration_s)     || 1.0);
+        const pauseD3   = Math.max(0,   parseFloat(clip.rise_pause_s)        || 3.0);
+        const speed3    = beforeH / riseD3;   // panel travels beforeH px (not H)
+        const exitD3    = panelH / speed3;
+
+        // Panel y: holds at beforeH for compShowD, then rises to 0, pauses, exits.
+        const panelY3 =
+          `if(lt(t,${compShowD}),${beforeH},` +
+          `if(lt(t,${compShowD + riseD3 + pauseD3}),` +
+            `max(0,${beforeH}-(t-${compShowD})*${speed3}),` +
+            `0-(t-${compShowD + riseD3 + pauseD3})*${speed3}` +
+          `))`;
+
+        const maskY3  = `max(0,${panelY3})`;
+        const videoY3 = `max(0,${panelY3}+${panelH})`;
+
+        const filter3 = [
+          `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
+          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}[vr3];`,
+          `[3:v]fps=30,scale=${W}:${H}[vl3];`,
+          `[vr3][vl3]overlay=0:0`,
+          drawTextFilterV2,
+          `[vv3];`,
+          `[vc3][vv3]overlay=0:'${videoY3}'[vb3];`,
+          `[1:v]fps=30,scale=${W}:${H}[vbr3];`,
+          `color=white:s=${W}x${H}:r=30,fps=30[cw3];`,
+          `color=black:s=${W}x${H}:r=30,fps=30[cb3];`,
+          `[cw3][cb3]overlay=0:'${maskY3}'[mk3];`,
+          `[vbr3][mk3]alphamerge[vbf3];`,
+          `[2:v]fps=30,scale=${W}:${panelH}[vp3];`,
+          `[vb3][vbf3]overlay=0:0[v13];`,
+          `[v13][vp3]overlay=0:'${panelY3}'[vout]`,
+        ].join('');
+
+        await new Promise((resolve, reject) => {
+          execFile(ffmpegBin, [
+            '-y', '-loglevel', 'error',
+            '-i', videoFile,
+            '-loop', '1', '-t', '999', '-framerate', '30', '-i', beforeFile,
+            '-loop', '1', '-t', '999', '-framerate', '30', '-i', panelFile,
+            '-loop', '1', '-t', '999', '-framerate', '30', '-i', afterLabelFile3,
+            '-filter_complex', filter3,
+            '-map', '[vout]', '-map', '0:a?',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k', '-shortest',
+            '-movflags', '+faststart',
+            outFile,
+          ], { timeout: 180000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error('FFmpeg v3: ' + (stderr || err.message).slice(0, 1200)));
+            resolve();
+          });
+        });
+
       } else {
         // ── Variant 1: static end card concat (original) ──────────────────
 
