@@ -3145,12 +3145,22 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const maskY3  = `max(0,${panelY3})`;
         const videoY3 = `max(0,${panelY3}+${panelH})`;
 
+        // As video rises from composite slot to full screen, animate the y-offset
+        // back to zero so the video fills edge-to-edge with no black gap.
+        // In composite: effective offset = afterYOff3 (shows correct portion).
+        // Full screen:  effective offset = 0 (video fills from top).
+        const afterYOff3 = Math.max(0, Math.min(parseInt(clip.after_y_offset) || 0, H - 10));
+        const compositeVideoY = beforeH + panelH; // videoY3 value at composite position
+        const videoOverlayY3 = afterYOff3 > 0
+          ? `${videoY3}*(1-${(afterYOff3 / compositeVideoY).toFixed(6)})`
+          : videoY3;
+
         const filter3 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
           `[0:v]fps=30[vr3];`,
           `[3:v]fps=30,scale=${W}:${H}[vl3];`,
           `[vr3][vl3]overlay=0:0[vv3];`,
-          `[vc3][vv3]overlay=0:'${videoY3}'[vb3];`,
+          `[vc3][vv3]overlay=0:'${videoOverlayY3}'[vb3];`,
           `[1:v]fps=30,scale=${W}:${H}[vbr3];`,
           `color=white:s=${W}x${H}:r=30,fps=30[cw3];`,
           `color=black:s=${W}x${H}:r=30,fps=30[cb3];`,
