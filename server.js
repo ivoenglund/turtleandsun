@@ -3453,7 +3453,15 @@ app.post('/admin/api/generations/:id/tiktok-thumbnail', requireRole('admin'), as
 
       // Extract frame at 1.5s
       const ffmpegBin2 = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
-      if (!fs3.existsSync(ffmpegBin2)) throw new Error('FFmpeg not available — check FFMPEG_PATH or run /admin/api/social-clips/ffmpeg-check');
+      if (!fs3.existsSync(ffmpegBin2)) {
+        await new Promise((resolve) => {
+          require('child_process').execFile(
+            process.execPath, [pathM2.join(__dirname, 'scripts/download-ffmpeg.js')],
+            { timeout: 180000 }, () => resolve()
+          );
+        });
+      }
+      if (!fs3.existsSync(ffmpegBin2)) throw new Error('FFmpeg unavailable — check FFMPEG_PATH');
       await new Promise((resolve, reject) => {
         execFile2(ffmpegBin2, [
           '-ss', '00:00:01.5',
