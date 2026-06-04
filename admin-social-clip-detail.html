@@ -329,9 +329,9 @@ async function handlePanelFile(file) {
     });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'Upload failed');
-    // Use cache-busted URL for preview; clear panel_url so server uses the file
+    // Store the R2 URL so it persists in the DB and survives Railway redeploys
     setPanelImage(d.url + '?v=' + Date.now());
-    document.getElementById('panel_url').value = '';
+    document.getElementById('panel_url').value = d.url;
     _dirty = true;
     scheduleAutoSave();
     setAutoSaveStatus('✓ Panel updated');

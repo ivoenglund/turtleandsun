@@ -2706,139 +2706,6 @@ app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, re
   }
 });
 
-app.post('/admin/api/social-clips/create', requireRole('admin'), async (req, res) => {
-  const { before_url, video_url, concept_name, label_before = 'BEFORE', label_after = 'AFTER', show_labels = true, show_logo = true } = req.body;
-  if (!before_url || !video_url) return res.status(400).json({ error: 'before_url and video_url are required' });
-
-  const { execFile } = require('child_process');
-  const os   = require('os');
-  const pathM = require('path');
-
-  const tmpDir = require('fs').mkdtempSync(pathM.join(os.tmpdir(), 'tns-clip-'));
-  const beforeFile = pathM.join(tmpDir, 'before.jpg');
-  const videoFile  = pathM.join(tmpDir, 'after.mp4');
-  const outFile    = pathM.join(tmpDir, 'clip.mp4');
-
-  try {
-    // Download source files
-    const _https = require('https');
-    const _http  = require('http');
-    const fs2 = require('fs');
-
-    async function dlFile(url, dest) {
-      return new Promise((resolve, reject) => {
-        const lib = url.startsWith('https') ? _https : _http;
-        const file = fs2.createWriteStream(dest);
-        lib.get(url, res2 => {
-          if (res2.statusCode >= 300 && res2.headers.location) {
-            file.close();
-            return dlFile(res2.headers.location, dest).then(resolve).catch(reject);
-          }
-          res2.pipe(file);
-          file.on('finish', () => { file.close(); resolve(); });
-        }).on('error', err => { fs2.unlink(dest, () => {}); reject(err); });
-      });
-    }
-
-    await dlFile(before_url, beforeFile);
-    await dlFile(video_url, videoFile);
-
-    // Build FFmpeg filter chain
-    // Output: 1080x1920 (9:16), before image for 3s, crossfade 0.5s, after video
-    const label = concept_name ? concept_name.toUpperCase() : 'LOVEOGRAM';
-    const logoPath = pathM.join(__dirname, 'public', 'logo.png');
-    const hasLogo = require('fs').existsSync(logoPath);
-
-    // Text overlays
-    const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
-    const beforeText = show_labels
-      ? `,drawtext=fontfile=${font}:text='${label_before.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
-      : '';
-    const afterText = show_labels
-      ? `,drawtext=fontfile=${font}:text='${label_after.replace(/'/g,"\\'")}':fontsize=52:fontcolor=white:x=(w-text_w)/2:y=h-120:box=1:boxcolor=black@0.55:boxborderw=12`
-      : '';
-    const conceptText = show_labels
-      ? `,drawtext=fontfile=${font}:text='${label.replace(/'/g,"\\'")}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=60:box=1:boxcolor=black@0.4:boxborderw=8`
-      : '';
-
-    // End card: cream background + brand text (+ logo overlay if logo.png exists)
-    const endCardEnabled = show_logo !== false;
-    const endDur = 3;
-    const ec1Text = `drawtext=fontfile=${font}:text='Turtle and Sun':fontsize=64:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2-60`;
-    const ec2Text = `,drawtext=fontfile=${font}:text='Remember to love':fontsize=40:fontcolor=0x1C2A14:x=(w-text_w)/2:y=(h-text_h)/2+40`;
-    // [2:v] is the logo (only added if file exists), else we use color source only.
-    // We always pass the logo as input; if missing we use a 1x1 transparent placeholder.
-    const endCardFilter = endCardEnabled
-      ? `color=c=#FFFEF5:size=1080x1920:rate=30:duration=${endDur}[ecbg];` +
-        `[ecbg]${ec1Text}${ec2Text},fade=t=in:st=0:d=0.5,fade=t=out:st=${endDur - 0.5}:d=0.5[vendcard];`
-      : '';
-
-    const filterParts = [
-      `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
-      `crop=1080:1920${beforeText},`,
-      `fade=t=out:st=2.5:d=0.5[vbefore];`,
-      `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,`,
-      `crop=1080:1920${afterText}${conceptText},`,
-      `fade=t=in:st=0:d=0.5[vafter];`,
-    ];
-    if (endCardEnabled) {
-      filterParts.push(endCardFilter);
-      filterParts.push(`[vbefore][vafter][vendcard]concat=n=3:v=1:a=0[vout]`);
-    } else {
-      filterParts.push(`[vbefore][vafter]concat=n=2:v=1:a=0[vout]`);
-    }
-    const filter = filterParts.join('');
-
-    // Ensure ffmpeg is available — download lazily on first use
-    const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
-    if (!require('fs').existsSync(ffmpegBin)) {
-      console.log('[social-clip] ffmpeg not found, downloading now (this may take 1-2 min)...');
-      await new Promise((resolve) => {
-        require('child_process').execFile(
-          process.execPath, [require('path').join(__dirname, 'scripts/download-ffmpeg.js')],
-          { timeout: 180000 },
-          (err, stdout, stderr) => {
-            if (stdout) console.log(stdout);
-            if (stderr) console.warn(stderr);
-            resolve();
-          }
-        );
-      });
-      if (!require('fs').existsSync(ffmpegBin)) {
-        return res.status(503).json({ error: 'FFmpeg unavailable. The download may have failed — check Railway logs and try again.' });
-      }
-      console.log('[social-clip] ffmpeg ready');
-    }
-    await new Promise((resolve, reject) => {
-      execFile(ffmpegBin, [
-        '-y', '-loglevel', 'error',
-        '-loop', '1', '-t', '3', '-framerate', '30', '-i', beforeFile,
-        '-i', videoFile,
-        '-filter_complex', filter,
-        '-map', '[vout]',
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-        '-movflags', '+faststart',
-        outFile,
-      ], { timeout: 120000 }, (err, stdout, stderr) => {
-        if (err) { console.error('[social-clip] ffmpeg error:', stderr); return reject(new Error('FFmpeg failed: ' + (stderr || err.message).slice(0, 1200))); }
-        resolve();
-      });
-    });
-
-    // Upload clip to R2
-    const { uploadBuffer } = require('./storage');
-    const clipBuf = require('fs').readFileSync(outFile);
-    const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip' });
-
-    res.json({ url: r2.url });
-  } catch (e) {
-    console.error('[social-clip create]', e.message);
-    res.status(500).json({ error: e.message });
-  } finally {
-    require('fs').rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
 // =====================================================================
 // Social Clips — library CRUD + generation + publish stubs
 // =====================================================================
@@ -2898,16 +2765,21 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
   }
 });
 
-// Upload a new panel image -- saves to public/tns_end_card_panel.png (global fallback)
+// Upload a new panel image — stores in R2 (persistent across deploys) and
+// also writes a local fallback copy for zero-latency generation on the same dyno.
 app.post('/admin/api/social-clips/panel-image', requireRole('admin'),
   express.raw({ type: ['image/png','image/jpeg','image/webp','image/gif'], limit: '15mb' }),
-  (req, res) => {
+  async (req, res) => {
     try {
+      const { uploadBuffer } = require('./storage');
+      const ct = req.headers['content-type'] || 'image/png';
+      const r2 = await uploadBuffer({ buffer: req.body, contentType: ct, kind: 'social-clip-panel' });
+      // Also cache locally so generation on the same dyno avoids an extra download
       const fs2 = require('fs');
       const dir = path.join(__dirname, 'public');
       if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-      fs2.writeFileSync(path.join(dir, 'tns_end_card_panel.png'), req.body);
-      res.json({ ok: true, url: '/public/tns_end_card_panel.png' });
+      try { fs2.writeFileSync(path.join(dir, 'tns_end_card_panel.png'), req.body); } catch(_) {}
+      res.json({ ok: true, url: r2.url });
     } catch(e) {
       console.error('[panel-image upload]', e.message);
       res.status(500).json({ error: e.message });
@@ -2915,7 +2787,7 @@ app.post('/admin/api/social-clips/panel-image', requireRole('admin'),
   }
 );
 
-// Most recently used panel URL (for auto-populating clips that don't have one yet)
+// Most recently used panel URL — lets a new clip inherit the last panel used.
 app.get('/admin/api/social-clips/panel-url', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
