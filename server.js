@@ -3127,15 +3127,6 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       }
       if (!fs2.existsSync(ffmpegBin)) throw new Error('FFmpeg unavailable');
 
-      let videoDur = 5;
-      try {
-        const probe = require('child_process').execSync(
-          `${ffmpegBin} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile}" 2>&1`,
-          { encoding: 'utf8' }
-        );
-        videoDur = parseFloat(probe.trim()) || 5;
-      } catch(e2) { console.warn('[social-clip] probe failed, assuming 5s:', e2.message); }
-
       // ── 4. Build FFmpeg filter: after video (with overlay) → end card ──
       const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
       const rawOverlay = (clip.video_overlay_text || '').trim();
