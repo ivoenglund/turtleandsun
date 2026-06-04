@@ -2813,7 +2813,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
   const id = parseInt(req.params.id);
   const {
     video_overlay_text, before_y_offset, after_y_offset, panel_url, end_card_duration_s, before_pct,
-    clip_style, rise_duration_s, rise_pause_s,
+    clip_style, show_before_s, rise_duration_s, rise_pause_s,
   } = req.body;
   try {
     const { rows } = await pool.query(`
@@ -2825,8 +2825,9 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         end_card_duration_s = COALESCE($6, end_card_duration_s),
         before_pct          = COALESCE($7, before_pct),
         clip_style          = COALESCE($8, clip_style),
-        rise_duration_s     = COALESCE($9, rise_duration_s),
-        rise_pause_s        = COALESCE($10, rise_pause_s),
+        show_before_s       = COALESCE($9, show_before_s),
+        rise_duration_s     = COALESCE($10, rise_duration_s),
+        rise_pause_s        = COALESCE($11, rise_pause_s),
         updated_at          = now()
       WHERE id = $1
       RETURNING *
@@ -2838,6 +2839,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         end_card_duration_s ?? null,
         before_pct ?? null,
         clip_style ?? null,
+        show_before_s ?? null,
         rise_duration_s ?? null,
         rise_pause_s ?? null,
     ]);
@@ -3003,49 +3005,68 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
       const clipStyle = parseInt(clip.clip_style) || 1;
 
       if (clipStyle === 2) {
-        // ── Variant 2: Rise & Pause ────────────────────────────────────────
-        // After video plays from t=0. Before photo frozen on top (top section).
-        // Panel rises from configured position, pauses at top, then exits.
+        // ── Variant 2: Rise & Pause (full-screen wipe) ────────────────────
+        // 1. Before photo fills the entire screen for show_before_s seconds.
+        // 2. Panel enters from BELOW the frame (y=H) and rises.
+        // 3. As panel rises it wipes away the before photo, revealing the video.
+        // 4. Panel pauses when top edge = frame top (y=0), then exits off top.
+        // 5. After panel exits: before photo remains in top section, video below.
 
-        // Prepare before photo (cropped to beforeH, no label)
-        const beforeCropped2 = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, beforeH);
-        fs2.writeFileSync(beforeFile, beforeCropped2);
+        // Prepare before photo — FULL frame height (1920px) for the wipe effect
+        const beforeFull = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H);
+        fs2.writeFileSync(beforeFile, beforeFull);
 
         // Prepare panel image
         fs2.writeFileSync(panelFile, panelBuf);
 
-        // Animation timing
-        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5);  // seconds panel travels beforeH px
-        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);  // seconds held at top
-        const speed  = beforeH / riseD;   // px/s  (same speed used for exit phase)
-        // Exit: panel travels panelH px at same speed
-        const exitD  = panelH / speed;
-        // Total image overlay duration (give plenty of headroom)
-        const imgDur = String(Math.ceil(riseD + pauseD + exitD + 2));
+        // Timing
+        const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.5);  // static before photo duration
+        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5); // panel travels H px (y=H→0)
+        const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0); // hold at top
+        const speed  = H / riseD;        // px/s — panel travels full H pixels
+        const exitD  = panelH / speed;   // panel travels panelH px to exit
+        const imgDur = String(Math.ceil(showD + riseD + pauseD + exitD + 3));
 
-        // Panel y(t): rises from beforeH → 0, pauses, then exits off top
-        // ffmpeg eval: negative y just clips above the frame
-        const panelY =
-          `if(lt(t,${riseD}),` +
-            `${beforeH}*(1-t/${riseD}),` +
-            `if(lt(t,${riseD + pauseD}),` +
-              `0,` +
-              `0-(t-${riseD + pauseD})*${speed}` +
-            `)` +
-          `)`;
+        // Panel y(t) — starts at H (off-screen below), waits showD, then rises
+        const panelYExpr = [
+          `if(lt(t,${showD}),${H},`,
+          `if(lt(t,${showD + riseD}),${H}-(t-${showD})*${speed},`,
+          `if(lt(t,${showD + riseD + pauseD}),0,`,
+          `0-(t-${showD + riseD + pauseD})*${speed}`,
+          `)))`,
+        ].join('');
+
+        // Cut line: how many pixels of before photo to show (shrinks as panel rises).
+        // = max(beforeH, panel_y) so it never goes below beforeH (before photo stays in top section).
+        const cutLineExpr = `max(${beforeH},${panelYExpr})`;
+
+        // geq filter: zero out before photo pixels below the cut line.
+        // Single-quoted values protect commas from filter_complex parsing.
+        const geqFilter = [
+          `geq=`,
+          `lum='if(gte(Y,${cutLineExpr}),0,lum(X,Y))':`,
+          `cb='if(gte(Y,${cutLineExpr}),128,cb(X,Y))':`,
+          `cr='if(gte(Y,${cutLineExpr}),128,cr(X,Y))'`,
+        ].join('');
 
         // filter_complex:
-        //  [0:v] after video (base, plays from start)  +  optional overlay text
-        //  [1:v] before photo (top section, static)
-        //  [2:v] panel (animated upward)
+        //  [intro]  black for show_before_s (prepended so video starts fresh when revealed)
+        //  [0:v]    after video, scaled 1080x1920 + optional overlay text
+        //  concat   → [vdelayed] (video starts at t=showD in the output)
+        //  [1:v]    before photo (full 1920px), masked below cut_line → [vbefore_masked]
+        //  [2:v]    panel image → [vpanel]
+        //  overlay stack: vdelayed ← vbefore_masked ← vpanel
         const filter2 = [
+          `color=black:size=1080x1920:rate=30:d=${showD}[intro];`,
           `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
           drawTextFilter,
-          `[vbase];`,
-          `[1:v]fps=30,scale=1080:${beforeH}[vbefore];`,
+          `[vscaled];`,
+          `[intro][vscaled]concat=n=2:v=1:a=0[vdelayed];`,
+          `[1:v]fps=30,scale=1080:1920[vbefore_full];`,
+          `[vbefore_full]${geqFilter}[vbefore_masked];`,
           `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
-          `[vbase][vbefore]overlay=0:0[v1];`,
-          `[v1][vpanel]overlay=0:'${panelY}'[vout]`,
+          `[vdelayed][vbefore_masked]overlay=0:0[v1];`,
+          `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
         ].join('');
 
         await new Promise((resolve, reject) => {
