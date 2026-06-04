@@ -3006,50 +3006,58 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
       if (clipStyle === 2) {
         // ── Variant 2: Rise & Pause ────────────────────────────────────────
-        // Segment A: before photo full screen for show_before_s seconds.
-        // Hard cut to Segment B: video plays from frame 0, panel enters from
-        // below the frame (y=H) and immediately begins rising.
-        // Panel pauses when top edge = frame top (y=0), then exits.
-        // After panel exits: full-screen video.
+        // Video plays full-screen from the start (hidden under before photo).
+        // Before photo fills screen and is fully opaque while panel hasn't started.
+        // Panel enters from below (y=H), rises upward.
+        // As panel rises: before photo fades out below the panel (alpha=0 where Y>=panel_y),
+        // revealing the video. Before photo stays visible above the panel.
+        // When panel exits off top: before photo fully transparent → video full screen.
 
-        // Before photo — full frame (1920px) for the static opening
+        // Before photo — full 1920px height
         const beforeFull = await cropPhoto(await dlBuffer(clip.before_url), clip.before_y_offset, H);
         fs2.writeFileSync(beforeFile, beforeFull);
         fs2.writeFileSync(panelFile, panelBuf);
 
         // Timing
         const showD  = Math.max(0,   parseFloat(clip.show_before_s)  || 1.5);
-        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5); // panel travels H px
+        const riseD  = Math.max(0.1, parseFloat(clip.rise_duration_s) || 0.5);
         const pauseD = Math.max(0,   parseFloat(clip.rise_pause_s)    || 2.0);
-        const speed  = H / riseD;
+        const speed  = H / riseD;   // panel travels full H pixels
         const exitD  = panelH / speed;
-        const imgDur = String(Math.ceil(showD + 1));
+        const imgDur = '999'; // longer than any video; -shortest ends on video
 
-        // Panel y in Segment B timeline (t=0 = first frame after cut).
-        // Starts at y=H (off-screen below), rises to y=0, pauses, exits off top.
-        const panelYB = [
-          `if(lt(t,${riseD}),`,
-            `${H}-t*${speed},`,
-          `if(lt(t,${riseD + pauseD}),`,
-            `0,`,
-            `0-(t-${riseD + pauseD})*${speed}`,
-          `))`,
-        ].join('');
+        // Panel y(t): waits showD, rises from H→0, pauses, exits off top
+        const panelYExpr =
+          `if(lt(t,${showD}),${H},` +
+          `if(lt(t,${showD + riseD}),${H}-(t-${showD})*${speed},` +
+          `if(lt(t,${showD + riseD + pauseD}),0,` +
+          `0-(t-${showD + riseD + pauseD})*${speed})))`;
+
+        // Before photo alpha: fully opaque (255) above panel_y, transparent (0) below.
+        // Single-quoted geq values protect commas from filter_complex parsing.
+        // format=rgba required for alpha channel; overlay blends using it automatically.
+        const geqAlpha =
+          `format=rgba,` +
+          `geq=` +
+            `r='r(X,Y)':` +
+            `g='g(X,Y)':` +
+            `b='b(X,Y)':` +
+            `a='255*lt(Y,${panelYExpr})'`;
 
         // filter_complex:
-        //  [1:v] before photo, looped for showD seconds  → [vseg_a]
-        //  [0:v] after video + optional overlay text     → [vbase]
-        //  [2:v] panel image                             → [vpanel]
-        //  [vbase][vpanel] overlay with animated y       → [vseg_b]
-        //  [vseg_a][vseg_b] concat (A then B)            → [vout]
+        //   [0:v] video (base, always playing)
+        //   [1:v] before photo → convert to RGBA → dynamic alpha → overlay on video
+        //   [2:v] panel → overlay on top with animated y
         const filter2 = [
-          `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[vseg_a];`,
           `[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920`,
           drawTextFilter,
           `[vbase];`,
+          `[1:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,`,
+          geqAlpha,
+          `[vbefore];`,
           `[2:v]fps=30,scale=1080:${panelH}[vpanel];`,
-          `[vbase][vpanel]overlay=0:'${panelYB}'[vseg_b];`,
-          `[vseg_a][vseg_b]concat=n=2:v=1:a=0[vout]`,
+          `[vbase][vbefore]overlay=0:0[v1];`,
+          `[v1][vpanel]overlay=0:'${panelYExpr}'[vout]`,
         ].join('');
 
         await new Promise((resolve, reject) => {
@@ -3057,10 +3065,11 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             '-y', '-loglevel', 'error',
             '-i', videoFile,
             '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', beforeFile,
-            '-loop', '1', '-t', String(Math.ceil(riseD + pauseD + exitD + 2)), '-framerate', '30', '-i', panelFile,
+            '-loop', '1', '-t', imgDur, '-framerate', '30', '-i', panelFile,
             '-filter_complex', filter2,
-            '-map', '[vout]',
+            '-map', '[vout]', '-map', '0:a?',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k', '-shortest',
             '-movflags', '+faststart',
             outFile,
           ], { timeout: 180000 }, (err, stdout, stderr) => {
