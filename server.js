@@ -3035,31 +3035,24 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             `0-(t-${showD + riseD + pauseD})*${speed}` +
           `))`;
 
-        // Video scroll: scaled taller than the frame, scrolls upward as panel animates.
-        // Starts showing the bottom of the video; ends showing the top.
-        const scrollAmt  = Math.round(H * 0.3);        // 576px extra height (~30%)
-        const videoH     = H + scrollAmt;               // 2496px
-        const scrollRate = scrollAmt / Math.max(0.1, totalAnimTime); // px/s
-        // scroll y: -scrollAmt (bottom) → 0 (top) over totalAnimTime, starting at showD
-        const scrollYExpr =
-          `if(lt(t,${showD}),-${scrollAmt},` +
-          `max(-${scrollAmt},min(0,-${scrollAmt}+(t-${showD})*${scrollRate})))`;
-
-        // Mask: white above panel → before photo opaque; black at/below panel → transparent.
-        const maskY = `max(0,${panelYExpr})`;
+        // Video rises with the panel — no zoom, natural size (1080x1920).
+        // Video top edge sits at the panel bottom edge and rises at the same rate.
+        // max(0,...) clamps once panel exits so video settles full-screen at y=0.
+        const maskY  = `max(0,${panelYExpr})`;
+        const videoY = `max(0,${panelYExpr}+${panelH})`;
 
         // filter_complex:
-        //   [0:v] video — scaled taller (-2:videoH crops to 1080 wide), scrolls upward
-        //   [canvas][vtall] overlay with scroll y → [vbase]
-        //   [1:v] before photo + white/black mask → alphamerge → [vbefore]
+        //   [0:v] video — natural size, rises with panel (y = videoY)
+        //   [canvas][vvideo] overlay → [vbase]
+        //   [1:v] before photo + white/black alpha mask → alphamerge → [vbefore]
         //   [vbase][vbefore] overlay → [v1]
-        //   [2:v] panel → overlay at animated y → [vout]
+        //   [2:v] panel → overlay at panelY → [vout]
         const filter2 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vcanvas];`,
-          `[0:v]fps=30,scale=-2:${videoH},crop=${W}:${videoH}`,
+          `[0:v]fps=30,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`,
           drawTextFilter,
-          `[vtall];`,
-          `[vcanvas][vtall]overlay=0:'${scrollYExpr}'[vbase];`,
+          `[vvideo];`,
+          `[vcanvas][vvideo]overlay=0:'${videoY}'[vbase];`,
           `[1:v]fps=30,scale=${W}:${H}[vbefore_raw];`,
           `color=white:s=${W}x${H}:r=30,fps=30[cwhite];`,
           `color=black:s=${W}x${H}:r=30,fps=30[cblack];`,
