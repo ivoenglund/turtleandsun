@@ -3157,12 +3157,13 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           ? `${videoY3}*(1-${(afterYOff3 / compositeVideoY).toFixed(6)})`
           : videoY3;
 
+        // AFTER label is overlaid on the CANVAS at videoY3 (not on the video itself),
+        // so it always sits exactly at the top of the after/video section regardless
+        // of any after_y_offset shift applied to the video content.
         const filter3 = [
           `color=black:s=${W}x${H}:r=30,fps=30[vc3];`,
           `[0:v]fps=30[vr3];`,
-          `[3:v]fps=30,scale=${W}:${H}[vl3];`,
-          `[vr3][vl3]overlay=0:0[vv3];`,
-          `[vc3][vv3]overlay=0:'${videoOverlayY3}'[vb3];`,
+          `[vc3][vr3]overlay=0:'${videoOverlayY3}'[vb3];`,
           `[1:v]fps=30,scale=${W}:${H}[vbr3];`,
           `color=white:s=${W}x${H}:r=30,fps=30[cw3];`,
           `color=black:s=${W}x${H}:r=30,fps=30[cb3];`,
@@ -3170,7 +3171,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           `[vbr3][mk3]alphamerge[vbf3];`,
           `[2:v]fps=30,scale=${W}:${panelH}[vp3];`,
           `[vb3][vbf3]overlay=0:0[v13];`,
-          `[v13][vp3]overlay=0:'${panelY3}'[vout]`,
+          `[v13][vp3]overlay=0:'${panelY3}'[v23];`,
+          `[3:v]fps=30,scale=${W}:${H}[vl3];`,
+          `[v23][vl3]overlay=0:'${videoY3}'[vout]`,
         ].join('');
 
         await new Promise((resolve, reject) => {
