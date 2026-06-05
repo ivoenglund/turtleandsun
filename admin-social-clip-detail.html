@@ -269,7 +269,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         </div>
         <div id="plat-tiktok" class="plat-pane">
           <div class="field-label">Date posted</div>
-          <input id="tt-date" type="date" class="field-input" onchange="debounceSave()" onblur="debounceSave()">
+          <input id="tt-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
           <div class="field-label" style="margin-top:6px">Post URL</div>
           <input id="tt-url" class="field-input" placeholder="https://tiktok.com/..." oninput="debounceSave()">
           <div class="field-label" style="margin-top:6px">Caption</div>
@@ -279,7 +279,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         </div>
         <div id="plat-instagram" class="plat-pane" style="display:none">
           <div class="field-label">Date posted</div>
-          <input id="ig-date" type="date" class="field-input" onchange="debounceSave()" onblur="debounceSave()">
+          <input id="ig-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
           <div class="field-label" style="margin-top:6px">Post URL</div>
           <input id="ig-url" class="field-input" placeholder="https://instagram.com/p/…" oninput="debounceSave()">
           <div class="field-label" style="margin-top:6px">Caption</div>
@@ -291,7 +291,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         </div>
         <div id="plat-youtube" class="plat-pane" style="display:none">
           <div class="field-label">Date posted</div>
-          <input id="yt-date" type="date" class="field-input" onchange="debounceSave()" onblur="debounceSave()">
+          <input id="yt-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
           <div class="field-label" style="margin-top:6px">Post URL</div>
           <input id="yt-url" class="field-input" placeholder="https://youtube.com/shorts/…" oninput="debounceSave()">
           <div class="field-label" style="margin-top:6px">Video ID <span style="font-weight:400;color:#aaa">(for auto stats)</span></div>
@@ -315,7 +315,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         </div>
         <div id="plat-facebook" class="plat-pane" style="display:none">
           <div class="field-label">Date posted</div>
-          <input id="fb-date" type="date" class="field-input" onchange="debounceSave()" onblur="debounceSave()">
+          <input id="fb-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
           <div class="field-label" style="margin-top:6px">Post URL</div>
           <input id="fb-url" class="field-input" placeholder="https://facebook.com/…" oninput="debounceSave()">
           <div class="field-label" style="margin-top:6px">Caption</div>
@@ -878,28 +878,30 @@ function switchPlat(plat, btn) {
 // ── Populate tags + platform fields from clip data ──────────
 function populateMeta(clip) {
   const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  // pg driver returns DATE columns as JS Date objects — normalise to YYYY-MM-DD for date inputs
+  const fd = v => { if (!v) return ''; if (v instanceof Date) return v.toISOString().slice(0,10); return String(v).slice(0,10); };
   sv('tag-subject',  clip.subject);
   sv('tag-name',     clip.subject_name);
   sv('tag-occasion', clip.occasion);
   sv('tag-mood',     clip.mood);
   sv('tag-custom',   (clip.custom_tags || []).join(', '));
   sv('tag-ref',      clip.ref_tag);
-  sv('tt-date',      clip.tiktok_posted_at || '');
+  sv('tt-date',      fd(clip.tiktok_posted_at));
   sv('tt-url',       clip.tiktok_post_url);
   sv('tt-caption',   clip.tiktok_caption);
   sv('tt-hashtags',  clip.tiktok_hashtags);
-  sv('ig-date',      clip.instagram_posted_at || '');
+  sv('ig-date',      fd(clip.instagram_posted_at));
   sv('ig-url',       clip.instagram_post_url);
   sv('ig-caption',   clip.instagram_caption);
   sv('ig-hashtags',  clip.instagram_hashtags);
   sv('ig-alt',       clip.instagram_alt_text);
-  sv('yt-date',      clip.yt_posted_at || '');
+  sv('yt-date',      fd(clip.yt_posted_at));
   sv('yt-url',       clip.yt_post_url);
   sv('yt-videoid',   clip.yt_video_id);
   sv('yt-title',     clip.yt_title);
   sv('yt-desc',      clip.yt_description);
   sv('yt-kw',        clip.yt_keyword_tags);
-  sv('fb-date',      clip.fb_posted_at || '');
+  sv('fb-date',      fd(clip.fb_posted_at));
   sv('fb-url',       clip.fb_post_url);
   sv('fb-caption',   clip.fb_caption);
 }
