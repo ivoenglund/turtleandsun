@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Social Tracker — Turtle and Sun Admin</title>
 <script src="/nav.js?v=20260602a"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px}
@@ -20,7 +21,7 @@ h1{font-size:18px;font-weight:700}
 .btn-sm{padding:4px 9px;font-size:11px}
 .btn-danger{background:#c0392b;color:#fff}
 .layout{display:grid;grid-template-columns:1fr;gap:12px;transition:grid-template-columns 0.15s}
-.layout.split{grid-template-columns:1fr 360px}
+
 .list-wrap{background:#fff;border-radius:10px;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.07)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:11px;font-weight:700;color:#555;padding:8px 9px;border-bottom:1px solid #e8e4dc;text-align:left;white-space:nowrap;background:#faf8f4;position:sticky;top:0;z-index:1}
@@ -43,12 +44,18 @@ td{padding:7px 9px;vertical-align:middle}
 .muted{color:#aaa}
 .empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
 
-/* Panel */
-.panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;height:fit-content;position:sticky;top:16px}
-.panel-head{background:#1C2A14;color:#FFE800;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.panel-head h2{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.panel-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
-.panel-body{padding:14px;overflow-y:auto;max-height:80vh}
+/* Bottom panel */
+.bottom-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;margin-top:12px}
+.bp-head{background:#1C2A14;color:#FFE800;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bp-head h2{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bp-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
+.bp-body{display:grid;grid-template-columns:160px 1fr;gap:18px;padding:16px;align-items:start}
+@media(max-width:700px){.bp-body{grid-template-columns:1fr}}
+.bp-video video{width:100%;border-radius:8px;background:#000;display:block}
+.bp-video .no-video{aspect-ratio:9/16;background:#111;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#555;font-size:11px}
+.bp-chart{position:relative;min-height:220px}
+.bp-no-stats{color:#aaa;font-size:12px;text-align:center;padding:40px 0}
+.bp-actions{margin-top:10px;padding-top:10px;border-top:1px solid #eee;display:flex;gap:6px;flex-wrap:wrap}
 .section-label{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px}
 .section-label:first-child{margin-top:0}
 .tags-big{display:flex;flex-wrap:wrap;gap:4px}
@@ -85,7 +92,6 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .log-form h4{font-size:11px;font-weight:700;color:#555;margin-bottom:7px}
 .log-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
 .log-row label{font-size:10px;color:#888;display:block;margin-bottom:2px}
-.panel-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid #eee}
 
 /* Modal */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center}
@@ -133,9 +139,9 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         </tbody>
       </table>
     </div>
-    <div class="panel" id="panel" style="display:none"></div>
   </div>
 </div>
+<div id="bottom-panel" style="display:none"></div>
 
 <!-- Add clip modal -->
 <div class="modal-bg" id="add-modal" style="display:none">
@@ -210,7 +216,10 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 <script src="/nav.js?v=20260602a"></script>
 <script>
 const PF = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook' };
+const PLAT_COLORS = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
 let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {};
+let chartInstance = null;
+function fd(v) { if (!v) return ''; if (v instanceof Date) return v.toISOString().slice(0,10); return String(v).slice(0,10); }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
@@ -255,7 +264,7 @@ function renderTable() {
 
 async function pick(id) {
   if (selId === id) { closePanel(); return; }
-  selId = id; selPlat = 'tiktok';
+  selId = id;
   renderTable();
   await loadPosts(id);
   await loadStats(id);
@@ -279,147 +288,75 @@ async function loadStats(id) {
 function renderPanel() {
   const c = clips.find(x => x.id === selId);
   if (!c) return;
-  const posts = postCache[selId] || {};
   const stats = statCache[selId] || [];
-  const panel = document.getElementById('panel');
+  const posts = postCache[selId] || {};
+  const panel = document.getElementById('bottom-panel');
 
-  const tagHtml = [
-    c.subject ? `<span class="tbig tbig-subj">${esc(c.subject)}${c.subject_name?' — '+esc(c.subject_name):''}</span>` : '',
-    c.occasion && c.occasion!=='general' ? `<span class="tbig tbig-occ">${esc(c.occasion)}</span>` : '',
-    c.style ? `<span class="tbig tbig-sty">${esc(c.style)}</span>` : '',
-    c.mood  ? `<span class="tbig tbig-moo">${esc(c.mood)}</span>` : '',
-    ...(c.custom_tags||[]).map(t=>`<span class="tbig tbig-gen">${esc(t)}</span>`)
-  ].filter(Boolean).join('');
+  // Video
+  const videoHtml = c.output_url
+    ? `<video src="${esc(c.output_url)}" controls playsinline></video>`
+    : `<div class="no-video">No video yet</div>`;
 
-  const tabs = ['tiktok','instagram','youtube','facebook'].map(p => {
-    const has = !!posts[p];
-    return `<button class="ptab ${p===selPlat?'act':''} ${!has?'np':''}" onclick="${has?`switchPlat('${p}')`:''}">${PF[p]}${has?' ✓':''}</button>`;
-  }).join('');
-
-  const pd = posts[selPlat];
-  let fieldsHtml = '';
-  if (pd) {
-    if (selPlat === 'tiktok' || selPlat === 'instagram') {
-      fieldsHtml = `
-        <div class="field"><div class="field-label">Posted</div><div class="field-val">${fdd(pd.posted_at)}</div></div>
-        <div class="field"><div class="field-label">Post URL</div><div class="field-val"><a href="${esc(pd.post_url||'#')}" target="_blank">${esc(pd.post_url||'—')}</a></div></div>
-        <div class="field"><div class="field-label">Caption</div><div class="field-val">${esc(pd.caption||'—')}</div></div>
-        <div class="field"><div class="field-label">Hashtags</div><div class="field-val mono">${esc(pd.hashtags||'—')}</div></div>
-        ${selPlat==='instagram' && pd.alt_text ? `<div class="field"><div class="field-label">Alt text</div><div class="field-val">${esc(pd.alt_text)}</div></div>` : ''}`;
-    } else if (selPlat === 'youtube') {
-      fieldsHtml = `
-        <div class="field"><div class="field-label">Posted</div><div class="field-val">${fdd(pd.posted_at)}</div></div>
-        <div class="field"><div class="field-label">Post URL</div><div class="field-val"><a href="${esc(pd.post_url||'#')}" target="_blank">${esc(pd.post_url||'—')}</a></div></div>
-        <div class="field"><div class="field-label">Title</div><div class="field-val">${esc(pd.yt_title||'—')}</div></div>
-        <div class="field"><div class="field-label">Description</div><div class="field-val" style="white-space:pre-line;font-size:11px">${esc(pd.yt_description||'—')}</div></div>
-        <div class="field"><div class="field-label">Keyword tags</div><div class="field-val mono">${esc(pd.yt_keyword_tags||'—')}</div></div>
-        <div class="field"><div class="field-label">Video ID <span style="font-size:10px;color:#aaa">(used for auto stats)</span></div><div class="field-val mono">${esc(pd.yt_video_id||'not set')}</div></div>`;
-    } else if (selPlat === 'facebook') {
-      fieldsHtml = `
-        <div class="field"><div class="field-label">Posted</div><div class="field-val">${fdd(pd.posted_at)}</div></div>
-        <div class="field"><div class="field-label">Post URL</div><div class="field-val"><a href="${esc(pd.post_url||'#')}" target="_blank">${esc(pd.post_url||'—')}</a></div></div>
-        <div class="field"><div class="field-label">Caption</div><div class="field-val">${esc(pd.fb_caption||'—')}</div></div>`;
-    }
-  } else {
-    fieldsHtml = `<div class="not-posted">Not posted to ${PF[selPlat]} yet. <button class="btn btn-sm btn-secondary" onclick="showPostModal('${selPlat}')">+ Add post info</button></div>`;
-  }
-  if (pd) {
-    fieldsHtml += `<button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="showPostModal('${selPlat}')">Edit</button>`;
-  }
-
-  // Stats table
-  let statsHtml = '';
-  if (stats.length) {
-    // Group by date, pivot platforms
-    const dates = [...new Set(stats.map(s=>s.stat_date))].sort().reverse().slice(0,14);
-    const plats = ['tiktok','instagram','youtube','facebook'];
-    const byKey = {};
-    stats.forEach(s => { byKey[s.stat_date+'_'+s.platform] = s; });
-    const rows = dates.map(dt => {
-      const cells = plats.map(p => {
-        const s = byKey[dt+'_'+p];
-        const v = s ? s.views.toLocaleString('sv-SE') : '—';
-        const cls = p==='youtube' ? ' class="yt"' : '';
-        const src = s && s.source==='api' ? ' title="auto-fetched"' : '';
-        return `<td${cls}${src}>${v}${s&&s.source==='api'?' ↺':''}</td>`;
-      }).join('');
-      return `<tr><td>${dt}</td>${cells}</tr>`;
-    }).join('');
-
-    statsHtml = `
-      <div class="stats-hd">
-        <span></span>
-        <div style="display:flex;gap:5px">
-          <span class="badge badge-auto">YT ↺ auto</span>
-          <span class="badge badge-manual">others manual</span>
-        </div>
-      </div>
-      <table class="st">
-        <thead><tr><th>Date</th><th>TikTok</th><th>Instagram</th><th>YouTube</th><th>Facebook</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-  }
+  // Post URLs for edit buttons
+  const editBtns = ['tiktok','instagram','youtube','facebook'].filter(p => posts[p]).map(p =>
+    `<button class="btn btn-sm btn-secondary" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
+  ).join('');
+  const addBtn = `<button class="btn btn-sm btn-secondary" onclick="showPostModal('tiktok')">+ Add post info</button>`;
 
   panel.innerHTML = `
-    <div class="panel-head">
-      <h2>${esc(c.concept)}</h2>
+    <div class="bp-head">
+      <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
       <button onclick="closePanel()">&#x2715;</button>
     </div>
-    <div class="panel-body">
-      <div class="section-label">Tags</div>
-      <div class="tags-big">${tagHtml||'<span style="color:#aaa;font-size:12px">No tags</span>'}</div>
-
-      <div class="section-label">Platform content</div>
-      <div class="plat-tabs">${tabs}</div>
-      ${fieldsHtml}
-
-      <div class="section-label">
-        <span>Stats</span>
-        <button class="btn btn-sm btn-secondary" style="float:right;margin-top:-2px" onclick="toggleLogForm()">+ Log stats</button>
-      </div>
-      ${statsHtml || '<div class="not-posted">No stats logged yet.</div>'}
-
-      <div id="log-form" style="display:none">
-        <div class="log-form">
-          <h4>Log stats manually</h4>
-          <div class="log-row">
-            <div>
-              <label>Platform</label>
-              <select id="log-plat" class="field-input">
-                <option value="tiktok">TikTok</option>
-                <option value="instagram">Instagram</option>
-                <option value="youtube">YouTube</option>
-                <option value="facebook">Facebook</option>
-              </select>
-            </div>
-            <div>
-              <label>Date</label>
-              <input id="log-date" type="date" class="field-input" value="${new Date().toISOString().slice(0,10)}">
-            </div>
-          </div>
-          <div class="log-row">
-            <div><label>Views</label><input id="log-views" type="number" class="field-input" placeholder="0"></div>
-            <div><label>Likes</label><input id="log-likes" type="number" class="field-input" placeholder="0"></div>
-          </div>
-          <div class="log-row">
-            <div><label>Comments</label><input id="log-comments" type="number" class="field-input" placeholder="0"></div>
-            <div><label>Shares</label><input id="log-shares" type="number" class="field-input" placeholder="0"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="logStats()">Save stats</button>
+    <div class="bp-body">
+      <div class="bp-video">${videoHtml}</div>
+      <div class="bp-chart">
+        ${stats.length ? '<canvas id="views-chart"></canvas>' : '<div class="bp-no-stats">No stats yet — log them in the stats panel or fetch YouTube stats from the tracker.</div>'}
+        <div class="bp-actions">
+          ${editBtns || addBtn}
+          <button class="btn btn-sm btn-danger" onclick="deleteClip(${c.id})">Delete</button>
         </div>
-      </div>
-
-      <div class="panel-actions">
-        <button class="btn btn-secondary btn-sm" onclick="deleteClip(${c.id})">Delete clip</button>
       </div>
     </div>`;
 
   panel.style.display = 'block';
-  document.getElementById('layout').className = 'layout split';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  if (stats.length) {
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    // Normalise dates and build per-platform series
+    const dates = [...new Set(stats.map(s => fd(s.stat_date)))].sort();
+    const datasets = ['tiktok','instagram','youtube','facebook'].map(p => {
+      const byDate = {};
+      stats.filter(s => s.platform === p).forEach(s => { byDate[fd(s.stat_date)] = s.views; });
+      if (!Object.keys(byDate).length) return null;
+      return {
+        label: PF[p],
+        data: dates.map(d => byDate[d] ?? null),
+        borderColor: PLAT_COLORS[p],
+        backgroundColor: PLAT_COLORS[p] + '22',
+        tension: 0.3, spanGaps: true, pointRadius: 3,
+      };
+    }).filter(Boolean);
+    const ctx = document.getElementById('views-chart');
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels: dates, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { font: { size: 10 }, boxWidth: 12 } } },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+    ctx.parentElement.style.height = '220px';
+  }
 }
 
 function switchPlat(p) { selPlat = p; renderPanel(); }
-function closePanel() { selId = null; document.getElementById('panel').style.display = 'none'; document.getElementById('layout').className = 'layout'; renderTable(); }
+function closePanel() { selId = null; document.getElementById('bottom-panel').style.display = 'none'; if (chartInstance) { chartInstance.destroy(); chartInstance = null; } renderTable(); }
 function toggleLogForm() { const f = document.getElementById('log-form'); f.style.display = f.style.display==='none'?'block':'none'; }
 
 async function logStats() {

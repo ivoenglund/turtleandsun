@@ -6800,6 +6800,7 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         sc.ref_tag, sc.subject, sc.subject_name, sc.occasion,
         sc.style, sc.mood, sc.notes,
         COALESCE(sc.custom_tags, '{}') AS custom_tags,
+        sc.output_url,
         sc.created_at,
         (sc.tiktok_posted_at IS NOT NULL OR sc.published_tiktok)      AS tiktok_posted,
         (sc.instagram_posted_at IS NOT NULL OR sc.published_instagram) AS instagram_posted,
