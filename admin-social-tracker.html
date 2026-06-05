@@ -168,6 +168,21 @@ table.st td.yt{color:#0F6E56;font-weight:700}
   </div>
 </div>
 <div id="bottom-panel" style="display:none"></div>
+<div style="max-width:1400px;margin:12px auto 0;padding:0 16px 24px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
+    <div class="cal-nav">
+      <button onclick="calWeek=calAddDays(calWeek,-7);loadCal()">&#8592;</button>
+      <span class="cal-week-label" id="cal-week-label"></span>
+      <button onclick="calWeek=calAddDays(calWeek,7);loadCal()">&#8594;</button>
+      <button onclick="calWeek=calMonday(new Date());loadCal()" style="background:#1C2A14;color:#FFE800;border:none">Today</button>
+    </div>
+  </div>
+  <div class="cal-wrap">
+    <div class="cal-head" id="cal-head"></div>
+    <div id="cal-body"></div>
+  </div>
+</div>
 
 <!-- Add clip modal -->
 <div class="modal-bg" id="add-modal" style="display:none">
@@ -354,7 +369,6 @@ function renderPanel() {
         ${stats.length ? '<canvas id="views-chart"></canvas>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube stats to load them.</div>'}
         <div class="bp-actions">
           ${ytEditBtn}${otherEditBtns}
-          <button class="btn btn-sm btn-danger" onclick="deleteClip(${c.id})">Delete</button>
         </div>
       </div>
     </div>`;
@@ -585,7 +599,7 @@ async function syncToYouTube() {
 
 
 
-NavBar.init({ requireAuth: true }).then(() => load());
+NavBar.init({ requireAuth: true }).then(() => { load(); loadCal(); });
 
 // ── Embedded content calendar ───────────────────────────────
 const CAL_PLATS = [
