@@ -860,56 +860,53 @@ async function initDb() {
   `);
 
   // ====================================================================
-  // Social Tracker — interim content tracking tool (2026-06-05)
+  // Social Tracker — merged into social_clips (2026-06-05)
+  // Drop the separate tracker tables (no data) and store everything on
+  // social_clips + a clip_stats time-series table.
   // ====================================================================
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS tracker_clips (
-      id              SERIAL PRIMARY KEY,
-      ref_tag         TEXT UNIQUE NOT NULL,
-      concept         TEXT NOT NULL,
-      subject         TEXT,
-      subject_name    TEXT,
-      occasion        TEXT,
-      style           TEXT,
-      mood            TEXT,
-      custom_tags     TEXT[] NOT NULL DEFAULT '{}',
-      social_clip_id  INTEGER REFERENCES social_clips(id) ON DELETE SET NULL,
-      notes           TEXT,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+    DROP TABLE IF EXISTS tracker_stats;
+    DROP TABLE IF EXISTS tracker_posts;
+    DROP TABLE IF EXISTS tracker_clips;
 
-    CREATE TABLE IF NOT EXISTS tracker_posts (
+    CREATE TABLE IF NOT EXISTS clip_stats (
       id              SERIAL PRIMARY KEY,
-      clip_id         INTEGER NOT NULL REFERENCES tracker_clips(id) ON DELETE CASCADE,
-      platform        TEXT NOT NULL CHECK (platform IN ('tiktok','instagram','youtube','facebook')),
-      posted_at       DATE,
-      post_url        TEXT,
-      caption         TEXT,
-      hashtags        TEXT,
-      alt_text        TEXT,
-      yt_title        TEXT,
-      yt_description  TEXT,
-      yt_keyword_tags TEXT,
-      yt_video_id     TEXT,
-      fb_caption      TEXT,
+      social_clip_id  INTEGER NOT NULL REFERENCES social_clips(id) ON DELETE CASCADE,
+      platform        TEXT NOT NULL,
+      stat_date       DATE NOT NULL DEFAULT CURRENT_DATE,
+      views           INTEGER NOT NULL DEFAULT 0,
+      likes           INTEGER NOT NULL DEFAULT 0,
+      comments        INTEGER NOT NULL DEFAULT 0,
+      shares          INTEGER NOT NULL DEFAULT 0,
+      source          TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','api')),
       created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (clip_id, platform)
+      UNIQUE (social_clip_id, platform, stat_date)
     );
 
-    CREATE TABLE IF NOT EXISTS tracker_stats (
-      id          SERIAL PRIMARY KEY,
-      clip_id     INTEGER NOT NULL REFERENCES tracker_clips(id) ON DELETE CASCADE,
-      platform    TEXT NOT NULL,
-      stat_date   DATE NOT NULL DEFAULT CURRENT_DATE,
-      views       INTEGER NOT NULL DEFAULT 0,
-      likes       INTEGER NOT NULL DEFAULT 0,
-      comments    INTEGER NOT NULL DEFAULT 0,
-      shares      INTEGER NOT NULL DEFAULT 0,
-      source      TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','api')),
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (clip_id, platform, stat_date)
-    );
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS subject         TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS subject_name    TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS occasion        TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS mood            TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS custom_tags     TEXT[] NOT NULL DEFAULT '{}';
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS ref_tag         TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_caption  TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_hashtags TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_post_url TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_posted_at DATE;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_caption  TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_hashtags TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_alt_text TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_post_url TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_posted_at DATE;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_title           TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_description     TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_keyword_tags    TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_video_id        TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_post_url        TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_posted_at       DATE;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_caption         TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_post_url        TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_posted_at       DATE;
   `);
 
   console.log('Database tables ready');

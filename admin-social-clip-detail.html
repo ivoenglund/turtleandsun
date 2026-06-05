@@ -68,6 +68,19 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
 .stat-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px}
 .stat-val{font-weight:700}
 .no-stats{font-size:11px;color:#aaa;text-align:center;padding:10px}
+.field-label{font-size:10px;font-weight:700;color:#666;margin-bottom:3px}
+.field-input{width:100%;border:1px solid #ccc;border-radius:5px;padding:6px 8px;font-size:12px;color:#1C0A00;background:#fff;font-family:Arial,sans-serif}
+.field-input:focus{outline:none;border-color:#1C2A14}
+.plat-tabs{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.ptab{padding:4px 11px;border-radius:7px;border:1px solid #ccc;background:#fff;color:#555;font-size:11px;font-weight:700;cursor:pointer}
+.ptab:hover{background:#f5f5f5}
+.ptab.act{background:#1C2A14;color:#FFE800;border-color:#1C2A14}
+table.daily-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+table.daily-tbl th{padding:4px 7px;color:#888;border-bottom:1px solid #eee;text-align:right;font-weight:700}
+table.daily-tbl th:first-child{text-align:left}
+table.daily-tbl td{padding:4px 7px;border-bottom:1px solid #f5f5f5;text-align:right;font-variant-numeric:tabular-nums}
+table.daily-tbl td:first-child{text-align:left;color:#888}
+table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
 .flash{padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:12px}
 .flash-ok{background:#d4edda;color:#155724}.flash-err{background:#f8d7da;color:#721c24}
 .gen-status{font-size:11px;color:#888;margin-top:4px}
@@ -174,6 +187,59 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
           <div style="font-size:10px;color:#aaa;margin-top:4px">Channel APIs not yet connected — marks intent only.</div>
         </div>
       </div>
+
+      <!-- Tags -->
+      <div class="card">
+        <h2>Tags</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div class="field-label">Subject</div>
+            <select id="tag-subject" class="field-input" onchange="debounceSave()">
+              <option value="">—</option>
+              <option value="dog">Dog</option>
+              <option value="cat">Cat</option>
+              <option value="human">Human</option>
+              <option value="family">Family</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Name</div>
+            <input id="tag-name" class="field-input" placeholder="e.g. Bella" oninput="debounceSave()">
+          </div>
+          <div>
+            <div class="field-label">Occasion</div>
+            <select id="tag-occasion" class="field-input" onchange="debounceSave()">
+              <option value="">—</option>
+              <option value="general">General</option>
+              <option value="birthday">Birthday</option>
+              <option value="fathers-day">Father's Day</option>
+              <option value="mothers-day">Mother's Day</option>
+              <option value="christmas">Christmas</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Mood</div>
+            <select id="tag-mood" class="field-input" onchange="debounceSave()">
+              <option value="">—</option>
+              <option value="funny">Funny</option>
+              <option value="heartfelt">Heartfelt</option>
+              <option value="dramatic">Dramatic</option>
+              <option value="cute">Cute</option>
+              <option value="elegant">Elegant</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="field-label">Custom tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></div>
+          <input id="tag-custom" class="field-input" placeholder="e.g. before-after, transformation" oninput="debounceSave()">
+        </div>
+        <div style="margin-top:8px">
+          <div class="field-label">Ref tag <span style="font-weight:400;color:#aaa">(for revenue attribution)</span></div>
+          <input id="tag-ref" class="field-input" placeholder="e.g. tns-rp-jun05" oninput="debounceSave()">
+        </div>
+      </div>
     </div>
 
     <!-- RIGHT: generated video only -->
@@ -186,9 +252,96 @@ h1{font-size:18px;font-weight:700;margin-bottom:2px}
         <a id="download-link" style="display:none" class="download-link" target="_blank">↓ Download MP4</a>
       </div>
 
+      <!-- Platform metadata -->
       <div class="card">
-        <h2>Performance</h2>
+        <h2>Platform content</h2>
+        <div class="plat-tabs" id="plat-tabs">
+          <button class="ptab act" onclick="switchPlat('tiktok',this)">🎵 TikTok</button>
+          <button class="ptab" onclick="switchPlat('instagram',this)">📸 Instagram</button>
+          <button class="ptab" onclick="switchPlat('youtube',this)">▶ YouTube</button>
+          <button class="ptab" onclick="switchPlat('facebook',this)">📘 Facebook</button>
+        </div>
+        <div id="plat-tiktok" class="plat-pane">
+          <div class="field-label">Date posted</div>
+          <input id="tt-date" type="date" class="field-input" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Post URL</div>
+          <input id="tt-url" class="field-input" placeholder="https://tiktok.com/..." oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Caption</div>
+          <textarea id="tt-caption" class="field-input" rows="3" placeholder="Hook + body…" oninput="debounceSave()"></textarea>
+          <div class="field-label" style="margin-top:6px">Hashtags</div>
+          <textarea id="tt-hashtags" class="field-input" rows="2" placeholder="#royalportrait #dogsoftiktok…" oninput="debounceSave()"></textarea>
+        </div>
+        <div id="plat-instagram" class="plat-pane" style="display:none">
+          <div class="field-label">Date posted</div>
+          <input id="ig-date" type="date" class="field-input" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Post URL</div>
+          <input id="ig-url" class="field-input" placeholder="https://instagram.com/p/…" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Caption</div>
+          <textarea id="ig-caption" class="field-input" rows="3" oninput="debounceSave()"></textarea>
+          <div class="field-label" style="margin-top:6px">Hashtags (max 30)</div>
+          <textarea id="ig-hashtags" class="field-input" rows="2" oninput="debounceSave()"></textarea>
+          <div class="field-label" style="margin-top:6px">Alt text</div>
+          <input id="ig-alt" class="field-input" placeholder="Describe the image for accessibility" oninput="debounceSave()">
+        </div>
+        <div id="plat-youtube" class="plat-pane" style="display:none">
+          <div class="field-label">Date posted</div>
+          <input id="yt-date" type="date" class="field-input" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Post URL</div>
+          <input id="yt-url" class="field-input" placeholder="https://youtube.com/shorts/…" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Video ID <span style="font-weight:400;color:#aaa">(for auto stats)</span></div>
+          <input id="yt-videoid" class="field-input" placeholder="e.g. dQw4w9WgXcQ" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Title</div>
+          <input id="yt-title" class="field-input" placeholder="Max 100 chars" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Description</div>
+          <textarea id="yt-desc" class="field-input" rows="4" oninput="debounceSave()"></textarea>
+          <div class="field-label" style="margin-top:6px">Keyword tags</div>
+          <input id="yt-kw" class="field-input" placeholder="pet portrait, royal portrait, dog…" oninput="debounceSave()">
+        </div>
+        <div id="plat-facebook" class="plat-pane" style="display:none">
+          <div class="field-label">Date posted</div>
+          <input id="fb-date" type="date" class="field-input" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Post URL</div>
+          <input id="fb-url" class="field-input" placeholder="https://facebook.com/…" oninput="debounceSave()">
+          <div class="field-label" style="margin-top:6px">Caption</div>
+          <textarea id="fb-caption" class="field-input" rows="3" oninput="debounceSave()"></textarea>
+        </div>
+      </div>
+
+      <!-- Daily stats -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h2 style="margin:0">Performance</h2>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="fetchYTStats(this)">▶ Fetch YT stats</button>
+            <button class="btn btn-secondary btn-sm" onclick="toggleLogForm()">+ Log stats</button>
+          </div>
+        </div>
+        <div id="log-form" style="display:none;background:#f5f2ea;border-radius:7px;padding:10px;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <div>
+              <div class="field-label">Platform</div>
+              <select id="log-plat" class="field-input">
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram</option>
+                <option value="youtube">YouTube</option>
+                <option value="facebook">Facebook</option>
+              </select>
+            </div>
+            <div>
+              <div class="field-label">Date</div>
+              <input id="log-date" type="date" class="field-input">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+            <div><div class="field-label">Views</div><input id="log-views" type="number" class="field-input" placeholder="0"></div>
+            <div><div class="field-label">Likes</div><input id="log-likes" type="number" class="field-input" placeholder="0"></div>
+            <div><div class="field-label">Comments</div><input id="log-comments" type="number" class="field-input" placeholder="0"></div>
+            <div><div class="field-label">Shares</div><input id="log-shares" type="number" class="field-input" placeholder="0"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="logStats()">Save</button>
+        </div>
         <div id="stats-section"><div class="no-stats">No stats yet.</div></div>
+        <div id="daily-stats-section"><div class="no-stats" style="margin-top:8px"></div></div>
       </div>
     </div>
 
@@ -368,6 +521,7 @@ async function loadClip() {
   }
 
   clip = fresh;
+  populateMeta(fresh);
   renderClip(true /* initial */);
 }
 
@@ -480,6 +634,7 @@ function scheduleAutoSave() {
   setAutoSaveStatus('…');
   saveTimer = setTimeout(saveNow, 800);
 }
+const debounceSave = scheduleAutoSave;
 
 async function saveNow(thenGenerate) {
   clearTimeout(saveTimer);
@@ -494,6 +649,7 @@ async function saveNow(thenGenerate) {
 
     rise_duration_s:     parseFloat(document.getElementById('rise_duration_s').value) || 1.0,
     rise_pause_s:        parseFloat(document.getElementById('rise_pause_s').value) || 3.0,
+    ...collectMeta(),
   };
   const r = await fetch('/admin/api/social-clips/' + clipId + '/settings', {
     method: 'PUT',
@@ -615,11 +771,150 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Platform tabs ───────────────────────────────────────────
+function switchPlat(plat, btn) {
+  document.querySelectorAll('.plat-pane').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.ptab').forEach(b => b.classList.remove('act'));
+  document.getElementById('plat-' + plat).style.display = 'block';
+  btn.classList.add('act');
+}
+
+// ── Populate tags + platform fields from clip data ──────────
+function populateMeta(clip) {
+  const sv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  sv('tag-subject',  clip.subject);
+  sv('tag-name',     clip.subject_name);
+  sv('tag-occasion', clip.occasion);
+  sv('tag-mood',     clip.mood);
+  sv('tag-custom',   (clip.custom_tags || []).join(', '));
+  sv('tag-ref',      clip.ref_tag);
+  sv('tt-date',      clip.tiktok_posted_at || '');
+  sv('tt-url',       clip.tiktok_post_url);
+  sv('tt-caption',   clip.tiktok_caption);
+  sv('tt-hashtags',  clip.tiktok_hashtags);
+  sv('ig-date',      clip.instagram_posted_at || '');
+  sv('ig-url',       clip.instagram_post_url);
+  sv('ig-caption',   clip.instagram_caption);
+  sv('ig-hashtags',  clip.instagram_hashtags);
+  sv('ig-alt',       clip.instagram_alt_text);
+  sv('yt-date',      clip.yt_posted_at || '');
+  sv('yt-url',       clip.yt_post_url);
+  sv('yt-videoid',   clip.yt_video_id);
+  sv('yt-title',     clip.yt_title);
+  sv('yt-desc',      clip.yt_description);
+  sv('yt-kw',        clip.yt_keyword_tags);
+  sv('fb-date',      clip.fb_posted_at || '');
+  sv('fb-url',       clip.fb_post_url);
+  sv('fb-caption',   clip.fb_caption);
+}
+
+// ── Collect meta fields for save ───────────────────────────
+function collectMeta() {
+  const gv = id => { const el = document.getElementById(id); return el ? el.value.trim() || null : null; };
+  const custom_raw = gv('tag-custom');
+  return {
+    subject:      gv('tag-subject'),
+    subject_name: gv('tag-name'),
+    occasion:     gv('tag-occasion'),
+    mood:         gv('tag-mood'),
+    custom_tags:  custom_raw ? custom_raw.split(',').map(s=>s.trim()).filter(Boolean) : [],
+    ref_tag:      gv('tag-ref'),
+    tiktok_posted_at:      gv('tt-date'),
+    tiktok_post_url:       gv('tt-url'),
+    tiktok_caption:        gv('tt-caption'),
+    tiktok_hashtags:       gv('tt-hashtags'),
+    instagram_posted_at:   gv('ig-date'),
+    instagram_post_url:    gv('ig-url'),
+    instagram_caption:     gv('ig-caption'),
+    instagram_hashtags:    gv('ig-hashtags'),
+    instagram_alt_text:    gv('ig-alt'),
+    yt_posted_at:          gv('yt-date'),
+    yt_post_url:           gv('yt-url'),
+    yt_video_id:           gv('yt-videoid'),
+    yt_title:              gv('yt-title'),
+    yt_description:        gv('yt-desc'),
+    yt_keyword_tags:       gv('yt-kw'),
+    fb_posted_at:          gv('fb-date'),
+    fb_post_url:           gv('fb-url'),
+    fb_caption:            gv('fb-caption'),
+  };
+}
+
+// ── Daily stats ─────────────────────────────────────────────
+function toggleLogForm() {
+  const f = document.getElementById('log-form');
+  if (!document.getElementById('log-date').value)
+    document.getElementById('log-date').value = new Date().toISOString().slice(0,10);
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function logStats() {
+  const clipId = new URLSearchParams(location.search).get('id');
+  const body = {
+    platform: document.getElementById('log-plat').value,
+    stat_date: document.getElementById('log-date').value,
+    views:    +document.getElementById('log-views').value||0,
+    likes:    +document.getElementById('log-likes').value||0,
+    comments: +document.getElementById('log-comments').value||0,
+    shares:   +document.getElementById('log-shares').value||0,
+  };
+  await fetch(`/admin/api/social-clips/${clipId}/stats`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+  });
+  await loadDailyStats(clipId);
+  showFlash('Stats saved', 'ok');
+}
+
+async function loadDailyStats(clipId) {
+  const r = await fetch(`/admin/api/social-clips/${clipId}/stats`);
+  const d = await r.json();
+  const rows = d.rows || [];
+  const el = document.getElementById('daily-stats-section');
+  if (!rows.length) { el.innerHTML = ''; return; }
+  const dates = [...new Set(rows.map(r=>r.stat_date))].sort().reverse().slice(0,14);
+  const byKey = {};
+  rows.forEach(r => { byKey[r.stat_date+'_'+r.platform] = r; });
+  const trs = dates.map(dt => {
+    const td = (p) => {
+      const s = byKey[dt+'_'+p];
+      if (!s) return '<td>—</td>';
+      const cls = p==='youtube' ? ' class="yt"' : '';
+      const auto = s.source==='api' ? ' ↺' : '';
+      return `<td${cls}>${s.views.toLocaleString()}${auto}</td>`;
+    };
+    return `<tr><td>${dt}</td>${td('tiktok')}${td('instagram')}${td('youtube')}${td('facebook')}</tr>`;
+  }).join('');
+  el.innerHTML = `<table class="daily-tbl">
+    <thead><tr><th>Date</th><th>TikTok</th><th>Instagram</th><th>YouTube ↺</th><th>Facebook</th></tr></thead>
+    <tbody>${trs}</tbody>
+  </table>`;
+}
+
+async function fetchYTStats(btn) {
+  const clipId = new URLSearchParams(location.search).get('id');
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  try {
+    const r = await fetch(`/admin/api/social-clips/${clipId}/fetch-youtube-stats`, { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    await loadDailyStats(clipId);
+    showFlash(`YouTube: ${d.views.toLocaleString()} views`, 'ok');
+  } catch(e) {
+    showFlash('YT stats error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ Fetch YT stats';
+  }
+}
+
 // ── Boot ───────────────────────────────────────────────────
 applyProportions(40);
 initPanelDrop();
 initPanelDrag();
-NavBar.init({ requireAuth: true }).then(() => loadClip());
+NavBar.init({ requireAuth: true }).then(async () => {
+  await loadClip();
+  const clipId = new URLSearchParams(location.search).get('id');
+  if (clipId) loadDailyStats(clipId);
+});
 </script>
 </body>
 </html>
