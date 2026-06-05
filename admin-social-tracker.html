@@ -311,6 +311,11 @@ async function pick(id) {
       if (r.ok) ytLiveCache[id] = await r.json();
     } catch(e) { /* non-fatal */ }
   }
+  // Scroll calendar to the week this clip was published
+  if (c && c.yt_posted_at) {
+    calWeek = calMonday(new Date(fd(c.yt_posted_at) + 'T12:00:00'));
+    loadCal();
+  }
   renderPanel();
 }
 
@@ -658,7 +663,13 @@ function renderCal(clips) {
         }
         const v=c[plat.dateKey]; return v&&fd(v)===ds;
       });
-      const pills = dc.map(c=>`<span class="clip-pill pill-${plat.cls}" title="${esc(c.concept_name||'Clip #'+c.id)}">${esc(c.concept_name||'Clip #'+c.id)}</span>`).join('');
+      const pills = dc.map(c=>{
+        const name = esc(c.concept||c.concept_name||'Clip');
+        const pub = c.yt_posted_at ? fd(c.yt_posted_at) : '';
+        const timeStr = pub ? ' · ' + pub.slice(5).replace('-','/') : '';
+        const sel = c.id === selId ? ' style="outline:2px solid #FFE800;outline-offset:1px"' : '';
+        return `<span class="clip-pill pill-${plat.cls}"${sel} title="${name}${timeStr}" onclick="pick(${c.id});document.getElementById('bottom-panel').scrollIntoView({behavior:'smooth',block:'nearest'})" style="cursor:pointer${c.id===selId?';outline:2px solid #FFE800;outline-offset:1px':''}">${name}${timeStr}</span>`;
+      }).join('');
       return `<div class="cal-cell${calIsToday(day)?' today-col':''}">${pills}</div>`;
     }).join('');
     return `<div class="cal-row"><div class="plat-label"><span class="plat-pill plat-${plat.key}">${plat.label}</span></div>${cells}</div>`;
