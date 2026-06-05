@@ -168,7 +168,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
   </div>
 </div>
 <div id="bottom-panel" style="display:none"></div>
-<div style="max-width:1400px;margin:48px auto 0;padding:0 16px 32px">
+<div style="max-width:1400px;margin:0 auto;padding:32px 16px 32px;border-top:2px solid #e8e4dc;margin-top:20px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
     <div class="cal-nav">
@@ -600,10 +600,13 @@ async function syncToYouTube() {
 
 
 NavBar.init({ requireAuth: true }).then(async () => {
-  load();
+  await load();
   try {
     await fetch('/admin/api/tracker/sync-dates', { method:'POST', headers:{'Accept':'application/json'} });
   } catch(e) { /* non-fatal */ }
+  // Navigate calendar to the week of the most recent published video
+  const dates = clips.map(c => c.yt_posted_at).filter(Boolean).map(d => String(d).slice(0,10)).sort().reverse();
+  if (dates.length) calWeek = calMonday(new Date(dates[0] + 'T12:00:00'));
   loadCal();
 });
 
