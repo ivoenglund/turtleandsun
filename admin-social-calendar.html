@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Content Calendar — Turtle and Sun Admin</title>
+<script src="/nav.js?v=20260602a"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px}
+.page{max-width:1300px;margin:0 auto;padding:16px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+h1{font-size:18px;font-weight:700}
+.nav-week{display:flex;align-items:center;gap:10px}
+.nav-week button{padding:5px 13px;border-radius:7px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
+.nav-week button:hover{background:#f5f5f5}
+.week-label{font-size:13px;font-weight:700;min-width:180px;text-align:center}
+.btn-today{background:#1C2A14;color:#FFE800;border:none;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer}
+
+.calendar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}
+.cal-head{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid #e8e4dc}
+.cal-head-cell{padding:8px 6px;text-align:center;font-size:11px;font-weight:700;color:#555;border-right:1px solid #f0ece4}
+.cal-head-cell:first-child{border-right:1px solid #e8e4dc;background:#faf8f4}
+.cal-head-cell.today-col{background:#fffde7;color:#856700}
+.cal-body{}
+.cal-row{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid #f0ece4;min-height:64px}
+.cal-row:last-child{border-bottom:none}
+.plat-label{padding:8px 6px;display:flex;align-items:flex-start;justify-content:center;border-right:1px solid #e8e4dc;background:#faf8f4}
+.plat-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;writing-mode:horizontal-tb}
+.plat-tiktok{background:#1C0A00;color:#fff}
+.plat-instagram{background:#C13584;color:#fff}
+.plat-youtube{background:#FF0000;color:#fff}
+.plat-facebook{background:#1877F2;color:#fff}
+.cal-cell{padding:4px;border-right:1px solid #f0ece4;vertical-align:top;min-height:64px}
+.cal-cell.today-col{background:#fffde7}
+.clip-pill{display:block;margin-bottom:3px;padding:3px 7px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.clip-pill:hover{opacity:.85}
+.pill-tiktok{background:#1C0A00;color:#fff}
+.pill-instagram{background:#C13584;color:#fff}
+.pill-youtube{background:#FF0000;color:#fff}
+.pill-youtube.scheduled{background:#FF6B6B;color:#fff}
+.pill-facebook{background:#1877F2;color:#fff}
+.pill-sched{position:relative}
+.pill-sched::after{content:'⏱';font-size:9px;margin-left:3px}
+.empty-week{padding:40px;text-align:center;color:#aaa;font-size:13px}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="toolbar">
+    <h1>Content Calendar</h1>
+    <div class="nav-week">
+      <button onclick="prevWeek()">&#8592; Prev</button>
+      <div class="week-label" id="week-label"></div>
+      <button onclick="nextWeek()">Next &#8594;</button>
+      <button class="btn-today" onclick="goToday()">Today</button>
+    </div>
+  </div>
+
+  <div class="calendar" id="calendar">
+    <div class="cal-head" id="cal-head"></div>
+    <div class="cal-body" id="cal-body"></div>
+  </div>
+</div>
+
+<script src="/nav.js?v=20260602a"></script>
+<script>
+const PLATS = [
+  { key: 'tiktok',    label: 'TikTok',    dateKey: 'tiktok_posted_at',    cls: 'tiktok' },
+  { key: 'instagram', label: 'Instagram',  dateKey: 'instagram_posted_at', cls: 'instagram' },
+  { key: 'youtube',   label: 'YouTube',    dateKey: 'yt_posted_at',        cls: 'youtube' },
+  { key: 'facebook',  label: 'Facebook',   dateKey: 'fb_posted_at',        cls: 'facebook' },
+];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let currentWeek = mondayOf(new Date());
+
+function mondayOf(d) {
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const m = new Date(d);
+  m.setDate(d.getDate() + diff);
+  m.setHours(0,0,0,0);
+  return m;
+}
+
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+
+function isoDate(d) { return d.toISOString().slice(0,10); }
+
+function isToday(d) { return isoDate(d) === isoDate(new Date()); }
+
+function prevWeek() { currentWeek = addDays(currentWeek, -7); load(); }
+function nextWeek() { currentWeek = addDays(currentWeek,  7); load(); }
+function goToday()  { currentWeek = mondayOf(new Date()); load(); }
+
+async function load() {
+  const r = await fetch('/admin/api/social-calendar?week=' + isoDate(currentWeek));
+  const d = await r.json();
+  render(d.rows || []);
+}
+
+function render(clips) {
+  // Build week days
+  const days = Array.from({length:7}, (_,i) => addDays(currentWeek, i));
+
+  // Week label
+  const s = days[0], e = days[6];
+  document.getElementById('week-label').textContent =
+    `${s.getDate()} ${MONTHS[s.getMonth()]} — ${e.getDate()} ${MONTHS[e.getMonth()]} ${e.getFullYear()}`;
+
+  // Header row
+  const head = document.getElementById('cal-head');
+  head.innerHTML = '<div class="cal-head-cell"></div>' +
+    days.map((d,i) => `<div class="cal-head-cell${isToday(d)?' today-col':''}">${DAYS[i]}<br><span style="font-size:14px;font-weight:700;color:#1C0A00">${d.getDate()}</span></div>`).join('');
+
+  // Body rows — one per platform
+  const body = document.getElementById('cal-body');
+  body.innerHTML = PLATS.map(plat => {
+    const cells = days.map(day => {
+      const dayStr = isoDate(day);
+      const dayClips = clips.filter(c => {
+        if (plat.key === 'youtube') {
+          // Show on posted date OR scheduled date
+          const posted = c.yt_posted_at ? c.yt_posted_at.slice(0,10) : null;
+          const sched  = c.yt_scheduled_at ? c.yt_scheduled_at.slice(0,10) : null;
+          return posted === dayStr || sched === dayStr;
+        }
+        const d2 = c[plat.dateKey];
+        return d2 && d2.slice(0,10) === dayStr;
+      });
+
+      const pills = dayClips.map(c => {
+        const label = c.concept_name || ('Clip #' + c.id);
+        const style = c.clip_style === 3 ? ' B' : ' A';
+        const subject = c.subject_name ? ` · ${c.subject_name}` : '';
+        const isScheduled = plat.key === 'youtube' && c.yt_scheduled_at && !c.published_youtube;
+        const schedCls = isScheduled ? ' scheduled pill-sched' : '';
+        const title = isScheduled ? 'Scheduled — not yet live' : 'Published';
+        return `<a href="/admin/social-clips/${c.id}" class="clip-pill pill-${plat.cls}${schedCls}" title="${title}">${label}${subject}${style}</a>`;
+      }).join('');
+
+      return `<div class="cal-cell${isToday(day)?' today-col':''}">${pills}</div>`;
+    }).join('');
+
+    return `<div class="cal-row">
+      <div class="plat-label"><span class="plat-pill plat-${plat.key}">${plat.label}</span></div>
+      ${cells}
+    </div>`;
+  }).join('');
+
+  // If nothing at all in the week
+  const hasAny = clips.length > 0;
+  if (!hasAny) {
+    body.innerHTML += `<div class="empty-week">No clips posted or scheduled this week.</div>`;
+  }
+}
+
+NavBar.init({ requireAuth: true }).then(() => load());
+</script>
+</body>
+</html>
