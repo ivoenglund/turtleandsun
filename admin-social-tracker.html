@@ -214,6 +214,10 @@ let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {}
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
+// fd(): normalise a pg DATE value (may arrive as full ISO timestamp) to YYYY-MM-DD for <input type="date">
+function fd(v) { if (!v) return ''; if (v instanceof Date) return v.toISOString().slice(0,10); return String(v).slice(0,10); }
+// fdd(): human-friendly date display from same raw value
+function fdd(v) { return v ? new Date(fd(v)).toLocaleDateString('sv-SE',{year:'numeric',month:'short',day:'numeric'}) : '—'; }
 
 async function load() {
   const r = await fetch('/admin/api/tracker/clips');
@@ -297,14 +301,14 @@ function renderPanel() {
   if (pd) {
     if (selPlat === 'tiktok' || selPlat === 'instagram') {
       fieldsHtml = `
-        <div class="field"><div class="field-label">Posted</div><div class="field-val">${esc(pd.posted_at||'')}</div></div>
+        <div class="field"><div class="field-label">Posted</div><div class="field-val">${fdd(pd.posted_at)}</div></div>
         <div class="field"><div class="field-label">Post URL</div><div class="field-val"><a href="${esc(pd.post_url||'#')}" target="_blank">${esc(pd.post_url||'—')}</a></div></div>
         <div class="field"><div class="field-label">Caption</div><div class="field-val">${esc(pd.caption||'—')}</div></div>
         <div class="field"><div class="field-label">Hashtags</div><div class="field-val mono">${esc(pd.hashtags||'—')}</div></div>
         ${selPlat==='instagram' && pd.alt_text ? `<div class="field"><div class="field-label">Alt text</div><div class="field-val">${esc(pd.alt_text)}</div></div>` : ''}`;
     } else if (selPlat === 'youtube') {
       fieldsHtml = `
-        <div class="field"><div class="field-label">Posted</div><div class="field-val">${esc(pd.posted_at||'')}</div></div>
+        <div class="field"><div class="field-label">Posted</div><div class="field-val">${fdd(pd.posted_at)}</div></div>
         <div class="field"><div class="field-label">Post URL</div><div class="field-val"><a href="${esc(pd.post_url||'#')}" target="_blank">${esc(pd.post_url||'—')}</a></div></div>
         <div class="field"><div class="field-label">Title</div><div class="field-val">${esc(pd.yt_title||'—')}</div></div>
         <div class="field"><div class="field-label">Description</div><div class="field-val" style="white-space:pre-line;font-size:11px">${esc(pd.yt_description||'—')}</div></div>
@@ -312,7 +316,7 @@ function renderPanel() {
         <div class="field"><div class="field-label">Video ID <span style="font-size:10px;color:#aaa">(used for auto stats)</span></div><div class="field-val mono">${esc(pd.yt_video_id||'not set')}</div></div>`;
     } else if (selPlat === 'facebook') {
       fieldsHtml = `
-        <div class="field"><div class="field-label">Posted</div><div class="field-val">${esc(pd.posted_at||'')}</div></div>
+        <div class="field"><div class="field-label">Posted</div><div class="field-val">${fdd(pd.posted_at)}</div></div>
         <div class="field"><div class="field-label">Post URL</div><div class="field-val"><a href="${esc(pd.post_url||'#')}" target="_blank">${esc(pd.post_url||'—')}</a></div></div>
         <div class="field"><div class="field-label">Caption</div><div class="field-val">${esc(pd.fb_caption||'—')}</div></div>`;
     }
@@ -494,20 +498,20 @@ function showPostModal(plat) {
   let fields = '';
   if (plat === 'tiktok') {
     fields = `
-      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${pd.posted_at||''}"></div>
+      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" placeholder="https://tiktok.com/..." value="${esc(pd.post_url||'')}"></div>
       <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label>Hashtags</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>`;
   } else if (plat === 'instagram') {
     fields = `
-      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${pd.posted_at||''}"></div>
+      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
       <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label>Hashtags (max 30)</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
       <div class="form-row"><label>Alt text</label><input id="pm-alt" value="${esc(pd.alt_text||'')}"></div>`;
   } else if (plat === 'youtube') {
     fields = `
-      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${pd.posted_at||''}"></div>
+      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
       <div class="form-row"><label>Video ID <span style="font-weight:400;color:#aaa">(from URL, used for auto stats)</span></label><input id="pm-ytid" placeholder="e.g. dQw4w9WgXcQ" value="${esc(pd.yt_video_id||'')}"></div>
       <div class="form-row"><label>Title</label><input id="pm-yttitle" value="${esc(pd.yt_title||'')}"></div>
@@ -515,7 +519,7 @@ function showPostModal(plat) {
       <div class="form-row"><label>Keyword tags</label><input id="pm-ytkw" value="${esc(pd.yt_keyword_tags||'')}"></div>`;
   } else if (plat === 'facebook') {
     fields = `
-      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${pd.posted_at||''}"></div>
+      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
       <div class="form-row"><label>Caption</label><textarea id="pm-fbcap" rows="3">${esc(pd.fb_caption||'')}</textarea></div>`;
   }

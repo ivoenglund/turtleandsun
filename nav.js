@@ -63,6 +63,8 @@
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/gallery">↳ Gallery</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/visits">↳ Visits</a>' +
         '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/failed-deliveries">↳ Deliveries</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/social-calendar">↳ Content Calendar</a>' +
+        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/social-tracker">↳ Social Tracker</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
@@ -97,6 +99,8 @@
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/gallery">↳ Gallery</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">↳ Visits</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/failed-deliveries">↳ Deliveries</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-calendar">↳ Content Calendar</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-tracker">↳ Social Tracker</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
