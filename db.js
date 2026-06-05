@@ -859,6 +859,59 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS before_pct NUMERIC(5,2) DEFAULT 40;
   `);
 
+  // ====================================================================
+  // Social Tracker — interim content tracking tool (2026-06-05)
+  // ====================================================================
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tracker_clips (
+      id              SERIAL PRIMARY KEY,
+      ref_tag         TEXT UNIQUE NOT NULL,
+      concept         TEXT NOT NULL,
+      subject         TEXT,
+      subject_name    TEXT,
+      occasion        TEXT,
+      style           TEXT,
+      mood            TEXT,
+      custom_tags     TEXT[] NOT NULL DEFAULT '{}',
+      social_clip_id  INTEGER REFERENCES social_clips(id) ON DELETE SET NULL,
+      notes           TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS tracker_posts (
+      id              SERIAL PRIMARY KEY,
+      clip_id         INTEGER NOT NULL REFERENCES tracker_clips(id) ON DELETE CASCADE,
+      platform        TEXT NOT NULL CHECK (platform IN ('tiktok','instagram','youtube','facebook')),
+      posted_at       DATE,
+      post_url        TEXT,
+      caption         TEXT,
+      hashtags        TEXT,
+      alt_text        TEXT,
+      yt_title        TEXT,
+      yt_description  TEXT,
+      yt_keyword_tags TEXT,
+      yt_video_id     TEXT,
+      fb_caption      TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (clip_id, platform)
+    );
+
+    CREATE TABLE IF NOT EXISTS tracker_stats (
+      id          SERIAL PRIMARY KEY,
+      clip_id     INTEGER NOT NULL REFERENCES tracker_clips(id) ON DELETE CASCADE,
+      platform    TEXT NOT NULL,
+      stat_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+      views       INTEGER NOT NULL DEFAULT 0,
+      likes       INTEGER NOT NULL DEFAULT 0,
+      comments    INTEGER NOT NULL DEFAULT 0,
+      shares      INTEGER NOT NULL DEFAULT 0,
+      source      TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','api')),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (clip_id, platform, stat_date)
+    );
+  `);
+
   console.log('Database tables ready');
 }
 

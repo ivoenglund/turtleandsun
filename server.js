@@ -899,7 +899,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email') +
       card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
       card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets') +
-      card('Social clips', 'Create before/after clips for TikTok, Instagram Reels, and YouTube Shorts.', '/admin/social-clips')
+      card('Social clips', 'Create before/after clips for TikTok, Instagram Reels, and YouTube Shorts.', '/admin/social-clips') +
+      card('Social Tracker', 'Track published videos, platform metadata, and daily view stats.', '/admin/social-tracker')
     )}
 
     <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
@@ -3401,6 +3402,205 @@ app.post('/admin/api/generations/:id/regenerate', requireRole('admin'), async (r
     generateForOrder(portrait_url, gen.product, gen.email || '', gen.oid, gen.concept_id, null)
       .catch(e => console.error('[regenerate] failed:', e.message));
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── Social Tracker ─────────────────────────────────────────────────────────
+// Interim content tracking tool. Tables: tracker_clips, tracker_posts,
+// tracker_stats. Full spec at 01_Context/_SPEC_Social_Tracker.md
+
+app.get('/admin/social-tracker', requireRole('admin'), (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-social-tracker.html'));
+});
+
+// List all clips with aggregated stats
+app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        c.id, c.ref_tag, c.concept, c.subject, c.subject_name,
+        c.occasion, c.style, c.mood, c.custom_tags, c.notes, c.created_at,
+        -- platform posted flags
+        MAX(CASE WHEN p.platform='tiktok'    THEN p.posted_at::text END) AS tiktok_posted,
+        MAX(CASE WHEN p.platform='instagram' THEN p.posted_at::text END) AS instagram_posted,
+        MAX(CASE WHEN p.platform='youtube'   THEN p.posted_at::text END) AS youtube_posted,
+        MAX(CASE WHEN p.platform='facebook'  THEN p.posted_at::text END) AS facebook_posted,
+        -- latest total views per platform (most recent stat_date)
+        COALESCE((
+          SELECT SUM(s.views) FROM tracker_stats s
+          WHERE s.clip_id=c.id AND s.platform='tiktok'
+            AND s.stat_date=(SELECT MAX(s2.stat_date) FROM tracker_stats s2 WHERE s2.clip_id=c.id AND s2.platform='tiktok')
+        ),0) AS tiktok_views,
+        COALESCE((
+          SELECT SUM(s.views) FROM tracker_stats s
+          WHERE s.clip_id=c.id AND s.platform='instagram'
+            AND s.stat_date=(SELECT MAX(s2.stat_date) FROM tracker_stats s2 WHERE s2.clip_id=c.id AND s2.platform='instagram')
+        ),0) AS instagram_views,
+        COALESCE((
+          SELECT SUM(s.views) FROM tracker_stats s
+          WHERE s.clip_id=c.id AND s.platform='youtube'
+            AND s.stat_date=(SELECT MAX(s2.stat_date) FROM tracker_stats s2 WHERE s2.clip_id=c.id AND s2.platform='youtube')
+        ),0) AS youtube_views,
+        COALESCE((
+          SELECT SUM(s.views) FROM tracker_stats s
+          WHERE s.clip_id=c.id AND s.platform='facebook'
+            AND s.stat_date=(SELECT MAX(s2.stat_date) FROM tracker_stats s2 WHERE s2.clip_id=c.id AND s2.platform='facebook')
+        ),0) AS facebook_views
+      FROM tracker_clips c
+      LEFT JOIN tracker_posts p ON p.clip_id = c.id
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `);
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Create clip
+app.post('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
+  try {
+    const { ref_tag, concept, subject, subject_name, occasion, style, mood, custom_tags, notes } = req.body;
+    if (!ref_tag || !concept) return res.status(400).json({ error: 'ref_tag and concept required' });
+    const { rows } = await pool.query(
+      `INSERT INTO tracker_clips (ref_tag, concept, subject, subject_name, occasion, style, mood, custom_tags, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [ref_tag, concept, subject||null, subject_name||null, occasion||null, style||null, mood||null, custom_tags||[], notes||null]
+    );
+    res.json({ ok: true, clip: rows[0] });
+  } catch(e) {
+    if (e.code === '23505') return res.status(400).json({ error: 'ref_tag already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Update clip
+app.put('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { concept, subject, subject_name, occasion, style, mood, custom_tags, notes } = req.body;
+    await pool.query(
+      `UPDATE tracker_clips SET concept=$2, subject=$3, subject_name=$4, occasion=$5,
+       style=$6, mood=$7, custom_tags=$8, notes=$9 WHERE id=$1`,
+      [req.params.id, concept, subject||null, subject_name||null, occasion||null, style||null, mood||null, custom_tags||[], notes||null]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Delete clip
+app.delete('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tracker_clips WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Upsert platform post
+app.post('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req, res) => {
+  try {
+    const { platform, posted_at, post_url, caption, hashtags, alt_text,
+            yt_title, yt_description, yt_keyword_tags, yt_video_id, fb_caption } = req.body;
+    if (!platform) return res.status(400).json({ error: 'platform required' });
+    await pool.query(`
+      INSERT INTO tracker_posts
+        (clip_id, platform, posted_at, post_url, caption, hashtags, alt_text,
+         yt_title, yt_description, yt_keyword_tags, yt_video_id, fb_caption, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+      ON CONFLICT (clip_id, platform) DO UPDATE SET
+        posted_at=$3, post_url=$4, caption=$5, hashtags=$6, alt_text=$7,
+        yt_title=$8, yt_description=$9, yt_keyword_tags=$10, yt_video_id=$11,
+        fb_caption=$12, updated_at=NOW()`,
+      [req.params.id, platform, posted_at||null, post_url||null, caption||null,
+       hashtags||null, alt_text||null, yt_title||null, yt_description||null,
+       yt_keyword_tags||null, yt_video_id||null, fb_caption||null]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Get platform posts for a clip
+app.get('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM tracker_posts WHERE clip_id=$1 ORDER BY platform', [req.params.id]
+    );
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Get daily stats for a clip
+app.get('/admin/api/tracker/clips/:id/stats', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT platform, stat_date, views, likes, comments, shares, source
+       FROM tracker_stats WHERE clip_id=$1 ORDER BY stat_date DESC, platform`,
+      [req.params.id]
+    );
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Log manual stats
+app.post('/admin/api/tracker/clips/:id/stats', requireRole('admin'), async (req, res) => {
+  try {
+    const { platform, stat_date, views, likes, comments, shares } = req.body;
+    if (!platform) return res.status(400).json({ error: 'platform required' });
+    await pool.query(`
+      INSERT INTO tracker_stats (clip_id, platform, stat_date, views, likes, comments, shares, source)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'manual')
+      ON CONFLICT (clip_id, platform, stat_date) DO UPDATE SET
+        views=$4, likes=$5, comments=$6, shares=$7, source='manual'`,
+      [req.params.id, platform, stat_date || new Date().toISOString().slice(0,10),
+       views||0, likes||0, comments||0, shares||0]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Fetch YouTube stats for all clips with yt_video_id
+app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
+  const YT_KEY = process.env.YOUTUBE_API_KEY;
+  if (!YT_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set in env' });
+  try {
+    const { rows: posts } = await pool.query(
+      `SELECT p.clip_id, p.yt_video_id FROM tracker_posts p
+       WHERE p.platform='youtube' AND p.yt_video_id IS NOT NULL AND p.yt_video_id <> ''`
+    );
+    if (!posts.length) return res.json({ ok: true, updated: 0 });
+
+    const https = require('https');
+    const today = new Date().toISOString().slice(0, 10);
+    let updated = 0;
+
+    // Batch in groups of 50
+    for (let i = 0; i < posts.length; i += 50) {
+      const batch = posts.slice(i, i + 50);
+      const ids = batch.map(p => p.yt_video_id).join(',');
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(ids)}&key=${YT_KEY}`;
+      const data = await new Promise((resolve, reject) => {
+        https.get(url, r => {
+          let body = '';
+          r.on('data', c => body += c);
+          r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+        }).on('error', reject);
+      });
+      for (const item of (data.items || [])) {
+        const post = batch.find(p => p.yt_video_id === item.id);
+        if (!post) continue;
+        const s = item.statistics || {};
+        await pool.query(`
+          INSERT INTO tracker_stats (clip_id, platform, stat_date, views, likes, comments, shares, source)
+          VALUES ($1,'youtube',$2,$3,$4,$5,0,'api')
+          ON CONFLICT (clip_id, platform, stat_date) DO UPDATE SET
+            views=$3, likes=$4, comments=$5, source='api'`,
+          [post.clip_id, today, parseInt(s.viewCount)||0, parseInt(s.likeCount)||0, parseInt(s.commentCount)||0]
+        );
+        updated++;
+      }
+    }
+    res.json({ ok: true, updated });
+  } catch(e) {
+    console.error('[tracker/yt-stats] error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── TikTok Thumbnail Generator ─────────────────────────────────────────────
