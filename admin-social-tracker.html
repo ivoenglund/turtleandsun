@@ -27,7 +27,7 @@ table{width:100%;border-collapse:collapse}
 thead th{font-size:11px;font-weight:700;color:#555;padding:8px 9px;border-bottom:1px solid #e8e4dc;text-align:left;white-space:nowrap;background:#faf8f4;position:sticky;top:0;z-index:1}
 tbody tr{border-bottom:1px solid #f0ece4;cursor:pointer}
 tbody tr:hover{background:#faf8f4}
-tbody tr.sel{background:#f0f7ea}
+tbody tr.sel{background:#e8f5e9;box-shadow:inset 3px 0 0 #1C2A14}
 td{padding:7px 9px;vertical-align:middle}
 .concept-name{font-weight:700;font-size:13px}
 .ref-tag{font-size:10px;color:#888;margin-top:1px}
@@ -303,6 +303,8 @@ async function pick(id) {
   if (selId === id) { closePanel(); return; }
   selId = id;
   renderTable();
+  const selRow = document.getElementById('row-' + id);
+  if (selRow) selRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   const c = clips.find(x => x.id === id);
   await loadStats(id);
   if (c && c.yt_video_id && !ytLiveCache[id]) {
