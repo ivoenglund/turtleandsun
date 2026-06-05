@@ -472,7 +472,10 @@ function showPostModal(plat) {
     ${fields}
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="document.getElementById('post-modal-bg').remove()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePost()">Save</button>
+      ${postModalPlat === 'youtube'
+        ? '<button class="btn btn-primary" onclick="syncToYouTube()">▶ Sync to YouTube</button>'
+        : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
+      }
     </div>
   </div>`;
   document.body.appendChild(div);
@@ -502,6 +505,36 @@ async function savePost() {
   await loadPosts(selId);
   await load();
   renderPanel();
+}
+
+async function syncToYouTube() {
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : null; };
+  const body = {
+    posted_at:       g('pm-date')    || null,
+    post_url:        g('pm-url')     || null,
+    yt_video_id:     g('pm-ytid')    || null,
+    yt_title:        g('pm-yttitle') || null,
+    yt_description:  g('pm-ytdesc')  || null,
+    yt_keyword_tags: g('pm-ytkw')    || null,
+  };
+  const btn = document.querySelector('#post-modal-bg .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+  try {
+    const r = await fetch(`/admin/api/tracker/clips/${selId}/sync-youtube`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    document.getElementById('post-modal-bg').remove();
+    await loadPosts(selId);
+    await load();
+    renderPanel();
+  } catch(e) {
+    alert('Sync failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Sync to YouTube'; }
+  }
 }
 
 NavBar.init({ requireAuth: true }).then(() => load());

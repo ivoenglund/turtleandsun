@@ -6786,6 +6786,43 @@ app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
 });
 
 // ============================================================
+
+// POST /admin/api/tracker/clips/:id/sync-youtube
+app.post('/admin/api/tracker/clips/:id/sync-youtube', requireRole('admin'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { posted_at, post_url, yt_video_id, yt_title, yt_description, yt_keyword_tags } = req.body;
+    if (!yt_video_id) return res.status(400).json({ error: 'No YouTube video ID set' });
+    // Save to DB
+    await pool.query(
+      'UPDATE social_clips SET yt_posted_at=$2, yt_post_url=$3, yt_title=$4, yt_description=$5, yt_keyword_tags=$6, yt_video_id=$7, updated_at=NOW() WHERE id=$1',
+      [id, posted_at||null, post_url||null, yt_title||null, yt_description||null, yt_keyword_tags||null, yt_video_id]
+    );
+    // Push to YouTube Data API v3 videos.update
+    const token = await getYouTubeAccessToken();
+    const https5 = require('https');
+    const tags = yt_keyword_tags ? yt_keyword_tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const ytBody = JSON.stringify({ id: yt_video_id, snippet: { title: yt_title||'', description: yt_description||'', tags, categoryId: '22' } });
+    const ytRes = await new Promise((resolve, reject) => {
+      const req2 = https5.request({
+        hostname: 'www.googleapis.com', path: '/youtube/v3/videos?part=snippet', method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(ytBody) }
+      }, r => {
+        let b = ''; r.on('data', c => b += c);
+        r.on('end', () => { try { resolve({ status: r.statusCode, body: JSON.parse(b) }); } catch(e) { reject(e); } });
+      });
+      req2.on('error', reject); req2.write(ytBody); req2.end();
+    });
+    if (ytRes.status !== 200) {
+      const msg = (ytRes.body.error && ytRes.body.error.message) || JSON.stringify(ytRes.body);
+      return res.status(502).json({ error: 'YouTube API error: ' + msg });
+    }
+    res.json({ ok: true, title: ytRes.body.snippet && ytRes.body.snippet.title });
+  } catch (e) {
+    console.error('[sync-youtube]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 // Social Tracker API -- /admin/api/tracker/*
 // Backed by social_clips + clip_stats (merged 2026-06-05).
 // ============================================================
