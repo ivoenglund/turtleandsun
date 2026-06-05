@@ -145,7 +145,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         <div id="dur-fields">
           <div class="field">
             <label id="dur-label">End card duration (seconds)</label>
-            <input type="number" id="end_card_duration_s" value="4" min="1" max="30" step="0.5" oninput="scheduleAutoSave()">
+            <input type="number" id="end_card_duration_s" value="6" min="1" max="30" step="0.5" oninput="scheduleAutoSave()">
           </div>
         </div>
 
@@ -190,7 +190,10 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
 
       <!-- Tags -->
       <div class="card">
-        <h2>Tags</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h2 style="margin:0">Tags</h2>
+          <span id="style-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#1C2A14;color:#FFE800"></span>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div>
             <div class="field-label">Subject</div>
@@ -254,7 +257,10 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
 
       <!-- Platform metadata -->
       <div class="card">
-        <h2>Platform content</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h2 style="margin:0">Platform content</h2>
+          <button class="btn btn-secondary btn-sm" id="btn-gen-content" onclick="generateContent(this)">&#10024; Generate texts</button>
+        </div>
         <div class="plat-tabs" id="plat-tabs">
           <button class="ptab act" onclick="switchPlat('tiktok',this)">🎵 TikTok</button>
           <button class="ptab" onclick="switchPlat('instagram',this)">📸 Instagram</button>
@@ -554,7 +560,7 @@ function renderClip(initial) {
   // Text settings — only update from DB if not dirty
   if (initial || !_dirty) {
     document.getElementById('video_overlay_text').value  = clip.video_overlay_text || '';
-    document.getElementById('end_card_duration_s').value = clip.end_card_duration_s || 4;
+    document.getElementById('end_card_duration_s').value = clip.end_card_duration_s || 6;
     document.getElementById('before_y_offset').value     = clip.before_y_offset  || 0;
     document.getElementById('after_y_offset').value      = clip.after_y_offset   || 0;
     document.getElementById('before_pct').value          = clip.before_pct != null ? clip.before_pct : 40;
@@ -627,6 +633,8 @@ function setStyle(n, silent) {
   document.getElementById('dur-label').textContent = n === 3 ? 'Show composite (seconds)' : 'End card duration (seconds)';
   // Rise duration: Style B only
   document.getElementById('vb-fields').style.display = n === 3 ? '' : 'none';
+  const sb = document.getElementById('style-badge');
+  if (sb) sb.textContent = n === 3 ? 'Style B' : 'Style A';
   if (!silent) { _dirty = true; scheduleAutoSave(); }
 }
 
@@ -648,7 +656,7 @@ async function saveNow(thenGenerate) {
     before_y_offset:     parseInt(document.getElementById('before_y_offset').value) || 0,
     after_y_offset:      parseInt(document.getElementById('after_y_offset').value)  || 0,
     panel_url:           document.getElementById('panel_url').value.trim() || null,
-    end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 4,
+    end_card_duration_s: parseFloat(document.getElementById('end_card_duration_s').value) || 6,
     before_pct:          parseFloat(document.getElementById('before_pct').value) || 40,
     clip_style:          parseInt(document.getElementById('clip_style').value) || 1,
 
@@ -774,6 +782,32 @@ function showFlash(msg, type) {
 }
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Generate platform content ───────────────────────────────
+async function generateContent(btn) {
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try {
+    const r = await fetch('/admin/api/social-clips/' + clipId + '/generate-content', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    // Populate all fields
+    const sv = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    sv('tt-caption',   d.tiktok_caption);
+    sv('tt-hashtags',  d.tiktok_hashtags);
+    sv('ig-caption',   d.instagram_caption);
+    sv('ig-hashtags',  d.instagram_hashtags);
+    sv('ig-alt',       d.instagram_alt_text);
+    sv('yt-title',     d.yt_title);
+    sv('yt-desc',      d.yt_description);
+    sv('yt-kw',        d.yt_keyword_tags);
+    sv('fb-caption',   d.fb_caption);
+    showFlash('Texts generated and saved', 'ok');
+  } catch(e) {
+    showFlash('Generate error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '✨ Generate texts';
+  }
 }
 
 // ── YouTube publish ─────────────────────────────────────────

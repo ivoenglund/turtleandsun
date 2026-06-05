@@ -2905,6 +2905,84 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
 
 
 
+
+// ── Generate platform content (titles, captions, hashtags) ─────────────────
+function buildPlatformContent(clip) {
+  const subject  = clip.subject || 'pet';
+  const name     = clip.subject_name;
+  const concept  = clip.concept_name || clip.concept || 'Loveogram';
+  const occasion = clip.occasion;
+  const styleTag = clip.clip_style === 3 ? 'style-b' : 'style-a';
+  const subj     = name ? name : ('a ' + subject);
+  const pronoun  = (subject === 'human' || subject === 'family') ? 'them' : ('your ' + subject);
+
+  const occasionLine = {
+    'birthday':    '🎂 Perfect birthday gift!',
+    'fathers-day': "🎁 Perfect Father's Day gift!",
+    'mothers-day': '🌸 Perfect Mother\'s Day gift!',
+    'christmas':   '🎄 The perfect Christmas gift!',
+  }[occasion] || '';
+
+  const subjectTags = {
+    'dog':    '#dogsoftiktok #doglovers #doglover',
+    'cat':    '#catsoftiktok #catlovers #catlover',
+    'human':  '#portrait #personalgift',
+    'family': '#familylove #familyphoto',
+  }[subject] || '#petlovers';
+
+  const occasionTags = {
+    'birthday':    '#birthdaygift #birthdayideas #giftideas',
+    'fathers-day': '#fathersday #fathersdaygift #giftfordad',
+    'mothers-day': '#mothersday #mothersdaygift #giftformom',
+    'christmas':   '#christmasgift #christmasideas',
+  }[occasion] || '';
+
+  const conceptTag = '#' + concept.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const capConcept = concept.charAt(0).toUpperCase() + concept.slice(1);
+
+  const ttCaption  = (name ? `We turned ${name} into a ${concept} 👑` : `We turned ${subj} into a ${concept} 👑`) + '\n\nWait for the after… 😍' + (occasionLine ? '\n\n' + occasionLine : '');
+  const ttHashtags = [conceptTag, subjectTags, '#beforeandafter #petportrait #loveogram #turtleandsun #fyp', occasionTags, '#' + styleTag].filter(Boolean).join(' ');
+
+  const igCaption  = (name ? `${name} got the royal treatment 👑` : `Your ${subject} deserves a portrait worthy of a palace 👑`) + `\n\nTransformed into a timeless ${concept} by Turtle and Sun — the family photo you could never take.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create yours at turtleandsun.com 🐢\nFrom 99 kr / ~$9`;
+  const igHashtags = ['#petportrait', conceptTag, subjectTags, '#beforeandafter #loveogram #turtleandsun #aiart #petgift', occasionTags, '#' + styleTag].filter(Boolean).join(' ');
+  const igAlt      = `${subject} transformed from a photo into a ${concept} — before and after showing the original and the AI-generated portrait`;
+
+  const ytTitle    = name ? `We turned ${name} into a ${concept} 👑 Wait for the after…` : `${subject.charAt(0).toUpperCase() + subject.slice(1)} becomes a ${concept} 👑 | Before & After`;
+  const ytDesc     = `${name ? name + ' got' : capConcept + ' transformation —'} the royal treatment! 👑🐾\n\nThis is a Loveogram — an AI-generated portrait that transforms your pet photo into a stunning ${concept}.\n\nCreate yours at turtleandsun.com\nFrom 99 kr / ~$9 USD\n\n${occasionLine ? occasionLine + '\n\n' : ''}The family photo you could never take.\n5% of every order goes to the Turtleandsun Connection Fund 🐢\n\n#Shorts ${conceptTag} #loveogram #turtleandsun`;
+  const ytKw       = [subject + ' portrait', concept.toLowerCase(), 'pet transformation', 'before and after', 'AI pet art', subject + ' makeover', 'pet gift', 'loveogram', 'turtle and sun', subject + ' art', 'cute ' + subject, occasion && occasion !== 'general' ? occasion + ' gift' : '', 'AI art', styleTag].filter(Boolean).join(', ');
+
+  const fbCaption  = (name ? `${name} is now royalty 👑` : `Your ${subject} deserves to be royalty 👑`) + ` We transformed ${pronoun} into a ${concept} using AI — and the result is stunning.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create your own Loveogram at turtleandsun.com — from 99 kr.`;
+
+  return { tiktok_caption: ttCaption, tiktok_hashtags: ttHashtags, instagram_caption: igCaption, instagram_hashtags: igHashtags, instagram_alt_text: igAlt, yt_title: ytTitle, yt_description: ytDesc, yt_keyword_tags: ytKw, fb_caption: fbCaption };
+}
+
+app.post('/admin/api/social-clips/:id(\\d+)/generate-content', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT sc.*, c.name AS concept_name
+      FROM social_clips sc LEFT JOIN concepts c ON c.id = sc.concept_id
+      WHERE sc.id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const clip = rows[0];
+    const generated = buildPlatformContent(clip);
+    // Save generated fields
+    await pool.query(`
+      UPDATE social_clips SET
+        tiktok_caption=$2, tiktok_hashtags=$3,
+        instagram_caption=$4, instagram_hashtags=$5, instagram_alt_text=$6,
+        yt_title=$7, yt_description=$8, yt_keyword_tags=$9,
+        fb_caption=$10, updated_at=NOW()
+      WHERE id=$1`,
+      [req.params.id,
+       generated.tiktok_caption, generated.tiktok_hashtags,
+       generated.instagram_caption, generated.instagram_hashtags, generated.instagram_alt_text,
+       generated.yt_title, generated.yt_description, generated.yt_keyword_tags,
+       generated.fb_caption]
+    );
+    res.json({ ok: true, ...generated });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── YouTube OAuth + Upload ──────────────────────────────────────────────────
 
 function ytOAuthUrl(state) {
