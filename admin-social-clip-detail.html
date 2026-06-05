@@ -322,42 +322,6 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
           <textarea id="fb-caption" class="field-input" rows="3" oninput="debounceSave()"></textarea>
         </div>
       </div>
-
-      <!-- Daily stats -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <h2 style="margin:0">Performance</h2>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm" onclick="fetchYTStats(this)">▶ Fetch YT stats</button>
-            <button class="btn btn-secondary btn-sm" onclick="toggleLogForm()">+ Log stats</button>
-          </div>
-        </div>
-        <div id="log-form" style="display:none;background:#f5f2ea;border-radius:7px;padding:10px;margin-bottom:10px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-            <div>
-              <div class="field-label">Platform</div>
-              <select id="log-plat" class="field-input">
-                <option value="tiktok">TikTok</option>
-                <option value="instagram">Instagram</option>
-                <option value="youtube">YouTube</option>
-                <option value="facebook">Facebook</option>
-              </select>
-            </div>
-            <div>
-              <div class="field-label">Date</div>
-              <input id="log-date" type="date" class="field-input">
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
-            <div><div class="field-label">Views</div><input id="log-views" type="number" class="field-input" placeholder="0"></div>
-            <div><div class="field-label">Likes</div><input id="log-likes" type="number" class="field-input" placeholder="0"></div>
-            <div><div class="field-label">Comments</div><input id="log-comments" type="number" class="field-input" placeholder="0"></div>
-            <div><div class="field-label">Shares</div><input id="log-shares" type="number" class="field-input" placeholder="0"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="logStats()">Save</button>
-        </div>
-        <div id="stats-section"><div class="no-stats">No stats yet.</div></div>
-        <div id="daily-stats-section"><div class="no-stats" style="margin-top:8px"></div></div>
       </div>
     </div>
 
@@ -858,7 +822,6 @@ async function publishYouTube(btn) {
     st.innerHTML = '<a href="' + d.url + '" target="_blank" style="color:#185FA5">' + d.url + '</a>';
     document.getElementById('yt-url').value = d.url;
     document.getElementById('yt-videoid').value = d.video_id;
-    await loadDailyStats(clipId);
     showFlash('Published to YouTube!', 'ok');
   } catch(e) {
     btn.disabled = false; btn.textContent = '&#9654; Publish to YouTube';
@@ -938,80 +901,14 @@ function collectMeta() {
   };
 }
 
-// ── Daily stats ─────────────────────────────────────────────
-function toggleLogForm() {
-  const f = document.getElementById('log-form');
-  if (!document.getElementById('log-date').value)
-    document.getElementById('log-date').value = new Date().toISOString().slice(0,10);
-  f.style.display = f.style.display === 'none' ? 'block' : 'none';
-}
-
-async function logStats() {
-  const clipId = new URLSearchParams(location.search).get('id');
-  const body = {
-    platform: document.getElementById('log-plat').value,
-    stat_date: document.getElementById('log-date').value,
-    views:    +document.getElementById('log-views').value||0,
-    likes:    +document.getElementById('log-likes').value||0,
-    comments: +document.getElementById('log-comments').value||0,
-    shares:   +document.getElementById('log-shares').value||0,
-  };
-  await fetch(`/admin/api/social-clips/${clipId}/stats`, {
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
-  });
-  await loadDailyStats(clipId);
-  showFlash('Stats saved', 'ok');
-}
-
-async function loadDailyStats(clipId) {
-  const r = await fetch(`/admin/api/social-clips/${clipId}/stats`);
-  const d = await r.json();
-  const rows = d.rows || [];
-  const el = document.getElementById('daily-stats-section');
-  if (!rows.length) { el.innerHTML = ''; return; }
-  const dates = [...new Set(rows.map(r=>r.stat_date))].sort().reverse().slice(0,14);
-  const byKey = {};
-  rows.forEach(r => { byKey[r.stat_date+'_'+r.platform] = r; });
-  const trs = dates.map(dt => {
-    const td = (p) => {
-      const s = byKey[dt+'_'+p];
-      if (!s) return '<td>—</td>';
-      const cls = p==='youtube' ? ' class="yt"' : '';
-      const auto = s.source==='api' ? ' ↺' : '';
-      return `<td${cls}>${s.views.toLocaleString()}${auto}</td>`;
-    };
-    return `<tr><td>${dt}</td>${td('tiktok')}${td('instagram')}${td('youtube')}${td('facebook')}</tr>`;
-  }).join('');
-  el.innerHTML = `<table class="daily-tbl">
-    <thead><tr><th>Date</th><th>TikTok</th><th>Instagram</th><th>YouTube ↺</th><th>Facebook</th></tr></thead>
-    <tbody>${trs}</tbody>
-  </table>`;
-}
-
-async function fetchYTStats(btn) {
-  btn.disabled = true; btn.textContent = 'Fetching…';
-  try {
-    const r = await fetch(`/admin/api/social-clips/${clipId}/fetch-youtube-stats`, { method:'POST', headers:{'Accept':'application/json'} });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    await loadDailyStats(clipId);
-    showFlash(`YouTube: ${d.views.toLocaleString()} views`, 'ok');
-  } catch(e) {
-    showFlash('YT stats error: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = '▶ Fetch YT stats';
-  }
-}
-
 // ── Boot ───────────────────────────────────────────────────
 applyProportions(40);
 initPanelDrop();
 initPanelDrag();
 NavBar.init({ requireAuth: true }).then(async () => {
   await loadClip();
-  const clipId = new URLSearchParams(location.search).get('id');
-  if (clipId) loadDailyStats(clipId);
 });
 </script>
 </body>
 </html>
+                          
