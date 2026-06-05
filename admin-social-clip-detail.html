@@ -836,6 +836,7 @@ async function scheduleYouTube(btn) {
     st.textContent = 'Publishes ' + fmt;
     document.getElementById('yt-url').value = d.url;
     document.getElementById('yt-videoid').value = d.video_id;
+    if (!document.getElementById('yt-date').value) document.getElementById('yt-date').value = new Date().toISOString().slice(0,10);
     showFlash('Scheduled for ' + fmt, 'ok');
   } catch(e) {
     btn.disabled = false; btn.textContent = '🕑 Schedule';
