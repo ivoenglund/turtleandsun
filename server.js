@@ -6866,7 +6866,7 @@ app.post('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
 });
 
 // PUT /admin/api/tracker/clips/:id -- update metadata
-app.put('/admin/api/tracker/clips/:id(\d+)', requireRole('admin'), async (req, res) => {
+app.put('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) => {
   try {
     const { concept, ref_tag, subject, subject_name, occasion, style, mood, custom_tags, notes } = req.body;
     await pool.query(
@@ -6898,7 +6898,7 @@ app.put('/admin/api/tracker/clips/:id(\d+)', requireRole('admin'), async (req, r
 });
 
 // DELETE /admin/api/tracker/clips/:id
-app.delete('/admin/api/tracker/clips/:id(\d+)', requireRole('admin'), async (req, res) => {
+app.delete('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('DELETE FROM social_clips WHERE id = $1', [parseInt(req.params.id)]);
     res.json({ ok: true });
@@ -6908,7 +6908,7 @@ app.delete('/admin/api/tracker/clips/:id(\d+)', requireRole('admin'), async (req
 });
 
 // GET /admin/api/tracker/clips/:id/posts -- platform post objects from social_clips columns
-app.get('/admin/api/tracker/clips/:id(\d+)/posts', requireRole('admin'), async (req, res) => {
+app.get('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT tiktok_posted_at, tiktok_post_url, tiktok_caption, tiktok_hashtags,
@@ -6940,7 +6940,7 @@ app.get('/admin/api/tracker/clips/:id(\d+)/posts', requireRole('admin'), async (
 });
 
 // POST /admin/api/tracker/clips/:id/posts -- upsert platform post data onto social_clips
-app.post('/admin/api/tracker/clips/:id(\d+)/posts', requireRole('admin'), async (req, res) => {
+app.post('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { platform, posted_at, post_url, caption, hashtags, alt_text,
@@ -6970,7 +6970,7 @@ app.post('/admin/api/tracker/clips/:id(\d+)/posts', requireRole('admin'), async 
 });
 
 // GET /admin/api/tracker/clips/:id/stats
-app.get('/admin/api/tracker/clips/:id(\d+)/stats', requireRole('admin'), async (req, res) => {
+app.get('/admin/api/tracker/clips/:id/stats', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT platform, stat_date::text, views, likes, comments, shares, source FROM clip_stats WHERE social_clip_id=$1 ORDER BY stat_date DESC, platform',
@@ -6983,7 +6983,7 @@ app.get('/admin/api/tracker/clips/:id(\d+)/stats', requireRole('admin'), async (
 });
 
 // POST /admin/api/tracker/clips/:id/stats -- manual stat log
-app.post('/admin/api/tracker/clips/:id(\d+)/stats', requireRole('admin'), async (req, res) => {
+app.post('/admin/api/tracker/clips/:id/stats', requireRole('admin'), async (req, res) => {
   try {
     const { platform, stat_date, views, likes, comments, shares } = req.body;
     if (!platform) return res.status(400).json({ error: 'platform required' });
