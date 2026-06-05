@@ -6844,7 +6844,7 @@ app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async
     const sn = item.snippet || {};
     // Also sync publishedAt to our DB
     if (sn.publishedAt) {
-      await pool.query('UPDATE social_clips SET yt_posted_at=$2, updated_at=NOW() WHERE id=$1 AND yt_posted_at IS NULL',
+      await pool.query('UPDATE social_clips SET yt_posted_at=$2, updated_at=NOW() WHERE id=$1',
         [parseInt(req.params.id), sn.publishedAt.slice(0,10)]);
     }
     res.json({
@@ -6858,6 +6858,38 @@ app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async
     });
   } catch(e) {
     console.error('[youtube-live]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /admin/api/tracker/sync-dates
+app.post('/admin/api/tracker/sync-dates', requireRole('admin'), async (req, res) => {
+  try {
+    const YT_KEY = process.env.YOUTUBE_API_KEY;
+    if (!YT_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set' });
+    const { rows } = await pool.query("SELECT id, yt_video_id FROM social_clips WHERE yt_video_id IS NOT NULL AND yt_video_id <> ''");
+    if (!rows.length) return res.json({ updated: 0 });
+    const https7 = require('https');
+    let updated = 0;
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const ids = batch.map(r => encodeURIComponent(r.yt_video_id)).join(',');
+      const url7 = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=' + ids + '&key=' + YT_KEY;
+      const data = await new Promise((resolve, reject) => {
+        https7.get(url7, r => { let b=''; r.on('data',c=>b+=c); r.on('end',()=>{ try{resolve(JSON.parse(b));}catch(e){reject(e);} }); }).on('error',reject);
+      });
+      const byId = {};
+      for (const item of (data.items||[])) byId[item.id] = item.snippet && item.snippet.publishedAt ? item.snippet.publishedAt.slice(0,10) : null;
+      for (const clip of batch) {
+        const pub = byId[clip.yt_video_id];
+        if (!pub) continue;
+        await pool.query('UPDATE social_clips SET yt_posted_at=$2, updated_at=NOW() WHERE id=$1', [clip.id, pub]);
+        updated++;
+      }
+    }
+    res.json({ ok: true, updated });
+  } catch(e) {
+    console.error('[sync-dates]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

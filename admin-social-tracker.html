@@ -168,7 +168,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
   </div>
 </div>
 <div id="bottom-panel" style="display:none"></div>
-<div style="max-width:1400px;margin:24px auto 0;padding:0 16px 24px">
+<div style="max-width:1400px;margin:48px auto 0;padding:0 16px 32px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
     <div class="cal-nav">
@@ -599,7 +599,13 @@ async function syncToYouTube() {
 
 
 
-NavBar.init({ requireAuth: true }).then(() => { load(); loadCal(); });
+NavBar.init({ requireAuth: true }).then(async () => {
+  load();
+  try {
+    await fetch('/admin/api/tracker/sync-dates', { method:'POST', headers:{'Accept':'application/json'} });
+  } catch(e) { /* non-fatal */ }
+  loadCal();
+});
 
 // ── Embedded content calendar ───────────────────────────────
 const CAL_PLATS = [
