@@ -6783,6 +6783,277 @@ app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
   }
 });
 
+// ============================================================
+// Social Tracker API -- /admin/api/tracker/*
+// Backed by social_clips + clip_stats (merged 2026-06-05).
+// ============================================================
+
+// GET /admin/api/tracker/clips -- list all clips with latest stats
+app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        sc.id,
+        COALESCE(sc.concept_name, c.name, '') AS concept,
+        sc.ref_tag, sc.subject, sc.subject_name, sc.occasion,
+        sc.style, sc.mood, sc.notes,
+        COALESCE(sc.custom_tags, '{}') AS custom_tags,
+        sc.created_at,
+        (sc.tiktok_posted_at IS NOT NULL OR sc.published_tiktok)      AS tiktok_posted,
+        (sc.instagram_posted_at IS NOT NULL OR sc.published_instagram) AS instagram_posted,
+        (sc.yt_posted_at IS NOT NULL OR sc.published_youtube)          AS youtube_posted,
+        (sc.fb_posted_at IS NOT NULL OR sc.published_facebook)         AS facebook_posted,
+        COALESCE(tt.views, sc.tiktok_views, 0)    AS tiktok_views,
+        COALESCE(ig.views, sc.instagram_views, 0) AS instagram_views,
+        COALESCE(yt.views, sc.youtube_views, 0)   AS youtube_views,
+        COALESCE(fb.views, sc.facebook_views, 0)  AS facebook_views
+      FROM social_clips sc
+      LEFT JOIN concepts c ON c.id = sc.concept_id
+      LEFT JOIN LATERAL (
+        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='tiktok'
+        ORDER BY stat_date DESC LIMIT 1
+      ) tt ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='instagram'
+        ORDER BY stat_date DESC LIMIT 1
+      ) ig ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='youtube'
+        ORDER BY stat_date DESC LIMIT 1
+      ) yt ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='facebook'
+        ORDER BY stat_date DESC LIMIT 1
+      ) fb ON TRUE
+      ORDER BY sc.created_at DESC
+      LIMIT 500
+    `);
+    res.json({ rows });
+  } catch (e) {
+    console.error('[tracker/clips/list]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /admin/api/tracker/clips -- create a new tracker clip (no triplet required)
+app.post('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
+  try {
+    const { concept, ref_tag, subject, subject_name, occasion, style, mood, custom_tags, notes } = req.body;
+    if (!concept || !String(concept).trim()) return res.status(400).json({ error: 'concept is required' });
+    if (!ref_tag  || !String(ref_tag).trim())  return res.status(400).json({ error: 'ref_tag is required' });
+    const { rows } = await pool.query(
+      `INSERT INTO social_clips
+        (concept_name, ref_tag, subject, subject_name, occasion, style, mood, custom_tags, notes, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'done')
+       RETURNING id, concept_name AS concept, ref_tag, created_at`,
+      [
+        concept.trim(), ref_tag.trim(),
+        subject || null, subject_name || null, occasion || null,
+        style || null, mood || null,
+        Array.isArray(custom_tags) ? custom_tags : [],
+        notes || null,
+      ]
+    );
+    res.json({ clip: rows[0] });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'A clip with that ref_tag already exists' });
+    console.error('[tracker/clips/create]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /admin/api/tracker/clips/:id -- update metadata
+app.put('/admin/api/tracker/clips/:id(\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const { concept, ref_tag, subject, subject_name, occasion, style, mood, custom_tags, notes } = req.body;
+    await pool.query(
+      `UPDATE social_clips SET
+        concept_name = COALESCE($2, concept_name),
+        ref_tag      = COALESCE($3, ref_tag),
+        subject      = $4,
+        subject_name = $5,
+        occasion     = $6,
+        style        = $7,
+        mood         = $8,
+        custom_tags  = COALESCE($9, custom_tags),
+        notes        = $10,
+        updated_at   = NOW()
+       WHERE id = $1`,
+      [
+        parseInt(req.params.id),
+        concept || null, ref_tag || null,
+        subject || null, subject_name || null, occasion || null,
+        style || null, mood || null,
+        Array.isArray(custom_tags) ? custom_tags : null,
+        notes || null,
+      ]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /admin/api/tracker/clips/:id
+app.delete('/admin/api/tracker/clips/:id(\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM social_clips WHERE id = $1', [parseInt(req.params.id)]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/clips/:id/posts -- platform post objects from social_clips columns
+app.get('/admin/api/tracker/clips/:id(\d+)/posts', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT tiktok_posted_at, tiktok_post_url, tiktok_caption, tiktok_hashtags,
+              instagram_posted_at, instagram_post_url, instagram_caption, instagram_hashtags, instagram_alt_text,
+              yt_posted_at, yt_post_url, yt_title, yt_description, yt_keyword_tags, yt_video_id,
+              fb_posted_at, fb_post_url, fb_caption
+       FROM social_clips WHERE id = $1`,
+      [parseInt(req.params.id)]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const sc = rows[0];
+    const posts = [];
+    if (sc.tiktok_posted_at || sc.tiktok_post_url || sc.tiktok_caption) {
+      posts.push({ platform: 'tiktok', posted_at: sc.tiktok_posted_at, post_url: sc.tiktok_post_url, caption: sc.tiktok_caption, hashtags: sc.tiktok_hashtags });
+    }
+    if (sc.instagram_posted_at || sc.instagram_post_url || sc.instagram_caption) {
+      posts.push({ platform: 'instagram', posted_at: sc.instagram_posted_at, post_url: sc.instagram_post_url, caption: sc.instagram_caption, hashtags: sc.instagram_hashtags, alt_text: sc.instagram_alt_text });
+    }
+    if (sc.yt_posted_at || sc.yt_post_url || sc.yt_title) {
+      posts.push({ platform: 'youtube', posted_at: sc.yt_posted_at, post_url: sc.yt_post_url, yt_title: sc.yt_title, yt_description: sc.yt_description, yt_keyword_tags: sc.yt_keyword_tags, yt_video_id: sc.yt_video_id });
+    }
+    if (sc.fb_posted_at || sc.fb_post_url || sc.fb_caption) {
+      posts.push({ platform: 'facebook', posted_at: sc.fb_posted_at, post_url: sc.fb_post_url, fb_caption: sc.fb_caption });
+    }
+    res.json({ rows: posts });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /admin/api/tracker/clips/:id/posts -- upsert platform post data onto social_clips
+app.post('/admin/api/tracker/clips/:id(\d+)/posts', requireRole('admin'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { platform, posted_at, post_url, caption, hashtags, alt_text,
+            yt_video_id, yt_title, yt_description, yt_keyword_tags, fb_caption } = req.body;
+    if (!platform) return res.status(400).json({ error: 'platform required' });
+    let sql, params;
+    if (platform === 'tiktok') {
+      sql = 'UPDATE social_clips SET tiktok_posted_at=$2, tiktok_post_url=$3, tiktok_caption=$4, tiktok_hashtags=$5, updated_at=NOW() WHERE id=$1';
+      params = [id, posted_at||null, post_url||null, caption||null, hashtags||null];
+    } else if (platform === 'instagram') {
+      sql = 'UPDATE social_clips SET instagram_posted_at=$2, instagram_post_url=$3, instagram_caption=$4, instagram_hashtags=$5, instagram_alt_text=$6, updated_at=NOW() WHERE id=$1';
+      params = [id, posted_at||null, post_url||null, caption||null, hashtags||null, alt_text||null];
+    } else if (platform === 'youtube') {
+      sql = 'UPDATE social_clips SET yt_posted_at=$2, yt_post_url=$3, yt_title=$4, yt_description=$5, yt_keyword_tags=$6, yt_video_id=$7, updated_at=NOW() WHERE id=$1';
+      params = [id, posted_at||null, post_url||null, yt_title||null, yt_description||null, yt_keyword_tags||null, yt_video_id||null];
+    } else if (platform === 'facebook') {
+      sql = 'UPDATE social_clips SET fb_posted_at=$2, fb_post_url=$3, fb_caption=$4, updated_at=NOW() WHERE id=$1';
+      params = [id, posted_at||null, post_url||null, fb_caption||null];
+    } else {
+      return res.status(400).json({ error: 'Unknown platform' });
+    }
+    await pool.query(sql, params);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/clips/:id/stats
+app.get('/admin/api/tracker/clips/:id(\d+)/stats', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT platform, stat_date::text, views, likes, comments, shares, source FROM clip_stats WHERE social_clip_id=$1 ORDER BY stat_date DESC, platform',
+      [parseInt(req.params.id)]
+    );
+    res.json({ rows });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /admin/api/tracker/clips/:id/stats -- manual stat log
+app.post('/admin/api/tracker/clips/:id(\d+)/stats', requireRole('admin'), async (req, res) => {
+  try {
+    const { platform, stat_date, views, likes, comments, shares } = req.body;
+    if (!platform) return res.status(400).json({ error: 'platform required' });
+    await pool.query(
+      `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'manual')
+       ON CONFLICT (social_clip_id, platform, stat_date) DO UPDATE SET
+         views=$4, likes=$5, comments=$6, shares=$7, source='manual'`,
+      [parseInt(req.params.id), platform,
+       stat_date || new Date().toISOString().slice(0, 10),
+       views||0, likes||0, comments||0, shares||0]
+    );
+    const viewCol = { tiktok: 'tiktok_views', instagram: 'instagram_views', youtube: 'youtube_views', facebook: 'facebook_views' }[platform];
+    if (viewCol) await pool.query('UPDATE social_clips SET ' + viewCol + '=$2, updated_at=NOW() WHERE id=$1', [parseInt(req.params.id), views||0]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /admin/api/tracker/fetch-youtube-stats -- batch YT stats for all clips with yt_video_id
+app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
+  const YT_KEY = process.env.YOUTUBE_API_KEY;
+  if (!YT_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set in Railway env' });
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, yt_video_id FROM social_clips WHERE yt_video_id IS NOT NULL AND yt_video_id <> ''"
+    );
+    if (!rows.length) return res.json({ updated: 0, message: 'No clips with a YouTube video ID' });
+    const https3 = require('https');
+    let updated = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const ids   = batch.map(r => encodeURIComponent(r.yt_video_id)).join(',');
+      const ytUrl = 'https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + ids + '&key=' + YT_KEY;
+      const data  = await new Promise((resolve, reject) => {
+        https3.get(ytUrl, r => {
+          let body = ''; r.on('data', c => body += c);
+          r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+        }).on('error', reject);
+      });
+      const byId = {};
+      for (const item of (data.items || [])) byId[item.id] = item.statistics || {};
+      for (const clip of batch) {
+        const s = byId[clip.yt_video_id];
+        if (!s) continue;
+        const views    = parseInt(s.viewCount)||0;
+        const likes    = parseInt(s.likeCount)||0;
+        const comments = parseInt(s.commentCount)||0;
+        await pool.query(
+          `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
+           VALUES ($1,'youtube',$2,$3,$4,$5,0,'api')
+           ON CONFLICT (social_clip_id, platform, stat_date) DO UPDATE SET
+             views=$3, likes=$4, comments=$5, source='api'`,
+          [clip.id, today, views, likes, comments]
+        );
+        await pool.query('UPDATE social_clips SET youtube_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1', [clip.id, views]);
+        updated++;
+      }
+    }
+    res.json({ ok: true, updated });
+  } catch (e) {
+    console.error('[tracker/fetch-youtube-stats]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Serve admin-social-tracker.html
+app.get('/admin/social-tracker', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-social-tracker.html'));
+});
+
 if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app);
 }

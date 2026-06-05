@@ -908,6 +908,9 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_post_url        TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_posted_at       DATE;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_scheduled_at    TIMESTAMPTZ;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS style              TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS notes              TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS facebook_views     INTEGER;
   `);
 
   // Platform OAuth tokens (single-admin, keyed by platform name)
