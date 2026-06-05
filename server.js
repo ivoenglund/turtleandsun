@@ -7004,48 +7004,54 @@ app.post('/admin/api/tracker/clips/:id(\d+)/stats', requireRole('admin'), async 
   }
 });
 
+// Shared helper called by HTTP route and daily cron
+async function fetchYouTubeStatsBatch() {
+  const YT_KEY = process.env.YOUTUBE_API_KEY;
+  if (!YT_KEY) throw new Error('YOUTUBE_API_KEY not set');
+  const { rows } = await pool.query(
+    "SELECT id, yt_video_id FROM social_clips WHERE yt_video_id IS NOT NULL AND yt_video_id <> ''"
+  );
+  if (!rows.length) return { updated: 0 };
+  const https3 = require('https');
+  let updated = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  for (let i = 0; i < rows.length; i += 50) {
+    const batch = rows.slice(i, i + 50);
+    const ids   = batch.map(r => encodeURIComponent(r.yt_video_id)).join(',');
+    const ytUrl = 'https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + ids + '&key=' + YT_KEY;
+    const data  = await new Promise((resolve, reject) => {
+      https3.get(ytUrl, r => {
+        let body = ''; r.on('data', c => body += c);
+        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      }).on('error', reject);
+    });
+    const byId = {};
+    for (const item of (data.items || [])) byId[item.id] = item.statistics || {};
+    for (const clip of batch) {
+      const s = byId[clip.yt_video_id];
+      if (!s) continue;
+      const views    = parseInt(s.viewCount)||0;
+      const likes    = parseInt(s.likeCount)||0;
+      const comments = parseInt(s.commentCount)||0;
+      await pool.query(
+        `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
+         VALUES ($1,'youtube',$2,$3,$4,$5,0,'api')
+         ON CONFLICT (social_clip_id, platform, stat_date) DO UPDATE SET
+           views=$3, likes=$4, comments=$5, source='api'`,
+        [clip.id, today, views, likes, comments]
+      );
+      await pool.query('UPDATE social_clips SET youtube_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1', [clip.id, views]);
+      updated++;
+    }
+  }
+  return { updated };
+}
+
 // POST /admin/api/tracker/fetch-youtube-stats -- batch YT stats for all clips with yt_video_id
 app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
-  const YT_KEY = process.env.YOUTUBE_API_KEY;
-  if (!YT_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set in Railway env' });
   try {
-    const { rows } = await pool.query(
-      "SELECT id, yt_video_id FROM social_clips WHERE yt_video_id IS NOT NULL AND yt_video_id <> ''"
-    );
-    if (!rows.length) return res.json({ updated: 0, message: 'No clips with a YouTube video ID' });
-    const https3 = require('https');
-    let updated = 0;
-    const today = new Date().toISOString().slice(0, 10);
-    for (let i = 0; i < rows.length; i += 50) {
-      const batch = rows.slice(i, i + 50);
-      const ids   = batch.map(r => encodeURIComponent(r.yt_video_id)).join(',');
-      const ytUrl = 'https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + ids + '&key=' + YT_KEY;
-      const data  = await new Promise((resolve, reject) => {
-        https3.get(ytUrl, r => {
-          let body = ''; r.on('data', c => body += c);
-          r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
-        }).on('error', reject);
-      });
-      const byId = {};
-      for (const item of (data.items || [])) byId[item.id] = item.statistics || {};
-      for (const clip of batch) {
-        const s = byId[clip.yt_video_id];
-        if (!s) continue;
-        const views    = parseInt(s.viewCount)||0;
-        const likes    = parseInt(s.likeCount)||0;
-        const comments = parseInt(s.commentCount)||0;
-        await pool.query(
-          `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
-           VALUES ($1,'youtube',$2,$3,$4,$5,0,'api')
-           ON CONFLICT (social_clip_id, platform, stat_date) DO UPDATE SET
-             views=$3, likes=$4, comments=$5, source='api'`,
-          [clip.id, today, views, likes, comments]
-        );
-        await pool.query('UPDATE social_clips SET youtube_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1', [clip.id, views]);
-        updated++;
-      }
-    }
-    res.json({ ok: true, updated });
+    const result = await fetchYouTubeStatsBatch();
+    res.json({ ok: true, updated: result.updated });
   } catch (e) {
     console.error('[tracker/fetch-youtube-stats]', e.message);
     res.status(500).json({ error: e.message });
@@ -7073,6 +7079,16 @@ cron.schedule('0 3 * * *', async () => {
 }, { timezone: 'UTC' });
 
 cron.schedule('0 6 * * *', () => sendDailyDigest().catch((err) => console.error('[digest] cron error:', err.message)), { timezone: 'UTC' });
+
+cron.schedule('0 7 * * *', async () => {
+  if (!process.env.YOUTUBE_API_KEY) return;
+  try {
+    const result = await fetchYouTubeStatsBatch();
+    console.log('[yt-stats-cron] updated', result.updated, 'clips');
+  } catch (err) {
+    console.error('[yt-stats-cron]', err.message);
+  }
+}, { timezone: 'UTC' });
 
 scheduleFxRefresh(cron);
 
