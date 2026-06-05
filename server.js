@@ -3109,6 +3109,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/publish-youtube', requireRole('admin
   const os4  = require('os');
   const path4 = require('path');
   try {
+    const publish_at = req.body && req.body.publish_at ? req.body.publish_at : null;
     // Load clip
     const { rows } = await pool.query(`SELECT * FROM social_clips WHERE id=$1`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Clip not found' });
@@ -3143,7 +3144,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/publish-youtube', requireRole('admin
           tags:        clip.yt_keyword_tags ? clip.yt_keyword_tags.split(',').map(s=>s.trim()).filter(Boolean) : [],
           categoryId:  '22', // People & Blogs
         },
-        status: { privacyStatus: 'public', selfDeclaredMadeForKids: false },
+        status: { privacyStatus: publish_at ? 'private' : 'public', publishAt: publish_at || undefined, selfDeclaredMadeForKids: false },
       });
 
       const uploadUrl = await new Promise((resolve, reject) => {

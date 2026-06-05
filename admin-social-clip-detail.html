@@ -302,9 +302,14 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
           <textarea id="yt-desc" class="field-input" rows="4" oninput="debounceSave()"></textarea>
           <div class="field-label" style="margin-top:6px">Keyword tags</div>
           <input id="yt-kw" class="field-input" placeholder="pet portrait, royal portrait, dog…" oninput="debounceSave()">
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" id="btn-publish-yt" onclick="publishYouTube(this)">&#9654; Publish to YouTube</button>
-            <span id="yt-publish-status" style="font-size:11px;color:#555"></span>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">
+            <div class="field-label">Schedule for (leave empty to publish immediately)</div>
+            <input id="yt-schedule-at" type="datetime-local" class="field-input" style="margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" id="btn-publish-yt" onclick="publishYouTube(this)">&#9654; Publish now</button>
+              <button class="btn btn-secondary btn-sm" id="btn-schedule-yt" onclick="scheduleYouTube(this)">&#128337; Schedule</button>
+              <span id="yt-publish-status" style="font-size:11px;color:#555"></span>
+            </div>
           </div>
           <div style="margin-top:5px"><a href="/admin/youtube/connect" style="font-size:11px;color:#185FA5">Not connected? Connect YouTube account &#8594;</a></div>
         </div>
@@ -811,6 +816,34 @@ async function generateContent(btn) {
 }
 
 // ── YouTube publish ─────────────────────────────────────────
+async function scheduleYouTube(btn) {
+  const schedAt = document.getElementById('yt-schedule-at').value;
+  if (!schedAt) { showFlash('Pick a date and time first', 'err'); return; }
+  const st = document.getElementById('yt-publish-status');
+  btn.disabled = true; btn.textContent = 'Uploading…'; st.textContent = 'Uploading to YouTube as scheduled…';
+  try {
+    await saveNow();
+    const r = await fetch('/admin/api/social-clips/' + clipId + '/publish-youtube', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publish_at: new Date(schedAt).toISOString() }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    btn.textContent = '✓ Scheduled';
+    btn.style.background = '#3A6B20'; btn.style.color = '#fff';
+    const fmt = new Date(schedAt).toLocaleString();
+    st.textContent = 'Publishes ' + fmt;
+    document.getElementById('yt-url').value = d.url;
+    document.getElementById('yt-videoid').value = d.video_id;
+    showFlash('Scheduled for ' + fmt, 'ok');
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '🕑 Schedule';
+    st.textContent = '';
+    showFlash('Schedule error: ' + e.message, 'err');
+  }
+}
+
 async function publishYouTube(btn) {
   const st = document.getElementById('yt-publish-status');
   btn.disabled = true; btn.textContent = 'Uploading…'; st.textContent = 'This may take a minute…';
