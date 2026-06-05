@@ -351,25 +351,27 @@ function renderPanel() {
 
   // Action buttons
   const ytEditBtn = c.yt_video_id
-    ? `<button class="btn btn-sm btn-secondary" onclick="showPostModal('youtube')">YouTube ✎</button>`
+    ? `<button style="padding:3px 8px;font-size:10px;font-weight:700;border-radius:5px;border:1px solid rgba(255,232,0,.5);background:rgba(255,232,0,.15);color:#FFE800;cursor:pointer" onclick="showPostModal('youtube')">YT ✎</button>`
     : '';
   const otherEditBtns = ['tiktok','instagram','facebook'].map(p =>
-    `<button class="btn btn-sm btn-secondary" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
+    `<button style="padding:3px 8px;font-size:10px;font-weight:700;border-radius:5px;border:1px solid rgba(255,232,0,.5);background:rgba(255,232,0,.15);color:#FFE800;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
   ).join('');
 
   panel.innerHTML = `
     <div class="bp-head">
-      <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
-      <button onclick="closePanel()">&#x2715;</button>
+      <div style="min-width:0;flex:1">
+        <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        ${ytEditBtn}${otherEditBtns}
+        <button onclick="closePanel()" style="margin-left:4px">&#x2715;</button>
+      </div>
     </div>
     <div class="bp-body">
       <div class="bp-video">${videoHtml}</div>
       <div class="bp-chart">
         ${ytInfoHtml}
         ${stats.length ? '<canvas id="views-chart"></canvas>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube stats to load them.</div>'}
-        <div class="bp-actions">
-          ${ytEditBtn}${otherEditBtns}
-        </div>
       </div>
     </div>`;
 
@@ -603,9 +605,9 @@ NavBar.init({ requireAuth: true }).then(async () => {
   await load();
   try {
     await fetch('/admin/api/tracker/sync-dates', { method:'POST', headers:{'Accept':'application/json'} });
+    await load(); // reload so yt_posted_at is fresh from DB
   } catch(e) { /* non-fatal */ }
-  // Navigate calendar to the week of the most recent published video
-  const dates = clips.map(c => c.yt_posted_at).filter(Boolean).map(d => String(d).slice(0,10)).sort().reverse();
+  const dates = clips.map(c => c.yt_posted_at).filter(Boolean).map(d => fd(d)).filter(Boolean).sort().reverse();
   if (dates.length) calWeek = calMonday(new Date(dates[0] + 'T12:00:00'));
   loadCal();
 });
@@ -652,11 +654,11 @@ function renderCal(clips) {
       const ds = calIso(day);
       const dc = clips.filter(c => {
         if (plat.key==='youtube') {
-          const p=c.yt_posted_at?String(c.yt_posted_at).slice(0,10):null;
-          const sc=c.yt_scheduled_at?String(c.yt_scheduled_at).slice(0,10):null;
+          const p=c.yt_posted_at?fd(c.yt_posted_at):null;
+          const sc=c.yt_scheduled_at?fd(c.yt_scheduled_at):null;
           return p===ds||sc===ds;
         }
-        const v=c[plat.dateKey]; return v&&String(v).slice(0,10)===ds;
+        const v=c[plat.dateKey]; return v&&fd(v)===ds;
       });
       const pills = dc.map(c=>`<span class="clip-pill pill-${plat.cls}" title="${esc(c.concept_name||'Clip #'+c.id)}">${esc(c.concept_name||'Clip #'+c.id)}</span>`).join('');
       return `<div class="cal-cell${calIsToday(day)?' today-col':''}">${pills}</div>`;
