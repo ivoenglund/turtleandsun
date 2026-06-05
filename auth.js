@@ -70,7 +70,7 @@ function setSessionCookie(res, token, expiresAt) {
 }
 
 function isApiRequest(req) {
-  return req.path.startsWith('/api/') || (req.headers.accept || '').includes('application/json');
+  return req.path.startsWith('/api/') || req.path.startsWith('/admin/api/') || (req.headers.accept || '').includes('application/json');
 }
 
 async function requireAuth(req, res, next) {
