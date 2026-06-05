@@ -351,10 +351,10 @@ function renderPanel() {
 
   // Action buttons
   const ytEditBtn = c.yt_video_id
-    ? `<button style="padding:3px 8px;font-size:10px;font-weight:700;border-radius:5px;border:1px solid rgba(255,232,0,.5);background:rgba(255,232,0,.15);color:#FFE800;cursor:pointer" onclick="showPostModal('youtube')">YT ✎</button>`
+    ? `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:#FF0000;color:#fff;cursor:pointer" onclick="showPostModal('youtube')">YouTube ✎</button>`
     : '';
   const otherEditBtns = ['tiktok','instagram','facebook'].map(p =>
-    `<button style="padding:3px 8px;font-size:10px;font-weight:700;border-radius:5px;border:1px solid rgba(255,232,0,.5);background:rgba(255,232,0,.15);color:#FFE800;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
+    `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
   ).join('');
 
   panel.innerHTML = `
@@ -634,10 +634,8 @@ function calAddDays(d,n) { const r=new Date(d); r.setDate(r.getDate()+n); return
 function calIso(d) { return d.toISOString().slice(0,10); }
 function calIsToday(d) { return calIso(d)===calIso(new Date()); }
 
-async function loadCal() {
-  const r = await fetch('/admin/api/social-calendar?week=' + calIso(calWeek));
-  const d = await r.json();
-  renderCal(d.rows || []);
+function loadCal() {
+  renderCal(clips); // render from in-memory clips — guaranteed to have data
 }
 
 function renderCal(clips) {
