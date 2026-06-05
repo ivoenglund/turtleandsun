@@ -2904,6 +2904,236 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
 });
 
 
+
+// ── YouTube OAuth + Upload ──────────────────────────────────────────────────
+
+function ytOAuthUrl(state) {
+  const params = new URLSearchParams({
+    client_id:     process.env.YOUTUBE_CLIENT_ID,
+    redirect_uri:  process.env.APP_BASE_URL
+                     ? process.env.APP_BASE_URL.replace(/\/$/, '') + '/admin/youtube/callback'
+                     : 'https://turtleandsun.com/admin/youtube/callback',
+    response_type: 'code',
+    scope:         'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+    access_type:   'offline',
+    prompt:        'consent',
+    state:         state || '',
+  });
+  return 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+}
+
+app.get('/admin/youtube/connect', requireRole('admin'), (req, res) => {
+  if (!process.env.YOUTUBE_CLIENT_ID) return res.status(400).send('YOUTUBE_CLIENT_ID not set in Railway env');
+  res.redirect(ytOAuthUrl('admin'));
+});
+
+app.get('/admin/youtube/callback', requireRole('admin'), async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) return res.redirect('/admin/social-clips?yt_error=' + encodeURIComponent(error || 'no_code'));
+  try {
+    const https4 = require('https');
+    const baseUrl = process.env.APP_BASE_URL
+      ? process.env.APP_BASE_URL.replace(/\/$/, '')
+      : 'https://turtleandsun.com';
+    const tokenBody = new URLSearchParams({
+      code,
+      client_id:     process.env.YOUTUBE_CLIENT_ID,
+      client_secret: process.env.YOUTUBE_CLIENT_SECRET,
+      redirect_uri:  baseUrl + '/admin/youtube/callback',
+      grant_type:    'authorization_code',
+    }).toString();
+
+    const tokens = await new Promise((resolve, reject) => {
+      const req2 = https4.request({
+        hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(tokenBody) }
+      }, r => {
+        let body = ''; r.on('data', c => body += c); r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      });
+      req2.on('error', reject); req2.write(tokenBody); req2.end();
+    });
+
+    if (!tokens.refresh_token) {
+      return res.redirect('/admin/social-clips?yt_error=' + encodeURIComponent('No refresh token — revoke access at myaccount.google.com/permissions and try again'));
+    }
+
+    // Get channel info
+    const chRes = await new Promise((resolve, reject) => {
+      https4.get(
+        `https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true&key=${process.env.YOUTUBE_API_KEY}`,
+        { headers: { Authorization: 'Bearer ' + tokens.access_token } },
+        r => { let b = ''; r.on('data', c => b += c); r.on('end', () => { try { resolve(JSON.parse(b)); } catch(e) { reject(e); } }); }
+      ).on('error', reject);
+    });
+    const ch = (chRes.items || [])[0];
+
+    await pool.query(`
+      INSERT INTO platform_tokens (platform, access_token, refresh_token, token_expiry, channel_id, channel_title, updated_at)
+      VALUES ('youtube', $1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (platform) DO UPDATE SET
+        access_token=$1, refresh_token=$2, token_expiry=$3, channel_id=$4, channel_title=$5, updated_at=NOW()`,
+      [tokens.access_token, tokens.refresh_token,
+       new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+       ch ? ch.id : null, ch ? ch.snippet.title : null]
+    );
+
+    res.redirect('/admin/social-clips?yt_connected=1');
+  } catch(e) {
+    console.error('[yt-oauth] callback error:', e.message);
+    res.redirect('/admin/social-clips?yt_error=' + encodeURIComponent(e.message));
+  }
+});
+
+app.get('/admin/api/youtube/status', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at FROM platform_tokens WHERE platform='youtube'`);
+    if (!rows.length) return res.json({ connected: false });
+    res.json({ connected: true, channel_id: rows[0].channel_id, channel_title: rows[0].channel_title, updated_at: rows[0].updated_at });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Get a fresh YouTube access token using stored refresh token
+async function getYouTubeAccessToken() {
+  const { rows } = await pool.query(`SELECT refresh_token, access_token, token_expiry FROM platform_tokens WHERE platform='youtube'`);
+  if (!rows.length) throw new Error('YouTube not connected — visit /admin/youtube/connect first');
+  const row = rows[0];
+  if (row.token_expiry && new Date(row.token_expiry) > new Date(Date.now() + 60000)) {
+    return row.access_token; // still valid
+  }
+  // Refresh it
+  const https4 = require('https');
+  const body = new URLSearchParams({
+    client_id:     process.env.YOUTUBE_CLIENT_ID,
+    client_secret: process.env.YOUTUBE_CLIENT_SECRET,
+    refresh_token: row.refresh_token,
+    grant_type:    'refresh_token',
+  }).toString();
+  const tokens = await new Promise((resolve, reject) => {
+    const req2 = https4.request({
+      hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) }
+    }, r => {
+      let b = ''; r.on('data', c => b += c); r.on('end', () => { try { resolve(JSON.parse(b)); } catch(e) { reject(e); } });
+    });
+    req2.on('error', reject); req2.write(body); req2.end();
+  });
+  if (!tokens.access_token) throw new Error('Token refresh failed: ' + JSON.stringify(tokens));
+  await pool.query(
+    `UPDATE platform_tokens SET access_token=$1, token_expiry=$2, updated_at=NOW() WHERE platform='youtube'`,
+    [tokens.access_token, new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()]
+  );
+  return tokens.access_token;
+}
+
+// Publish a social clip to YouTube
+app.post('/admin/api/social-clips/:id(\\d+)/publish-youtube', requireRole('admin'), async (req, res) => {
+  const fs4  = require('fs');
+  const os4  = require('os');
+  const path4 = require('path');
+  try {
+    // Load clip
+    const { rows } = await pool.query(`SELECT * FROM social_clips WHERE id=$1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Clip not found' });
+    const clip = rows[0];
+    if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet — generate it first' });
+    if (!clip.yt_title) return res.status(400).json({ error: 'YouTube title is required — fill it in the YouTube tab first' });
+
+    const accessToken = await getYouTubeAccessToken();
+
+    // Download the video
+    const tmpDir = fs4.mkdtempSync(path4.join(os4.tmpdir(), 'tns-yt-'));
+    const videoPath = path4.join(tmpDir, 'clip.mp4');
+    try {
+      const https4 = require('https');
+      const http4  = require('http');
+      const urlM   = require('url');
+      const parsed4 = urlM.parse(clip.output_url);
+      const lib4 = parsed4.protocol === 'https:' ? https4 : http4;
+      await new Promise((resolve, reject) => {
+        const ws = fs4.createWriteStream(videoPath);
+        lib4.get(clip.output_url, r => { r.pipe(ws); ws.on('finish', resolve); ws.on('error', reject); }).on('error', reject);
+      });
+
+      const videoBytes = fs4.readFileSync(videoPath);
+      const fileSize   = videoBytes.length;
+
+      // Step 1: initiate resumable upload
+      const meta = JSON.stringify({
+        snippet: {
+          title:       clip.yt_title,
+          description: clip.yt_description || '',
+          tags:        clip.yt_keyword_tags ? clip.yt_keyword_tags.split(',').map(s=>s.trim()).filter(Boolean) : [],
+          categoryId:  '22', // People & Blogs
+        },
+        status: { privacyStatus: 'public', selfDeclaredMadeForKids: false },
+      });
+
+      const uploadUrl = await new Promise((resolve, reject) => {
+        const initReq = require('https').request({
+          hostname: 'www.googleapis.com',
+          path:     '/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+          method:   'POST',
+          headers: {
+            Authorization:           'Bearer ' + accessToken,
+            'Content-Type':          'application/json',
+            'Content-Length':        Buffer.byteLength(meta),
+            'X-Upload-Content-Type': 'video/mp4',
+            'X-Upload-Content-Length': fileSize,
+          }
+        }, r => {
+          if (r.statusCode !== 200) {
+            let b = ''; r.on('data', c => b += c); r.on('end', () => reject(new Error('Init failed ' + r.statusCode + ': ' + b)));
+          } else {
+            resolve(r.headers.location);
+          }
+        });
+        initReq.on('error', reject); initReq.write(meta); initReq.end();
+      });
+
+      // Step 2: upload the video bytes
+      const ytResponse = await new Promise((resolve, reject) => {
+        const upUrl = new URL(uploadUrl);
+        const upReq = require('https').request({
+          hostname: upUrl.hostname,
+          path:     upUrl.pathname + upUrl.search,
+          method:   'PUT',
+          headers: {
+            'Content-Type':   'video/mp4',
+            'Content-Length': fileSize,
+          }
+        }, r => {
+          let b = ''; r.on('data', c => b += c);
+          r.on('end', () => {
+            try {
+              const d = JSON.parse(b);
+              if (r.statusCode === 200 || r.statusCode === 201) resolve(d);
+              else reject(new Error('Upload failed ' + r.statusCode + ': ' + b.slice(0,400)));
+            } catch(e) { reject(e); }
+          });
+        });
+        upReq.on('error', reject); upReq.write(videoBytes); upReq.end();
+      });
+
+      const videoId  = ytResponse.id;
+      const videoUrl = `https://www.youtube.com/shorts/${videoId}`;
+      const today    = new Date().toISOString().slice(0,10);
+
+      // Save video ID and URL back to the clip
+      await pool.query(
+        `UPDATE social_clips SET yt_video_id=$2, yt_post_url=$3, yt_posted_at=$4, published_youtube=TRUE, updated_at=NOW() WHERE id=$1`,
+        [req.params.id, videoId, videoUrl, today]
+      );
+
+      res.json({ ok: true, video_id: videoId, url: videoUrl });
+    } finally {
+      fs4.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  } catch(e) {
+    console.error('[publish-youtube] error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Clip stats (daily views per platform) ──────────────────────────────────────
 app.get('/admin/api/social-clips/:id(\d+)/stats', requireRole('admin'), async (req, res) => {
   try {

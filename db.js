@@ -909,6 +909,20 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_posted_at       DATE;
   `);
 
+  // Platform OAuth tokens (single-admin, keyed by platform name)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS platform_tokens (
+      platform      TEXT PRIMARY KEY,
+      access_token  TEXT,
+      refresh_token TEXT,
+      token_expiry  TIMESTAMPTZ,
+      channel_id    TEXT,
+      channel_title TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
   console.log('Database tables ready');
 }
 

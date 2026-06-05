@@ -296,6 +296,11 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
           <textarea id="yt-desc" class="field-input" rows="4" oninput="debounceSave()"></textarea>
           <div class="field-label" style="margin-top:6px">Keyword tags</div>
           <input id="yt-kw" class="field-input" placeholder="pet portrait, royal portrait, dog…" oninput="debounceSave()">
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" id="btn-publish-yt" onclick="publishYouTube(this)">&#9654; Publish to YouTube</button>
+            <span id="yt-publish-status" style="font-size:11px;color:#555"></span>
+          </div>
+          <div style="margin-top:5px"><a href="/admin/youtube/connect" style="font-size:11px;color:#185FA5">Not connected? Connect YouTube account &#8594;</a></div>
         </div>
         <div id="plat-facebook" class="plat-pane" style="display:none">
           <div class="field-label">Date posted</div>
@@ -769,6 +774,29 @@ function showFlash(msg, type) {
 }
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── YouTube publish ─────────────────────────────────────────
+async function publishYouTube(btn) {
+  const st = document.getElementById('yt-publish-status');
+  btn.disabled = true; btn.textContent = 'Uploading…'; st.textContent = 'This may take a minute…';
+  try {
+    await saveNow(); // save title/description first
+    const r = await fetch('/admin/api/social-clips/' + clipId + '/publish-youtube', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    btn.textContent = '✓ Published';
+    btn.style.background = '#3A6B20';
+    st.innerHTML = '<a href="' + d.url + '" target="_blank" style="color:#185FA5">' + d.url + '</a>';
+    document.getElementById('yt-url').value = d.url;
+    document.getElementById('yt-videoid').value = d.video_id;
+    await loadDailyStats(clipId);
+    showFlash('Published to YouTube!', 'ok');
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '&#9654; Publish to YouTube';
+    st.textContent = '';
+    showFlash('YouTube error: ' + e.message, 'err');
+  }
 }
 
 // ── Platform tabs ───────────────────────────────────────────
