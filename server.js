@@ -6823,6 +6823,45 @@ app.post('/admin/api/tracker/clips/:id/sync-youtube', requireRole('admin'), asyn
     res.status(500).json({ error: e.message });
   }
 });
+// GET /admin/api/tracker/clips/:id/youtube-live -- fetch live snippet from YouTube API
+app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async (req, res) => {
+  try {
+    const YT_KEY = process.env.YOUTUBE_API_KEY;
+    if (!YT_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set' });
+    const { rows } = await pool.query('SELECT yt_video_id FROM social_clips WHERE id=$1', [parseInt(req.params.id)]);
+    if (!rows.length || !rows[0].yt_video_id) return res.status(400).json({ error: 'No YouTube video ID for this clip' });
+    const vidId = rows[0].yt_video_id;
+    const https6 = require('https');
+    const url6 = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=' + encodeURIComponent(vidId) + '&key=' + YT_KEY;
+    const data = await new Promise((resolve, reject) => {
+      https6.get(url6, r => {
+        let b = ''; r.on('data', c => b += c);
+        r.on('end', () => { try { resolve(JSON.parse(b)); } catch(e) { reject(e); } });
+      }).on('error', reject);
+    });
+    const item = (data.items || [])[0];
+    if (!item) return res.status(404).json({ error: 'Video not found on YouTube' });
+    const sn = item.snippet || {};
+    // Also sync publishedAt to our DB
+    if (sn.publishedAt) {
+      await pool.query('UPDATE social_clips SET yt_posted_at=$2, updated_at=NOW() WHERE id=$1 AND yt_posted_at IS NULL',
+        [parseInt(req.params.id), sn.publishedAt.slice(0,10)]);
+    }
+    res.json({
+      video_id:     vidId,
+      title:        sn.title || '',
+      description:  sn.description || '',
+      tags:         (sn.tags || []).join(', '),
+      published_at: sn.publishedAt ? sn.publishedAt.slice(0,10) : null,
+      url:          'https://www.youtube.com/shorts/' + vidId,
+      thumbnail:    sn.thumbnails && sn.thumbnails.default && sn.thumbnails.default.url,
+    });
+  } catch(e) {
+    console.error('[youtube-live]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Social Tracker API -- /admin/api/tracker/*
 // Backed by social_clips + clip_stats (merged 2026-06-05).
 // ============================================================
