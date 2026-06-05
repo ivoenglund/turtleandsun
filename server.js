@@ -2994,7 +2994,7 @@ function ytOAuthUrl(state) {
                      ? process.env.APP_BASE_URL.replace(/\/$/, '') + '/admin/youtube/callback'
                      : 'https://turtleandsun.com/admin/youtube/callback',
     response_type: 'code',
-    scope:         'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+    scope:         'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
     access_type:   'offline',
     prompt:        'consent',
     state:         state || '',
@@ -7095,7 +7095,7 @@ async function fetchYouTubeStatsBatch() {
   for (let i = 0; i < rows.length; i += 50) {
     const batch = rows.slice(i, i + 50);
     const ids   = batch.map(r => encodeURIComponent(r.yt_video_id)).join(',');
-    const ytUrl = 'https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + ids + '&key=' + YT_KEY;
+    const ytUrl = 'https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=' + ids + '&key=' + YT_KEY;
     const data  = await new Promise((resolve, reject) => {
       https3.get(ytUrl, r => {
         let body = ''; r.on('data', c => body += c);
@@ -7103,7 +7103,7 @@ async function fetchYouTubeStatsBatch() {
       }).on('error', reject);
     });
     const byId = {};
-    for (const item of (data.items || [])) byId[item.id] = item.statistics || {};
+    for (const item of (data.items || [])) { byId[item.id] = item.statistics || {}; byId[item.id]._publishedAt = item.snippet && item.snippet.publishedAt ? item.snippet.publishedAt.slice(0,10) : null; }
     for (const clip of batch) {
       const s = byId[clip.yt_video_id];
       if (!s) continue;
@@ -7118,6 +7118,8 @@ async function fetchYouTubeStatsBatch() {
         [clip.id, today, views, likes, comments]
       );
       await pool.query('UPDATE social_clips SET youtube_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1', [clip.id, views]);
+      const pub = byId[clip.yt_video_id] && byId[clip.yt_video_id]._publishedAt;
+      if (pub) await pool.query('UPDATE social_clips SET yt_posted_at=$2 WHERE id=$1 AND yt_posted_at IS NULL', [clip.id, pub]);
       updated++;
     }
   }
