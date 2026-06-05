@@ -3288,7 +3288,7 @@ app.post('/admin/api/social-clips/:id(\d+)/stats', requireRole('admin'), async (
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/admin/api/social-clips/:id(\d+)/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
+app.post('/admin/api/social-clips/:id(\\d+)/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
   const YT_KEY = process.env.YOUTUBE_API_KEY;
   if (!YT_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set in Railway env' });
   try {
