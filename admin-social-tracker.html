@@ -578,7 +578,7 @@ function showPostModal(plat) {
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
           : postModalPlat === 'instagram' && igConnected
-          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button><button class="btn btn-primary" id="ig-upload-btn" onclick="' + (pd.posted_at||pd.post_url ? 'reuploadToInstagram' : 'uploadToInstagram') + '()" style="background:#C13584;color:#fff;margin-left:6px">' + (pd.posted_at||pd.post_url ? '↺ Re-upload to Instagram' : '▶ Upload to Instagram') + '</button>'
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button>' + (pd.post_url ? '<button class="btn btn-secondary" onclick="editOnInstagram()" style="margin-left:6px">✏️ Edit on Instagram</button>' : '') + '<button class="btn btn-primary" id="ig-upload-btn" onclick="' + (pd.posted_at||pd.post_url ? 'reuploadToInstagram' : 'uploadToInstagram') + '()" style="background:#C13584;color:#fff;margin-left:6px">' + (pd.posted_at||pd.post_url ? '↺ Re-upload to Instagram' : '▶ Upload to Instagram') + '</button>'
           : postModalPlat === 'instagram' && !igConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#C13584;color:#fff;margin-left:6px;text-decoration:none">Connect Instagram</a>'
           : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
@@ -682,6 +682,24 @@ async function uploadToTikTok() {
   }
 }
 
+
+async function editOnInstagram() {
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const caption = g('pm-caption');
+  const hashtags = g('pm-hashtags');
+  const text = [caption, hashtags].filter(Boolean).join('\n\n');
+  const pd = (postData[selId]||{});
+  const url = pd.post_url;
+  if (text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Caption copied to clipboard!\n\nInstagram will open — tap the three dots on your post and choose Edit, then paste.');
+    } catch(e) {
+      alert('Could not copy automatically.\n\nHere is the caption to copy manually:\n\n' + text);
+    }
+  }
+  if (url) window.open(url, '_blank');
+}
 
 async function removeFromInstagram() {
   if (!confirm('Remove this clip from Instagram tracking?\n\nNote: the existing Instagram post must be deleted manually from the Instagram app.')) return;
