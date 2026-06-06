@@ -314,7 +314,7 @@ async function pick(id) {
   const selRow = document.getElementById('row-' + id);
   if (selRow) selRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   const c = clips.find(x => x.id === id);
-  await loadStats(id);
+  await Promise.all([loadStats(id), loadPosts(id)]);
   if (c && c.yt_video_id && !ytLiveCache[id]) {
     try {
       const r = await fetch(`/admin/api/tracker/clips/${id}/youtube-live`, { headers: { 'Accept': 'application/json' } });
@@ -747,7 +747,9 @@ async function uploadToInstagram() {
     if (!r.ok) throw new Error(d.error);
     document.getElementById('post-modal-bg').remove();
     await load();
-    await pick(selId);
+    // Reload post cache so the panel shows updated Instagram data
+    await loadPosts(selId);
+    renderPanel();
     const msg = d.scheduled
       ? `⏰ Scheduled! Goes live ${schedVal}\n${d.permalink||''}`
       : d.permalink ? `✅ Published to Instagram!\n${d.permalink}` : '✅ Published to Instagram!';
