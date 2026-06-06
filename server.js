@@ -3332,6 +3332,7 @@ function instagramOAuthUrl() {
     redirect_uri:  base + '/admin/instagram/callback',
     scope:         'pages_show_list,pages_read_engagement,instagram_content_publish',
     response_type: 'code',
+    auth_type:     'rerequest',
     state:         'admin',
   });
   return 'https://www.facebook.com/dialog/oauth?' + params.toString();
