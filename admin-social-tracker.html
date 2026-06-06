@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px}
+body{font-family:Arial,sans-serif;background:linear-gradient(160deg,#f0ece0 0%,#e8e2d4 100%);min-height:100vh;color:#1C0A00;font-size:13px}
 .page{max-width:1400px;margin:0 auto;padding:16px}
 .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .toolbar-left{display:flex;align-items:center;gap:8px}
@@ -141,12 +141,12 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 </style>
 </head>
 <body>
-<div style="display:grid;grid-template-columns:160px 1fr;max-width:1400px;margin:0 auto;align-items:start;padding:0 16px;gap:0">
+<div style="display:grid;grid-template-columns:110px 1fr;max-width:1400px;margin:0 auto;align-items:start;padding:0 16px;gap:0">
 
   <!-- LEFT: persistent sticky video column -->
   <div id="side-col" style="position:sticky;top:0;align-self:start;padding:0 10px;display:flex;flex-direction:column;align-items:center">
-    <video id="side-video-el" controls playsinline style="width:140px;border-radius:8px;background:#111;display:none"></video>
-    <div id="side-video-ph" style="aspect-ratio:9/16;width:140px;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#444;font-size:11px;text-align:center;padding:8px">Select a clip</div>
+    <video id="side-video-el" controls playsinline style="width:90px;border-radius:8px;background:#111;display:none"></video>
+    <div id="side-video-ph" style="aspect-ratio:9/16;width:90px;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#444;font-size:11px;text-align:center;padding:8px">Select a clip</div>
   </div>
 
   <!-- RIGHT: all main content -->
