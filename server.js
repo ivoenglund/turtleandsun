@@ -3590,9 +3590,13 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
       permalink = plData.permalink || null;
     } catch(e) { /* non-fatal */ }
 
+    // Save posted_at, url, media_id AND write back the actual caption/hashtags so the modal reflects reality
+    const sentCaption = clip.instagram_caption || null;
+    const sentHashtags = clip.instagram_hashtags || null;
     await pool.query(
-      `UPDATE social_clips SET instagram_posted_at=NOW(), instagram_post_url=$1, instagram_media_id=$3 WHERE id=$2`,
-      [permalink, id, mediaId]);
+      `UPDATE social_clips SET instagram_posted_at=NOW(), instagram_post_url=$1, instagram_media_id=$3,
+       instagram_caption=COALESCE($4, instagram_caption), instagram_hashtags=COALESCE($5, instagram_hashtags) WHERE id=$2`,
+      [permalink, id, mediaId, sentCaption, sentHashtags]);
 
     console.log('[upload-instagram] clip', id, 'published, media_id', mediaId);
     res.json({ ok: true, media_id: mediaId, permalink, scheduled: !!scheduledTime });

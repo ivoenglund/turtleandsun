@@ -535,7 +535,7 @@ function showPostModal(plat) {
       ${igInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||c&&c.concept||'')}</textarea></div>
+      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label>Hashtags (max 30)</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
       <div class="form-row"><label>Alt text</label><input id="pm-alt" value="${esc(pd.alt_text||'')}"></div>
       ${(!pd.post_url && !pd.posted_at) ? `<div class="form-row"><label>Schedule for later <span style="font-weight:400;color:#aaa">(leave blank = publish now)</span></label><input id="pm-ig-schedule" type="datetime-local"></div>` : ''}` ;
