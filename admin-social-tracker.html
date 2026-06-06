@@ -49,7 +49,7 @@ td{padding:7px 9px;vertical-align:middle}
 .bp-head{background:#1C2A14;color:#FFE800;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .bp-head h2{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bp-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
-.bp-body{display:grid;grid-template-columns:160px 1fr;gap:18px;padding:16px 16px 16px 0;align-items:start}
+.bp-body{padding:16px}
 @media(max-width:700px){.bp-body{grid-template-columns:1fr}}
 .bp-video video{width:100%;border-radius:8px;background:#000;display:block}
 .bp-video .no-video{aspect-ratio:9/16;background:#111;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#555;font-size:11px}
@@ -141,52 +141,64 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="toolbar">
-    <div class="toolbar-left">
-      <h1>Social Tracker</h1>
+<div style="display:grid;grid-template-columns:170px 1fr;max-width:1400px;margin:0 auto;align-items:start;padding:0 16px;gap:0">
+
+  <!-- LEFT: persistent sticky video column -->
+  <div id="side-col" style="position:sticky;top:0;align-self:start;padding:60px 14px 40px 0;display:flex;flex-direction:column;align-items:center">
+    <video id="side-video-el" controls playsinline style="width:100%;border-radius:8px;background:#111;display:none"></video>
+    <div id="side-video-ph" style="aspect-ratio:9/16;width:100%;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#444;font-size:11px;text-align:center;padding:8px">Select a clip</div>
+  </div>
+
+  <!-- RIGHT: all main content -->
+  <div>
+    <div style="padding:16px 0">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <h1>Social Tracker</h1>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" onclick="fetchYT(this)">&#8635; Fetch YouTube stats</button>
+          <button class="btn btn-secondary" onclick="fetchIG(this)" style="background:#C13584;color:#fff;border-color:#C13584">&#8635; Fetch Instagram stats</button>
+          <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
+        </div>
+      </div>
+      <div class="layout" id="layout">
+        <div class="list-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="num" style="width:32px;color:#aaa">#</th>
+                <th style="width:24%">Concept</th>
+                <th>Tags</th>
+                <th style="width:72px">TikTok</th>
+                <th style="width:72px">Instagram</th>
+                <th style="width:72px">YouTube</th>
+                <th style="width:72px">Facebook</th>
+                <th class="num" style="width:72px">Total views</th>
+                <th style="width:70px">Added</th>
+              </tr>
+            </thead>
+            <tbody id="clips-body">
+              <tr><td colspan="9" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-secondary" onclick="fetchYT(this)">&#8635; Fetch YouTube stats</button>
-      <button class="btn btn-secondary" onclick="fetchIG(this)" style="background:#C13584;color:#fff;border-color:#C13584">&#8635; Fetch Instagram stats</button>
-      <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
+    <div>
+      <div id="bottom-panel" style="display:block"></div>
+    </div>
+    <div style="padding:0 0 24px 0">
+      <div style="margin-bottom:0">
+        <button onclick="calScrollToToday()" style="font-size:14px;font-weight:700;background:none;border:none;cursor:pointer;padding:10px 0;color:#1C0A00;display:block" title="Jump to current month">Content Calendar</button>
+      </div>
+      <div id="cal-month-nav" class="cal-month-nav-wrap"></div>
+      <div class="cal-wrap" id="cal-wrap">
+        <div id="cal-body"></div>
+      </div>
     </div>
   </div>
 
-  <div class="layout" id="layout">
-    <div class="list-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th class="num" style="width:32px;color:#aaa">#</th>
-            <th style="width:24%">Concept</th>
-            <th>Tags</th>
-            <th style="width:72px">TikTok</th>
-            <th style="width:72px">Instagram</th>
-            <th style="width:72px">YouTube</th>
-            <th style="width:72px">Facebook</th>
-            <th class="num" style="width:72px">Total views</th>
-            <th style="width:70px">Added</th>
-          </tr>
-        </thead>
-        <tbody id="clips-body">
-          <tr><td colspan="9" class="empty">Loading…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-<div class="page" style="padding-top:0;padding-bottom:0;padding-left:10px">
-  <div id="bottom-panel" style="display:block"></div>
-</div>
-<div style="max-width:1400px;margin:0 auto;padding:0 16px 24px">
-  <div style="margin-bottom:0">
-    <button onclick="calScrollToToday()" style="font-size:14px;font-weight:700;background:none;border:none;cursor:pointer;padding:10px 0;color:#1C0A00;display:block" title="Jump to current month">Content Calendar</button>
-  </div>
-  <div id="cal-month-nav" class="cal-month-nav-wrap"></div>
-  <div class="cal-wrap" id="cal-wrap">
-    <div id="cal-body"></div>
-  </div>
 </div>
 
 <!-- Add clip modal -->
@@ -316,6 +328,7 @@ async function pick(id) {
   if (selId === id) return; // already selected — no toggle
   selId = id;
   renderTable();
+  updateSideVideo(clips.find(x => x.id === id) || null);
   const selRow = document.getElementById('row-' + id);
   if (selRow) selRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   const c = clips.find(x => x.id === id);
@@ -385,12 +398,10 @@ function renderPanel() {
       </div>
     </div>
     <div class="bp-body">
-      <div class="bp-video">${videoHtml}</div>
       <div class="bp-chart">
         ${ytInfoHtml}
         ${ytPubHtml}
         ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram stats above.</div>'}
-      </div>
     </div>`;
 
   panel.style.display = 'block';
@@ -429,8 +440,23 @@ function renderPanel() {
   }
 }
 
+function updateSideVideo(c) {
+  const vid = document.getElementById('side-video-el');
+  const ph  = document.getElementById('side-video-ph');
+  if (!vid || !ph) return;
+  if (c && c.output_url) {
+    vid.src = c.output_url;
+    vid.style.display = 'block';
+    ph.style.display  = 'none';
+  } else {
+    vid.src = '';
+    vid.style.display = 'none';
+    ph.style.display  = 'flex';
+    ph.textContent = c ? 'No video yet' : 'Select a clip';
+  }
+}
 function switchPlat(p) { selPlat = p; renderPanel(); }
-function closePanel() { selId = null; document.getElementById('bottom-panel').style.display = 'none'; if (chartInstance) { chartInstance.destroy(); chartInstance = null; } renderTable(); }
+function closePanel() { selId = null; document.getElementById('bottom-panel').style.display = 'none'; if (chartInstance) { chartInstance.destroy(); chartInstance = null; } updateSideVideo(null); renderTable(); }
 function toggleLogForm() { const f = document.getElementById('log-form'); f.style.display = f.style.display==='none'?'block':'none'; }
 
 async function logStats() {
