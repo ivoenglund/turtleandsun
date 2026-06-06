@@ -689,7 +689,9 @@ async function editOnInstagram() {
   const hashtags = g('pm-hashtags');
   const text = [caption, hashtags].filter(Boolean).join('\n\n');
   const pd = (postCache[selId]||{}).instagram || {};
-  const url = pd.post_url;
+  // /reels/ URLs open a viewer popup; /p/ URLs open the editable post view
+  const rawUrl = pd.post_url || '';
+  const url = rawUrl.replace(/instagram\.com\/reels?\//i, 'instagram.com/p/');
   if (text) {
     try {
       await navigator.clipboard.writeText(text);
