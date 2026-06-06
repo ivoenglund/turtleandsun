@@ -155,19 +155,17 @@ table.st td.yt{color:#0F6E56;font-weight:700}
             <th>YouTube</th>
             <th>Facebook</th>
             <th class="num">Total views</th>
-            <th class="num">YT views</th>
-            <th class="num">TT views</th>
             <th>Added</th>
           </tr>
         </thead>
         <tbody id="clips-body">
-          <tr><td colspan="10" class="empty">Loading…</td></tr>
+          <tr><td colspan="8" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
-<div id="bottom-panel" style="display:none"></div>
+<div id="bottom-panel" style="display:block"></div>
 <div style="max-width:1400px;margin:0 auto;padding:32px 16px 32px;border-top:2px solid #e8e4dc;margin-top:20px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
@@ -283,7 +281,7 @@ async function load() {
 function renderTable() {
   const tbody = document.getElementById('clips-body');
   if (!clips.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
     return;
   }
   tbody.innerHTML = clips.map(c => {
@@ -295,20 +293,18 @@ function renderTable() {
     return `<tr onclick="pick(${c.id})" id="row-${c.id}" class="${selId===c.id?'sel':''}">
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
-      <td><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div></td>
-      <td><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}"></div></td>
-      <td><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}"></div></td>
-      <td><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}"></div></td>
+      <td><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div>${+c.tiktok_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</td>
+      <td><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}"></div>${+c.instagram_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</td>
+      <td><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}"></div>${+c.youtube_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</td>
+      <td><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}"></div>${+c.facebook_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
-      <td class="num yt-num">${+c.youtube_views ? (+c.youtube_views).toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
-      <td class="num">${+c.tiktok_views ? (+c.tiktok_views).toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('');
 }
 
 async function pick(id) {
-  if (selId === id) { closePanel(); return; }
+  if (selId === id) return; // already selected — no toggle
   selId = id;
   renderTable();
   const selRow = document.getElementById('row-' + id);
@@ -769,6 +765,8 @@ NavBar.init({ requireAuth: true }).then(async () => {
     await fetch('/admin/api/tracker/sync-dates', { method:'POST', headers:{'Accept':'application/json'} });
     await load(); // reload so yt_posted_at is fresh from DB
   } catch(e) { /* non-fatal */ }
+  // Auto-select first clip so the panel is never empty
+  if (clips.length) await pick(clips[0].id);
   const dates = clips.map(c => c.yt_posted_at).filter(Boolean).map(d => fd(d)).filter(Boolean).sort().reverse();
   if (dates.length) calWeek = calMonday(new Date(dates[0] + 'T12:00:00'));
   loadCal();
