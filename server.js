@@ -7669,6 +7669,55 @@ app.post('/admin/api/tracker/clips/:id/stats', requireRole('admin'), async (req,
   }
 });
 
+
+// Shared helper: fetch Instagram stats for all clips with instagram_media_id
+async function fetchInstagramStatsBatch() {
+  const { rows } = await pool.query(
+    "SELECT id, instagram_media_id FROM social_clips WHERE instagram_media_id IS NOT NULL AND instagram_media_id <> ''"
+  );
+  if (!rows.length) return { updated: 0 };
+  const { token, pageToken } = await getInstagramToken();
+  const tok = pageToken || token;
+  const today = new Date().toISOString().slice(0, 10);
+  let updated = 0;
+  for (const clip of rows) {
+    try {
+      const fields = 'like_count,comments_count,reach,plays';
+      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=${fields}&access_token=${tok}`);
+      const d = await r.json();
+      if (d.error) { console.warn('[ig-stats]', clip.id, d.error.message); continue; }
+      const views    = d.plays    || 0;
+      const reach    = d.reach    || 0;
+      const likes    = d.like_count    || 0;
+      const comments = d.comments_count || 0;
+      await pool.query(
+        `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
+         VALUES ($1,'instagram',$2,$3,$4,$5,0,'api')
+         ON CONFLICT (social_clip_id, platform, stat_date) DO UPDATE SET
+           views=$3, likes=$4, comments=$5, source='api'`,
+        [clip.id, today, views, likes, comments]
+      );
+      await pool.query(
+        'UPDATE social_clips SET instagram_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1',
+        [clip.id, views]
+      );
+      updated++;
+    } catch(e) { console.warn('[ig-stats] clip', clip.id, e.message); }
+  }
+  return { updated };
+}
+
+// POST /admin/api/tracker/fetch-instagram-stats
+app.post('/admin/api/tracker/fetch-instagram-stats', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await fetchInstagramStatsBatch();
+    res.json({ ok: true, updated: result.updated });
+  } catch(e) {
+    console.error('[tracker/fetch-instagram-stats]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Shared helper called by HTTP route and daily cron
 async function fetchYouTubeStatsBatch() {
   const YT_KEY = process.env.YOUTUBE_API_KEY;
@@ -7754,6 +7803,16 @@ cron.schedule('0 7 * * *', async () => {
     console.log('[yt-stats-cron] updated', result.updated, 'clips');
   } catch (err) {
     console.error('[yt-stats-cron]', err.message);
+  }
+}, { timezone: 'UTC' });
+
+cron.schedule('0 8 * * *', async () => {
+  try {
+    await getInstagramToken(); // throws if not connected
+    const result = await fetchInstagramStatsBatch();
+    console.log('[ig-stats-cron] updated', result.updated, 'clips');
+  } catch (err) {
+    console.error('[ig-stats-cron]', err.message);
   }
 }, { timezone: 'UTC' });
 

@@ -25,7 +25,7 @@ h1{font-size:18px;font-weight:700}
 .list-wrap{background:#fff;border-radius:10px;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.07)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:11px;font-weight:700;color:#555;padding:8px 9px;border-bottom:1px solid #e8e4dc;text-align:left;white-space:nowrap;background:#faf8f4;position:sticky;top:0;z-index:1}
-tbody tr{border-bottom:1px solid #dedad2;cursor:pointer}
+tbody tr{border-bottom:1px solid #c8c2b8;cursor:pointer}
 tbody tr:hover{background:#faf8f4}
 tbody tr.sel{background:#e8f5e9;box-shadow:inset 3px 0 0 #1C2A14}
 td{padding:7px 9px;vertical-align:middle}
@@ -99,12 +99,12 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-nav button{padding:3px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
 .cal-week-label{font-size:12px;font-weight:700;min-width:160px;text-align:center}
-.cal-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}
+.cal-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:auto;max-height:560px}
 .cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px;border-top:3px solid #e8e4dc}
 .cal-day-head{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #e8e4dc;background:#faf8f4;min-width:900px}
 .cal-day-num{padding:2px 1px;text-align:center;font-size:9px;font-weight:700;color:#888;border-right:1px solid #f0ece4}
 .cal-day-num.today-day{color:#856700;background:#fffde7}
-.cal-row{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #dedad2;min-height:26px;min-width:900px}
+.cal-row{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #c8c2b8;min-height:26px;min-width:900px}
 .cal-row:last-child{border-bottom:none}
 .plat-label{padding:3px 5px;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid #e8e4dc;background:#faf8f4}
 .plat-pill{font-size:9px;font-weight:700;padding:2px 5px;border-radius:20px}
@@ -142,6 +142,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-secondary" onclick="fetchYT(this)">&#8635; Fetch YouTube stats</button>
+      <button class="btn btn-secondary" onclick="fetchIG(this)" style="background:#C13584;color:#fff;border-color:#C13584">&#8635; Fetch Instagram stats</button>
       <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
     </div>
   </div>
@@ -173,8 +174,13 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 <div style="max-width:1400px;margin:0 auto;padding:32px 16px 32px;border-top:2px solid #e8e4dc;margin-top:20px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
+    <div class="cal-nav">
+      <button onclick="calScrollMonths(-1)">&#8592; Prev</button>
+      <button onclick="calScrollMonths(1)">Next &#8594;</button>
+      <button onclick="calScrollToToday()" style="background:#1C2A14;color:#FFE800;border:none">Today</button>
+    </div>
   </div>
-  <div class="cal-wrap" style="overflow-x:auto">
+  <div class="cal-wrap" id="cal-wrap">
     <div id="cal-body"></div>
   </div>
 </div>
@@ -291,10 +297,10 @@ function renderTable() {
       <td class="num" style="color:#bbb;font-size:11px;font-weight:700">#${c.id}</td>
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div>${+c.tiktok_views?'<span style="font-size:11px">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}"></div>${+c.instagram_views?'<span style="font-size:11px">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}"></div>${+c.youtube_views?'<span style="font-size:11px">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}"></div>${+c.facebook_views?'<span style="font-size:11px">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.tiktok_posted?'background:#1C0A00':'background:#eee;border:1px solid #ddd'}"></div>${+c.tiktok_views?'<span style="font-size:11px;color:#1C0A00;font-weight:600">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.instagram_posted?'background:#C13584':'background:#eee;border:1px solid #ddd'}"></div>${+c.instagram_views?'<span style="font-size:11px;color:#C13584;font-weight:600">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.youtube_posted?'background:#FF0000':'background:#eee;border:1px solid #ddd'}"></div>${+c.youtube_views?'<span style="font-size:11px;color:#FF0000;font-weight:600">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.facebook_posted?'background:#1877F2':'background:#eee;border:1px solid #ddd'}"></div>${+c.facebook_views?'<span style="font-size:11px;color:#1877F2;font-weight:600">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
@@ -360,7 +366,7 @@ function renderPanel() {
     ? `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:#FF0000;color:#fff;cursor:pointer" onclick="showPostModal('youtube')">YouTube ✎</button>`
     : '';
   const otherEditBtns = ['tiktok','instagram','facebook'].map(p =>
-    `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
+    `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:${PLAT_COLORS[p]};color:#fff;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
   ).join('');
 
   panel.innerHTML = `
@@ -377,7 +383,7 @@ function renderPanel() {
       <div class="bp-video">${videoHtml}</div>
       <div class="bp-chart">
         ${ytInfoHtml}
-        ${stats.length ? '<canvas id="views-chart"></canvas>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube stats to load them.</div>'}
+        ${stats.length ? '<canvas id="views-chart"></canvas>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram stats above.</div>'}
       </div>
     </div>`;
 
@@ -449,6 +455,22 @@ async function fetchYT(btn) {
   } catch(e) {
     btn.disabled = false; btn.textContent = '↻ Fetch YouTube stats';
     alert('YouTube stats error: ' + e.message);
+  }
+}
+
+async function fetchIG(btn) {
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  try {
+    const r = await fetch('/admin/api/tracker/fetch-instagram-stats', { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    btn.textContent = `✓ Updated ${d.updated} clip${d.updated===1?'':'s'}`;
+    await load();
+    if (selId) { await loadStats(selId); renderPanel(); }
+    setTimeout(() => { btn.disabled=false; btn.textContent='↻ Fetch Instagram stats'; }, 3000);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '↻ Fetch Instagram stats';
+    alert('Instagram stats error: ' + e.message);
   }
 }
 
@@ -777,6 +799,25 @@ const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct',
 function calIso(d){return d.toISOString().slice(0,10);}
 
 function loadCal(){renderCal(clips);}
+function calScrollMonths(dir){
+  var wrap=document.getElementById('cal-wrap');
+  if(!wrap)return;
+  var labels=[].slice.call(wrap.querySelectorAll('.cal-month-label'));
+  if(!labels.length)return;
+  var top=wrap.scrollTop;
+  if(dir>0){
+    var nxt=labels.find(function(el){return el.offsetTop>top+10;});
+    if(nxt)wrap.scrollTo({top:nxt.offsetTop,behavior:'smooth'});
+  } else {
+    var prv=labels.slice().reverse().find(function(el){return el.offsetTop<top-10;});
+    if(prv)wrap.scrollTo({top:prv.offsetTop,behavior:'smooth'});
+  }
+}
+function calScrollToToday(){
+  var wrap=document.getElementById('cal-wrap');
+  var el=wrap&&wrap.querySelector('.today-day');
+  if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+}
 
 function renderCal(clips){
   const todayStr=calIso(new Date());
