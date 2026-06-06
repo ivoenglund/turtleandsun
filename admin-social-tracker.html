@@ -150,10 +150,10 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           <tr>
             <th style="width:28%">Concept</th>
             <th>Tags</th>
-            <th title="TikTok">TT</th>
-            <th title="Instagram">IG</th>
-            <th title="YouTube">YT</th>
-            <th title="Facebook">FB</th>
+            <th>TikTok</th>
+            <th>Instagram</th>
+            <th>YouTube</th>
+            <th>Facebook</th>
             <th class="num">Total views</th>
             <th class="num">YT views</th>
             <th class="num">TT views</th>
@@ -295,10 +295,10 @@ function renderTable() {
     return `<tr onclick="pick(${c.id})" id="row-${c.id}" class="${selId===c.id?'sel':''}">
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
-      <td><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}">TT</div></td>
-      <td><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}">IG</div></td>
-      <td><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}">YT</div></td>
-      <td><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}">FB</div></td>
+      <td><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div></td>
+      <td><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}"></div></td>
+      <td><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}"></div></td>
+      <td><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}"></div></td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td class="num yt-num">${+c.youtube_views ? (+c.youtube_views).toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td class="num">${+c.tiktok_views ? (+c.tiktok_views).toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
@@ -322,8 +322,9 @@ async function pick(id) {
     } catch(e) { /* non-fatal */ }
   }
   // Scroll calendar to the week this clip was published
-  if (c && c.yt_posted_at) {
-    calWeek = calMonday(new Date(fd(c.yt_posted_at) + 'T12:00:00'));
+  const refDate = c && (c.yt_posted_at || c.instagram_posted_at || c.tiktok_posted_at || c.fb_posted_at);
+  if (refDate) {
+    calWeek = calMonday(new Date(fd(refDate) + 'T12:00:00'));
     loadCal();
   }
   renderPanel();
