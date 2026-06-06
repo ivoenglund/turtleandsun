@@ -3497,10 +3497,13 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     const caption = [clip.instagram_caption, clip.instagram_hashtags].filter(Boolean).join('\n\n') || 'Loveogram by Turtle and Sun 🐢☀️';
 
     // Step 1: Create Reels container (uses graph.facebook.com via Facebook Login OAuth)
+    const scheduledTime = req.body && req.body.scheduled_publish_time ? parseInt(req.body.scheduled_publish_time) : null;
+    const containerParams = { media_type: 'REELS', video_url: clip.output_url, caption, access_token: token };
+    if (scheduledTime) { containerParams.published = 'false'; containerParams.scheduled_publish_time = String(scheduledTime); }
     const createResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ media_type: 'REELS', video_url: clip.output_url, caption, access_token: token }),
+      body: new URLSearchParams(containerParams),
     });
     const containerData = await createResp.json();
     if (containerData.error) throw new Error(containerData.error.message);
@@ -3519,11 +3522,13 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     }
     if (statusCode !== 'FINISHED') throw new Error('Instagram upload timed out — video still processing. Try again in a few minutes.');
 
-    // Step 3: Publish
+    // Step 3: Publish (or schedule)
+    const publishParams = { creation_id: containerId, access_token: token };
+    if (scheduledTime) publishParams.scheduled_publish_time = String(scheduledTime);
     const publishResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ creation_id: containerId, access_token: token }),
+      body: new URLSearchParams(publishParams),
     });
     const publishData = await publishResp.json();
     if (publishData.error) throw new Error(publishData.error.message);
@@ -3542,7 +3547,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
       [permalink, id, mediaId]);
 
     console.log('[upload-instagram] clip', id, 'published, media_id', mediaId);
-    res.json({ ok: true, media_id: mediaId, permalink });
+    res.json({ ok: true, media_id: mediaId, permalink, scheduled: !!scheduledTime });
   } catch(e) {
     console.error('[upload-instagram]', e.message);
     res.status(500).json({ error: e.message });
