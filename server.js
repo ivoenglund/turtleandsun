@@ -3418,6 +3418,22 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
         break;
       }
     }
+    // Final fallback: try the known @turtleandsun.comm IG user ID directly.
+    // This works once the account is in the same Meta Accounts Center as the
+    // authorised Facebook user (even before the Page platform-link is confirmed).
+    if (!igUserId) {
+      const knownIgId = '17841424587372941';
+      try {
+        const igFallbackResp = await fetch(`https://graph.facebook.com/v21.0/${knownIgId}?fields=id,username&access_token=${longToken}`);
+        const igFallbackData = await igFallbackResp.json();
+        console.log('[ig-debug] direct IG fallback:', JSON.stringify(igFallbackData));
+        if (igFallbackData.id && !igFallbackData.error) {
+          igUserId   = igFallbackData.id;
+          igUsername = igFallbackData.username || igFallbackData.id;
+          pageToken  = longToken; // use long-lived user token directly
+        }
+      } catch(e) { /* non-fatal */ }
+    }
     if (!igUserId) throw new Error('No Instagram Business account found linked to a Facebook Page. Ensure @turtleandsun is a Business/Creator account connected to a Facebook Page.');
 
     // access_token = page token (used for API calls); refresh_token = long-lived user token (for future re-auth)
