@@ -260,6 +260,7 @@ const PF = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook
 const PLAT_COLORS = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
 let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {}, ytLiveCache = {};
 let ttConnected = false;
+let igConnected = false;
 let chartInstance = null;
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
@@ -267,13 +268,15 @@ function fd(v) { if (!v) return ''; if (v instanceof Date) return v.toISOString(
 function fdd(v) { return v ? new Date(fd(v)).toLocaleDateString('sv-SE',{year:'numeric',month:'short',day:'numeric'}) : '—'; }
 
 async function load() {
-  const [r, ttR] = await Promise.all([
+  const [r, ttR, igR] = await Promise.all([
     fetch('/admin/api/tracker/clips'),
     fetch('/admin/api/tiktok/status'),
+    fetch('/admin/api/instagram/status'),
   ]);
   const d = await r.json();
   clips = d.rows || [];
   if (ttR.ok) { const ttD = await ttR.json(); ttConnected = !!ttD.connected; }
+  if (igR.ok) { const igD = await igR.json(); igConnected = !!igD.connected; }
   renderTable();
 }
 
@@ -561,6 +564,10 @@ function showPostModal(plat) {
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-upload-btn" onclick="uploadToTikTok()" style="background:#1C0A00;color:#fff;margin-left:6px">▶ Upload to TikTok</button>'
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
+          : postModalPlat === 'instagram' && igConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="ig-upload-btn" onclick="uploadToInstagram()" style="background:#C13584;color:#fff;margin-left:6px">▶ Upload to Instagram</button>'
+          : postModalPlat === 'instagram' && !igConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#C13584;color:#fff;margin-left:6px;text-decoration:none">Connect Instagram</a>'
           : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
       }
     </div>
@@ -641,6 +648,27 @@ async function uploadToTikTok() {
   } catch(e) {
     alert('TikTok upload failed: ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to TikTok'; }
+  }
+}
+
+async function uploadToInstagram() {
+  const btn = document.getElementById('ig-upload-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  try {
+    const r = await fetch(`/admin/api/tracker/clips/${selId}/upload-instagram`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    document.getElementById('post-modal-bg').remove();
+    await load();
+    await pick(selId);
+    const msg = d.permalink ? `✅ Published to Instagram!\n${d.permalink}` : '✅ Published to Instagram!';
+    alert(msg);
+  } catch(e) {
+    alert('Instagram upload failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to Instagram'; }
   }
 }
 
