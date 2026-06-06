@@ -3526,7 +3526,6 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
 
     // Step 3: Publish (or schedule)
     const publishParams = { creation_id: containerId, access_token: publishToken };
-    if (scheduledTime) publishParams.scheduled_publish_time = String(scheduledTime);
     const publishResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
