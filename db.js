@@ -912,6 +912,7 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS notes              TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS facebook_views     INTEGER;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_video_id    TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_media_id  TEXT;
   `);
 
   // Platform OAuth tokens (single-admin, keyed by platform name)

@@ -520,10 +520,22 @@ function showPostModal(plat) {
       <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label>Hashtags</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>`;
   } else if (plat === 'instagram') {
+    const igInfoRow = pd.post_url
+      ? `<div id="ig-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
+           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
+             <span style="color:#888;font-weight:700">Posted</span><span>${fd(pd.posted_at)||'—'}</span>
+             <span style="color:#888;font-weight:700">URL</span><span><a href="${esc(pd.post_url)}" target="_blank" style="color:#C13584">${esc(pd.post_url)}</a></span>
+             <span style="color:#888;font-weight:700">Plays</span><span id="ig-stat-plays">…</span>
+             <span style="color:#888;font-weight:700">Reach</span><span id="ig-stat-reach">…</span>
+             <span style="color:#888;font-weight:700">Likes</span><span id="ig-stat-likes">…</span>
+             <span style="color:#888;font-weight:700">Comments</span><span id="ig-stat-comments">…</span>
+           </div>
+         </div>` : '';
     fields = `
+      ${igInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
+      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||c&&c.concept||'')}</textarea></div>
       <div class="form-row"><label>Hashtags (max 30)</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
       <div class="form-row"><label>Alt text</label><input id="pm-alt" value="${esc(pd.alt_text||'')}"></div>`;
   } else if (plat === 'youtube') {
@@ -573,6 +585,24 @@ function showPostModal(plat) {
     </div>
   </div>`;
   document.body.appendChild(div);
+
+  // Fetch live Instagram stats if it's an Instagram post with a URL
+  if (plat === 'instagram' && pd.post_url) {
+    fetch(`/admin/api/tracker/clips/${selId}/ig-live`)
+      .then(r => r.json())
+      .then(d => {
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val != null ? val.toLocaleString() : '—'; };
+        set('ig-stat-plays',    d.plays);
+        set('ig-stat-reach',    d.reach);
+        set('ig-stat-likes',    d.likes);
+        set('ig-stat-comments', d.comments);
+        if (d.apiError) {
+          const panel = document.getElementById('ig-live-panel');
+          if (panel) panel.title = d.apiError;
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 async function savePost() {

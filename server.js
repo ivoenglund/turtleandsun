@@ -3538,13 +3538,34 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     } catch(e) { /* non-fatal */ }
 
     await pool.query(
-      `UPDATE social_clips SET instagram_posted_at=NOW(), instagram_post_url=$1 WHERE id=$2`,
-      [permalink, id]);
+      `UPDATE social_clips SET instagram_posted_at=NOW(), instagram_post_url=$1, instagram_media_id=$3 WHERE id=$2`,
+      [permalink, id, mediaId]);
 
     console.log('[upload-instagram] clip', id, 'published, media_id', mediaId);
     res.json({ ok: true, media_id: mediaId, permalink });
   } catch(e) {
     console.error('[upload-instagram]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/clips/:id/ig-live — fetch live stats from Instagram Graph API
+app.get('/admin/api/tracker/clips/:id/ig-live', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT instagram_media_id, instagram_post_url, instagram_posted_at FROM social_clips WHERE id=$1`,
+      [parseInt(req.params.id)]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const { instagram_media_id: mediaId, instagram_post_url: postUrl, instagram_posted_at: postedAt } = rows[0];
+    if (!mediaId) return res.json({ mediaId: null, postUrl, postedAt });
+
+    const { token } = await getInstagramToken();
+    const fields = 'id,timestamp,like_count,comments_count,media_type,permalink,reach,plays,total_interactions';
+    const r = await fetch(`https://graph.facebook.com/v21.0/${mediaId}?fields=${fields}&access_token=${token}`);
+    const d = await r.json();
+    if (d.error) return res.json({ mediaId, postUrl, postedAt, apiError: d.error.message });
+    res.json({ mediaId, postUrl, postedAt, plays: d.plays, reach: d.reach, likes: d.like_count, comments: d.comments_count, permalink: d.permalink, timestamp: d.timestamp });
+  } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });
