@@ -100,21 +100,24 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .cal-nav button{padding:3px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
 .cal-week-label{font-size:12px;font-weight:700;min-width:160px;text-align:center}
 .cal-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}
-.cal-head{display:grid;grid-template-columns:70px repeat(7,1fr);border-bottom:1px solid #e8e4dc}
-.cal-head-cell{padding:6px 4px;text-align:center;font-size:10px;font-weight:700;color:#555;border-right:1px solid #f0ece4;background:#faf8f4}
-.cal-head-cell:first-child{border-right:1px solid #e8e4dc}
-.cal-head-cell.today-col{background:#fffde7;color:#856700}
-.cal-row{display:grid;grid-template-columns:70px repeat(7,1fr);border-bottom:1px solid #f0ece4;min-height:48px}
+.cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px}
+.cal-day-head{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #e8e4dc;background:#faf8f4;min-width:900px}
+.cal-day-num{padding:2px 1px;text-align:center;font-size:9px;font-weight:700;color:#888;border-right:1px solid #f0ece4}
+.cal-day-num.today-day{color:#856700;background:#fffde7}
+.cal-row{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #f0ece4;min-height:26px;min-width:900px}
 .cal-row:last-child{border-bottom:none}
-.plat-label{padding:6px 4px;display:flex;align-items:flex-start;justify-content:center;border-right:1px solid #e8e4dc;background:#faf8f4}
-.plat-pill{font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px}
+.plat-label{padding:3px 5px;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid #e8e4dc;background:#faf8f4}
+.plat-pill{font-size:9px;font-weight:700;padding:2px 5px;border-radius:20px}
 .plat-tiktok{background:#1C0A00;color:#fff}
 .plat-instagram{background:#C13584;color:#fff}
 .plat-youtube{background:#FF0000;color:#fff}
 .plat-facebook{background:#1877F2;color:#fff}
-.cal-cell{padding:3px;border-right:1px solid #f0ece4;min-height:48px}
-.cal-cell.today-col{background:#fffde7}
-.clip-pill{display:block;margin-bottom:2px;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cal-cell{padding:1px 2px;border-right:1px solid #f0ece4;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1px}
+.cal-cell.today-day{background:#fffde7}
+.cal-cell.no-day{background:#f8f6f2}
+.cal-num{font-size:10px;font-weight:700;cursor:pointer;color:#1C2A14;padding:1px 2px;border-radius:3px;line-height:1.3}
+.cal-num:hover{background:#FFE800}
+.cal-num.sel-num{background:#FFE800;outline:1px solid #856700}
 .pill-tiktok{background:#1C0A00;color:#fff}
 .pill-instagram{background:#C13584;color:#fff}
 .pill-youtube{background:#FF0000;color:#fff}
@@ -169,15 +172,8 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 <div style="max-width:1400px;margin:0 auto;padding:32px 16px 32px;border-top:2px solid #e8e4dc;margin-top:20px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
-    <div class="cal-nav">
-      <button onclick="calWeek=calAddDays(calWeek,-7);loadCal()">&#8592;</button>
-      <span class="cal-week-label" id="cal-week-label"></span>
-      <button onclick="calWeek=calAddDays(calWeek,7);loadCal()">&#8594;</button>
-      <button onclick="calWeek=calMonday(new Date());loadCal()" style="background:#1C2A14;color:#FFE800;border:none">Today</button>
-    </div>
   </div>
-  <div class="cal-wrap">
-    <div class="cal-head" id="cal-head"></div>
+  <div class="cal-wrap" style="overflow-x:auto">
     <div id="cal-body"></div>
   </div>
 </div>
@@ -293,10 +289,10 @@ function renderTable() {
     return `<tr onclick="pick(${c.id})" id="row-${c.id}" class="${selId===c.id?'sel':''}">
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
-      <td><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div>${+c.tiktok_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</td>
-      <td><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}"></div>${+c.instagram_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</td>
-      <td><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}"></div>${+c.youtube_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</td>
-      <td><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}"></div>${+c.facebook_views?'<span class="num" style="font-size:11px;margin-left:3px">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div>${+c.tiktok_views?'<span style="font-size:11px">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.instagram_posted?'pip-y':'pip-n'}"></div>${+c.instagram_views?'<span style="font-size:11px">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.youtube_posted?'pip-y':'pip-n'}"></div>${+c.youtube_views?'<span style="font-size:11px">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.facebook_posted?'pip-y':'pip-n'}"></div>${+c.facebook_views?'<span style="font-size:11px">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
@@ -318,11 +314,7 @@ async function pick(id) {
     } catch(e) { /* non-fatal */ }
   }
   // Scroll calendar to the week this clip was published
-  const refDate = c && (c.yt_posted_at || c.instagram_posted_at || c.tiktok_posted_at || c.fb_posted_at);
-  if (refDate) {
-    calWeek = calMonday(new Date(fd(refDate) + 'T12:00:00'));
-    loadCal();
-  }
+
   renderPanel();
 }
 
@@ -767,8 +759,6 @@ NavBar.init({ requireAuth: true }).then(async () => {
   } catch(e) { /* non-fatal */ }
   // Auto-select first clip so the panel is never empty
   if (clips.length) await pick(clips[0].id);
-  const dates = clips.map(c => c.yt_posted_at).filter(Boolean).map(d => fd(d)).filter(Boolean).sort().reverse();
-  if (dates.length) calWeek = calMonday(new Date(dates[0] + 'T12:00:00'));
   loadCal();
 });
 
@@ -781,54 +771,58 @@ const CAL_PLATS = [
 ];
 const CAL_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-let calWeek = calMonday(new Date());
 
-function calMonday(d) {
-  const day = d.getDay();
-  const m = new Date(d);
-  m.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  m.setHours(0,0,0,0);
-  return m;
-}
-function calAddDays(d,n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
-function calIso(d) { return d.toISOString().slice(0,10); }
-function calIsToday(d) { return calIso(d)===calIso(new Date()); }
+function calIso(d){return d.toISOString().slice(0,10);}
 
-function loadCal() {
-  renderCal(clips); // render from in-memory clips — guaranteed to have data
-}
+function loadCal(){renderCal(clips);}
 
-function renderCal(clips) {
-  const days = Array.from({length:7},(_,i)=>calAddDays(calWeek,i));
-  const s=days[0],e=days[6];
-  document.getElementById('cal-week-label').textContent =
-    s.getDate()+' '+CAL_MONTHS[s.getMonth()]+' — '+e.getDate()+' '+CAL_MONTHS[e.getMonth()]+' '+e.getFullYear();
-  const head = document.getElementById('cal-head');
-  head.innerHTML = '<div class="cal-head-cell"></div>' +
-    days.map((d,i)=>`<div class="cal-head-cell${calIsToday(d)?' today-col':''}">${CAL_DAYS[i]}<br><strong>${d.getDate()}</strong></div>`).join('');
-  const body = document.getElementById('cal-body');
-  body.innerHTML = CAL_PLATS.map(plat => {
-    const cells = days.map(day => {
-      const ds = calIso(day);
-      const dc = clips.filter(c => {
-        if (plat.key==='youtube') {
-          const p=c.yt_posted_at?fd(c.yt_posted_at):null;
-          const sc=c.yt_scheduled_at?fd(c.yt_scheduled_at):null;
-          return p===ds||sc===ds;
-        }
-        const v=c[plat.dateKey]; return v&&fd(v)===ds;
+function renderCal(clips){
+  const todayStr=calIso(new Date());
+  const byPlatDay={};
+  CAL_PLATS.forEach(p=>{byPlatDay[p.key]={}; });
+  clips.forEach(c=>{
+    CAL_PLATS.forEach(p=>{
+      let ds=null;
+      if(p.key==='youtube'){ds=c.yt_posted_at?fd(c.yt_posted_at):(c.yt_scheduled_at?fd(c.yt_scheduled_at):null);}
+      else{const v=c[p.dateKey];ds=v?fd(v):null;}
+      if(!ds)return;
+      if(!byPlatDay[p.key][ds])byPlatDay[p.key][ds]=[];
+      byPlatDay[p.key][ds].push(c);
+    });
+  });
+  const allDates=Object.values(byPlatDay).flatMap(d=>Object.keys(d)).map(s=>new Date(s)).filter(d=>!isNaN(d));
+  const now=new Date(),endY=now.getFullYear(),endM=now.getMonth();
+  let startY=endY,startM=endM;
+  if(allDates.length){const e=new Date(Math.min(...allDates.map(d=>d.getTime())));startY=e.getFullYear();startM=e.getMonth();}
+  const months=[];
+  let y=startY,m=startM;
+  while(y<endY||(y===endY&&m<=endM)){months.push([y,m]);m++;if(m>11){m=0;y++;}}
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const D31=Array.from({length:31},(_,i)=>i+1);
+  let html='';
+  months.forEach(([yr,mo])=>{
+    const dim=new Date(yr,mo+1,0).getDate();
+    html+=`<div class="cal-month-label">${MN[mo]} ${yr}</div>`;
+    html+='<div class="cal-day-head"><div class="cal-day-num"></div>';
+    D31.forEach(d=>{
+      const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const inv=d>dim;
+      html+=`<div class="cal-day-num${ds===todayStr?' today-day':''}" style="${inv?'color:#ddd':''}">${inv?'':`<strong>${d}</strong>`}</div>`;
+    });
+    html+='</div>';
+    CAL_PLATS.forEach(plat=>{
+      html+='<div class="cal-row"><div class="plat-label"><span class="plat-pill plat-'+plat.key+'">'+plat.label+'</span></div>';
+      D31.forEach(d=>{
+        if(d>dim){html+='<div class="cal-cell no-day"></div>';return;}
+        const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dc=byPlatDay[plat.key][ds]||[];
+        const nums=dc.map((c,i)=>`<span class="cal-num${c.id===selId?' sel-num':''}" title="${esc(c.concept||'Clip')}" onclick="pick(${c.id})">${i+1}</span>`).join('');
+        html+=`<div class="cal-cell${ds===todayStr?' today-day':''}">${nums}</div>`;
       });
-      const pills = dc.map(c=>{
-        const name = esc(c.concept||c.concept_name||'Clip');
-        const pub = c.yt_posted_at ? fd(c.yt_posted_at) : '';
-        const timeStr = pub ? ' · ' + pub.slice(5).replace('-','/') : '';
-        const sel = c.id === selId ? ' style="outline:2px solid #FFE800;outline-offset:1px"' : '';
-        return `<span class="clip-pill pill-${plat.cls}"${sel} title="${name}${timeStr}" onclick="pick(${c.id});document.getElementById('bottom-panel').scrollIntoView({behavior:'smooth',block:'nearest'})" style="cursor:pointer${c.id===selId?';outline:2px solid #FFE800;outline-offset:1px':''}">${name}${timeStr}</span>`;
-      }).join('');
-      return `<div class="cal-cell${calIsToday(day)?' today-col':''}">${pills}</div>`;
-    }).join('');
-    return `<div class="cal-row"><div class="plat-label"><span class="plat-pill plat-${plat.key}">${plat.label}</span></div>${cells}</div>`;
-  }).join('');
+      html+='</div>';
+    });
+  });
+  document.getElementById('cal-body').innerHTML=html||'<div style="padding:20px;color:#888;font-size:12px">No posts yet.</div>';
 }
 </script>
 </body>
