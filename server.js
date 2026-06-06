@@ -3493,12 +3493,14 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     const clip = rows[0];
     if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet' });
 
-    const { token, igUserId } = await getInstagramToken();
+    const { token, pageToken, igUserId } = await getInstagramToken();
+    // Use page token for publishing (required for Business account content publishing)
+    const publishToken = pageToken || token;
     const caption = [clip.instagram_caption, clip.instagram_hashtags].filter(Boolean).join('\n\n') || 'Loveogram by Turtle and Sun 🐢☀️';
 
     // Step 1: Create Reels container (uses graph.facebook.com via Facebook Login OAuth)
     const scheduledTime = req.body && req.body.scheduled_publish_time ? parseInt(req.body.scheduled_publish_time) : null;
-    const containerParams = { media_type: 'REELS', video_url: clip.output_url, caption, access_token: token };
+    const containerParams = { media_type: 'REELS', video_url: clip.output_url, caption, access_token: publishToken };
     if (scheduledTime) { containerParams.published = 'false'; containerParams.scheduled_publish_time = String(scheduledTime); }
     const createResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
       method: 'POST',
@@ -3514,7 +3516,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     let statusCode = 'IN_PROGRESS';
     for (let i = 0; i < 18 && statusCode !== 'FINISHED'; i++) {
       await new Promise(r => setTimeout(r, 10000));
-      const statusResp = await fetch(`https://graph.facebook.com/v21.0/${containerId}?fields=status_code&access_token=${token}`);
+      const statusResp = await fetch(`https://graph.facebook.com/v21.0/${containerId}?fields=status_code&access_token=${publishToken}`);
       const statusData = await statusResp.json();
       statusCode = statusData.status_code || 'IN_PROGRESS';
       console.log('[upload-instagram] status poll', i + 1, statusCode);
@@ -3523,7 +3525,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     if (statusCode !== 'FINISHED') throw new Error('Instagram upload timed out — video still processing. Try again in a few minutes.');
 
     // Step 3: Publish (or schedule)
-    const publishParams = { creation_id: containerId, access_token: token };
+    const publishParams = { creation_id: containerId, access_token: publishToken };
     if (scheduledTime) publishParams.scheduled_publish_time = String(scheduledTime);
     const publishResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media_publish`, {
       method: 'POST',
@@ -3537,7 +3539,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     // Get permalink
     let permalink = null;
     try {
-      const plResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}?fields=permalink&access_token=${token}`);
+      const plResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}?fields=permalink&access_token=${publishToken}`);
       const plData = await plResp.json();
       permalink = plData.permalink || null;
     } catch(e) { /* non-fatal */ }
