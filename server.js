@@ -3321,22 +3321,24 @@ app.post('/admin/api/tracker/clips/:id/upload-tiktok', requireRole('admin'), asy
 });
 
 
-// ─── Instagram / Meta OAuth ────────────────────────────────────────────────
+// ─── Instagram OAuth (new Instagram API — instagram.com Login) ────────────────
+// Uses Instagram's own OAuth (api.instagram.com), not Facebook Login.
+// Env vars: INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET (from Use cases → Customize page)
 
 function instagramOAuthUrl() {
   const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
   const params = new URLSearchParams({
-    client_id:     process.env.META_APP_ID,
+    client_id:     process.env.INSTAGRAM_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
+    scope:         'instagram_business_basic,instagram_content_publish',
     response_type: 'code',
     state:         'admin',
   });
-  return 'https://www.facebook.com/v20.0/dialog/oauth?' + params.toString();
+  return 'https://api.instagram.com/oauth/authorize?' + params.toString();
 }
 
 app.get('/admin/instagram/connect', requireRole('admin'), (req, res) => {
-  if (!process.env.META_APP_ID) return res.status(400).send('META_APP_ID not set in Railway env');
+  if (!process.env.INSTAGRAM_APP_ID) return res.status(400).send('INSTAGRAM_APP_ID not set in Railway env');
   res.redirect(instagramOAuthUrl());
 });
 
@@ -3345,61 +3347,49 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
   if (error || !code) return res.redirect('/admin/social-tracker?ig_error=' + encodeURIComponent(error || 'no_code'));
   const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
   try {
-    // 1. Exchange code for short-lived user token
-    const tokenUrl = 'https://graph.facebook.com/v20.0/oauth/access_token?' + new URLSearchParams({
-      client_id:     process.env.META_APP_ID,
-      client_secret: process.env.META_APP_SECRET,
-      redirect_uri:  base + '/admin/instagram/callback',
-      code,
+    // 1. Exchange code for short-lived token
+    const tokenResp = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id:     process.env.INSTAGRAM_APP_ID,
+        client_secret: process.env.INSTAGRAM_APP_SECRET,
+        grant_type:    'authorization_code',
+        redirect_uri:  base + '/admin/instagram/callback',
+        code,
+      }),
     });
-    const shortResp = await fetch(tokenUrl);
-    const shortData = await shortResp.json();
-    if (shortData.error) throw new Error(shortData.error.message);
-    const shortToken = shortData.access_token;
+    const tokenData = await tokenResp.json();
+    if (tokenData.error_type || tokenData.error_message) throw new Error(tokenData.error_message || tokenData.error_type);
+    const shortToken = tokenData.access_token;
+    const igUserId   = String(tokenData.user_id);
 
-    // 2. Exchange for long-lived user token (~60 days)
-    const llUrl = 'https://graph.facebook.com/v20.0/oauth/access_token?' + new URLSearchParams({
-      grant_type:        'fb_exchange_token',
-      client_id:         process.env.META_APP_ID,
-      client_secret:     process.env.META_APP_SECRET,
-      fb_exchange_token: shortToken,
-    });
-    const llResp = await fetch(llUrl);
+    // 2. Exchange for long-lived token (~60 days)
+    const llResp = await fetch(`https://graph.instagram.com/access_token?` + new URLSearchParams({
+      grant_type:    'ig_exchange_token',
+      client_secret: process.env.INSTAGRAM_APP_SECRET,
+      access_token:  shortToken,
+    }));
     const llData = await llResp.json();
     if (llData.error) throw new Error(llData.error.message);
     const longToken = llData.access_token;
     const expiresIn = llData.expires_in || (60 * 24 * 3600);
     const expiry    = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-    // 3. Get Facebook Pages, then linked Instagram Business/Creator account
-    const pagesResp = await fetch(`https://graph.facebook.com/v20.0/me/accounts?access_token=${longToken}`);
-    const pagesData = await pagesResp.json();
-    if (pagesData.error) throw new Error(pagesData.error.message);
-    if (!pagesData.data || !pagesData.data.length) throw new Error('No Facebook Pages found — link your Instagram account to a Facebook Page first');
-    const page = pagesData.data[0];
-    const pageToken = page.access_token;
-
-    const igResp = await fetch(`https://graph.facebook.com/v20.0/${page.id}?fields=instagram_business_account&access_token=${pageToken}`);
-    const igData = await igResp.json();
-    if (igData.error) throw new Error(igData.error.message);
-    const igUserId = igData.instagram_business_account && igData.instagram_business_account.id;
-    if (!igUserId) throw new Error('No Instagram Business/Creator account linked to this Facebook Page');
-
-    // 4. Get Instagram username for display
+    // 3. Get username
     let igUsername = igUserId;
     try {
-      const profResp = await fetch(`https://graph.facebook.com/v20.0/${igUserId}?fields=username&access_token=${longToken}`);
+      const profResp = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${longToken}`);
       const profData = await profResp.json();
       if (profData.username) igUsername = profData.username;
     } catch(e) { /* non-fatal */ }
 
-    // 5. Store — access_token = long-lived user token, channel_id = IG user ID, channel_title = username
     await pool.query(`
       INSERT INTO platform_tokens (platform, access_token, refresh_token, token_expiry, channel_id, channel_title, updated_at)
       VALUES ('instagram', $1, $2, $3, $4, $5, NOW())
       ON CONFLICT (platform) DO UPDATE SET
         access_token=$1, refresh_token=$2, token_expiry=$3, channel_id=$4, channel_title=$5, updated_at=NOW()`,
-      [longToken, pageToken, expiry, igUserId, igUsername]);
+      [longToken, null, expiry, igUserId, igUsername]);
 
     console.log('[instagram-oauth] connected:', igUsername, igUserId);
     res.redirect('/admin/social-tracker?ig_connected=1');
@@ -3445,8 +3435,8 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     const { token, igUserId } = await getInstagramToken();
     const caption = [clip.instagram_caption, clip.instagram_hashtags].filter(Boolean).join('\n\n') || 'Loveogram by Turtle and Sun 🐢☀️';
 
-    // Step 1: Create Reels container
-    const createResp = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media`, {
+    // Step 1: Create Reels container (new Instagram API uses graph.instagram.com)
+    const createResp = await fetch(`https://graph.instagram.com/v21.0/${igUserId}/media`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ media_type: 'REELS', video_url: clip.output_url, caption, access_token: token }),
@@ -3460,7 +3450,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     let statusCode = 'IN_PROGRESS';
     for (let i = 0; i < 18 && statusCode !== 'FINISHED'; i++) {
       await new Promise(r => setTimeout(r, 10000));
-      const statusResp = await fetch(`https://graph.facebook.com/v20.0/${containerId}?fields=status_code&access_token=${token}`);
+      const statusResp = await fetch(`https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${token}`);
       const statusData = await statusResp.json();
       statusCode = statusData.status_code || 'IN_PROGRESS';
       console.log('[upload-instagram] status poll', i + 1, statusCode);
@@ -3469,7 +3459,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     if (statusCode !== 'FINISHED') throw new Error('Instagram upload timed out — video still processing. Try again in a few minutes.');
 
     // Step 3: Publish
-    const publishResp = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media_publish`, {
+    const publishResp = await fetch(`https://graph.instagram.com/v21.0/${igUserId}/media_publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ creation_id: containerId, access_token: token }),
@@ -3481,7 +3471,7 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     // Get permalink
     let permalink = null;
     try {
-      const plResp = await fetch(`https://graph.facebook.com/v20.0/${mediaId}?fields=permalink&access_token=${token}`);
+      const plResp = await fetch(`https://graph.instagram.com/v21.0/${mediaId}?fields=permalink&access_token=${token}`);
       const plData = await plResp.json();
       permalink = plData.permalink || null;
     } catch(e) { /* non-fatal */ }
