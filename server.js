@@ -3327,6 +3327,44 @@ let _igLastDebug = {};
 app.get('/admin/api/instagram/debug-last', requireRole('admin'), (req, res) => res.json(_igLastDebug));
 
 // Switched from api.instagram.com (broken "Invalid platform app") to Facebook Login.
+// ── Instagram pillarbox cover generator ──────────────────────────────────────
+// Generates a square 720×720 JPEG with white bars on left/right from a 9:16 video
+// so Instagram grid thumbnails show the full frame instead of an auto-cropped square.
+const _igCovers = new Map(); // uuid → Buffer, auto-expires after 10 min
+
+function generateIgCover(videoUrl) {
+  return new Promise((resolve, reject) => {
+    const { spawn } = require('child_process');
+    const { randomUUID } = require('crypto');
+    const uuid = randomUUID();
+    // pad to square (pillarbox white), then scale to 720×720 for a compact JPEG
+    const ff = spawn('ffmpeg', [
+      '-i', videoUrl,
+      '-vframes', '1',
+      '-vf', 'pad=ih:ih:(ih-iw)/2:0:white,scale=720:720',
+      '-f', 'image2', '-vcodec', 'mjpeg', 'pipe:1'
+    ]);
+    const chunks = [];
+    ff.stdout.on('data', d => chunks.push(d));
+    ff.stderr.on('data', () => {}); // discard
+    ff.on('close', code => {
+      if (code !== 0 || chunks.length === 0) return reject(new Error('ffmpeg cover failed (code ' + code + ')'));
+      const buf = Buffer.concat(chunks);
+      _igCovers.set(uuid, buf);
+      setTimeout(() => _igCovers.delete(uuid), 10 * 60 * 1000); // clean up after 10 min
+      resolve(uuid);
+    });
+    ff.on('error', reject);
+  });
+}
+
+// Public (no auth) endpoint so Meta can fetch the cover during container creation
+app.get('/ig-cover/:uuid', (req, res) => {
+  const buf = _igCovers.get(req.params.uuid);
+  if (!buf) return res.status(404).end();
+  res.set('Content-Type', 'image/jpeg').set('Cache-Control', 'no-store').send(buf);
+});
+
 // Env vars: META_APP_ID, META_APP_SECRET (already in Railway)
 
 function instagramOAuthUrl() {
@@ -3502,6 +3540,15 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     const scheduledTime = req.body && req.body.scheduled_publish_time ? parseInt(req.body.scheduled_publish_time) : null;
     const containerParams = { media_type: 'REELS', video_url: clip.output_url, caption, access_token: publishToken };
     if (scheduledTime) { containerParams.published = 'false'; containerParams.scheduled_publish_time = String(scheduledTime); }
+    // Generate pillarboxed cover so grid thumbnail shows full 9:16 frame with white bars
+    try {
+      const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
+      const coverUuid = await generateIgCover(clip.output_url);
+      containerParams.cover_url = base + '/ig-cover/' + coverUuid;
+      console.log('[upload-instagram] cover_url:', containerParams.cover_url);
+    } catch(e) {
+      console.warn('[upload-instagram] cover generation skipped:', e.message);
+    }
     const createResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}/media`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
