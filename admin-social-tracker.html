@@ -535,7 +535,7 @@ function showPostModal(plat) {
       ${igInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
+      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="6">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label>Hashtags (max 30)</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
       <div class="form-row"><label>Alt text</label><input id="pm-alt" value="${esc(pd.alt_text||'')}"></div>
       ${(!pd.post_url && !pd.posted_at) ? `<div class="form-row"><label>Schedule for later <span style="font-weight:400;color:#aaa">(leave blank = publish now)</span></label><input id="pm-ig-schedule" type="datetime-local"></div>` : ''}` ;
@@ -578,7 +578,7 @@ function showPostModal(plat) {
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
           : postModalPlat === 'instagram' && igConnected
-          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button>' + ((pd.post_url||pd.media_id) ? '<button class="btn btn-secondary" onclick="editOnInstagram()" style="margin-left:6px">✏️ Edit on Instagram</button>' : '') + '<button class="btn btn-primary" id="ig-upload-btn" onclick="' + (pd.posted_at||pd.post_url ? 'reuploadToInstagram' : 'uploadToInstagram') + '()" style="background:#C13584;color:#fff;margin-left:6px">' + (pd.posted_at||pd.post_url ? '↺ Re-upload to Instagram' : '▶ Upload to Instagram') + '</button>'
+          ? '<button class="btn btn-secondary" title="Save caption, hashtags and alt text to your records without uploading" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" title="Clear Instagram tracking from your records (the post stays on Instagram — delete it manually in the app)" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button>' + ((pd.post_url||pd.media_id) ? '<button class="btn btn-secondary" title="Copy caption to clipboard and open the post on Instagram so you can edit it there" onclick="editOnInstagram()" style="margin-left:6px">✏️ Edit on Instagram</button>' : '') + '<button class="btn btn-primary" id="ig-upload-btn" title="' + (pd.posted_at||pd.post_url ? 'Delete the existing Instagram post first, then upload this clip as a new Reel' : 'Upload this clip to Instagram as a Reel') + '" onclick="' + (pd.posted_at||pd.post_url ? 'reuploadToInstagram' : 'uploadToInstagram') + '()" style="background:#C13584;color:#fff;margin-left:6px">' + (pd.posted_at||pd.post_url ? '↺ Re-upload to Instagram' : '▶ Upload to Instagram') + '</button>'
           : postModalPlat === 'instagram' && !igConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#C13584;color:#fff;margin-left:6px;text-decoration:none">Connect Instagram</a>'
           : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
@@ -688,7 +688,7 @@ async function editOnInstagram() {
   const caption = g('pm-caption');
   const hashtags = g('pm-hashtags');
   const text = [caption, hashtags].filter(Boolean).join('\n\n');
-  const pd = (postData[selId]||{});
+  const pd = (postCache[selId]||{}).instagram || {};
   const url = pd.post_url;
   if (text) {
     try {
