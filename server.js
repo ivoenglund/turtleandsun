@@ -3379,9 +3379,11 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
     let pageToken = null;
     const pagesResp = await fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token=${longToken}`);
     const pagesData = await pagesResp.json();
+    console.log('[ig-debug] pagesData:', JSON.stringify(pagesData));
     for (const page of (pagesData.data || [])) {
       const igResp = await fetch(`https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`);
       const igData = await igResp.json();
+      console.log('[ig-debug] igData for page', page.id, ':', JSON.stringify(igData));
       if (igData.instagram_business_account && igData.instagram_business_account.id) {
         igUserId  = igData.instagram_business_account.id;
         pageToken = page.access_token;
