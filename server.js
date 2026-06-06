@@ -3322,6 +3322,10 @@ app.post('/admin/api/tracker/clips/:id/upload-tiktok', requireRole('admin'), asy
 
 
 // ─── Instagram OAuth (Facebook Login — uses META_APP_ID via facebook.com/dialog/oauth) ─────────
+// In-memory store for last OAuth debug info (developer use only)
+let _igLastDebug = {};
+app.get('/admin/api/instagram/debug-last', requireRole('admin'), (req, res) => res.json(_igLastDebug));
+
 // Switched from api.instagram.com (broken "Invalid platform app") to Facebook Login.
 // Env vars: META_APP_ID, META_APP_SECRET (already in Railway)
 
@@ -3330,7 +3334,7 @@ function instagramOAuthUrl() {
   const params = new URLSearchParams({
     client_id:     process.env.META_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish',
+    scope:         'pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_content_publish',
     response_type: 'code',
     auth_type:     'rerequest',
     state:         'admin',
@@ -3386,6 +3390,7 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
     const pagesResp = await fetch(`https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${longToken}`);
     const pagesData = await pagesResp.json();
     console.log('[ig-debug] pagesData:', JSON.stringify(pagesData));
+    _igLastDebug = { step: 'after_me_accounts', meData, pagesData };
 
     // Fallback: if page is in Business Portfolio, /me/accounts returns empty.
     // Try fetching the known page directly by ID using the user token.
@@ -3434,7 +3439,10 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
         }
       } catch(e) { /* non-fatal */ }
     }
-    if (!igUserId) throw new Error('No Instagram Business account found linked to a Facebook Page. Ensure @turtleandsun is a Business/Creator account connected to a Facebook Page.');
+    if (!igUserId) {
+      _igLastDebug = { meData, pagesData, igDataSamples: 'check Railway logs', note: 'all paths failed' };
+      throw new Error('No Instagram Business account found linked to a Facebook Page. Ensure @turtleandsun is a Business/Creator account connected to a Facebook Page.');
+    }
 
     // access_token = page token (used for API calls); refresh_token = long-lived user token (for future re-auth)
     await pool.query(`
