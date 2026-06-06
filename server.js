@@ -3330,7 +3330,7 @@ function instagramOAuthUrl() {
   const params = new URLSearchParams({
     client_id:     process.env.META_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
+    config_id:     '1655387055736469',
     response_type: 'code',
     state:         'admin',
   });
