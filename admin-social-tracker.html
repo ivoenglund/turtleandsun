@@ -520,7 +520,7 @@ function showPostModal(plat) {
       <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label>Hashtags</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>`;
   } else if (plat === 'instagram') {
-    const igInfoRow = pd.post_url
+    const igInfoRow = (pd.post_url || pd.posted_at)
       ? `<div id="ig-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
              <span style="color:#888;font-weight:700">Posted</span><span>${fd(pd.posted_at)||'—'}</span>
@@ -538,7 +538,7 @@ function showPostModal(plat) {
       <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||c&&c.concept||'')}</textarea></div>
       <div class="form-row"><label>Hashtags (max 30)</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
       <div class="form-row"><label>Alt text</label><input id="pm-alt" value="${esc(pd.alt_text||'')}"></div>
-      ${!pd.post_url ? `<div class="form-row"><label>Schedule for later <span style="font-weight:400;color:#aaa">(leave blank = publish now)</span></label><input id="pm-ig-schedule" type="datetime-local"></div>` : ''}` ;
+      ${(!pd.post_url && !pd.posted_at) ? `<div class="form-row"><label>Schedule for later <span style="font-weight:400;color:#aaa">(leave blank = publish now)</span></label><input id="pm-ig-schedule" type="datetime-local"></div>` : ''}` ;
   } else if (plat === 'youtube') {
     const ytLive = ytLiveCache[selId] || {};
     const clip = clips.find(x => x.id === selId) || {};
@@ -577,10 +577,8 @@ function showPostModal(plat) {
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-upload-btn" onclick="uploadToTikTok()" style="background:#1C0A00;color:#fff;margin-left:6px">▶ Upload to TikTok</button>'
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
-          : postModalPlat === 'instagram' && igConnected && pd.post_url
-          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button><button class="btn btn-primary" id="ig-upload-btn" onclick="reuploadToInstagram()" style="background:#C13584;color:#fff;margin-left:6px">↺ Re-upload to Instagram</button>'
-          : postModalPlat === 'instagram' && igConnected && !pd.post_url
-          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="ig-upload-btn" onclick="uploadToInstagram()" style="background:#C13584;color:#fff;margin-left:6px">▶ Upload to Instagram</button>'
+          : postModalPlat === 'instagram' && igConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button><button class="btn btn-primary" id="ig-upload-btn" onclick="' + (pd.posted_at||pd.post_url ? 'reuploadToInstagram' : 'uploadToInstagram') + '()" style="background:#C13584;color:#fff;margin-left:6px">' + (pd.posted_at||pd.post_url ? '↺ Re-upload to Instagram' : '▶ Upload to Instagram') + '</button>'
           : postModalPlat === 'instagram' && !igConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#C13584;color:#fff;margin-left:6px;text-decoration:none">Connect Instagram</a>'
           : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
@@ -590,7 +588,7 @@ function showPostModal(plat) {
   document.body.appendChild(div);
 
   // Fetch live Instagram stats if it's an Instagram post with a URL
-  if (plat === 'instagram' && pd.post_url) {
+  if (plat === 'instagram' && (pd.post_url || pd.posted_at)) {
     fetch(`/admin/api/tracker/clips/${selId}/ig-live`)
       .then(r => r.json())
       .then(d => {
