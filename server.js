@@ -3602,6 +3602,20 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
   }
 });
 
+// DELETE /admin/api/tracker/clips/:id/instagram — clear Instagram tracking (DB only; post stays on IG)
+app.delete('/admin/api/tracker/clips/:id/instagram', requireRole('admin'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await pool.query(
+      `UPDATE social_clips SET instagram_posted_at=NULL, instagram_post_url=NULL, instagram_media_id=NULL WHERE id=$1`,
+      [id]);
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('[delete-instagram]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /admin/api/tracker/clips/:id/ig-live — fetch live stats from Instagram Graph API
 app.get('/admin/api/tracker/clips/:id/ig-live', requireRole('admin'), async (req, res) => {
   try {

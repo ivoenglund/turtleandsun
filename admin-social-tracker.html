@@ -577,7 +577,9 @@ function showPostModal(plat) {
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-upload-btn" onclick="uploadToTikTok()" style="background:#1C0A00;color:#fff;margin-left:6px">▶ Upload to TikTok</button>'
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
-          : postModalPlat === 'instagram' && igConnected
+          : postModalPlat === 'instagram' && igConnected && pd.post_url
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button><button class="btn btn-primary" id="ig-upload-btn" onclick="reuploadToInstagram()" style="background:#C13584;color:#fff;margin-left:6px">↺ Re-upload to Instagram</button>'
+          : postModalPlat === 'instagram' && igConnected && !pd.post_url
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="ig-upload-btn" onclick="uploadToInstagram()" style="background:#C13584;color:#fff;margin-left:6px">▶ Upload to Instagram</button>'
           : postModalPlat === 'instagram' && !igConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#C13584;color:#fff;margin-left:6px;text-decoration:none">Connect Instagram</a>'
@@ -682,6 +684,33 @@ async function uploadToTikTok() {
   }
 }
 
+
+async function removeFromInstagram() {
+  if (!confirm('Remove this clip from Instagram tracking?\n\nNote: the existing Instagram post must be deleted manually from the Instagram app.')) return;
+  const btn = document.getElementById('ig-remove-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch(`/admin/api/tracker/clips/${selId}/instagram`, { method: 'DELETE' });
+    if (!r.ok) throw new Error((await r.json()).error);
+    document.getElementById('post-modal-bg').remove();
+    await load(); await pick(selId);
+  } catch(e) {
+    alert('Remove failed: ' + e.message);
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function reuploadToInstagram() {
+  if (!confirm('This will upload a new version to Instagram.\n\nThe existing Instagram post must be deleted manually from the Instagram app.\n\nContinue?')) return;
+  // Save caption/hashtags/alt text first so the new upload uses the latest text
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : null; };
+  const saveBody = { platform: 'instagram', caption: g('pm-caption'), hashtags: g('pm-hashtags'), alt_text: g('pm-alt') };
+  await fetch(`/admin/api/tracker/clips/${selId}/posts`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(saveBody) });
+  // Clear old Instagram tracking
+  await fetch(`/admin/api/tracker/clips/${selId}/instagram`, { method: 'DELETE' });
+  // Now upload fresh
+  await uploadToInstagram();
+}
 
 async function uploadToInstagram() {
   const btn = document.getElementById('ig-upload-btn');
