@@ -3402,11 +3402,13 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
     for (const page of (pagesData.data || [])) {
       // Use page.access_token if available, else fall back to user token
       const pageAccessToken = page.access_token || longToken;
-      const igResp = await fetch(`https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`);
+      const igResp = await fetch(`https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account,connected_instagram_account&access_token=${pageAccessToken}`);
       const igData = await igResp.json();
       console.log('[ig-debug] igData for page', page.id, ':', JSON.stringify(igData));
-      if (igData.instagram_business_account && igData.instagram_business_account.id) {
-        igUserId  = igData.instagram_business_account.id;
+      // instagram_business_account = Business account; connected_instagram_account = Creator account
+      const igAccount = igData.instagram_business_account || igData.connected_instagram_account;
+      if (igAccount && igAccount.id) {
+        igUserId  = igAccount.id;
         pageToken = page.access_token || longToken;
         try {
           const profResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}?fields=username&access_token=${pageToken}`);
