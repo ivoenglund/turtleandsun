@@ -259,6 +259,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 const PF = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook' };
 const PLAT_COLORS = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
 let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {}, ytLiveCache = {};
+let ttConnected = false;
 let chartInstance = null;
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
@@ -266,9 +267,13 @@ function fd(v) { if (!v) return ''; if (v instanceof Date) return v.toISOString(
 function fdd(v) { return v ? new Date(fd(v)).toLocaleDateString('sv-SE',{year:'numeric',month:'short',day:'numeric'}) : '—'; }
 
 async function load() {
-  const r = await fetch('/admin/api/tracker/clips');
+  const [r, ttR] = await Promise.all([
+    fetch('/admin/api/tracker/clips'),
+    fetch('/admin/api/tiktok/status'),
+  ]);
   const d = await r.json();
   clips = d.rows || [];
+  if (ttR.ok) { const ttD = await ttR.json(); ttConnected = !!ttD.connected; }
   renderTable();
 }
 
@@ -497,7 +502,16 @@ function showPostModal(plat) {
 
   let fields = '';
   if (plat === 'tiktok') {
+    const ttVidId = c && c.tiktok_video_id ? c.tiktok_video_id : '';
+    const ttInfoRow = ttVidId
+      ? `<div style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
+           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
+             <span style="color:#888;font-weight:700">Publish ID</span><span>${esc(ttVidId)}</span>
+             <span style="color:#888;font-weight:700">Status</span><span>Sent to TikTok inbox — publish in TikTok Studio</span>
+           </div>
+         </div>` : '';
     fields = `
+      ${ttInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" placeholder="https://tiktok.com/..." value="${esc(pd.post_url||'')}"></div>
       <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
@@ -543,7 +557,11 @@ function showPostModal(plat) {
       <button class="btn btn-secondary" onclick="document.getElementById('post-modal-bg').remove()">Cancel</button>
       ${postModalPlat === 'youtube'
         ? '<button class="btn btn-primary" onclick="syncToYouTube()">▶ Sync to YouTube</button>'
-        : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
+        : postModalPlat === 'tiktok' && ttConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-upload-btn" onclick="uploadToTikTok()" style="background:#1C0A00;color:#fff;margin-left:6px">▶ Upload to TikTok</button>'
+          : postModalPlat === 'tiktok' && !ttConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
+          : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
       }
     </div>
   </div>`;
@@ -606,7 +624,25 @@ async function syncToYouTube() {
   }
 }
 
-
+async function uploadToTikTok() {
+  const btn = document.getElementById('tt-upload-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  try {
+    const r = await fetch(`/admin/api/tracker/clips/${selId}/upload-tiktok`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    document.getElementById('post-modal-bg').remove();
+    await load();
+    await pick(selId);
+    alert('✅ Sent to TikTok inbox! Publish it in TikTok Studio.');
+  } catch(e) {
+    alert('TikTok upload failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to TikTok'; }
+  }
+}
 
 NavBar.init({ requireAuth: true }).then(async () => {
   await load();

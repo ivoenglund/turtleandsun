@@ -3105,6 +3105,221 @@ async function getYouTubeAccessToken() {
   return tokens.access_token;
 }
 
+// ── TikTok OAuth + Upload ──────────────────────────────────────────────────
+
+function tiktokOAuthUrl() {
+  const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
+  const params = new URLSearchParams({
+    client_key:    process.env.TIKTOK_CLIENT_KEY,
+    scope:         'video.publish,user.info.basic',
+    response_type: 'code',
+    redirect_uri:  base + '/admin/tiktok/callback',
+    state:         'admin',
+  });
+  return 'https://www.tiktok.com/v2/auth/authorize/?' + params.toString();
+}
+
+app.get('/admin/tiktok/connect', requireRole('admin'), (req, res) => {
+  if (!process.env.TIKTOK_CLIENT_KEY) return res.status(400).send('TIKTOK_CLIENT_KEY not set in Railway env');
+  res.redirect(tiktokOAuthUrl());
+});
+
+app.get('/admin/tiktok/callback', requireRole('admin'), async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) return res.redirect('/admin/social-tracker?tt_error=' + encodeURIComponent(error || 'no_code'));
+  const https5 = require('https');
+  const base   = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
+  try {
+    // Exchange code for tokens
+    const tokenBody = new URLSearchParams({
+      client_key:    process.env.TIKTOK_CLIENT_KEY,
+      client_secret: process.env.TIKTOK_CLIENT_SECRET,
+      code,
+      grant_type:    'authorization_code',
+      redirect_uri:  base + '/admin/tiktok/callback',
+    }).toString();
+
+    const tokData = await new Promise((resolve, reject) => {
+      const r = https5.request({
+        hostname: 'open.tiktokapis.com',
+        path: '/v2/oauth/token/',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(tokenBody) },
+      }, res2 => {
+        let d = '';
+        res2.on('data', c => d += c);
+        res2.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+      });
+      r.on('error', reject);
+      r.write(tokenBody);
+      r.end();
+    });
+
+    if (tokData.error) throw new Error(tokData.error_description || tokData.error);
+    const { access_token, refresh_token, expires_in, refresh_expires_in, open_id } = tokData.data || tokData;
+    if (!access_token) throw new Error('No access_token in TikTok response: ' + JSON.stringify(tokData));
+
+    // Fetch display name
+    let display_name = open_id || 'TikTok user';
+    try {
+      const uInfo = await new Promise((resolve, reject) => {
+        const r = https5.request({
+          hostname: 'open.tiktokapis.com',
+          path: '/v2/user/info/?fields=display_name,username',
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + access_token },
+        }, res2 => {
+          let d = '';
+          res2.on('data', c => d += c);
+          res2.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+        });
+        r.on('error', reject);
+        r.end();
+      });
+      const u = (uInfo.data || {}).user || {};
+      display_name = u.display_name || u.username || display_name;
+    } catch(e) { console.warn('[tiktok-callback] user info fetch failed:', e.message); }
+
+    const expiry = new Date(Date.now() + (expires_in || 86400) * 1000).toISOString();
+
+    await pool.query(`
+      INSERT INTO platform_tokens (platform, access_token, refresh_token, token_expiry, channel_id, channel_title, updated_at)
+      VALUES ('tiktok', $1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (platform) DO UPDATE SET
+        access_token=$1, refresh_token=$2, token_expiry=$3, channel_id=$4, channel_title=$5, updated_at=NOW()`,
+      [access_token, refresh_token, expiry, open_id, display_name]);
+
+    console.log('[tiktok-oauth] connected:', display_name, open_id);
+    res.redirect('/admin/social-tracker?tt_connected=1');
+  } catch(e) {
+    console.error('[tiktok-oauth] callback error:', e.message);
+    res.redirect('/admin/social-tracker?tt_error=' + encodeURIComponent(e.message));
+  }
+});
+
+app.get('/admin/api/tiktok/status', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at FROM platform_tokens WHERE platform='tiktok'`);
+    if (!rows.length) return res.json({ connected: false });
+    res.json({ connected: true, open_id: rows[0].channel_id, display_name: rows[0].channel_title, updated_at: rows[0].updated_at });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+async function getTikTokAccessToken() {
+  const https5 = require('https');
+  const { rows } = await pool.query(`SELECT refresh_token, access_token, token_expiry FROM platform_tokens WHERE platform='tiktok'`);
+  if (!rows.length) throw new Error('TikTok not connected — visit /admin/tiktok/connect first');
+  const row = rows[0];
+  // Return cached token if still valid (>60s remaining)
+  if (row.token_expiry && new Date(row.token_expiry) > new Date(Date.now() + 60000)) {
+    return row.access_token;
+  }
+  // Refresh
+  const body = new URLSearchParams({
+    client_key:    process.env.TIKTOK_CLIENT_KEY,
+    client_secret: process.env.TIKTOK_CLIENT_SECRET,
+    grant_type:    'refresh_token',
+    refresh_token: row.refresh_token,
+  }).toString();
+  const tokens = await new Promise((resolve, reject) => {
+    const r = https5.request({
+      hostname: 'open.tiktokapis.com',
+      path: '/v2/oauth/token/',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+    }, res2 => {
+      let d = '';
+      res2.on('data', c => d += c);
+      res2.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+    });
+    r.on('error', reject);
+    r.write(body);
+    r.end();
+  });
+  const td = tokens.data || tokens;
+  if (!td.access_token) throw new Error('TikTok token refresh failed: ' + JSON.stringify(tokens));
+  await pool.query(
+    `UPDATE platform_tokens SET access_token=$1, token_expiry=$2, updated_at=NOW() WHERE platform='tiktok'`,
+    [td.access_token, new Date(Date.now() + (td.expires_in || 86400) * 1000).toISOString()]
+  );
+  return td.access_token;
+}
+
+// POST /admin/api/tracker/clips/:id/upload-tiktok
+// Sends the clip video to TikTok using PULL_FROM_URL (TikTok fetches from R2).
+// Privacy SELF_ONLY → lands in creator inbox as draft; Ivo publishes from TikTok Studio.
+app.post('/admin/api/tracker/clips/:id/upload-tiktok', requireRole('admin'), async (req, res) => {
+  const https5 = require('https');
+  const id = parseInt(req.params.id);
+  try {
+    const { rows } = await pool.query(
+      `SELECT sc.*, c.name AS concept FROM social_clips sc LEFT JOIN concepts c ON c.id=sc.concept_id WHERE sc.id=$1`, [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Clip not found' });
+    const clip = rows[0];
+    if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet' });
+
+    const accessToken = await getTikTokAccessToken();
+
+    // Build title: caption + hashtags (max 2200 chars for TikTok)
+    const caption   = clip.tiktok_caption   || clip.concept || 'Loveogram by Turtle and Sun';
+    const hashtags  = clip.tiktok_hashtags  || '';
+    const title     = (caption + (hashtags ? '\n\n' + hashtags : '')).slice(0, 2200);
+
+    const payload = JSON.stringify({
+      post_info: {
+        title,
+        privacy_level:              'SELF_ONLY',
+        disable_duet:               false,
+        disable_comment:            false,
+        disable_stitch:             false,
+        video_cover_timestamp_ms:   1000,
+      },
+      source_info: {
+        source:    'PULL_FROM_URL',
+        video_url: clip.output_url,
+      },
+    });
+
+    const ttRes = await new Promise((resolve, reject) => {
+      const r = https5.request({
+        hostname: 'open.tiktokapis.com',
+        path: '/v2/post/publish/video/init/',
+        method: 'POST',
+        headers: {
+          'Authorization':  'Bearer ' + accessToken,
+          'Content-Type':   'application/json; charset=UTF-8',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      }, res2 => {
+        let d = '';
+        res2.on('data', c => d += c);
+        res2.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+      });
+      r.on('error', reject);
+      r.write(payload);
+      r.end();
+    });
+
+    if (ttRes.error && ttRes.error.code !== 'ok') {
+      throw new Error(ttRes.error.message || JSON.stringify(ttRes));
+    }
+
+    const publish_id = (ttRes.data || {}).publish_id;
+    if (!publish_id) throw new Error('No publish_id returned: ' + JSON.stringify(ttRes));
+
+    // Store publish_id as tiktok_video_id so we can track status
+    await pool.query(
+      `UPDATE social_clips SET tiktok_video_id=$2, tiktok_posted_at=NOW(), updated_at=NOW() WHERE id=$1`,
+      [id, publish_id]);
+
+    console.log('[upload-tiktok] clip', id, 'publish_id', publish_id);
+    res.json({ ok: true, publish_id });
+  } catch(e) {
+    console.error('[upload-tiktok]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Publish a social clip to YouTube
 app.post('/admin/api/social-clips/:id(\\d+)/publish-youtube', requireRole('admin'), async (req, res) => {
   const fs4  = require('fs');
