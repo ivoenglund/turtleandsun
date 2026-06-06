@@ -7558,7 +7558,7 @@ app.get('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req, 
   try {
     const { rows } = await pool.query(
       `SELECT tiktok_posted_at, tiktok_post_url, tiktok_caption, tiktok_hashtags,
-              instagram_posted_at, instagram_post_url, instagram_caption, instagram_hashtags, instagram_alt_text,
+              instagram_posted_at, instagram_post_url, instagram_caption, instagram_hashtags, instagram_alt_text, instagram_media_id,
               yt_posted_at, yt_post_url, yt_title, yt_description, yt_keyword_tags, yt_video_id,
               fb_posted_at, fb_post_url, fb_caption
        FROM social_clips WHERE id = $1`,
@@ -7570,8 +7570,24 @@ app.get('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req, 
     if (sc.tiktok_posted_at || sc.tiktok_post_url || sc.tiktok_caption) {
       posts.push({ platform: 'tiktok', posted_at: sc.tiktok_posted_at, post_url: sc.tiktok_post_url, caption: sc.tiktok_caption, hashtags: sc.tiktok_hashtags });
     }
-    if (sc.instagram_posted_at || sc.instagram_post_url || sc.instagram_caption) {
-      posts.push({ platform: 'instagram', posted_at: sc.instagram_posted_at, post_url: sc.instagram_post_url, caption: sc.instagram_caption, hashtags: sc.instagram_hashtags, alt_text: sc.instagram_alt_text });
+    if (sc.instagram_posted_at || sc.instagram_post_url || sc.instagram_caption || sc.instagram_media_id) {
+      let igPostUrl = sc.instagram_post_url;
+      // Auto-fetch permalink if we have a media_id but no URL yet
+      if (sc.instagram_media_id && !igPostUrl) {
+        try {
+          const { token, pageToken } = await getInstagramToken().catch(() => ({}));
+          const tok = pageToken || token;
+          if (tok) {
+            const plR = await fetch(`https://graph.facebook.com/v21.0/${sc.instagram_media_id}?fields=permalink&access_token=${tok}`);
+            const plD = await plR.json();
+            if (plD.permalink) {
+              igPostUrl = plD.permalink;
+              await pool.query(`UPDATE social_clips SET instagram_post_url=$1 WHERE id=$2`, [igPostUrl, parseInt(req.params.id)]);
+            }
+          }
+        } catch(e) { /* non-fatal */ }
+      }
+      posts.push({ platform: 'instagram', posted_at: sc.instagram_posted_at, post_url: igPostUrl, caption: sc.instagram_caption, hashtags: sc.instagram_hashtags, alt_text: sc.instagram_alt_text, media_id: sc.instagram_media_id });
     }
     if (sc.yt_posted_at || sc.yt_post_url || sc.yt_title) {
       posts.push({ platform: 'youtube', posted_at: sc.yt_posted_at, post_url: sc.yt_post_url, yt_title: sc.yt_title, yt_description: sc.yt_description, yt_keyword_tags: sc.yt_keyword_tags, yt_video_id: sc.yt_video_id });
