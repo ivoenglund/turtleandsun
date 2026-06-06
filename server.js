@@ -3111,7 +3111,7 @@ function tiktokOAuthUrl() {
   const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
   const params = new URLSearchParams({
     client_key:    process.env.TIKTOK_CLIENT_KEY,
-    scope:         'video.publish,user.info.basic',
+    scope:         'video.upload,user.info.basic',
     response_type: 'code',
     redirect_uri:  base + '/admin/tiktok/callback',
     state:         'admin',
