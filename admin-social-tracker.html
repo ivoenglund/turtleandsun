@@ -25,7 +25,7 @@ h1{font-size:18px;font-weight:700}
 .list-wrap{background:#fff;border-radius:10px;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.07)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:11px;font-weight:700;color:#555;padding:8px 9px;border-bottom:1px solid #e8e4dc;text-align:left;white-space:nowrap;background:#faf8f4;position:sticky;top:0;z-index:1}
-tbody tr{border-bottom:1px solid #f0ece4;cursor:pointer}
+tbody tr{border-bottom:1px solid #dedad2;cursor:pointer}
 tbody tr:hover{background:#faf8f4}
 tbody tr.sel{background:#e8f5e9;box-shadow:inset 3px 0 0 #1C2A14}
 td{padding:7px 9px;vertical-align:middle}
@@ -100,11 +100,11 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .cal-nav button{padding:3px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
 .cal-week-label{font-size:12px;font-weight:700;min-width:160px;text-align:center}
 .cal-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}
-.cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px}
+.cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px;border-top:3px solid #e8e4dc}
 .cal-day-head{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #e8e4dc;background:#faf8f4;min-width:900px}
 .cal-day-num{padding:2px 1px;text-align:center;font-size:9px;font-weight:700;color:#888;border-right:1px solid #f0ece4}
 .cal-day-num.today-day{color:#856700;background:#fffde7}
-.cal-row{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #f0ece4;min-height:26px;min-width:900px}
+.cal-row{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #dedad2;min-height:26px;min-width:900px}
 .cal-row:last-child{border-bottom:none}
 .plat-label{padding:3px 5px;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid #e8e4dc;background:#faf8f4}
 .plat-pill{font-size:9px;font-weight:700;padding:2px 5px;border-radius:20px}
@@ -151,7 +151,8 @@ table.st td.yt{color:#0F6E56;font-weight:700}
       <table>
         <thead>
           <tr>
-            <th style="width:28%">Concept</th>
+            <th class="num" style="width:36px;color:#aaa">#</th>
+            <th style="width:26%">Concept</th>
             <th>Tags</th>
             <th>TikTok</th>
             <th>Instagram</th>
@@ -162,7 +163,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           </tr>
         </thead>
         <tbody id="clips-body">
-          <tr><td colspan="8" class="empty">Loading…</td></tr>
+          <tr><td colspan="9" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -277,7 +278,7 @@ async function load() {
 function renderTable() {
   const tbody = document.getElementById('clips-body');
   if (!clips.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
     return;
   }
   tbody.innerHTML = clips.map(c => {
@@ -287,6 +288,7 @@ function renderTable() {
       c.occasion && c.occasion!=='general' ? `<span class="tag tag-occ">${esc(c.occasion)}</span>` : '',
     ].filter(Boolean).join('');
     return `<tr onclick="pick(${c.id})" id="row-${c.id}" class="${selId===c.id?'sel':''}">
+      <td class="num" style="color:#bbb;font-size:11px;font-weight:700">#${c.id}</td>
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip ${c.tiktok_posted?'pip-y':'pip-n'}"></div>${+c.tiktok_views?'<span style="font-size:11px">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
