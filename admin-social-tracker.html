@@ -45,7 +45,7 @@ td{padding:7px 9px;vertical-align:middle}
 .empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
 
 /* Bottom panel */
-.bottom-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;margin-top:12px}
+.bottom-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;margin-top:0}
 .bp-head{background:#1C2A14;color:#FFE800;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .bp-head h2{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bp-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
@@ -53,7 +53,7 @@ td{padding:7px 9px;vertical-align:middle}
 @media(max-width:700px){.bp-body{grid-template-columns:1fr}}
 .bp-video video{width:100%;border-radius:8px;background:#000;display:block}
 .bp-video .no-video{aspect-ratio:9/16;background:#111;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#555;font-size:11px}
-.bp-chart{position:relative;min-height:220px}
+.bp-chart{overflow:visible}.bp-canvas-wrap{position:relative;height:220px;margin-top:8px}
 .bp-no-stats{color:#aaa;font-size:12px;text-align:center;padding:40px 0}
 .bp-actions{margin-top:10px;padding-top:10px;border-top:1px solid #eee;display:flex;gap:6px;flex-wrap:wrap}
 .section-label{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px}
@@ -100,7 +100,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .cal-nav button{padding:3px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
 .cal-week-label{font-size:12px;font-weight:700;min-width:160px;text-align:center}
 .cal-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:auto;max-height:560px}
-.cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px;border-top:3px solid #e8e4dc}
+.cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px}
 .cal-day-head{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #e8e4dc;background:#faf8f4;min-width:900px}
 .cal-day-num{padding:2px 1px;text-align:center;font-size:9px;font-weight:700;color:#888;border-right:1px solid #f0ece4}
 .cal-day-num.today-day{color:#856700;background:#fffde7}
@@ -152,15 +152,15 @@ table.st td.yt{color:#0F6E56;font-weight:700}
       <table>
         <thead>
           <tr>
-            <th class="num" style="width:36px;color:#aaa">#</th>
-            <th style="width:26%">Concept</th>
+            <th class="num" style="width:32px;color:#aaa">#</th>
+            <th style="width:24%">Concept</th>
             <th>Tags</th>
-            <th>TikTok</th>
-            <th>Instagram</th>
-            <th>YouTube</th>
-            <th>Facebook</th>
-            <th class="num">Total views</th>
-            <th>Added</th>
+            <th style="width:72px">TikTok</th>
+            <th style="width:72px">Instagram</th>
+            <th style="width:72px">YouTube</th>
+            <th style="width:72px">Facebook</th>
+            <th class="num" style="width:72px">Total views</th>
+            <th style="width:70px">Added</th>
           </tr>
         </thead>
         <tbody id="clips-body">
@@ -171,7 +171,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
   </div>
 </div>
 <div id="bottom-panel" style="display:block"></div>
-<div style="max-width:1400px;margin:0 auto;padding:32px 16px 32px;border-top:2px solid #e8e4dc;margin-top:20px">
+<div style="max-width:1400px;margin:0 auto;padding:0 16px 24px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
     <div class="cal-nav">
@@ -383,7 +383,7 @@ function renderPanel() {
       <div class="bp-video">${videoHtml}</div>
       <div class="bp-chart">
         ${ytInfoHtml}
-        ${stats.length ? '<canvas id="views-chart"></canvas>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram stats above.</div>'}
+        ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram stats above.</div>'}
       </div>
     </div>`;
 
@@ -419,7 +419,7 @@ function renderPanel() {
         }
       }
     });
-    ctx.parentElement.style.height = '220px';
+    // height set via CSS on .bp-canvas-wrap
   }
 }
 

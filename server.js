@@ -3631,11 +3631,22 @@ app.get('/admin/api/tracker/clips/:id/ig-live', requireRole('admin'), async (req
     if (!mediaId) return res.json({ mediaId: null, postUrl, postedAt });
 
     const { token } = await getInstagramToken();
-    const fields = 'id,timestamp,like_count,comments_count,media_type,permalink,reach,plays,total_interactions';
-    const r = await fetch(`https://graph.facebook.com/v21.0/${mediaId}?fields=${fields}&access_token=${token}`);
-    const d = await r.json();
-    if (d.error) return res.json({ mediaId, postUrl, postedAt, apiError: d.error.message });
-    res.json({ mediaId, postUrl, postedAt, plays: d.plays, reach: d.reach, likes: d.like_count, comments: d.comments_count, permalink: d.permalink, timestamp: d.timestamp });
+    const { token: igToken, pageToken: igPageToken } = await getInstagramToken();
+    const igTok = igToken || igPageToken;
+    const basicR = await fetch(`https://graph.facebook.com/v21.0/${mediaId}?fields=like_count,comments_count,permalink,timestamp,media_type&access_token=${igTok}`);
+    const basicD = await basicR.json();
+    if (basicD.error) return res.json({ mediaId, postUrl, postedAt, apiError: basicD.error.message });
+    let plays = null, reach = null;
+    try {
+      const insR = await fetch(`https://graph.facebook.com/v21.0/${mediaId}/insights?metric=plays,reach&access_token=${igTok}`);
+      const insD = await insR.json();
+      if (!insD.error && insD.data) {
+        const byName = {};
+        insD.data.forEach(m => { byName[m.name] = m.values && m.values[0] ? m.values[0].value : (m.value || 0); });
+        plays = byName.plays ?? null; reach = byName.reach ?? null;
+      }
+    } catch(e) { /* insights not available in dev mode */ }
+    res.json({ mediaId, postUrl, postedAt, plays, reach, likes: basicD.like_count, comments: basicD.comments_count, permalink: basicD.permalink||postUrl, timestamp: basicD.timestamp });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
@@ -7682,14 +7693,23 @@ async function fetchInstagramStatsBatch() {
   let updated = 0;
   for (const clip of rows) {
     try {
-      const fields = 'like_count,comments_count,reach,plays';
-      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=${fields}&access_token=${tok}`);
-      const d = await r.json();
-      if (d.error) { console.warn('[ig-stats]', clip.id, d.error.message); continue; }
-      const views    = d.plays    || 0;
-      const reach    = d.reach    || 0;
-      const likes    = d.like_count    || 0;
-      const comments = d.comments_count || 0;
+      // Basic fields (always available)
+      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=like_count,comments_count&access_token=${tok}`);
+      const basicD = await basicR.json();
+      if (basicD.error) { console.warn('[ig-stats]', clip.id, basicD.error.message); continue; }
+      const likes    = basicD.like_count    || 0;
+      const comments = basicD.comments_count || 0;
+      // Insights (plays, reach) — requires instagram_manage_insights
+      let views = 0;
+      try {
+        const insR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}/insights?metric=plays,reach&access_token=${tok}`);
+        const insD = await insR.json();
+        if (!insD.error && insD.data) {
+          const byName = {};
+          insD.data.forEach(m => { byName[m.name] = m.values && m.values[0] ? m.values[0].value : (m.value || 0); });
+          views = byName.plays || byName.reach || 0;
+        }
+      } catch(e) { /* insights not available — use likes as proxy */ views = likes; }
       await pool.query(
         `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
          VALUES ($1,'instagram',$2,$3,$4,$5,0,'api')
