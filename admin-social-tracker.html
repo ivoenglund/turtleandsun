@@ -99,7 +99,13 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-nav button{padding:3px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;font-weight:700}
 .cal-week-label{font-size:12px;font-weight:700;min-width:160px;text-align:center}
-.cal-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:auto;max-height:560px}
+.cal-month-nav-wrap{overflow-x:auto;overflow-y:hidden;cursor:grab;user-select:none;margin-bottom:0;border-radius:10px 10px 0 0;background:#e8e4dc}
+.cal-month-nav-wrap:active{cursor:grabbing}
+.cal-month-nav-inner{display:flex;min-width:max-content;padding:4px 6px;gap:4px}
+.cal-month-btn{flex-shrink:0;padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:#555;white-space:nowrap}
+.cal-month-btn:hover{background:#1C2A14;color:#FFE800}
+.cal-month-btn.active-month{background:#1C2A14;color:#FFE800}
+.cal-wrap{background:#fff;border-radius:0 0 10px 10px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:auto;max-height:540px}
 .cal-month-label{font-size:11px;font-weight:700;padding:6px 8px;background:#1C2A14;color:#FFE800;letter-spacing:.04em;min-width:900px}
 .cal-day-head{display:grid;grid-template-columns:80px repeat(31,minmax(20px,1fr));border-bottom:1px solid #e8e4dc;background:#faf8f4;min-width:900px}
 .cal-day-num{padding:2px 1px;text-align:center;font-size:9px;font-weight:700;color:#888;border-right:1px solid #f0ece4}
@@ -170,16 +176,14 @@ table.st td.yt{color:#0F6E56;font-weight:700}
     </div>
   </div>
 </div>
-<div id="bottom-panel" style="display:block"></div>
+<div class="page" style="padding-top:0;padding-bottom:0">
+  <div id="bottom-panel" style="display:block"></div>
+</div>
 <div style="max-width:1400px;margin:0 auto;padding:0 16px 24px">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-    <h2 style="font-size:14px;font-weight:700">Content Calendar</h2>
-    <div class="cal-nav">
-      <button onclick="calScrollMonths(-1)">&#8592; Prev</button>
-      <button onclick="calScrollMonths(1)">Next &#8594;</button>
-      <button onclick="calScrollToToday()" style="background:#1C2A14;color:#FFE800;border:none">Today</button>
-    </div>
+  <div style="margin-bottom:0">
+    <button onclick="calScrollToToday()" style="font-size:14px;font-weight:700;background:none;border:none;cursor:pointer;padding:10px 0;color:#1C0A00;display:block" title="Jump to current month">Content Calendar ↓</button>
   </div>
+  <div id="cal-month-nav" class="cal-month-nav-wrap"></div>
   <div class="cal-wrap" id="cal-wrap">
     <div id="cal-body"></div>
   </div>
@@ -353,7 +357,7 @@ function renderPanel() {
     <div style="margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#1C0A00;margin-bottom:3px">${esc(yt.title)}</div>
       ${yt.description ? `<div style="font-size:11px;color:#555;white-space:pre-line;max-height:60px;overflow:hidden">${esc(yt.description.slice(0,200))}${yt.description.length>200?'…':''}</div>` : ''}
-      <div style="font-size:10px;color:#888;margin-top:4px">Published ${yt.published_at||'—'} &nbsp;·&nbsp; <a href="${esc(yt.url)}" target="_blank" style="color:#185FA5">Open on YouTube ↗</a></div>
+      <div style="font-size:10px;color:#888;margin-top:8px;padding-bottom:12px;border-bottom:1px solid #eee">Published ${yt.published_at||'—'} &nbsp;·&nbsp; <a href="${esc(yt.url)}" target="_blank" style="color:#185FA5">Open on YouTube ↗</a></div>
     </div>` : '';
 
   // Video
@@ -798,25 +802,62 @@ const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct',
 
 function calIso(d){return d.toISOString().slice(0,10);}
 
-function loadCal(){renderCal(clips);}
-function calScrollMonths(dir){
+function loadCal(){renderCal(clips);renderCalNav();}
+
+function renderCalNav(){
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const nav=document.getElementById('cal-month-nav');
+  if(!nav)return;
+  // Collect months from renderCal's data (re-derive quickly)
+  const byPlatDay={};
+  CAL_PLATS.forEach(p=>{byPlatDay[p.key]={};});
+  clips.forEach(c=>{
+    CAL_PLATS.forEach(p=>{
+      let ds=null;
+      if(p.key==='youtube'){ds=c.yt_posted_at?fd(c.yt_posted_at):(c.yt_scheduled_at?fd(c.yt_scheduled_at):null);}
+      else{var v=c[p.dateKey];ds=v?fd(v):null;}
+      if(!ds)return;
+      if(!byPlatDay[p.key][ds])byPlatDay[p.key][ds]=[];
+      byPlatDay[p.key][ds].push(c);
+    });
+  });
+  const allDates=Object.values(byPlatDay).flatMap(function(d){return Object.keys(d);}).map(function(s){return new Date(s);}).filter(function(d){return !isNaN(d);});
+  const now=new Date(),endY=now.getFullYear(),endM=now.getMonth();
+  let startY=endY,startM=endM;
+  if(allDates.length){var e=new Date(Math.min.apply(null,allDates.map(function(d){return d.getTime();})));startY=e.getFullYear();startM=e.getMonth();}
+  const months=[];
+  let y=startY,m=startM;
+  while(y<endY||(y===endY&&m<=endM)){months.push([y,m]);m++;if(m>11){m=0;y++;}}
+  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  nav.innerHTML='<div class="cal-month-nav-inner">'+months.map(function(ym){
+    var yr=ym[0],mo=ym[1];
+    var key=yr+'-'+String(mo+1).padStart(2,'0');
+    var isNow=(key===nowKey);
+    return '<button class="cal-month-btn'+(isNow?' active-month':'')+'" onclick="calJumpToMonth('+yr+','+mo+')">'+MN[mo]+' '+(yr%100)+'</button>';
+  }).join('')+'</div>';
+  // Drag to scroll
+  var inner=nav;
+  var isDown=false,startX=0,scrollL=0;
+  inner.addEventListener('pointerdown',function(e){isDown=true;startX=e.pageX-inner.offsetLeft;scrollL=inner.scrollLeft;inner.setPointerCapture(e.pointerId);});
+  inner.addEventListener('pointermove',function(e){if(!isDown)return;inner.scrollLeft=scrollL-(e.pageX-inner.offsetLeft-startX);});
+  inner.addEventListener('pointerup',function(){isDown=false;});
+}
+
+function calJumpToMonth(yr,mo){
   var wrap=document.getElementById('cal-wrap');
   if(!wrap)return;
   var labels=[].slice.call(wrap.querySelectorAll('.cal-month-label'));
-  if(!labels.length)return;
-  var top=wrap.scrollTop;
-  if(dir>0){
-    var nxt=labels.find(function(el){return el.offsetTop>top+10;});
-    if(nxt)wrap.scrollTo({top:nxt.offsetTop,behavior:'smooth'});
-  } else {
-    var prv=labels.slice().reverse().find(function(el){return el.offsetTop<top-10;});
-    if(prv)wrap.scrollTo({top:prv.offsetTop,behavior:'smooth'});
-  }
+  var MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var target=MN[mo]+' '+yr;
+  var el=labels.find(function(l){return l.textContent.trim()===target;});
+  if(el)wrap.scrollTo({top:el.offsetTop,behavior:'smooth'});
 }
+
 function calScrollToToday(){
   var wrap=document.getElementById('cal-wrap');
-  var el=wrap&&wrap.querySelector('.today-day');
-  if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+  if(!wrap)return;
+  var now=new Date();
+  calJumpToMonth(now.getFullYear(),now.getMonth());
 }
 
 function renderCal(clips){
