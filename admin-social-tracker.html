@@ -381,11 +381,8 @@ function renderPanel() {
     ? `<video src="${esc(c.output_url)}" controls playsinline></video>`
     : `<div class="no-video">No video yet</div>`;
 
-  // Action buttons
-  const ytEditBtn = c.yt_video_id
-    ? `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:#FF0000;color:#fff;cursor:pointer" onclick="showPostModal('youtube')">YouTube ✎</button>`
-    : '';
-  const otherEditBtns = ['tiktok','instagram','facebook'].map(p =>
+  // Action buttons — TikTok | Instagram | YouTube | Facebook (matches table column order)
+  const platEditBtns = ['tiktok','instagram','youtube','facebook'].map(p =>
     `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:${PLAT_COLORS[p]};color:#fff;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
   ).join('');
 
@@ -395,6 +392,7 @@ function renderPanel() {
         <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
       </div>
       <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        ${platEditBtns}
         <button onclick="closePanel()" style="margin-left:4px">&#x2715;</button>
       </div>
     </div>
@@ -403,24 +401,6 @@ function renderPanel() {
         ${ytInfoHtml}
         ${ytPubHtml}
         ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — click ↻ Fetch all stats above.</div>'}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 14px;background:#f7f4ee;border-top:1px solid #e0dbd2">
-      ${['tiktok','instagram','youtube','facebook'].map(p => {
-        const pc = (posts[p]||{});
-        const postedDate = p==='youtube' ? (c.yt_posted_at ? fd(c.yt_posted_at) : null) : fd(pc.posted_at);
-        const viewsVal = c[p+'_views'];
-        const viewsStr = viewsVal!=null ? viewsVal.toLocaleString('sv-SE') + ' views' : 'No stats';
-        const color = PLAT_COLORS[p];
-        const posted = !!postedDate;
-        return '<div style="border:1px solid #e0dbd2;border-radius:8px;background:#fff;padding:8px 10px;display:flex;flex-direction:column;gap:4px">'
-          + '<div style="display:flex;align-items:center;justify-content:space-between">'
-          +   '<span style="font-size:11px;font-weight:700;color:'+color+'">'+PF[p]+'</span>'
-          +   '<button onclick="showPostModal(\'' + p + '\')" style="padding:2px 8px;font-size:10px;font-weight:700;border-radius:4px;border:none;background:'+color+';color:#fff;cursor:pointer">'+PF[p]+' ✎</button>'
-          + '</div>'
-          + '<div style="font-size:10px;color:#555">' + (posted ? '✓ '+postedDate : '<span style=\"color:#aaa\">Not posted</span>') + '</div>'
-          + '<div style="font-size:10px;color:#888">' + (posted ? viewsStr : '') + '</div>'
-          + '</div>';
-      }).join('')}
     </div>`;
 
   panel.style.display = 'block';
@@ -953,21 +933,36 @@ function renderCalNav(){
   if(!nav)return;
   if(!calCurrentYM){const n=new Date();calCurrentYM=[n.getFullYear(),n.getMonth()];}
   const curY=calCurrentYM[0], curM=calCurrentYM[1];
-  const btnStyle='background:none;border:1px solid #bbb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px;font-weight:700;color:#1C2A14';
+  // Year selector sits outside the scrollable area to avoid pointer-capture conflicts
+  const arrowStyle='flex-shrink:0;padding:3px 9px;border-radius:5px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#1C2A14;color:#FFE800';
+  nav.style.overflow='hidden';
   nav.innerHTML=
-    '<div class="cal-month-nav-inner">'+
-      '<button style="'+btnStyle+';flex-shrink:0;margin-right:2px" onclick="calChangeYear(-1)">&#9664;</button>'+
-      '<span style="flex-shrink:0;min-width:40px;text-align:center;font-size:12px;font-weight:700;color:#1C2A14;padding:0 2px;align-self:center">'+curY+'</span>'+
-      '<button style="'+btnStyle+';flex-shrink:0;margin-right:8px" onclick="calChangeYear(1)">&#9654;</button>'+
-      MN.map(function(mn,mo){
-        return '<button class="cal-month-btn'+(mo===curM?' active-month':'')+'" data-y="'+curY+'" data-m="'+mo+'" onclick="calJumpToMonth('+curY+','+mo+')">'+mn+'</button>';
-      }).join('')+
+    '<div style="display:flex;align-items:stretch;height:100%">'+
+      // Fixed year selector
+      '<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;flex-shrink:0;background:#1C2A14;border-radius:10px 0 0 0">'+
+        '<button style="'+arrowStyle+'" onclick="calChangeYear(-1)">&#9664;</button>'+
+        '<span style="min-width:38px;text-align:center;font-size:13px;font-weight:700;color:#FFE800">'+curY+'</span>'+
+        '<button style="'+arrowStyle+'" onclick="calChangeYear(1)">&#9654;</button>'+
+      '</div>'+
+      // Scrollable months
+      '<div id="cal-scroll" style="overflow-x:auto;overflow-y:hidden;flex:1;cursor:grab;user-select:none;background:#e8e4dc">'+
+        '<div style="display:flex;min-width:max-content;padding:4px 6px;gap:4px">'+
+          MN.map(function(mn,mo){
+            return '<button class="cal-month-btn'+(mo===curM?' active-month':'')+'" data-y="'+curY+'" data-m="'+mo+'" onclick="calJumpToMonth('+curY+','+mo+')">'+mn+'</button>';
+          }).join('')+
+        '</div>'+
+      '</div>'+
     '</div>';
-  var inner=nav;
+  // Drag-to-scroll on the months area only
+  var scroll=document.getElementById('cal-scroll');
+  if(!scroll)return;
   var isDown=false,startX=0,scrollL=0;
-  inner.addEventListener('pointerdown',function(e){isDown=true;startX=e.pageX-inner.offsetLeft;scrollL=inner.scrollLeft;inner.setPointerCapture(e.pointerId);});
-  inner.addEventListener('pointermove',function(e){if(!isDown)return;inner.scrollLeft=scrollL-(e.pageX-inner.offsetLeft-startX);});
-  inner.addEventListener('pointerup',function(){isDown=false;});
+  scroll.addEventListener('pointerdown',function(e){
+    if(e.target.tagName==='BUTTON')return; // let month button clicks through
+    isDown=true;startX=e.pageX-scroll.getBoundingClientRect().left;scrollL=scroll.scrollLeft;scroll.setPointerCapture(e.pointerId);
+  });
+  scroll.addEventListener('pointermove',function(e){if(!isDown)return;scroll.scrollLeft=scrollL-(e.pageX-scroll.getBoundingClientRect().left-startX);});
+  scroll.addEventListener('pointerup',function(){isDown=false;});
 }
 
 function calJumpToMonth(yr,mo){
