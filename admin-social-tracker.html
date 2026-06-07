@@ -846,6 +846,7 @@ async function uploadToFacebook() {
     if (!r.ok) throw new Error(d.error || 'Upload failed');
     document.getElementById('post-modal-bg').remove();
     await load();
+    await loadPosts(selId);
     renderPanel();
     alert(d.permalink ? `✅ Posted to Facebook!\n${d.permalink}` : '✅ Posted to Facebook!');
   } catch(e) {
