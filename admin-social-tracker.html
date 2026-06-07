@@ -279,6 +279,7 @@ let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {}
 let calCurrentYM = null;
 let ttConnected = false;
 let igConnected = false;
+let fbConnected = false;
 let chartInstance = null;
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
@@ -286,15 +287,17 @@ function fd(v) { if (!v) return ''; if (v instanceof Date) return v.toISOString(
 function fdd(v) { return v ? new Date(fd(v)).toLocaleDateString('sv-SE',{year:'numeric',month:'short',day:'numeric'}) : '—'; }
 
 async function load() {
-  const [r, ttR, igR] = await Promise.all([
+  const [r, ttR, igR, fbR] = await Promise.all([
     fetch('/admin/api/tracker/clips'),
     fetch('/admin/api/tiktok/status'),
     fetch('/admin/api/instagram/status'),
+    fetch('/admin/api/facebook/status'),
   ]);
   const d = await r.json();
   clips = d.rows || [];
   if (ttR.ok) { const ttD = await ttR.json(); ttConnected = !!ttD.connected; }
   if (igR.ok) { const igD = await igR.json(); igConnected = !!igD.connected; }
+  if (fbR.ok) { const fbD = await fbR.json(); fbConnected = !!fbD.connected; }
   renderTable();
 }
 
@@ -645,6 +648,10 @@ function showPostModal(plat) {
           ? '<button class="btn btn-secondary" title="Save caption, hashtags and alt text to your records without uploading" onclick="savePost()">Save</button><button class="btn btn-secondary" id="ig-remove-btn" title="Clear Instagram tracking from your records (the post stays on Instagram — delete it manually in the app)" onclick="removeFromInstagram()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button>' + ((pd.post_url||pd.media_id) ? '<button class="btn btn-secondary" title="Copy caption to clipboard and open the post on Instagram so you can edit it there" onclick="editOnInstagram()" style="margin-left:6px">✏️ Edit on Instagram</button>' : '') + '<button class="btn btn-primary" id="ig-upload-btn" title="' + (pd.posted_at||pd.post_url ? 'Delete the existing Instagram post first, then upload this clip as a new Reel' : 'Upload this clip to Instagram as a Reel') + '" onclick="' + (pd.posted_at||pd.post_url ? 'reuploadToInstagram' : 'uploadToInstagram') + '()" style="background:#C13584;color:#fff;margin-left:6px">' + (pd.posted_at||pd.post_url ? '↺ Re-upload to Instagram' : '▶ Upload to Instagram') + '</button>'
           : postModalPlat === 'instagram' && !igConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#C13584;color:#fff;margin-left:6px;text-decoration:none">Connect Instagram</a>'
+          : postModalPlat === 'facebook' && fbConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button>' + (pd.post_url ? '<button class="btn btn-secondary" id="fb-remove-btn" title="Clear Facebook tracking from records (post stays on Facebook)" onclick="removeFromFacebook()" style="margin-left:6px;color:#c00;border-color:#c00">✕ Remove</button>' : '') + '<button class="btn btn-primary" id="fb-upload-btn" onclick="uploadToFacebook()" style="background:#1877F2;color:#fff;margin-left:6px">' + (pd.post_url ? '↺ Re-post to Facebook' : '▶ Post to Facebook') + '</button>'
+          : postModalPlat === 'facebook' && !fbConnected
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/instagram/connect" class="btn btn-primary" style="background:#1877F2;color:#fff;margin-left:6px;text-decoration:none">Connect Facebook</a>'
           : '<button class="btn btn-primary" onclick="savePost()">Save</button>'
       }
     </div>
@@ -823,6 +830,42 @@ async function uploadToInstagram() {
   } catch(e) {
     alert('Instagram upload failed: ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to Instagram'; }
+  }
+}
+
+async function uploadToFacebook() {
+  const btn = document.getElementById('fb-upload-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Posting…'; }
+  try {
+    const r = await fetch(`/admin/api/tracker/clips/${selId}/upload-facebook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Upload failed');
+    document.getElementById('post-modal-bg').remove();
+    await load();
+    renderPanel();
+    alert(d.permalink ? `✅ Posted to Facebook!\n${d.permalink}` : '✅ Posted to Facebook!');
+  } catch(e) {
+    alert('Facebook upload failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Post to Facebook'; }
+  }
+}
+
+async function removeFromFacebook() {
+  if (!confirm('Clear Facebook tracking from records?\n\nThe post stays on Facebook — delete it manually there if needed.')) return;
+  const btn = document.getElementById('fb-remove-btn');
+  if (btn) btn.disabled = true;
+  try {
+    await fetch(`/admin/api/tracker/clips/${selId}/facebook`, { method: 'DELETE' });
+    document.getElementById('post-modal-bg').remove();
+    await load();
+    renderPanel();
+  } catch(e) {
+    alert('Remove failed: ' + e.message);
+    if (btn) btn.disabled = false;
   }
 }
 

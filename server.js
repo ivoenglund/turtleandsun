@@ -3372,7 +3372,7 @@ function instagramOAuthUrl() {
   const params = new URLSearchParams({
     client_id:     process.env.META_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'pages_show_list,pages_read_engagement,business_management,instagram_basic,instagram_content_publish',
+    scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish',
     response_type: 'code',
     auth_type:     'rerequest',
     state:         'admin',
@@ -3419,6 +3419,7 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
     // 3. Find Instagram Business Account via Facebook Pages
     let igUserId = null;
     let igUsername = null;
+    let facebookPageId = null;
     let pageToken = null;
     // Debug: who is the token for?
     const meResp = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${longToken}`);
@@ -3451,7 +3452,8 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
       // instagram_business_account = Business account; connected_instagram_account = Creator account
       const igAccount = igData.instagram_business_account || igData.connected_instagram_account;
       if (igAccount && igAccount.id) {
-        igUserId  = igAccount.id;
+        igUserId       = igAccount.id;
+        facebookPageId = page.id;
         pageToken = page.access_token || longToken;
         try {
           const profResp = await fetch(`https://graph.facebook.com/v21.0/${igUserId}?fields=username&access_token=${pageToken}`);
@@ -3471,9 +3473,10 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
         const igFallbackData = await igFallbackResp.json();
         console.log('[ig-debug] direct IG fallback:', JSON.stringify(igFallbackData));
         if (igFallbackData.id && !igFallbackData.error) {
-          igUserId   = igFallbackData.id;
-          igUsername = igFallbackData.username || igFallbackData.id;
-          pageToken  = longToken; // use long-lived user token directly
+          igUserId       = igFallbackData.id;
+          igUsername     = igFallbackData.username || igFallbackData.id;
+          pageToken      = longToken; // use long-lived user token directly
+          facebookPageId = facebookPageId || '1127984543734705';
         }
       } catch(e) { /* non-fatal */ }
     }
@@ -3489,6 +3492,15 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
       ON CONFLICT (platform) DO UPDATE SET
         access_token=$1, refresh_token=$2, token_expiry=$3, channel_id=$4, channel_title=$5, updated_at=NOW()`,
       [pageToken, longToken, expiry, igUserId, igUsername]);
+
+    // Also store Facebook page token so upload-facebook can use the same connection
+    const fbPageId = facebookPageId || '1127984543734705';
+    await pool.query(`
+      INSERT INTO platform_tokens (platform, access_token, refresh_token, token_expiry, channel_id, channel_title, updated_at)
+      VALUES ('facebook', $1, $2, $3, $4, 'Turtle and Sun', NOW())
+      ON CONFLICT (platform) DO UPDATE SET
+        access_token=$1, refresh_token=$2, token_expiry=$3, channel_id=$4, channel_title='Turtle and Sun', updated_at=NOW()`,
+      [pageToken, longToken, expiry, fbPageId]);
 
     console.log('[instagram-oauth] connected via Facebook Login:', igUsername, igUserId);
     res.redirect('/admin/social-tracker?ig_connected=1');
@@ -3604,6 +3616,87 @@ app.post('/admin/api/tracker/clips/:id/upload-instagram', requireRole('admin'), 
     console.error('[upload-instagram]', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── Facebook video posting (reuses Meta page token from Instagram OAuth) ──────
+
+async function getFacebookToken() {
+  const { rows } = await pool.query(`SELECT access_token, channel_id, token_expiry FROM platform_tokens WHERE platform='facebook'`);
+  if (!rows.length) throw new Error('Facebook not connected — reconnect Instagram at /admin/instagram/connect first');
+  const row = rows[0];
+  if (row.token_expiry && new Date(row.token_expiry) < new Date()) throw new Error('Facebook token expired — reconnect at /admin/instagram/connect');
+  return { token: row.access_token, pageId: row.channel_id || '1127984543734705' };
+}
+
+app.get('/admin/api/facebook/status', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at, token_expiry FROM platform_tokens WHERE platform='facebook'`);
+    if (!rows.length) return res.json({ connected: false });
+    const row     = rows[0];
+    const expired = row.token_expiry && new Date(row.token_expiry) < new Date();
+    const daysLeft = row.token_expiry
+      ? Math.max(0, Math.round((new Date(row.token_expiry) - Date.now()) / 86400000))
+      : null;
+    res.json({ connected: !expired, page_id: row.channel_id, page_name: row.channel_title, updated_at: row.updated_at, expires_at: row.token_expiry, days_left: daysLeft });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /admin/api/tracker/clips/:id/upload-facebook
+// Posts clip as a video to the Turtle and Sun Facebook Page.
+app.post('/admin/api/tracker/clips/:id/upload-facebook', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    const { rows } = await pool.query(
+      `SELECT sc.*, c.name AS concept FROM social_clips sc LEFT JOIN concepts c ON c.id=sc.concept_id WHERE sc.id=$1`, [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Clip not found' });
+    const clip = rows[0];
+    if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet' });
+
+    const { token, pageId } = await getFacebookToken();
+    const caption = clip.fb_caption || 'Loveogram by Turtle and Sun 🐢☀️';
+
+    // POST video to Facebook Page via file_url (Graph API uploads asynchronously)
+    const videoParams = { file_url: clip.output_url, description: caption, access_token: token };
+    const videoResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(videoParams),
+    });
+    const videoData = await videoResp.json();
+    if (videoData.error) throw new Error(videoData.error.message);
+    const videoId = videoData.id;
+    console.log('[upload-facebook] video posted, id:', videoId);
+
+    // Get permalink
+    let permalink = null;
+    try {
+      const plResp = await fetch(`https://graph.facebook.com/v21.0/${videoId}?fields=permalink_url&access_token=${token}`);
+      const plData = await plResp.json();
+      permalink = plData.permalink_url || null;
+    } catch(e) { /* non-fatal */ }
+    if (!permalink) permalink = `https://www.facebook.com/${pageId}/videos/${videoId}`;
+
+    await pool.query(
+      `UPDATE social_clips SET fb_posted_at=NOW(), fb_post_url=$1, facebook_video_id=$3,
+       fb_caption=COALESCE($4, fb_caption) WHERE id=$2`,
+      [permalink, id, videoId, clip.fb_caption || null]);
+
+    console.log('[upload-facebook] clip', id, 'published, video_id', videoId);
+    res.json({ ok: true, video_id: videoId, permalink });
+  } catch(e) {
+    console.error('[upload-facebook]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /admin/api/tracker/clips/:id/facebook — clear Facebook tracking (DB only; post stays on FB)
+app.delete('/admin/api/tracker/clips/:id/facebook', requireRole('admin'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await pool.query(
+      `UPDATE social_clips SET fb_posted_at=NULL, fb_post_url=NULL, facebook_video_id=NULL WHERE id=$1`, [id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // DELETE /admin/api/tracker/clips/:id/instagram — clear Instagram tracking (DB only; post stays on IG)
