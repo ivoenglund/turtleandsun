@@ -321,7 +321,7 @@ function renderTable() {
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.tiktok_posted?'background:#1C0A00':'background:#eee;border:1px solid #ddd'}"></div>${+c.tiktok_views?'<span style="font-size:11px;color:#1C0A00;font-weight:600">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.instagram_posted?'background:#C13584':'background:#eee;border:1px solid #ddd'}"></div>${+c.instagram_views?'<span style="font-size:11px;color:#C13584;font-weight:600">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.youtube_posted?'background:#FF0000':'background:#eee;border:1px solid #ddd'}"></div>${+c.youtube_views?'<span style="font-size:11px;color:#FF0000;font-weight:600">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.facebook_posted?'background:#1877F2':'background:#eee;border:1px solid #ddd'}"></div>${+c.facebook_views?'<span style="font-size:11px;color:#1877F2;font-weight:600">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.facebook_posted?'background:#1877F2':'background:#eee;border:1px solid #ddd'}"></div>${c.facebook_views!=null?'<span style="font-size:11px;color:#1877F2;font-weight:600">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
@@ -916,37 +916,20 @@ function renderCalNav(){
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const nav=document.getElementById('cal-month-nav');
   if(!nav)return;
-  // Collect months from renderCal's data (re-derive quickly)
-  const byPlatDay={};
-  CAL_PLATS.forEach(p=>{byPlatDay[p.key]={};});
-  clips.forEach(c=>{
-    CAL_PLATS.forEach(p=>{
-      let ds=null;
-      if(p.key==='youtube'){ds=c.yt_posted_at?fd(c.yt_posted_at):(c.yt_scheduled_at?fd(c.yt_scheduled_at):null);}
-      else{var v=c[p.dateKey];ds=v?fd(v):null;}
-      if(!ds)return;
-      if(!byPlatDay[p.key][ds])byPlatDay[p.key][ds]=[];
-      byPlatDay[p.key][ds].push(c);
-    });
-  });
-  const allDates=Object.values(byPlatDay).flatMap(function(d){return Object.keys(d);}).map(function(s){return new Date(s);}).filter(function(d){return !isNaN(d);});
-  const now=new Date(),endY=now.getFullYear(),endM=now.getMonth();
-  let startY=endY,startM=endM;
-  if(allDates.length){var e=new Date(Math.min.apply(null,allDates.map(function(d){return d.getTime();})));startY=e.getFullYear();startM=e.getMonth();}
-  const months=[];
-  let y=startY,m=startM;
-  // include up to 12 months in the future
-  const futureEnd=new Date(now.getFullYear(),now.getMonth()+13,1);
-  const futureY=futureEnd.getFullYear(),futureM=futureEnd.getMonth();
-  while(y<futureY||(y===futureY&&m<futureM)){months.push([y,m]);m++;if(m>11){m=0;y++;}}
-  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  nav.innerHTML='<div class="cal-month-nav-inner">'+months.map(function(ym){
-    var yr=ym[0],mo=ym[1];
-    var key=yr+'-'+String(mo+1).padStart(2,'0');
-    var isNow=(key===nowKey);
-    return '<button class="cal-month-btn'+(isNow?' active-month':'')+'" data-y="'+yr+'" data-m="'+mo+'" onclick="calJumpToMonth('+yr+','+mo+')">'+MN[mo]+' '+(yr%100)+'</button>';
-  }).join('')+'</div>';
-  // Drag to scroll
+  if(!calCurrentYM){const n=new Date();calCurrentYM=[n.getFullYear(),n.getMonth()];}
+  const curY=calCurrentYM[0], curM=calCurrentYM[1];
+  const btnStyle='background:none;border:1px solid #bbb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px;font-weight:700;color:#1C2A14';
+  nav.innerHTML=
+    '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px 2px;border-bottom:1px solid #d4cfc7">'+
+      '<button style="'+btnStyle+'" onclick="calChangeYear(-1)">&#9664;</button>'+
+      '<span style="min-width:42px;text-align:center;font-size:13px;font-weight:700;color:#1C2A14">'+curY+'</span>'+
+      '<button style="'+btnStyle+'" onclick="calChangeYear(1)">&#9654;</button>'+
+    '</div>'+
+    '<div class="cal-month-nav-inner">'+
+    MN.map(function(mn,mo){
+      return '<button class="cal-month-btn'+(mo===curM?' active-month':'')+'" data-y="'+curY+'" data-m="'+mo+'" onclick="calJumpToMonth('+curY+','+mo+')">'+mn+'</button>';
+    }).join('')+
+    '</div>';
   var inner=nav;
   var isDown=false,startX=0,scrollL=0;
   inner.addEventListener('pointerdown',function(e){isDown=true;startX=e.pageX-inner.offsetLeft;scrollL=inner.scrollLeft;inner.setPointerCapture(e.pointerId);});
@@ -957,11 +940,7 @@ function renderCalNav(){
 function calJumpToMonth(yr,mo){
   calCurrentYM=[yr,mo];
   renderCal(clips);
-  // Update active-month highlight in nav
-  document.querySelectorAll('.cal-month-btn').forEach(function(btn){
-    var by=parseInt(btn.getAttribute('data-y')),bm=parseInt(btn.getAttribute('data-m'));
-    btn.classList.toggle('active-month',by===yr&&bm===mo);
-  });
+  renderCalNav();
 }
 
 function calScrollToToday(){
@@ -969,6 +948,13 @@ function calScrollToToday(){
   if(!wrap)return;
   var now=new Date();
   calJumpToMonth(now.getFullYear(),now.getMonth());
+}
+
+function calChangeYear(delta){
+  if(!calCurrentYM){const n=new Date();calCurrentYM=[n.getFullYear(),n.getMonth()];}
+  calCurrentYM=[calCurrentYM[0]+delta,calCurrentYM[1]];
+  renderCal(clips);
+  renderCalNav();
 }
 
 function renderCal(clips){
