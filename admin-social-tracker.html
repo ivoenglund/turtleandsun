@@ -157,8 +157,9 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           <h1>Social Tracker</h1>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary" onclick="fetchYT(this)">&#8635; Fetch YouTube stats</button>
+          <button class="btn btn-secondary" onclick="fetchYT(this)" style="background:#FF0000;color:#fff;border-color:#FF0000">&#8635; Fetch YouTube stats</button>
           <button class="btn btn-secondary" onclick="fetchIG(this)" style="background:#C13584;color:#fff;border-color:#C13584">&#8635; Fetch Instagram stats</button>
+          <button class="btn btn-secondary" onclick="fetchFB(this)" style="background:#1877F2;color:#fff;border-color:#1877F2">&#8635; Fetch Facebook stats</button>
           <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
         </div>
       </div>
@@ -404,7 +405,7 @@ function renderPanel() {
       <div class="bp-chart">
         ${ytInfoHtml}
         ${ytPubHtml}
-        ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram stats above.</div>'}
+        ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram / Facebook stats above.</div>'}
     </div>`;
 
   panel.style.display = 'block';
@@ -494,6 +495,22 @@ async function logStats() {
   await loadStats(selId);
   await load();
   renderPanel();
+}
+
+async function fetchFB(btn) {
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  try {
+    const r = await fetch('/admin/api/tracker/fetch-facebook-stats', { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    btn.textContent = `✓ Updated ${d.updated} video${d.updated===1?'':'s'}`;
+    await load();
+    if (selId) { await loadStats(selId); renderPanel(); }
+    setTimeout(() => { btn.disabled=false; btn.textContent='↻ Fetch Facebook stats'; }, 3000);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '↻ Fetch Facebook stats';
+    alert('Facebook stats error: ' + e.message);
+  }
 }
 
 async function fetchYT(btn) {

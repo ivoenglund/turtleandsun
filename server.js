@@ -7876,6 +7876,48 @@ async function fetchYouTubeStatsBatch() {
   return { updated };
 }
 
+// POST /admin/api/tracker/fetch-facebook-stats -- batch Facebook stats for all clips with facebook_video_id
+async function fetchFacebookStatsBatch() {
+  const { rows } = await pool.query(
+    `SELECT id, facebook_video_id FROM social_clips WHERE facebook_video_id IS NOT NULL AND facebook_video_id <> '' ORDER BY id DESC LIMIT 50`
+  );
+  if (!rows.length) return { updated: 0 };
+  const { token } = await getFacebookToken();
+  let updated = 0;
+  for (const clip of rows) {
+    try {
+      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views&access_token=${token}`);
+      const d = await r.json();
+      if (d.error) { console.warn('[fb-stats] clip', clip.id, d.error.message); continue; }
+      const viewsEntry = (d.data || []).find(x => x.name === 'total_video_views');
+      const views = viewsEntry ? (viewsEntry.values?.[0]?.value || 0) : 0;
+      await pool.query(
+        `UPDATE social_clips SET facebook_views=$2, updated_at=NOW() WHERE id=$1`,
+        [clip.id, views]
+      );
+      await pool.query(
+        `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views)
+         VALUES ($1, 'facebook', CURRENT_DATE, $2)
+         ON CONFLICT (social_clip_id, platform, stat_date)
+         DO UPDATE SET views=$2, updated_at=NOW()`,
+        [clip.id, views]
+      );
+      updated++;
+    } catch(e) { console.warn('[fb-stats] clip', clip.id, e.message); }
+  }
+  return { updated };
+}
+
+app.post('/admin/api/tracker/fetch-facebook-stats', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await fetchFacebookStatsBatch();
+    res.json({ ok: true, updated: result.updated });
+  } catch(e) {
+    console.error('[tracker/fetch-facebook-stats]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /admin/api/tracker/fetch-youtube-stats -- batch YT stats for all clips with yt_video_id
 app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
   try {
