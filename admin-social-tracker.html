@@ -157,9 +157,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           <h1>Social Tracker</h1>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary" onclick="fetchYT(this)" style="background:#FF0000;color:#fff;border-color:#FF0000">&#8635; Fetch YouTube stats</button>
-          <button class="btn btn-secondary" onclick="fetchIG(this)" style="background:#C13584;color:#fff;border-color:#C13584">&#8635; Fetch Instagram stats</button>
-          <button class="btn btn-secondary" onclick="fetchFB(this)" style="background:#1877F2;color:#fff;border-color:#1877F2">&#8635; Fetch Facebook stats</button>
+          <button class="btn btn-secondary" onclick="fetchAll(this)" style="background:#1C2A14;color:#FFE800;border-color:#1C2A14">&#8635; Fetch all stats</button>
           <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
         </div>
       </div>
@@ -397,7 +395,6 @@ function renderPanel() {
         <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
       </div>
       <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-        ${ytEditBtn}${otherEditBtns}
         <button onclick="closePanel()" style="margin-left:4px">&#x2715;</button>
       </div>
     </div>
@@ -405,7 +402,25 @@ function renderPanel() {
       <div class="bp-chart">
         ${ytInfoHtml}
         ${ytPubHtml}
-        ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — use Fetch YouTube / Instagram / Facebook stats above.</div>'}
+        ${stats.length ? '<div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — click ↻ Fetch all stats above.</div>'}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 14px;background:#f7f4ee;border-top:1px solid #e0dbd2">
+      ${['tiktok','instagram','youtube','facebook'].map(p => {
+        const pc = (posts[p]||{});
+        const postedDate = p==='youtube' ? (c.yt_posted_at ? fd(c.yt_posted_at) : null) : fd(pc.posted_at);
+        const viewsVal = c[p+'_views'];
+        const viewsStr = viewsVal!=null ? viewsVal.toLocaleString('sv-SE') + ' views' : 'No stats';
+        const color = PLAT_COLORS[p];
+        const posted = !!postedDate;
+        return '<div style="border:1px solid #e0dbd2;border-radius:8px;background:#fff;padding:8px 10px;display:flex;flex-direction:column;gap:4px">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between">'
+          +   '<span style="font-size:11px;font-weight:700;color:'+color+'">'+PF[p]+'</span>'
+          +   '<button onclick="showPostModal(\'' + p + '\')" style="padding:2px 8px;font-size:10px;font-weight:700;border-radius:4px;border:none;background:'+color+';color:#fff;cursor:pointer">'+PF[p]+' ✎</button>'
+          + '</div>'
+          + '<div style="font-size:10px;color:#555">' + (posted ? '✓ '+postedDate : '<span style=\"color:#aaa\">Not posted</span>') + '</div>'
+          + '<div style="font-size:10px;color:#888">' + (posted ? viewsStr : '') + '</div>'
+          + '</div>';
+      }).join('')}
     </div>`;
 
   panel.style.display = 'block';
@@ -542,6 +557,26 @@ async function fetchIG(btn) {
   } catch(e) {
     btn.disabled = false; btn.textContent = '↻ Fetch Instagram stats';
     alert('Instagram stats error: ' + e.message);
+  }
+}
+
+async function fetchAll(btn) {
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  try {
+    const [ytR, igR, fbR] = await Promise.all([
+      fetch('/admin/api/tracker/fetch-youtube-stats', { method:'POST' }),
+      fetch('/admin/api/tracker/fetch-instagram-stats', { method:'POST' }),
+      fetch('/admin/api/tracker/fetch-facebook-stats', { method:'POST' }),
+    ]);
+    const [yt, ig, fb] = await Promise.all([ytR.json(), igR.json(), fbR.json()]);
+    const total = (yt.updated||0) + (ig.updated||0) + (fb.updated||0);
+    btn.textContent = `✓ Updated ${total} item${total===1?'':'s'}`;
+    await load();
+    if (selId) { await loadStats(selId); renderPanel(); }
+    setTimeout(() => { btn.disabled=false; btn.textContent='↻ Fetch all stats'; }, 3000);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '↻ Fetch all stats';
+    alert('Fetch stats error: ' + e.message);
   }
 }
 
@@ -920,15 +955,13 @@ function renderCalNav(){
   const curY=calCurrentYM[0], curM=calCurrentYM[1];
   const btnStyle='background:none;border:1px solid #bbb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px;font-weight:700;color:#1C2A14';
   nav.innerHTML=
-    '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px 2px;border-bottom:1px solid #d4cfc7">'+
-      '<button style="'+btnStyle+'" onclick="calChangeYear(-1)">&#9664;</button>'+
-      '<span style="min-width:42px;text-align:center;font-size:13px;font-weight:700;color:#1C2A14">'+curY+'</span>'+
-      '<button style="'+btnStyle+'" onclick="calChangeYear(1)">&#9654;</button>'+
-    '</div>'+
     '<div class="cal-month-nav-inner">'+
-    MN.map(function(mn,mo){
-      return '<button class="cal-month-btn'+(mo===curM?' active-month':'')+'" data-y="'+curY+'" data-m="'+mo+'" onclick="calJumpToMonth('+curY+','+mo+')">'+mn+'</button>';
-    }).join('')+
+      '<button style="'+btnStyle+';flex-shrink:0;margin-right:2px" onclick="calChangeYear(-1)">&#9664;</button>'+
+      '<span style="flex-shrink:0;min-width:40px;text-align:center;font-size:12px;font-weight:700;color:#1C2A14;padding:0 2px;align-self:center">'+curY+'</span>'+
+      '<button style="'+btnStyle+';flex-shrink:0;margin-right:8px" onclick="calChangeYear(1)">&#9654;</button>'+
+      MN.map(function(mn,mo){
+        return '<button class="cal-month-btn'+(mo===curM?' active-month':'')+'" data-y="'+curY+'" data-m="'+mo+'" onclick="calJumpToMonth('+curY+','+mo+')">'+mn+'</button>';
+      }).join('')+
     '</div>';
   var inner=nav;
   var isDown=false,startX=0,scrollL=0;
