@@ -7791,7 +7791,7 @@ async function fetchInstagramStatsBatch() {
   for (const clip of rows) {
     try {
       // Basic fields — video_views works for Reels/Video without insights permission
-      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=like_count,comments_count,media_type&access_token=${tok}`);
+      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=id,like_count,comments_count,media_type&access_token=${tok}`);
       const basicD = await basicR.json();
       if (basicD.error) { console.warn('[ig-stats]', clip.id, basicD.error.message); continue; }
       const likes    = basicD.like_count    || 0;
@@ -7800,12 +7800,12 @@ async function fetchInstagramStatsBatch() {
       let views = 0; // Will be set by insights (plays/reach) if instagram_manage_insights is granted
       // Try insights for plays/reach (requires instagram_manage_insights)
       try {
-        const insR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}/insights?metric=plays,reach&access_token=${tok}`);
+        const insR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}/insights?metric=views,reach&access_token=${tok}`);
         const insD = await insR.json();
         if (!insD.error && insD.data) {
           const byName = {};
           insD.data.forEach(m => { byName[m.name] = m.values && m.values[0] ? m.values[0].value : (m.value || 0); });
-          const insViews = byName.plays || byName.reach || 0;
+          const insViews = byName.views || byName.reach || 0;
           console.log('[ig-stats] clip', clip.id, 'insights plays:', byName.plays, 'reach:', byName.reach);
           if (insViews > views) views = insViews;
         } else if (insD.error) {
