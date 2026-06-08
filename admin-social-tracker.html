@@ -724,23 +724,39 @@ async function saveClip() {
 
 // Post modal (add/edit platform info)
 let postModalPlat = null;
-async function showPostModal(plat) {
+function buildYtText(clip) {
+  const concept  = clip.concept || clip.concept_name || '';
+  const subject  = clip.subject || 'pet';
+  const name     = clip.subject_name || null;
+  const occasion = clip.occasion || 'general';
+  const styleTag = (clip.style || 'royal-portrait').toLowerCase().replace(/\s+/g, '-');
+  const conceptTag = '#' + concept.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cap = concept.charAt(0).toUpperCase() + concept.slice(1);
+  const subj1 = subject.charAt(0).toUpperCase() + subject.slice(1);
+  const occasionLine = { 'mothers-day':'Perfect Mothers Day gift 🌸', 'fathers-day':'Perfect Fathers Day gift 🎁',
+    'birthday':'The perfect birthday gift 🎂', 'christmas':'The perfect Christmas gift 🎄',
+    'valentines':"The perfect Valentine's Day gift ❤️", 'easter':'A unique Easter gift 🐣' }[occasion] || '';
+  const yt_title = name
+    ? `We turned ${name} into a ${concept} 👑 Wait for the after…`
+    : `${subj1} becomes a ${concept} 👑 | Before & After`;
+  const yt_description = `${name ? name + ' got' : cap + ' transformation —'} the royal treatment! 👑🐾\n\nThis is a Loveogram — an AI-generated portrait that transforms your pet photo into a stunning ${concept}.\n\nCreate yours at turtleandsun.com\nFrom 99 kr / ~$9 USD\n\n${occasionLine ? occasionLine + '\n\n' : ''}The family photo you could never take.\n5% of every order goes to the Turtleandsun Connection Fund 🐢\n\n#Shorts ${conceptTag} #loveogram #turtleandsun`;
+  const yt_keyword_tags = [subject+' portrait', concept.toLowerCase(), 'pet transformation', 'before and after',
+    'AI pet art', subject+' makeover', 'pet gift', 'loveogram', 'turtle and sun', subject+' art', 'cute '+subject,
+    occasion && occasion !== 'general' ? occasion+' gift' : '', 'AI art', styleTag].filter(Boolean).join(', ');
+  return { yt_title, yt_description, yt_keyword_tags };
+}
+
+function showPostModal(plat) {
   postModalPlat = plat;
   const pd = (postCache[selId]||{})[plat] || {};
   const c = clips.find(x=>x.id===selId);
 
-  // Auto-generate platform text if missing (YouTube title is the sentinel)
+  // Auto-generate YouTube text client-side if missing
   if (plat === 'youtube' && c && !c.yt_title) {
-    try {
-      const gr = await fetch(`/admin/api/social-clips/${selId}/generate-content`, { method:'POST', headers:{'Accept':'application/json'} });
-      if (gr.ok) {
-        const gd = await gr.json();
-        // Patch the clip in memory so the modal renders with the generated text
-        c.yt_title = gd.yt_title || '';
-        c.yt_description = gd.yt_description || '';
-        c.yt_keyword_tags = gd.yt_keyword_tags || '';
-      }
-    } catch(e) { /* non-fatal */ }
+    const gen = buildYtText(c);
+    c.yt_title        = gen.yt_title;
+    c.yt_description  = gen.yt_description;
+    c.yt_keyword_tags = gen.yt_keyword_tags;
   }
 
   let fields = '';
