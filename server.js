@@ -7786,23 +7786,25 @@ async function fetchInstagramStatsBatch() {
   let updated = 0;
   for (const clip of rows) {
     try {
-      // Basic fields (always available)
-      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=like_count,comments_count&access_token=${tok}`);
+      // Basic fields — video_views works for Reels/Video without insights permission
+      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=like_count,comments_count,video_views,media_type&access_token=${tok}`);
       const basicD = await basicR.json();
       if (basicD.error) { console.warn('[ig-stats]', clip.id, basicD.error.message); continue; }
       const likes    = basicD.like_count    || 0;
       const comments = basicD.comments_count || 0;
-      // Insights (plays, reach) — requires instagram_manage_insights
-      let views = 0;
+      // video_views is a standard field for Reels/Videos — no insights permission needed
+      let views = basicD.video_views || 0;
+      // Try insights for plays/reach as enhancement (requires instagram_manage_insights)
       try {
         const insR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}/insights?metric=plays,reach&access_token=${tok}`);
         const insD = await insR.json();
         if (!insD.error && insD.data) {
           const byName = {};
           insD.data.forEach(m => { byName[m.name] = m.values && m.values[0] ? m.values[0].value : (m.value || 0); });
-          views = byName.plays || byName.reach || 0;
+          const insViews = byName.plays || byName.reach || 0;
+          if (insViews > views) views = insViews;
         }
-      } catch(e) { /* insights not available — use likes as proxy */ views = likes; }
+      } catch(e) { /* insights not available — video_views already set above */ }
       await pool.query(
         `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
          VALUES ($1,'instagram',$2,$3,$4,$5,0,'api')
@@ -7886,21 +7888,30 @@ async function fetchFacebookStatsBatch() {
   let updated = 0;
   for (const clip of rows) {
     try {
-      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views&access_token=${token}`);
+      const metrics = 'total_video_views,total_video_impressions,total_video_reactions_by_action_type,total_video_comment_count,total_video_shares';
+      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=${metrics}&access_token=${token}`);
       const d = await r.json();
       if (d.error) { console.warn('[fb-stats] clip', clip.id, d.error.message); continue; }
-      const viewsEntry = (d.data || []).find(x => x.name === 'total_video_views');
-      const views = viewsEntry ? (viewsEntry.values?.[0]?.value || 0) : 0;
+      const byName = {};
+      (d.data || []).forEach(m => {
+        const val = m.values && m.values.length ? m.values[m.values.length - 1].value : (m.value || 0);
+        byName[m.name] = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : (val || 0);
+      });
+      const views    = byName.total_video_views || 0;
+      const reach    = byName.total_video_impressions || 0;
+      const likes    = byName.total_video_reactions_by_action_type || 0;
+      const comments = byName.total_video_comment_count || 0;
+      const shares   = byName.total_video_shares || 0;
       await pool.query(
         `UPDATE social_clips SET facebook_views=$2, updated_at=NOW() WHERE id=$1`,
         [clip.id, views]
       );
       await pool.query(
-        `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views)
-         VALUES ($1, 'facebook', CURRENT_DATE, $2)
+        `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
+         VALUES ($1, 'facebook', CURRENT_DATE, $2, $3, $4, $5, 'api')
          ON CONFLICT (social_clip_id, platform, stat_date)
-         DO UPDATE SET views=$2, updated_at=NOW()`,
-        [clip.id, views]
+         DO UPDATE SET views=$2, likes=$3, comments=$4, shares=$5, source='api', updated_at=NOW()`,
+        [clip.id, views, likes, comments, shares]
       );
       updated++;
     } catch(e) { console.warn('[fb-stats] clip', clip.id, e.message); }
