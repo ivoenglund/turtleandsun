@@ -3372,7 +3372,7 @@ function instagramOAuthUrl() {
   const params = new URLSearchParams({
     client_id:     process.env.META_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish,instagram_manage_insights',
+    scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,read_insights,business_management,instagram_basic,instagram_content_publish,instagram_manage_insights',
     response_type: 'code',
     auth_type:     'rerequest',
     state:         'admin',
@@ -7903,43 +7903,41 @@ async function fetchFacebookStatsBatch() {
   let updated = 0;
   for (const clip of rows) {
     try {
-      // Try video object fields first (works for Reels AND regular videos)
-      let views = 0;
-      try {
-        const rv = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}?fields=views,likes.summary(true),comments.summary(true),shares&access_token=${token}`);
-        const dv = await rv.json();
-        console.log('[fb-stats] clip', clip.id, 'video object:', JSON.stringify(dv));
-        if (!dv.error) {
-          views = dv.views || 0;
+      // Try Reels metrics first (FB converts short vertical videos to Reels)
+      let views = 0, likes = 0, comments = 0, shares = 0;
+      const reelsR = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,post_video_likes_by_reaction_type,post_video_social_actions&period=lifetime&access_token=${token}`);
+      const reelsD = await reelsR.json();
+      console.log('[fb-stats] clip', clip.id, 'reels metrics:', JSON.stringify(reelsD));
+      if (!reelsD.error && reelsD.data && reelsD.data.length) {
+        const byName = {};
+        reelsD.data.forEach(m => {
+          const val = m.values && m.values.length ? m.values[0].value : (m.value || 0);
+          byName[m.name] = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : (val || 0);
+        });
+        views    = byName.blue_reels_play_count || byName.fb_reels_total_plays || 0;
+        likes    = byName.post_video_likes_by_reaction_type || 0;
+        const social = reelsD.data.find(m => m.name === 'post_video_social_actions');
+        if (social && social.values && social.values[0] && typeof social.values[0].value === 'object') {
+          comments = social.values[0].value.comment || 0;
+          shares   = social.values[0].value.share || 0;
         }
-      } catch(e) { /* fallback to video_insights */ }
-      // Also try video_insights for lifetime total_video_views
-      if (!views) {
-        const r1 = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views&period=lifetime&access_token=${token}`);
-        const d1 = await r1.json();
-        if (!d1.error) {
-          const viewsEntry = (d1.data || []).find(x => x.name === 'total_video_views');
-          const insViews = viewsEntry ? (viewsEntry.values && viewsEntry.values.length ? viewsEntry.values[viewsEntry.values.length-1].value : 0) : 0;
-          if (insViews > views) views = insViews;
-        }
-        console.log('[fb-stats] clip', clip.id, 'video_insights total_video_views:', views);
       }
-      // Engagement metrics (no period=lifetime — they use default period)
-      let likes = 0, comments = 0, shares = 0;
-      try {
-        const r2 = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_reactions_by_action_type,total_video_comment_count,total_video_shares&access_token=${token}`);
-        const d2 = await r2.json();
-        if (!d2.error && d2.data) {
+      // Fallback: regular video metrics (total_video_views) if not a Reel
+      if (!views) {
+        const vidR = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views,total_video_reactions_by_type_total&period=lifetime&access_token=${token}`);
+        const vidD = await vidR.json();
+        console.log('[fb-stats] clip', clip.id, 'video metrics:', JSON.stringify(vidD));
+        if (!vidD.error && vidD.data) {
           const byName = {};
-          d2.data.forEach(m => {
-            const val = m.values && m.values.length ? m.values[m.values.length-1].value : (m.value || 0);
+          vidD.data.forEach(m => {
+            const val = m.values && m.values.length ? m.values[0].value : (m.value || 0);
             byName[m.name] = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : (val || 0);
           });
-          likes    = byName.total_video_reactions_by_action_type || 0;
-          comments = byName.total_video_comment_count || 0;
-          shares   = byName.total_video_shares || 0;
+          views = byName.total_video_views || 0;
+          if (!likes) likes = byName.total_video_reactions_by_type_total || 0;
         }
-      } catch(e) { /* engagement metrics optional */ }
+      }
+      console.log('[fb-stats] clip', clip.id, 'final: views='+views+' likes='+likes+' comments='+comments+' shares='+shares);
       await pool.query(
         `UPDATE social_clips SET facebook_views=$2, updated_at=NOW() WHERE id=$1`,
         [clip.id, views]
