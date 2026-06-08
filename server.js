@@ -7792,9 +7792,9 @@ async function fetchInstagramStatsBatch() {
       if (basicD.error) { console.warn('[ig-stats]', clip.id, basicD.error.message); continue; }
       const likes    = basicD.like_count    || 0;
       const comments = basicD.comments_count || 0;
-      // video_views is a standard field for Reels/Videos — no insights permission needed
+      console.log('[ig-stats] clip', clip.id, 'media_type:', basicD.media_type, 'video_views:', basicD.video_views, 'like_count:', basicD.like_count);
       let views = basicD.video_views || 0;
-      // Try insights for plays/reach as enhancement (requires instagram_manage_insights)
+      // Try insights for plays/reach (requires instagram_manage_insights)
       try {
         const insR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}/insights?metric=plays,reach&access_token=${tok}`);
         const insD = await insR.json();
@@ -7802,9 +7802,12 @@ async function fetchInstagramStatsBatch() {
           const byName = {};
           insD.data.forEach(m => { byName[m.name] = m.values && m.values[0] ? m.values[0].value : (m.value || 0); });
           const insViews = byName.plays || byName.reach || 0;
+          console.log('[ig-stats] clip', clip.id, 'insights plays:', byName.plays, 'reach:', byName.reach);
           if (insViews > views) views = insViews;
+        } else if (insD.error) {
+          console.warn('[ig-stats] insights error clip', clip.id, insD.error.message);
         }
-      } catch(e) { /* insights not available — video_views already set above */ }
+      } catch(e) { console.warn('[ig-stats] insights exception clip', clip.id, e.message); }
       await pool.query(
         `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
          VALUES ($1,'instagram',$2,$3,$4,$5,0,'api')
@@ -7812,10 +7815,18 @@ async function fetchInstagramStatsBatch() {
            views=$3, likes=$4, comments=$5, source='api'`,
         [clip.id, today, views, likes, comments]
       );
-      await pool.query(
-        'UPDATE social_clips SET instagram_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1',
-        [clip.id, views]
-      );
+      // Only update instagram_views if we got a real value (don't zero out existing data)
+      if (views > 0) {
+        await pool.query(
+          'UPDATE social_clips SET instagram_views=$2, stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1',
+          [clip.id, views]
+        );
+      } else {
+        await pool.query(
+          'UPDATE social_clips SET stats_refreshed_at=NOW(), updated_at=NOW() WHERE id=$1',
+          [clip.id]
+        );
+      }
       updated++;
     } catch(e) { console.warn('[ig-stats] clip', clip.id, e.message); }
   }
