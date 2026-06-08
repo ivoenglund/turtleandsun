@@ -799,7 +799,7 @@ function showPostModal(plat) {
       <button class="btn btn-secondary" onclick="document.getElementById('post-modal-bg').remove()">Cancel</button>
       ${postModalPlat === 'youtube' && ytConnected
         ? (clips.find(x=>x.id===selId)||{}).yt_video_id
-          ? '<button class="btn btn-secondary" onclick="syncToYouTube()">Sync metadata</button><button class="btn btn-primary" id="yt-upload-btn" onclick="uploadToYouTube()" style="background:#FF0000;color:#fff;margin-left:6px">↺ Re-upload to YouTube</button>'
+          ? '<button class="btn btn-primary" onclick="syncToYouTube()" style="background:#FF0000;color:#fff">💾 Save to YouTube</button>'
           : '<button class="btn btn-primary" id="yt-upload-btn" onclick="uploadToYouTube()" style="background:#FF0000;color:#fff">▶ Upload to YouTube</button>'
         : postModalPlat === 'youtube' && !ytConnected
         ? '<a href="/admin/youtube/connect" class="btn btn-primary" style="background:#FF0000;color:#fff;text-decoration:none">Connect YouTube</a>'
