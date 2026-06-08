@@ -3642,49 +3642,149 @@ app.get('/admin/api/facebook/status', requireRole('admin'), async (req, res) => 
 });
 
 // POST /admin/api/tracker/clips/:id/upload-facebook
-// Posts clip as a video to the Turtle and Sun Facebook Page.
+// Posts clip as a Facebook Reel using the Reels binary upload API.
 app.post('/admin/api/tracker/clips/:id/upload-facebook', requireRole('admin'), async (req, res) => {
+  const fs4   = require('fs');
+  const os4   = require('os');
+  const path4 = require('path');
   const id = parseInt(req.params.id);
   try {
     const { rows } = await pool.query(
-      `SELECT sc.*, c.name AS concept FROM social_clips sc LEFT JOIN concepts c ON c.id=sc.concept_id WHERE sc.id=$1`, [id]);
+      `SELECT sc.*, COALESCE(c.name, sc.concept_name, '') AS concept FROM social_clips sc LEFT JOIN concepts c ON c.id=sc.concept_id WHERE sc.id=$1`, [id]);
     if (!rows.length) return res.status(404).json({ error: 'Clip not found' });
     const clip = rows[0];
     if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet' });
 
     const { token, pageId } = await getFacebookToken();
-    const caption = clip.fb_caption || 'Loveogram by Turtle and Sun 🐢☀️';
+    const caption = clip.fb_caption || ('Loveogram by Turtle and Sun \u{1F422}\u2600\uFE0F');
 
-    // POST video to Facebook Page via file_url (Graph API uploads asynchronously)
-    const videoParams = { file_url: clip.output_url, description: caption, access_token: token };
-    const videoResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/videos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(videoParams),
-    });
-    const videoData = await videoResp.json();
-    if (videoData.error) throw new Error(videoData.error.message);
-    const videoId = videoData.id;
-    console.log('[upload-facebook] video posted, id:', videoId);
-
-    // Get permalink
-    let permalink = null;
+    // Download the video to a temp file
+    const tmpDir = fs4.mkdtempSync(path4.join(os4.tmpdir(), 'tns-fb-'));
     try {
-      const plResp = await fetch(`https://graph.facebook.com/v21.0/${videoId}?fields=permalink_url&access_token=${token}`);
-      const plData = await plResp.json();
-      permalink = plData.permalink_url || null;
-    } catch(e) { /* non-fatal */ }
-    if (!permalink) permalink = `https://www.facebook.com/${pageId}/videos/${videoId}`;
+      const videoPath = path4.join(tmpDir, 'clip.mp4');
+      const https4 = require('https');
+      const http4  = require('http');
+      const urlM   = require('url');
+      const parsed4 = urlM.parse(clip.output_url);
+      const lib4 = parsed4.protocol === 'https:' ? https4 : http4;
+      await new Promise((resolve, reject) => {
+        const ws = fs4.createWriteStream(videoPath);
+        lib4.get(clip.output_url, r => { r.pipe(ws); ws.on('finish', resolve); ws.on('error', reject); }).on('error', reject);
+      });
+      const videoBytes = fs4.readFileSync(videoPath);
+      const fileSize   = videoBytes.length;
 
-    await pool.query(
-      `UPDATE social_clips SET fb_posted_at=NOW(), fb_post_url=$1, facebook_video_id=$3,
-       fb_caption=COALESCE($4, fb_caption) WHERE id=$2`,
-      [permalink, id, videoId, clip.fb_caption || null]);
+      // Step 1: Start Reels upload session
+      const startResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/video_reels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ upload_phase: 'start', access_token: token }),
+      });
+      const startData = await startResp.json();
+      if (startData.error) throw new Error('FB start: ' + startData.error.message);
+      const { video_id: videoId, upload_url: uploadUrl } = startData;
+      console.log('[upload-facebook] upload session started, video_id:', videoId);
 
-    console.log('[upload-facebook] clip', id, 'published, video_id', videoId);
-    res.json({ ok: true, video_id: videoId, permalink });
+      // Step 2: Upload binary to the upload_url
+      const upResp = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'OAuth ' + token,
+          'Content-Type':  'application/octet-stream',
+          'offset':        '0',
+          'file_size':     String(fileSize),
+        },
+        body: videoBytes,
+      });
+      const upData = await upResp.json().catch(() => ({}));
+      if (upData.error) throw new Error('FB upload: ' + upData.error.message);
+
+      // Step 3: Finish / publish as Reel
+      const finishResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/video_reels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          upload_phase: 'finish',
+          video_id:     videoId,
+          title:        (clip.concept || '').slice(0, 100),
+          description:  caption,
+          published:    'true',
+          access_token: token,
+        }),
+      });
+      const finishData = await finishResp.json();
+      if (finishData.error) throw new Error('FB finish: ' + finishData.error.message);
+
+      // Get permalink
+      let permalink = null;
+      try {
+        const plResp = await fetch(`https://graph.facebook.com/v21.0/${videoId}?fields=permalink_url&access_token=${token}`);
+        const plData = await plResp.json();
+        permalink = plData.permalink_url || null;
+      } catch(e) { /* non-fatal */ }
+      if (!permalink) permalink = 'https://www.facebook.com/' + pageId + '/videos/' + videoId;
+
+      const today = new Date().toISOString().slice(0, 10);
+      await pool.query(
+        'UPDATE social_clips SET fb_posted_at=$2, fb_post_url=$3, facebook_video_id=$4, fb_caption=COALESCE($5, fb_caption), updated_at=NOW() WHERE id=$1',
+        [id, today, permalink, videoId, clip.fb_caption || null]);
+
+      console.log('[upload-facebook] clip', id, 'published as Reel, video_id', videoId);
+      res.json({ ok: true, video_id: videoId, permalink });
+    } finally {
+      fs4.rmSync(tmpDir, { recursive: true, force: true });
+    }
   } catch(e) {
     console.error('[upload-facebook]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/clips/:id/fb-live — live Facebook stats for a clip
+app.get('/admin/api/tracker/clips/:id/fb-live', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT facebook_video_id, fb_post_url, fb_posted_at FROM social_clips WHERE id=$1', [parseInt(req.params.id)]);
+    if (!rows.length || !rows[0].facebook_video_id) return res.status(400).json({ error: 'No Facebook video ID for this clip' });
+    const { facebook_video_id: videoId, fb_post_url: knownUrl, fb_posted_at: postedAt } = rows[0];
+    const { token, pageId } = await getFacebookToken();
+
+    // Fetch video metadata
+    let permalink = knownUrl, description = null, createdTime = postedAt;
+    try {
+      const detR = await fetch('https://graph.facebook.com/v21.0/' + videoId + '?fields=permalink_url,description,created_time&access_token=' + token);
+      const detD = await detR.json();
+      if (!detD.error) {
+        permalink   = detD.permalink_url || knownUrl;
+        description = detD.description   || null;
+        createdTime = detD.created_time   || postedAt;
+      }
+    } catch(e) { /* non-fatal */ }
+
+    // Fetch video insights
+    let views = 0, likes = 0, comments = 0;
+    try {
+      const insR = await fetch('https://graph.facebook.com/v21.0/' + videoId + '/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,post_video_likes_by_reaction_type,post_video_comments&period=lifetime&access_token=' + token);
+      const insD = await insR.json();
+      if (!insD.error && insD.data) {
+        const byName = {};
+        for (const m of insD.data) byName[m.name] = m.values && m.values[0] ? m.values[0].value : 0;
+        views = byName.blue_reels_play_count || byName.fb_reels_total_plays || 0;
+        if (typeof views === 'object') views = Object.values(views).reduce((a, b) => a + b, 0);
+        const reactions = byName.post_video_likes_by_reaction_type;
+        if (reactions && typeof reactions === 'object') likes = Object.values(reactions).reduce((a, b) => a + b, 0);
+        if (typeof byName.post_video_comments === 'number') comments = byName.post_video_comments;
+      }
+    } catch(e) { /* non-fatal */ }
+
+    res.json({
+      video_id:    videoId,
+      permalink:   permalink || ('https://www.facebook.com/' + pageId + '/videos/' + videoId),
+      description: description,
+      posted_at:   createdTime ? new Date(createdTime).toISOString().slice(0, 10) : null,
+      views, likes, comments,
+    });
+  } catch(e) {
+    console.error('[fb-live]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -7577,6 +7677,9 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         sc.yt_keyword_tags,
         sc.yt_post_url,
         sc.yt_posted_at,
+        sc.facebook_video_id,
+        sc.fb_post_url,
+        sc.fb_caption,
         sc.tiktok_posted_at,
         sc.instagram_posted_at,
         sc.fb_posted_at,

@@ -289,7 +289,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 <script>
 const PF = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook' };
 const PLAT_COLORS = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
-let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {}, ytLiveCache = {};
+let clips = [], selId = null, selPlat = 'tiktok', postCache = {}, statCache = {}, ytLiveCache = {}, fbLiveCache = {};
 let calCurrentYM = null;
 let ttConnected = false;
 let igConnected = false;
@@ -492,6 +492,12 @@ async function pick(id) {
     try {
       const r = await fetch(`/admin/api/tracker/clips/${id}/youtube-live`, { headers: { 'Accept': 'application/json' } });
       if (r.ok) ytLiveCache[id] = await r.json();
+    } catch(e) { /* non-fatal */ }
+  }
+  if (c && c.facebook_video_id && !fbLiveCache[id]) {
+    try {
+      const r = await fetch(`/admin/api/tracker/clips/${id}/fb-live`, { headers: { 'Accept': 'application/json' } });
+      if (r.ok) fbLiveCache[id] = await r.json();
     } catch(e) { /* non-fatal */ }
   }
   // Scroll calendar to the week this clip was published
@@ -724,6 +730,22 @@ async function saveClip() {
 
 // Post modal (add/edit platform info)
 let postModalPlat = null;
+function buildFbCaption(clip) {
+  const concept  = clip.concept || clip.concept_name || '';
+  const subject  = clip.subject || 'pet';
+  const name     = clip.subject_name || null;
+  const occasion = clip.occasion || 'general';
+  const pronoun  = 'them';
+  const cap = concept.charAt(0).toUpperCase() + concept.slice(1);
+  const occasionLine = { 'mothers-day':'Perfect Mothers Day gift 🌸', 'fathers-day':'Perfect Fathers Day gift 🎁',
+    'birthday':'The perfect birthday gift 🎂', 'christmas':'The perfect Christmas gift 🎄',
+    'valentines':"The perfect Valentine's Day gift ❤️", 'easter':'A unique Easter gift 🐣' }[occasion] || '';
+  return (name ? `${name} is now royalty 👑` : `Your ${subject} deserves to be royalty 👑`) +
+    ` We transformed ${pronoun} into a ${concept} using AI — and the result is stunning.\n\n` +
+    (occasionLine ? occasionLine + '\n\n' : '') +
+    'Create your own Loveogram at turtleandsun.com — from 99 kr.';
+}
+
 function buildYtText(clip) {
   const concept  = clip.concept || clip.concept_name || '';
   const subject  = clip.subject || 'pet';
@@ -818,11 +840,32 @@ function showPostModal(plat) {
       <div class="form-row"><label>Description</label><textarea id="pm-ytdesc" rows="5">${esc(ytLive.description||clip.yt_description||'')}</textarea></div>
       <div class="form-row"><label>Keyword tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></label><input id="pm-ytkw" value="${esc(ytLive.tags||clip.yt_keyword_tags||'')}"></div>`;
   } else if (plat === 'facebook') {
+    const fbLive = fbLiveCache[selId] || {};
+    const clip   = clips.find(x => x.id === selId) || {};
+    const fbUrl  = fbLive.permalink || clip.fb_post_url || null;
+    const fbInfoRow = (clip.facebook_video_id || fbLive.video_id)
+      ? `<div id="fb-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
+           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
+             <span style="color:#888;font-weight:700">Posted</span><span>${fbLive.posted_at ? fd(fbLive.posted_at) : (pd.posted_at ? fd(pd.posted_at) : '—')}</span>
+             <span style="color:#888;font-weight:700">URL</span><span>${fbUrl ? `<a href="${esc(fbUrl)}" target="_blank" style="color:#1877F2">${esc(fbUrl)}</a>` : '—'}</span>
+             <span style="color:#888;font-weight:700">Views</span><span id="fb-stat-views">${fbLive.views != null ? fbLive.views.toLocaleString() : '…'}</span>
+             <span style="color:#888;font-weight:700">Likes</span><span id="fb-stat-likes">${fbLive.likes != null ? fbLive.likes.toLocaleString() : '…'}</span>
+             <span style="color:#888;font-weight:700">Comments</span><span id="fb-stat-comments">${fbLive.comments != null ? fbLive.comments.toLocaleString() : '…'}</span>
+           </div>
+         </div>` : '';
+    // Auto-generate caption if missing
+    if (!pd.fb_caption && !clip.fb_caption) {
+      const gen = buildFbCaption(clip);
+      clip.fb_caption = gen;
+      pd.fb_caption   = gen;
+    }
     fields = `
-      <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
-      <div class="form-row"><label>Post URL</label><input id="pm-url" value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label>Caption</label><textarea id="pm-fbcap" rows="3">${esc(pd.fb_caption||'')}</textarea></div>`;
-  }
+      ${fbInfoRow}
+      ${clip.facebook_video_id ? `<div style="background:#fff8e1;border:1px solid #f9a825;border-radius:7px;padding:8px 11px;margin-bottom:10px;font-size:11px;color:#856700">
+        Posting again will create a new Reel.
+      </div>` : ''}
+      <div class="form-row"><label>Caption</label><textarea id="pm-fbcap" rows="5">${esc(fbLive.description||pd.fb_caption||clip.fb_caption||'')}</textarea></div>`;
+    }
 
   const existing = document.getElementById('post-modal-bg');
   if (existing) existing.remove();
@@ -886,6 +929,21 @@ function showPostModal(plat) {
         set('yt-stat-views',    d.views);
         set('yt-stat-likes',    d.likes);
         set('yt-stat-comments', d.comments);
+      })
+      .catch(() => {});
+  }
+  // Fetch live Facebook stats
+  const fbClip = clips.find(x => x.id === selId) || {};
+  if (plat === 'facebook' && fbClip.facebook_video_id) {
+    fetch(`/admin/api/tracker/clips/${selId}/fb-live`, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        fbLiveCache[selId] = d;
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val != null ? val.toLocaleString() : '—'; };
+        set('fb-stat-views',    d.views);
+        set('fb-stat-likes',    d.likes);
+        set('fb-stat-comments', d.comments);
       })
       .catch(() => {});
   }
@@ -1086,6 +1144,7 @@ async function uploadToFacebook() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Upload failed');
     document.getElementById('post-modal-bg').remove();
+    delete fbLiveCache[selId];
     await load();
     await loadPosts(selId);
     renderPanel();
