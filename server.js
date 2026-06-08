@@ -3372,7 +3372,7 @@ function instagramOAuthUrl() {
   const params = new URLSearchParams({
     client_id:     process.env.META_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish',
+    scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish,instagram_manage_insights',
     response_type: 'code',
     auth_type:     'rerequest',
     state:         'admin',
