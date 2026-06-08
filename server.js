@@ -7977,6 +7977,49 @@ app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (
   }
 });
 
+
+// GET /admin/api/tracker/channel-followers -- subscriber/follower counts for all connected channels
+app.get('/admin/api/tracker/channel-followers', requireRole('admin'), async (req, res) => {
+  const result = {};
+  // YouTube
+  try {
+    const ytRow = await pool.query("SELECT channel_id FROM platform_tokens WHERE platform='youtube'");
+    if (ytRow.rows.length && ytRow.rows[0].channel_id) {
+      const ytKey = process.env.YOUTUBE_API_KEY;
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${encodeURIComponent(ytRow.rows[0].channel_id)}&key=${ytKey}`);
+      const d = await r.json();
+      const s = d.items && d.items[0] && d.items[0].statistics;
+      if (s) result.youtube = parseInt(s.subscriberCount) || 0;
+    }
+  } catch(e) { console.warn('[channel-followers] youtube:', e.message); }
+  // Instagram
+  try {
+    const { token, igUserId } = await getInstagramToken();
+    const r = await fetch(`https://graph.facebook.com/v21.0/${igUserId}?fields=followers_count&access_token=${token}`);
+    const d = await r.json();
+    if (!d.error) result.instagram = d.followers_count || 0;
+  } catch(e) { console.warn('[channel-followers] instagram:', e.message); }
+  // Facebook
+  try {
+    const { token, pageId } = await getFacebookToken();
+    const r = await fetch(`https://graph.facebook.com/v21.0/${pageId}?fields=fan_count,followers_count&access_token=${token}`);
+    const d = await r.json();
+    if (!d.error) result.facebook = d.followers_count || d.fan_count || 0;
+  } catch(e) { console.warn('[channel-followers] facebook:', e.message); }
+  // TikTok
+  try {
+    const ttRow = await pool.query("SELECT access_token FROM platform_tokens WHERE platform='tiktok'");
+    if (ttRow.rows.length && ttRow.rows[0].access_token) {
+      const r = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=follower_count', {
+        headers: { 'Authorization': 'Bearer ' + ttRow.rows[0].access_token }
+      });
+      const d = await r.json();
+      if (d.data && d.data.user) result.tiktok = d.data.user.follower_count || 0;
+    }
+  } catch(e) { console.warn('[channel-followers] tiktok:', e.message); }
+  res.json(result);
+});
+
 // Serve admin-social-tracker.html
 app.get('/admin/social-tracker', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-social-tracker.html'));
