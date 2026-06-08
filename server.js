@@ -7965,6 +7965,48 @@ app.post('/admin/api/tracker/fetch-facebook-stats', requireRole('admin'), async 
   }
 });
 
+// GET /admin/api/tracker/debug-meta-stats -- raw Graph API response for first clip (temp debug)
+app.get('/admin/api/tracker/debug-meta-stats', requireRole('admin'), async (req, res) => {
+  try {
+    const out = {};
+    try {
+      const { token: fbToken, pageId } = await getFacebookToken();
+      out.fb_page_id = pageId;
+      out.fb_token_prefix = fbToken ? fbToken.substring(0, 20) + '...' : null;
+      const { rows: fbRows } = await pool.query(
+        "SELECT id, facebook_video_id FROM social_clips WHERE facebook_video_id IS NOT NULL AND facebook_video_id <> '' ORDER BY id DESC LIMIT 1"
+      );
+      if (fbRows.length) {
+        const clip = fbRows[0];
+        out.fb_clip_id = clip.id;
+        out.fb_video_id = clip.facebook_video_id;
+        const r1 = await fetch('https://graph.facebook.com/v21.0/' + clip.facebook_video_id + '/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,total_video_views&period=lifetime&access_token=' + fbToken);
+        out.fb_insights = await r1.json();
+        const r2 = await fetch('https://graph.facebook.com/v21.0/' + clip.facebook_video_id + '?fields=id,title,created_time&access_token=' + fbToken);
+        out.fb_video_meta = await r2.json();
+      } else { out.fb_clip = 'none'; }
+    } catch(e) { out.fb_error = e.message; }
+    try {
+      const { token: igToken, pageToken: igPageToken, igUserId } = await getInstagramToken();
+      const tok = igPageToken || igToken;
+      out.ig_user_id = igUserId;
+      const { rows: igRows } = await pool.query(
+        "SELECT id, instagram_media_id FROM social_clips WHERE instagram_media_id IS NOT NULL AND instagram_media_id <> '' ORDER BY id DESC LIMIT 1"
+      );
+      if (igRows.length) {
+        const clip = igRows[0];
+        out.ig_clip_id = clip.id;
+        out.ig_media_id = clip.instagram_media_id;
+        const r1 = await fetch('https://graph.facebook.com/v21.0/' + clip.instagram_media_id + '?fields=id,media_type,like_count,comments_count,video_views,play_count&access_token=' + tok);
+        out.ig_basic = await r1.json();
+        const r2 = await fetch('https://graph.facebook.com/v21.0/' + clip.instagram_media_id + '/insights?metric=plays,reach&access_token=' + tok);
+        out.ig_insights = await r2.json();
+      } else { out.ig_clip = 'none'; }
+    } catch(e) { out.ig_error = e.message; }
+    res.json(out);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /admin/api/tracker/fetch-youtube-stats -- batch YT stats for all clips with yt_video_id
 app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (req, res) => {
   try {
