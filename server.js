@@ -7903,13 +7903,27 @@ async function fetchFacebookStatsBatch() {
   let updated = 0;
   for (const clip of rows) {
     try {
-      // total_video_views supports period=lifetime; engagement metrics do not
-      const r1 = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views&period=lifetime&access_token=${token}`);
-      const d1 = await r1.json();
-      if (d1.error) { console.warn('[fb-stats] clip', clip.id, d1.error.message); continue; }
-      const viewsEntry = (d1.data || []).find(x => x.name === 'total_video_views');
-      const views = viewsEntry ? (viewsEntry.values && viewsEntry.values.length ? viewsEntry.values[viewsEntry.values.length-1].value : 0) : 0;
-      console.log('[fb-stats] clip', clip.id, 'total_video_views:', views);
+      // Try video object fields first (works for Reels AND regular videos)
+      let views = 0;
+      try {
+        const rv = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}?fields=views,likes.summary(true),comments.summary(true),shares&access_token=${token}`);
+        const dv = await rv.json();
+        console.log('[fb-stats] clip', clip.id, 'video object:', JSON.stringify(dv));
+        if (!dv.error) {
+          views = dv.views || 0;
+        }
+      } catch(e) { /* fallback to video_insights */ }
+      // Also try video_insights for lifetime total_video_views
+      if (!views) {
+        const r1 = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views&period=lifetime&access_token=${token}`);
+        const d1 = await r1.json();
+        if (!d1.error) {
+          const viewsEntry = (d1.data || []).find(x => x.name === 'total_video_views');
+          const insViews = viewsEntry ? (viewsEntry.values && viewsEntry.values.length ? viewsEntry.values[viewsEntry.values.length-1].value : 0) : 0;
+          if (insViews > views) views = insViews;
+        }
+        console.log('[fb-stats] clip', clip.id, 'video_insights total_video_views:', views);
+      }
       // Engagement metrics (no period=lifetime — they use default period)
       let likes = 0, comments = 0, shares = 0;
       try {
