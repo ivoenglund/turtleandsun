@@ -7791,13 +7791,13 @@ async function fetchInstagramStatsBatch() {
   for (const clip of rows) {
     try {
       // Basic fields — video_views works for Reels/Video without insights permission
-      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=like_count,comments_count,video_views,media_type&access_token=${tok}`);
+      const basicR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}?fields=like_count,comments_count,media_type&access_token=${tok}`);
       const basicD = await basicR.json();
       if (basicD.error) { console.warn('[ig-stats]', clip.id, basicD.error.message); continue; }
       const likes    = basicD.like_count    || 0;
       const comments = basicD.comments_count || 0;
-      console.log('[ig-stats] clip', clip.id, 'media_type:', basicD.media_type, 'video_views:', basicD.video_views, 'like_count:', basicD.like_count);
-      let views = basicD.video_views || 0;
+      console.log('[ig-stats] clip', clip.id, 'media_type:', basicD.media_type, 'like_count:', basicD.like_count, 'comments:', basicD.comments_count);
+      let views = 0; // Will be set by insights (plays/reach) if instagram_manage_insights is granted
       // Try insights for plays/reach (requires instagram_manage_insights)
       try {
         const insR = await fetch(`https://graph.facebook.com/v21.0/${clip.instagram_media_id}/insights?metric=plays,reach&access_token=${tok}`);
@@ -7903,20 +7903,29 @@ async function fetchFacebookStatsBatch() {
   let updated = 0;
   for (const clip of rows) {
     try {
-      const metrics = 'total_video_views,total_video_impressions,total_video_reactions_by_action_type,total_video_comment_count,total_video_shares';
-      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=${metrics}&period=lifetime&access_token=${token}`);
-      const d = await r.json();
-      if (d.error) { console.warn('[fb-stats] clip', clip.id, d.error.message); continue; }
-      const byName = {};
-      (d.data || []).forEach(m => {
-        const val = m.values && m.values.length ? m.values[m.values.length - 1].value : (m.value || 0);
-        byName[m.name] = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : (val || 0);
-      });
-      const views    = byName.total_video_views || 0;
-      const reach    = byName.total_video_impressions || 0;
-      const likes    = byName.total_video_reactions_by_action_type || 0;
-      const comments = byName.total_video_comment_count || 0;
-      const shares   = byName.total_video_shares || 0;
+      // total_video_views supports period=lifetime; engagement metrics do not
+      const r1 = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_views&period=lifetime&access_token=${token}`);
+      const d1 = await r1.json();
+      if (d1.error) { console.warn('[fb-stats] clip', clip.id, d1.error.message); continue; }
+      const viewsEntry = (d1.data || []).find(x => x.name === 'total_video_views');
+      const views = viewsEntry ? (viewsEntry.values && viewsEntry.values.length ? viewsEntry.values[viewsEntry.values.length-1].value : 0) : 0;
+      console.log('[fb-stats] clip', clip.id, 'total_video_views:', views);
+      // Engagement metrics (no period=lifetime — they use default period)
+      let likes = 0, comments = 0, shares = 0;
+      try {
+        const r2 = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=total_video_reactions_by_action_type,total_video_comment_count,total_video_shares&access_token=${token}`);
+        const d2 = await r2.json();
+        if (!d2.error && d2.data) {
+          const byName = {};
+          d2.data.forEach(m => {
+            const val = m.values && m.values.length ? m.values[m.values.length-1].value : (m.value || 0);
+            byName[m.name] = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : (val || 0);
+          });
+          likes    = byName.total_video_reactions_by_action_type || 0;
+          comments = byName.total_video_comment_count || 0;
+          shares   = byName.total_video_shares || 0;
+        }
+      } catch(e) { /* engagement metrics optional */ }
       await pool.query(
         `UPDATE social_clips SET facebook_views=$2, updated_at=NOW() WHERE id=$1`,
         [clip.id, views]
