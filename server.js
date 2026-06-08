@@ -7487,7 +7487,7 @@ app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async
     if (!rows.length || !rows[0].yt_video_id) return res.status(400).json({ error: 'No YouTube video ID for this clip' });
     const vidId = rows[0].yt_video_id;
     const https6 = require('https');
-    const url6 = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=' + encodeURIComponent(vidId) + '&key=' + YT_KEY;
+    const url6 = 'https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=' + encodeURIComponent(vidId) + '&key=' + YT_KEY;
     const data = await new Promise((resolve, reject) => {
       https6.get(url6, r => {
         let b = ''; r.on('data', c => b += c);
@@ -7505,6 +7505,7 @@ app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async
          sn.title || null, sn.description || null, (sn.tags||[]).join(', ') || null]
       );
     }
+    const st = item.statistics || {};
     res.json({
       video_id:     vidId,
       title:        sn.title || '',
@@ -7513,6 +7514,9 @@ app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async
       published_at: sn.publishedAt ? sn.publishedAt.slice(0,10) : null,
       url:          'https://www.youtube.com/shorts/' + vidId,
       thumbnail:    sn.thumbnails && sn.thumbnails.default && sn.thumbnails.default.url,
+      views:        parseInt(st.viewCount)   || 0,
+      likes:        parseInt(st.likeCount)   || 0,
+      comments:     parseInt(st.commentCount)|| 0,
     });
   } catch(e) {
     console.error('[youtube-live]', e.message);

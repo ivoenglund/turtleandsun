@@ -799,9 +799,20 @@ function showPostModal(plat) {
     const ytLive = ytLiveCache[selId] || {};
     const clip = clips.find(x => x.id === selId) || {};
     const existingUrl = ytLive.url || clip.yt_post_url || null;
+    const ytInfoRow = (clip.yt_video_id || ytLive.video_id)
+      ? `<div id="yt-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
+           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
+             <span style="color:#888;font-weight:700">Posted</span><span>${ytLive.published_at ? fd(ytLive.published_at) : (clip.yt_posted_at ? fd(clip.yt_posted_at) : '—')}</span>
+             <span style="color:#888;font-weight:700">URL</span><span>${existingUrl ? `<a href="${esc(existingUrl)}" target="_blank" style="color:#FF0000">${esc(existingUrl)}</a>` : '—'}</span>
+             <span style="color:#888;font-weight:700">Views</span><span id="yt-stat-views">${ytLive.views != null ? ytLive.views.toLocaleString() : '…'}</span>
+             <span style="color:#888;font-weight:700">Likes</span><span id="yt-stat-likes">${ytLive.likes != null ? ytLive.likes.toLocaleString() : '…'}</span>
+             <span style="color:#888;font-weight:700">Comments</span><span id="yt-stat-comments">${ytLive.comments != null ? ytLive.comments.toLocaleString() : '…'}</span>
+           </div>
+         </div>` : '';
     fields = `
+      ${ytInfoRow}
       ${clip.yt_video_id ? `<div style="background:#fff8e1;border:1px solid #f9a825;border-radius:7px;padding:8px 11px;margin-bottom:10px;font-size:11px;color:#856700">
-        Already uploaded${existingUrl ? ` · <a href="${esc(existingUrl)}" target="_blank" style="color:#185FA5">Open on YouTube ↗</a>` : ''}. Uploading again will create a new video.
+        Uploading again will create a new video.
       </div>` : ''}
       <div class="form-row"><label>Title</label><input id="pm-yttitle" value="${esc(ytLive.title||clip.yt_title||'')}"></div>
       <div class="form-row"><label>Description</label><textarea id="pm-ytdesc" rows="5">${esc(ytLive.description||clip.yt_description||'')}</textarea></div>
@@ -860,6 +871,21 @@ function showPostModal(plat) {
           const panel = document.getElementById('ig-live-panel');
           if (panel) panel.title = d.apiError;
         }
+      })
+      .catch(() => {});
+  }
+  // Fetch live YouTube stats if the video exists but cache is stale
+  const ytClip = clips.find(x => x.id === selId) || {};
+  if (plat === 'youtube' && ytClip.yt_video_id) {
+    fetch(`/admin/api/tracker/clips/${selId}/youtube-live`, { headers: { 'Accept': 'application/json' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        ytLiveCache[selId] = d;
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val != null ? val.toLocaleString() : '—'; };
+        set('yt-stat-views',    d.views);
+        set('yt-stat-likes',    d.likes);
+        set('yt-stat-comments', d.comments);
       })
       .catch(() => {});
   }
