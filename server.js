@@ -7984,6 +7984,10 @@ app.get('/admin/api/tracker/debug-meta-stats', requireRole('admin'), async (req,
         out.fb_insights = await r1.json();
         const r2 = await fetch('https://graph.facebook.com/v21.0/' + clip.facebook_video_id + '?fields=id,title,created_time&access_token=' + fbToken);
         out.fb_video_meta = await r2.json();
+        const r3 = await fetch('https://graph.facebook.com/v21.0/' + pageId + '/videos?fields=id,title,created_time,description&limit=5&access_token=' + fbToken);
+        out.fb_page_videos = await r3.json();
+        const r4 = await fetch('https://graph.facebook.com/v21.0/' + pageId + '/feed?fields=id,message,created_time,full_picture,attachments{type,media{id}}&limit=5&access_token=' + fbToken);
+        out.fb_page_feed = await r4.json();
       } else { out.fb_clip = 'none'; }
     } catch(e) { out.fb_error = e.message; }
     try {
