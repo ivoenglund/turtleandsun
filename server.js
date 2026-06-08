@@ -7946,7 +7946,7 @@ async function fetchFacebookStatsBatch() {
         `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
          VALUES ($1, 'facebook', CURRENT_DATE, $2, $3, $4, $5, 'api')
          ON CONFLICT (social_clip_id, platform, stat_date)
-         DO UPDATE SET views=$2, likes=$3, comments=$4, shares=$5, source='api', updated_at=NOW()`,
+         DO UPDATE SET views=$2, likes=$3, comments=$4, shares=$5, source='api'`,
         [clip.id, views, likes, comments, shares]
       );
       updated++;
