@@ -724,10 +724,24 @@ async function saveClip() {
 
 // Post modal (add/edit platform info)
 let postModalPlat = null;
-function showPostModal(plat) {
+async function showPostModal(plat) {
   postModalPlat = plat;
   const pd = (postCache[selId]||{})[plat] || {};
   const c = clips.find(x=>x.id===selId);
+
+  // Auto-generate platform text if missing (YouTube title is the sentinel)
+  if (plat === 'youtube' && c && !c.yt_title) {
+    try {
+      const gr = await fetch(`/admin/api/social-clips/${selId}/generate-content`, { method:'POST', headers:{'Accept':'application/json'} });
+      if (gr.ok) {
+        const gd = await gr.json();
+        // Patch the clip in memory so the modal renders with the generated text
+        c.yt_title = gd.yt_title || '';
+        c.yt_description = gd.yt_description || '';
+        c.yt_keyword_tags = gd.yt_keyword_tags || '';
+      }
+    } catch(e) { /* non-fatal */ }
+  }
 
   let fields = '';
   if (plat === 'tiktok') {
