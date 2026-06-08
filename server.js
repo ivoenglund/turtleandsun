@@ -3374,7 +3374,7 @@ function instagramOAuthUrl() {
     redirect_uri:  base + '/admin/instagram/callback',
     scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,read_insights,business_management,instagram_basic,instagram_content_publish',
     response_type: 'code',
-    auth_type:     'rerequest',
+    // auth_type: 'rerequest', // removed - causes Meta to re-request old deprecated permissions
     state:         'admin',
   });
   return 'https://www.facebook.com/dialog/oauth?' + params.toString();
