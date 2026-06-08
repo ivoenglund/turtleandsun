@@ -768,17 +768,30 @@ function showPostModal(plat) {
   } else if (plat === 'youtube') {
     const ytLive = ytLiveCache[selId] || {};
     const clip = clips.find(x => x.id === selId) || {};
-    fields = `
-      <div style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
-          <span style="color:#888;font-weight:700">Video ID</span><span>${esc(clip.yt_video_id||ytLive.video_id||'—')}</span>
-          <span style="color:#888;font-weight:700">Published</span><span>${esc(ytLive.published_at||'—')}</span>
-          <span style="color:#888;font-weight:700">URL</span><span><a href="${esc(ytLive.url||'#')}" target="_blank">${esc(ytLive.url||'—')}</a></span>
+    if (clip.yt_video_id) {
+      // Already uploaded — show read-only data from YouTube
+      const title = ytLive.title || clip.yt_title || '—';
+      const desc  = ytLive.description || clip.yt_description || '—';
+      const tags  = ytLive.tags || clip.yt_keyword_tags || '—';
+      const url   = ytLive.url || clip.yt_post_url || null;
+      const pub   = ytLive.published_at || clip.yt_posted_at || '—';
+      fields = `
+        <div style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
+            <span style="color:#888;font-weight:700">Published</span><span>${esc(pub)}</span>
+            <span style="color:#888;font-weight:700">URL</span><span>${url ? `<a href="${esc(url)}" target="_blank" style="color:#185FA5">Open on YouTube ↗</a>` : '—'}</span>
+          </div>
         </div>
-      </div>
-      <div class="form-row"><label>Title</label><input id="pm-yttitle" value="${esc(ytLive.title||clip.yt_title||'')}"></div>
-      <div class="form-row"><label>Description</label><textarea id="pm-ytdesc" rows="5">${esc(ytLive.description||clip.yt_description||'')}</textarea></div>
-      <div class="form-row"><label>Keyword tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></label><input id="pm-ytkw" value="${esc(ytLive.tags||clip.yt_keyword_tags||'')}"></div>`;
+        <div class="form-row"><label>Title</label><div style="font-size:12px;padding:4px 0">${esc(title)}</div></div>
+        <div class="form-row"><label>Description</label><div style="font-size:12px;padding:4px 0;white-space:pre-wrap;max-height:120px;overflow-y:auto">${esc(desc)}</div></div>
+        <div class="form-row"><label>Keyword tags</label><div style="font-size:12px;padding:4px 0;color:#555">${esc(tags)}</div></div>`;
+    } else {
+      // Not yet uploaded — editable fields pre-populated from clip data
+      fields = `
+        <div class="form-row"><label>Title</label><input id="pm-yttitle" value="${esc(clip.yt_title||'')}"></div>
+        <div class="form-row"><label>Description</label><textarea id="pm-ytdesc" rows="5">${esc(clip.yt_description||'')}</textarea></div>
+        <div class="form-row"><label>Keyword tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></label><input id="pm-ytkw" value="${esc(clip.yt_keyword_tags||'')}"></div>`;
+    }
   } else if (plat === 'facebook') {
     fields = `
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
@@ -797,10 +810,10 @@ function showPostModal(plat) {
     ${fields}
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="document.getElementById('post-modal-bg').remove()">Cancel</button>
-      ${postModalPlat === 'youtube' && ytConnected
-        ? (clips.find(x=>x.id===selId)||{}).yt_video_id
-          ? '<button class="btn btn-primary" onclick="syncToYouTube()" style="background:#FF0000;color:#fff">💾 Save to YouTube</button>'
-          : '<button class="btn btn-primary" id="yt-upload-btn" onclick="uploadToYouTube()" style="background:#FF0000;color:#fff">▶ Upload to YouTube</button>'
+      ${postModalPlat === 'youtube' && (clips.find(x=>x.id===selId)||{}).yt_video_id
+        ? '' /* already uploaded — no action needed */
+        : postModalPlat === 'youtube' && ytConnected
+        ? '<button class="btn btn-primary" id="yt-upload-btn" onclick="uploadToYouTube()" style="background:#FF0000;color:#fff">▶ Upload to YouTube</button>'
         : postModalPlat === 'youtube' && !ytConnected
         ? '<a href="/admin/youtube/connect" class="btn btn-primary" style="background:#FF0000;color:#fff;text-decoration:none">Connect YouTube</a>'
         : postModalPlat === 'tiktok' && ttConnected

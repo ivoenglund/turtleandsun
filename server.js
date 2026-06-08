@@ -7498,9 +7498,12 @@ app.get('/admin/api/tracker/clips/:id/youtube-live', requireRole('admin'), async
     if (!item) return res.status(404).json({ error: 'Video not found on YouTube' });
     const sn = item.snippet || {};
     // Also sync publishedAt to our DB
-    if (sn.publishedAt) {
-      await pool.query('UPDATE social_clips SET yt_posted_at=$2, updated_at=NOW() WHERE id=$1',
-        [parseInt(req.params.id), sn.publishedAt.slice(0,10)]);
+    if (sn.publishedAt || sn.title) {
+      await pool.query(
+        'UPDATE social_clips SET yt_posted_at=$2, yt_title=$3, yt_description=$4, yt_keyword_tags=$5, updated_at=NOW() WHERE id=$1',
+        [parseInt(req.params.id), sn.publishedAt ? sn.publishedAt.slice(0,10) : null,
+         sn.title || null, sn.description || null, (sn.tags||[]).join(', ') || null]
+      );
     }
     res.json({
       video_id:     vidId,
