@@ -7905,7 +7905,7 @@ async function fetchFacebookStatsBatch() {
     try {
       // Try Reels metrics first (FB converts short vertical videos to Reels)
       let views = 0, likes = 0, comments = 0, shares = 0;
-      const reelsR = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,post_video_likes_by_reaction_type,post_reactions_by_type_total,post_video_social_actions&period=lifetime&access_token=${token}`);
+      const reelsR = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,post_video_likes_by_reaction_type,post_video_social_actions&period=lifetime&access_token=${token}`);
       const reelsD = await reelsR.json();
       console.log('[fb-stats] clip', clip.id, 'reels metrics:', JSON.stringify(reelsD));
       if (!reelsD.error && reelsD.data && reelsD.data.length) {

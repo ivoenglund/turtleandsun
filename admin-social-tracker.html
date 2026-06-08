@@ -37,6 +37,7 @@ td{padding:7px 9px;vertical-align:middle}
 .tag-occ{background:#fffde7;color:#856700;border:1px solid #F9A825}
 .tag-gen{background:#f5f5f5;color:#555;border:1px solid #ddd}
 .pip{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700}
+.plat-sep{border-left:2px solid #ddd!important}
 .pip-y{background:#1C2A14;color:#FFE800}
 .pip-n{background:#eee;color:#aaa;border:1px solid #ddd}
 .num{text-align:right;font-variant-numeric:tabular-nums}
@@ -169,13 +170,13 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th class="num" style="width:32px;color:#aaa">#</th>
                 <th style="width:24%">Concept</th>
                 <th>Tags</th>
-                <th id="th-tiktok" style="width:52px;color:#1C0A00">TikTok</th>
+                <th id="th-tiktok" style="width:52px;color:#1C0A00;border-left:2px solid #ddd">TikTok</th>
                 <th style="width:44px;color:#1C0A00;font-weight:400;font-size:10px">❤ Likes</th>
-                <th id="th-instagram" style="width:52px;color:#C13584">Instagram</th>
+                <th id="th-instagram" style="width:52px;color:#C13584;border-left:2px solid #ddd">Instagram</th>
                 <th style="width:44px;color:#C13584;font-weight:400;font-size:10px">❤ Likes</th>
-                <th id="th-youtube" style="width:52px;color:#FF0000">YouTube</th>
+                <th id="th-youtube" style="width:52px;color:#FF0000;border-left:2px solid #ddd">YouTube</th>
                 <th style="width:44px;color:#FF0000;font-weight:400;font-size:10px">❤ Likes</th>
-                <th id="th-facebook" style="width:52px;color:#1877F2">Facebook</th>
+                <th id="th-facebook" style="width:52px;color:#1877F2;border-left:2px solid #ddd">Facebook</th>
                 <th style="width:44px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
                 <th class="num" style="width:72px">Total views</th>
                 <th style="width:70px">Added</th>
@@ -346,13 +347,13 @@ function renderTable() {
       <td class="num" style="color:#bbb;font-size:11px;font-weight:700">#${c.id}</td>
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
-      <td><div style="display:flex;align-items:center;gap:3px">${c.tiktok_posted?'<span style="color:#1C0A00;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.tiktok_posted?'#1C0A00':'#bbb'};font-weight:600">${c.tiktok_views!=null?c.tiktok_views.toLocaleString('sv-SE'):'—'}</span></div></td>
+      <td class="plat-sep"><div style="display:flex;align-items:center;gap:3px">${c.tiktok_posted?'<span style="color:#1C0A00;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.tiktok_posted?'#1C0A00':'#bbb'};font-weight:600">${c.tiktok_views!=null?c.tiktok_views.toLocaleString('sv-SE'):'—'}</span></div></td>
       <td style="font-size:11px;color:#1C0A00">${c.tiktok_likes!=null?c.tiktok_likes.toLocaleString('sv-SE'):''}</td>
-      <td><div style="display:flex;align-items:center;gap:3px">${c.instagram_posted?'<span style="color:#C13584;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.instagram_posted?'#C13584':'#bbb'};font-weight:600">${c.instagram_views!=null?c.instagram_views.toLocaleString('sv-SE'):'—'}</span></div></td>
+      <td class="plat-sep"><div style="display:flex;align-items:center;gap:3px">${c.instagram_posted?'<span style="color:#C13584;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.instagram_posted?'#C13584':'#bbb'};font-weight:600">${c.instagram_views!=null?c.instagram_views.toLocaleString('sv-SE'):'—'}</span></div></td>
       <td style="font-size:11px;color:#C13584">${c.instagram_likes!=null?c.instagram_likes.toLocaleString('sv-SE'):''}</td>
-      <td><div style="display:flex;align-items:center;gap:3px">${c.youtube_posted?'<span style="color:#FF0000;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.youtube_posted?'#FF0000':'#bbb'};font-weight:600">${c.youtube_views!=null?c.youtube_views.toLocaleString('sv-SE'):'—'}</span></div></td>
+      <td class="plat-sep"><div style="display:flex;align-items:center;gap:3px">${c.youtube_posted?'<span style="color:#FF0000;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.youtube_posted?'#FF0000':'#bbb'};font-weight:600">${c.youtube_views!=null?c.youtube_views.toLocaleString('sv-SE'):'—'}</span></div></td>
       <td style="font-size:11px;color:#FF0000">${c.youtube_likes!=null?c.youtube_likes.toLocaleString('sv-SE'):''}</td>
-      <td><div style="display:flex;align-items:center;gap:3px">${c.facebook_posted?'<span style="color:#1877F2;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.facebook_posted?'#1877F2':'#bbb'};font-weight:600">${c.facebook_views!=null?c.facebook_views.toLocaleString('sv-SE'):'—'}</span></div></td>
+      <td class="plat-sep"><div style="display:flex;align-items:center;gap:3px">${c.facebook_posted?'<span style="color:#1877F2;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.facebook_posted?'#1877F2':'#bbb'};font-weight:600">${c.facebook_views!=null?c.facebook_views.toLocaleString('sv-SE'):'—'}</span></div></td>
       <td style="font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
