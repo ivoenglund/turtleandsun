@@ -169,10 +169,14 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th class="num" style="width:32px;color:#aaa">#</th>
                 <th style="width:24%">Concept</th>
                 <th>Tags</th>
-                <th style="width:72px">TikTok</th>
-                <th style="width:72px">Instagram</th>
-                <th style="width:72px">YouTube</th>
-                <th style="width:72px">Facebook</th>
+                <th style="width:52px;color:#1C0A00">TikTok</th>
+                <th style="width:44px;color:#1C0A00;font-weight:400;font-size:10px">❤ Likes</th>
+                <th style="width:52px;color:#C13584">Instagram</th>
+                <th style="width:44px;color:#C13584;font-weight:400;font-size:10px">❤ Likes</th>
+                <th style="width:52px;color:#FF0000">YouTube</th>
+                <th style="width:44px;color:#FF0000;font-weight:400;font-size:10px">❤ Likes</th>
+                <th style="width:52px;color:#1877F2">Facebook</th>
+                <th style="width:44px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
                 <th class="num" style="width:72px">Total views</th>
                 <th style="width:70px">Added</th>
               </tr>
@@ -316,10 +320,14 @@ function renderTable() {
       <td class="num" style="color:#bbb;font-size:11px;font-weight:700">#${c.id}</td>
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.tiktok_posted?'background:#1C0A00':'background:#eee;border:1px solid #ddd'}"></div>${+c.tiktok_views?'<span style="font-size:11px;color:#1C0A00;font-weight:600">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.tiktok_posted?'background:#1C0A00':'background:#eee;border:1px solid #ddd'}"></div>${c.tiktok_views!=null?'<span style="font-size:11px;color:#1C0A00;font-weight:600">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td style="font-size:11px;color:#1C0A00">${c.tiktok_likes>0?c.tiktok_likes.toLocaleString('sv-SE'):''}</td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.instagram_posted?'background:#C13584':'background:#eee;border:1px solid #ddd'}"></div>${c.instagram_views!=null?'<span style="font-size:11px;color:#C13584;font-weight:600">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.youtube_posted?'background:#FF0000':'background:#eee;border:1px solid #ddd'}"></div>${+c.youtube_views?'<span style="font-size:11px;color:#FF0000;font-weight:600">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td style="font-size:11px;color:#C13584">${c.instagram_likes>0?c.instagram_likes.toLocaleString('sv-SE'):''}</td>
+      <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.youtube_posted?'background:#FF0000':'background:#eee;border:1px solid #ddd'}"></div>${c.youtube_views!=null?'<span style="font-size:11px;color:#FF0000;font-weight:600">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td style="font-size:11px;color:#FF0000">${c.youtube_likes>0?c.youtube_likes.toLocaleString('sv-SE'):''}</td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.facebook_posted?'background:#1877F2':'background:#eee;border:1px solid #ddd'}"></div>${c.facebook_views!=null?'<span style="font-size:11px;color:#1877F2;font-weight:600">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
+      <td style="font-size:11px;color:#1877F2">${c.facebook_likes>0?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;

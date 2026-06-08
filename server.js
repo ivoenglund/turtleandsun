@@ -7562,23 +7562,27 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         COALESCE(tt.views, sc.tiktok_views, 0)    AS tiktok_views,
         COALESCE(ig.views, sc.instagram_views, 0) AS instagram_views,
         COALESCE(yt.views, sc.youtube_views, 0)   AS youtube_views,
-        COALESCE(fb.views, sc.facebook_views, 0)  AS facebook_views
+        COALESCE(fb.views, sc.facebook_views, 0)  AS facebook_views,
+        COALESCE(tt.likes, 0) AS tiktok_likes,
+        COALESCE(ig.likes, 0) AS instagram_likes,
+        COALESCE(yt.likes, 0) AS youtube_likes,
+        COALESCE(fb.likes, 0) AS facebook_likes
       FROM social_clips sc
       LEFT JOIN concepts c ON c.id = sc.concept_id
       LEFT JOIN LATERAL (
-        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='tiktok'
+        SELECT views, likes FROM clip_stats WHERE social_clip_id=sc.id AND platform='tiktok'
         ORDER BY stat_date DESC LIMIT 1
       ) tt ON TRUE
       LEFT JOIN LATERAL (
-        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='instagram'
+        SELECT views, likes FROM clip_stats WHERE social_clip_id=sc.id AND platform='instagram'
         ORDER BY stat_date DESC LIMIT 1
       ) ig ON TRUE
       LEFT JOIN LATERAL (
-        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='youtube'
+        SELECT views, likes FROM clip_stats WHERE social_clip_id=sc.id AND platform='youtube'
         ORDER BY stat_date DESC LIMIT 1
       ) yt ON TRUE
       LEFT JOIN LATERAL (
-        SELECT views FROM clip_stats WHERE social_clip_id=sc.id AND platform='facebook'
+        SELECT views, likes FROM clip_stats WHERE social_clip_id=sc.id AND platform='facebook'
         ORDER BY stat_date DESC LIMIT 1
       ) fb ON TRUE
       ORDER BY sc.created_at DESC
@@ -7900,7 +7904,7 @@ async function fetchFacebookStatsBatch() {
   for (const clip of rows) {
     try {
       const metrics = 'total_video_views,total_video_impressions,total_video_reactions_by_action_type,total_video_comment_count,total_video_shares';
-      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=${metrics}&access_token=${token}`);
+      const r = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=${metrics}&period=lifetime&access_token=${token}`);
       const d = await r.json();
       if (d.error) { console.warn('[fb-stats] clip', clip.id, d.error.message); continue; }
       const byName = {};
