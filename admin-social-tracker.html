@@ -294,6 +294,7 @@ let calCurrentYM = null;
 let ttConnected = false;
 let igConnected = false;
 let fbConnected = false;
+let ytConnected = false;
 let channelFollowers = {};
 let chartInstance = null;
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -430,17 +431,19 @@ function updateStats() {
 }
 
 async function load() {
-  const [r, ttR, igR, fbR] = await Promise.all([
+  const [r, ttR, igR, fbR, ytR] = await Promise.all([
     fetch('/admin/api/tracker/clips'),
     fetch('/admin/api/tiktok/status'),
     fetch('/admin/api/instagram/status'),
     fetch('/admin/api/facebook/status'),
+    fetch('/admin/api/youtube/status'),
   ]);
   const d = await r.json();
   clips = d.rows || [];
   if (ttR.ok) { const ttD = await ttR.json(); ttConnected = !!ttD.connected; }
   if (igR.ok) { const igD = await igR.json(); igConnected = !!igD.connected; }
   if (fbR.ok) { const fbD = await fbR.json(); fbConnected = !!fbD.connected; }
+  if (ytR.ok) { const ytD = await ytR.json(); ytConnected = !!ytD.connected; }
   renderTable();
   loadFollowers();
 }
@@ -794,8 +797,12 @@ function showPostModal(plat) {
     ${fields}
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="document.getElementById('post-modal-bg').remove()">Cancel</button>
-      ${postModalPlat === 'youtube'
-        ? '<button class="btn btn-primary" onclick="syncToYouTube()">▶ Sync to YouTube</button>'
+      ${postModalPlat === 'youtube' && ytConnected
+        ? (clips.find(x=>x.id===selId)||{}).yt_video_id
+          ? '<button class="btn btn-secondary" onclick="syncToYouTube()">Sync metadata</button><button class="btn btn-primary" id="yt-upload-btn" onclick="uploadToYouTube()" style="background:#FF0000;color:#fff;margin-left:6px">↺ Re-upload to YouTube</button>'
+          : '<button class="btn btn-primary" id="yt-upload-btn" onclick="uploadToYouTube()" style="background:#FF0000;color:#fff">▶ Upload to YouTube</button>'
+        : postModalPlat === 'youtube' && !ytConnected
+        ? '<a href="/admin/youtube/connect" class="btn btn-primary" style="background:#FF0000;color:#fff;text-decoration:none">Connect YouTube</a>'
         : postModalPlat === 'tiktok' && ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-upload-btn" onclick="uploadToTikTok()" style="background:#1C0A00;color:#fff;margin-left:6px">▶ Upload to TikTok</button>'
           : postModalPlat === 'tiktok' && !ttConnected
@@ -886,6 +893,33 @@ async function syncToYouTube() {
   } catch(e) {
     alert('Sync failed: ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = '▶ Sync to YouTube'; }
+  }
+}
+
+async function uploadToYouTube() {
+  const btn = document.getElementById('yt-upload-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : null; };
+  try {
+    // Save title/desc/tags to DB first (required by publish-youtube endpoint)
+    const meta = { yt_title: g('pm-yttitle'), yt_description: g('pm-ytdesc'), yt_keyword_tags: g('pm-ytkw') };
+    const saveR = await fetch(`/admin/api/tracker/clips/${selId}/save-youtube-meta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(meta)
+    });
+    if (!saveR.ok) { const e = await saveR.json(); throw new Error(e.error); }
+    // Upload to YouTube (resumable upload)
+    const r = await fetch(`/admin/api/social-clips/${selId}/publish-youtube`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    document.getElementById('post-modal-bg').remove();
+    delete ytLiveCache[selId];
+    await load();
+    await pick(selId);
+  } catch(e) {
+    alert('YouTube upload failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to YouTube'; }
   }
 }
 

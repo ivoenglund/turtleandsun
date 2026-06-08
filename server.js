@@ -7427,6 +7427,21 @@ app.get('/admin/_digest_test', requireRole('admin'), async (req, res) => {
 
 // ============================================================
 
+// POST /admin/api/tracker/clips/:id/save-youtube-meta
+app.post('/admin/api/tracker/clips/:id/save-youtube-meta', requireRole('admin'), async (req, res) => {
+  try {
+    const { yt_title, yt_description, yt_keyword_tags } = req.body;
+    await pool.query(
+      'UPDATE social_clips SET yt_title=$2, yt_description=$3, yt_keyword_tags=$4, updated_at=NOW() WHERE id=$1',
+      [req.params.id, yt_title||null, yt_description||null, yt_keyword_tags||null]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('[save-youtube-meta]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /admin/api/tracker/clips/:id/sync-youtube
 app.post('/admin/api/tracker/clips/:id/sync-youtube', requireRole('admin'), async (req, res) => {
   try {
