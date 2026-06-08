@@ -321,13 +321,13 @@ function renderTable() {
       <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.tiktok_posted?'background:#1C0A00':'background:#eee;border:1px solid #ddd'}"></div>${c.tiktok_views!=null?'<span style="font-size:11px;color:#1C0A00;font-weight:600">'+c.tiktok_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td style="font-size:11px;color:#1C0A00">${c.tiktok_likes>0?c.tiktok_likes.toLocaleString('sv-SE'):''}</td>
+      <td style="font-size:11px;color:#1C0A00">${c.tiktok_likes!=null?c.tiktok_likes.toLocaleString('sv-SE'):''}</td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.instagram_posted?'background:#C13584':'background:#eee;border:1px solid #ddd'}"></div>${c.instagram_views!=null?'<span style="font-size:11px;color:#C13584;font-weight:600">'+c.instagram_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td style="font-size:11px;color:#C13584">${c.instagram_likes>0?c.instagram_likes.toLocaleString('sv-SE'):''}</td>
+      <td style="font-size:11px;color:#C13584">${c.instagram_likes!=null?c.instagram_likes.toLocaleString('sv-SE'):''}</td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.youtube_posted?'background:#FF0000':'background:#eee;border:1px solid #ddd'}"></div>${c.youtube_views!=null?'<span style="font-size:11px;color:#FF0000;font-weight:600">'+c.youtube_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td style="font-size:11px;color:#FF0000">${c.youtube_likes>0?c.youtube_likes.toLocaleString('sv-SE'):''}</td>
+      <td style="font-size:11px;color:#FF0000">${c.youtube_likes!=null?c.youtube_likes.toLocaleString('sv-SE'):''}</td>
       <td><div style="display:flex;align-items:center;gap:4px"><div class="pip" style="${c.facebook_posted?'background:#1877F2':'background:#eee;border:1px solid #ddd'}"></div>${c.facebook_views!=null?'<span style="font-size:11px;color:#1877F2;font-weight:600">'+c.facebook_views.toLocaleString('sv-SE')+'</span>':''}</div></td>
-      <td style="font-size:11px;color:#1877F2">${c.facebook_likes>0?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
+      <td style="font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;

@@ -7905,7 +7905,7 @@ async function fetchFacebookStatsBatch() {
     try {
       // Try Reels metrics first (FB converts short vertical videos to Reels)
       let views = 0, likes = 0, comments = 0, shares = 0;
-      const reelsR = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,post_video_likes_by_reaction_type,post_video_social_actions&period=lifetime&access_token=${token}`);
+      const reelsR = await fetch(`https://graph.facebook.com/v21.0/${clip.facebook_video_id}/video_insights?metric=blue_reels_play_count,fb_reels_total_plays,post_video_likes_by_reaction_type,post_reactions_by_type_total,post_video_social_actions&period=lifetime&access_token=${token}`);
       const reelsD = await reelsR.json();
       console.log('[fb-stats] clip', clip.id, 'reels metrics:', JSON.stringify(reelsD));
       if (!reelsD.error && reelsD.data && reelsD.data.length) {
@@ -7915,7 +7915,7 @@ async function fetchFacebookStatsBatch() {
           byName[m.name] = typeof val === 'object' ? Object.values(val).reduce((a,b)=>a+b,0) : (val || 0);
         });
         views    = byName.blue_reels_play_count || byName.fb_reels_total_plays || 0;
-        likes    = byName.post_video_likes_by_reaction_type || 0;
+        likes    = byName.post_video_likes_by_reaction_type || byName.post_reactions_by_type_total || 0;
         const social = reelsD.data.find(m => m.name === 'post_video_social_actions');
         if (social && social.values && social.values[0] && typeof social.values[0].value === 'object') {
           comments = social.values[0].value.comment || 0;
