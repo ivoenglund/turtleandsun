@@ -3372,7 +3372,7 @@ function instagramOAuthUrl() {
   const params = new URLSearchParams({
     client_id:     process.env.META_APP_ID,
     redirect_uri:  base + '/admin/instagram/callback',
-    scope:         'pages_show_list,pages_read_engagement,pages_manage_posts,read_insights,business_management,instagram_basic,instagram_content_publish,instagram_manage_insights',
+    scope:         'pages_show_list,pages_read_engagement,read_insights,business_management,instagram_basic,instagram_content_publish,instagram_manage_insights',
     response_type: 'code',
     // auth_type: 'rerequest', // removed - causes Meta to re-request old deprecated permissions
     state:         'admin',
@@ -3642,11 +3642,8 @@ app.get('/admin/api/facebook/status', requireRole('admin'), async (req, res) => 
 });
 
 // POST /admin/api/tracker/clips/:id/upload-facebook
-// Posts clip as a Facebook Reel using the Reels binary upload API.
+// Posts clip as a video to the Turtle and Sun Facebook Page (file_url approach).
 app.post('/admin/api/tracker/clips/:id/upload-facebook', requireRole('admin'), async (req, res) => {
-  const fs4   = require('fs');
-  const os4   = require('os');
-  const path4 = require('path');
   const id = parseInt(req.params.id);
   try {
     const { rows } = await pool.query(
@@ -3656,84 +3653,33 @@ app.post('/admin/api/tracker/clips/:id/upload-facebook', requireRole('admin'), a
     if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet' });
 
     const { token, pageId } = await getFacebookToken();
-    const caption = clip.fb_caption || ('Loveogram by Turtle and Sun \u{1F422}\u2600\uFE0F');
+    const caption = clip.fb_caption || 'Loveogram by Turtle and Sun';
 
-    // Download the video to a temp file
-    const tmpDir = fs4.mkdtempSync(path4.join(os4.tmpdir(), 'tns-fb-'));
+    const videoResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ file_url: clip.output_url, description: caption, title: (clip.concept||'').slice(0,100), access_token: token }),
+    });
+    const videoData = await videoResp.json();
+    if (videoData.error) throw new Error(videoData.error.message);
+    const videoId = videoData.id;
+
+    // Get permalink
+    let permalink = null;
     try {
-      const videoPath = path4.join(tmpDir, 'clip.mp4');
-      const https4 = require('https');
-      const http4  = require('http');
-      const urlM   = require('url');
-      const parsed4 = urlM.parse(clip.output_url);
-      const lib4 = parsed4.protocol === 'https:' ? https4 : http4;
-      await new Promise((resolve, reject) => {
-        const ws = fs4.createWriteStream(videoPath);
-        lib4.get(clip.output_url, r => { r.pipe(ws); ws.on('finish', resolve); ws.on('error', reject); }).on('error', reject);
-      });
-      const videoBytes = fs4.readFileSync(videoPath);
-      const fileSize   = videoBytes.length;
+      const plResp = await fetch(`https://graph.facebook.com/v21.0/${videoId}?fields=permalink_url&access_token=${token}`);
+      const plData = await plResp.json();
+      permalink = plData.permalink_url || null;
+    } catch(e) { /* non-fatal */ }
+    if (!permalink) permalink = 'https://www.facebook.com/' + pageId + '/videos/' + videoId;
 
-      // Step 1: Start Reels upload session
-      const startResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/video_reels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ upload_phase: 'start', access_token: token }),
-      });
-      const startData = await startResp.json();
-      if (startData.error) throw new Error('FB start: ' + startData.error.message);
-      const { video_id: videoId, upload_url: uploadUrl } = startData;
-      console.log('[upload-facebook] upload session started, video_id:', videoId);
+    const today = new Date().toISOString().slice(0, 10);
+    await pool.query(
+      'UPDATE social_clips SET fb_posted_at=$2, fb_post_url=$3, facebook_video_id=$4, fb_caption=COALESCE($5, fb_caption), updated_at=NOW() WHERE id=$1',
+      [id, today, permalink, videoId, clip.fb_caption || null]);
 
-      // Step 2: Upload binary to the upload_url
-      const upResp = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization': 'OAuth ' + token,
-          'Content-Type':  'application/octet-stream',
-          'offset':        '0',
-          'file_size':     String(fileSize),
-        },
-        body: videoBytes,
-      });
-      const upData = await upResp.json().catch(() => ({}));
-      if (upData.error) throw new Error('FB upload: ' + upData.error.message);
-
-      // Step 3: Finish / publish as Reel
-      const finishResp = await fetch(`https://graph.facebook.com/v21.0/${pageId}/video_reels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          upload_phase: 'finish',
-          video_id:     videoId,
-          title:        (clip.concept || '').slice(0, 100),
-          description:  caption,
-          published:    'true',
-          access_token: token,
-        }),
-      });
-      const finishData = await finishResp.json();
-      if (finishData.error) throw new Error('FB finish: ' + finishData.error.message);
-
-      // Get permalink
-      let permalink = null;
-      try {
-        const plResp = await fetch(`https://graph.facebook.com/v21.0/${videoId}?fields=permalink_url&access_token=${token}`);
-        const plData = await plResp.json();
-        permalink = plData.permalink_url || null;
-      } catch(e) { /* non-fatal */ }
-      if (!permalink) permalink = 'https://www.facebook.com/' + pageId + '/videos/' + videoId;
-
-      const today = new Date().toISOString().slice(0, 10);
-      await pool.query(
-        'UPDATE social_clips SET fb_posted_at=$2, fb_post_url=$3, facebook_video_id=$4, fb_caption=COALESCE($5, fb_caption), updated_at=NOW() WHERE id=$1',
-        [id, today, permalink, videoId, clip.fb_caption || null]);
-
-      console.log('[upload-facebook] clip', id, 'published as Reel, video_id', videoId);
-      res.json({ ok: true, video_id: videoId, permalink });
-    } finally {
-      fs4.rmSync(tmpDir, { recursive: true, force: true });
-    }
+    console.log('[upload-facebook] clip', id, 'published, video_id', videoId);
+    res.json({ ok: true, video_id: videoId, permalink });
   } catch(e) {
     console.error('[upload-facebook]', e.message);
     res.status(500).json({ error: e.message });
