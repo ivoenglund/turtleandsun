@@ -776,9 +776,9 @@ function showPostModal(plat) {
           <span style="color:#888;font-weight:700">URL</span><span><a href="${esc(ytLive.url||'#')}" target="_blank">${esc(ytLive.url||'—')}</a></span>
         </div>
       </div>
-      <div class="form-row"><label>Title</label><input id="pm-yttitle" value="${esc(ytLive.title||'')}"></div>
-      <div class="form-row"><label>Description</label><textarea id="pm-ytdesc" rows="5">${esc(ytLive.description||'')}</textarea></div>
-      <div class="form-row"><label>Keyword tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></label><input id="pm-ytkw" value="${esc(ytLive.tags||'')}"></div>`;
+      <div class="form-row"><label>Title</label><input id="pm-yttitle" value="${esc(ytLive.title||clip.yt_title||'')}"></div>
+      <div class="form-row"><label>Description</label><textarea id="pm-ytdesc" rows="5">${esc(ytLive.description||clip.yt_description||'')}</textarea></div>
+      <div class="form-row"><label>Keyword tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></label><input id="pm-ytkw" value="${esc(ytLive.tags||clip.yt_keyword_tags||'')}"></div>`;
   } else if (plat === 'facebook') {
     fields = `
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
