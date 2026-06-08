@@ -178,7 +178,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th style="width:44px;color:#FF0000;font-weight:400;font-size:10px">❤ Likes</th>
                 <th id="th-facebook" style="width:52px;color:#1877F2;border-left:2px solid #a8a29c">Facebook</th>
                 <th style="width:44px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
-                <th class="num" style="width:72px">Total views</th>
+                <th class="num" style="width:72px;border-left:2px solid #a8a29c">Total views</th>
                 <th style="width:70px">Added</th>
               </tr>
             </thead>
@@ -188,6 +188,54 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           </table>
         </div>
       </div>
+    </div>
+    <!-- Stats summary panel -->
+    <div style="margin:10px 0 6px 0;padding:10px 14px 8px 14px;background:#eceae6;border:1px solid #b0aba4;border-radius:8px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:.05em;text-transform:uppercase">Include in total</span>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#1C0A00;cursor:pointer"><input type="checkbox" id="sch-tiktok" checked onchange="updateStats()"> TikTok</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#C13584;cursor:pointer"><input type="checkbox" id="sch-instagram" checked onchange="updateStats()"> Instagram</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#FF0000;cursor:pointer"><input type="checkbox" id="sch-youtube" checked onchange="updateStats()"> YouTube</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#1877F2;cursor:pointer"><input type="checkbox" id="sch-facebook" checked onchange="updateStats()"> Facebook</label>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr>
+            <th style="width:80px;text-align:left;padding:3px 8px;color:#888;font-weight:600;border-bottom:1px solid #b0aba4"></th>
+            <th style="text-align:right;padding:3px 8px;color:#1C0A00;font-weight:700;border-bottom:1px solid #b0aba4">TikTok</th>
+            <th style="text-align:right;padding:3px 8px;color:#C13584;font-weight:700;border-bottom:1px solid #b0aba4">Instagram</th>
+            <th style="text-align:right;padding:3px 8px;color:#FF0000;font-weight:700;border-bottom:1px solid #b0aba4">YouTube</th>
+            <th style="text-align:right;padding:3px 8px;color:#1877F2;font-weight:700;border-bottom:1px solid #b0aba4">Facebook</th>
+            <th style="text-align:right;padding:3px 8px;color:#333;font-weight:700;border-bottom:1px solid #b0aba4;border-left:2px solid #b0aba4">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:3px 8px;color:#666;font-weight:600">Subscribers</td>
+            <td id="ss-tt-sub"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-ig-sub"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-yt-sub"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-fb-sub"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-total-sub" style="text-align:right;padding:3px 8px;font-weight:700;font-variant-numeric:tabular-nums;border-left:2px solid #b0aba4">—</td>
+          </tr>
+          <tr style="background:rgba(0,0,0,.04)">
+            <td style="padding:3px 8px;color:#666;font-weight:600">Views</td>
+            <td id="ss-tt-views"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-ig-views"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-yt-views"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-fb-views"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-total-views" style="text-align:right;padding:3px 8px;font-weight:700;font-variant-numeric:tabular-nums;border-left:2px solid #b0aba4">—</td>
+          </tr>
+          <tr>
+            <td style="padding:3px 8px;color:#666;font-weight:600">Likes</td>
+            <td id="ss-tt-likes"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-ig-likes"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-yt-likes"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-fb-likes"  style="text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">—</td>
+            <td id="ss-total-likes" style="text-align:right;padding:3px 8px;font-weight:700;font-variant-numeric:tabular-nums;border-left:2px solid #b0aba4">—</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
     <div>
       <div id="bottom-panel" style="display:block"></div>
@@ -284,6 +332,7 @@ let calCurrentYM = null;
 let ttConnected = false;
 let igConnected = false;
 let fbConnected = false;
+let channelFollowers = {};
 let chartInstance = null;
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
@@ -302,6 +351,7 @@ async function loadFollowers() {
     const r = await fetch('/admin/api/tracker/channel-followers');
     if (!r.ok) return;
     const d = await r.json();
+    channelFollowers = d;
     const map = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
     const labels = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook' };
     for (const [ch, color] of Object.entries(map)) {
@@ -312,7 +362,42 @@ async function loadFollowers() {
         el.innerHTML = labels[ch] + '<br><span style="font-weight:400;font-size:10px;color:' + color + ';opacity:0.8">' + fmtFollowers(count) + '</span>';
       }
     }
+    updateStats();
   } catch(e) { console.warn('loadFollowers:', e.message); }
+}
+
+function updateStats() {
+  const chs = ['tiktok','instagram','youtube','facebook'];
+  const idMap = {tiktok:'tt', instagram:'ig', youtube:'yt', facebook:'fb'};
+  if (!document.getElementById('ss-tt-sub')) return;
+  const active = {};
+  for (const ch of chs) { const el = document.getElementById('sch-'+ch); active[ch] = el ? el.checked : true; }
+  const views = {tiktok:0,instagram:0,youtube:0,facebook:0};
+  const likes = {tiktok:0,instagram:0,youtube:0,facebook:0};
+  for (const c of clips) {
+    for (const ch of chs) {
+      views[ch] += (+c[ch+'_views'])||0;
+      likes[ch] += (+c[ch+'_likes'])||0;
+    }
+  }
+  const fmt = n => (n||0).toLocaleString('sv-SE');
+  for (const ch of chs) {
+    const id = idMap[ch];
+    const sub = channelFollowers[ch];
+    document.getElementById('ss-'+id+'-sub').textContent   = sub != null ? fmt(sub) : '—';
+    document.getElementById('ss-'+id+'-views').textContent = fmt(views[ch]);
+    document.getElementById('ss-'+id+'-likes').textContent = fmt(likes[ch]);
+  }
+  let totalSub=0, totalViews=0, totalLikes=0, hasSub=false;
+  for (const ch of chs) {
+    if (!active[ch]) continue;
+    if (channelFollowers[ch] != null) { totalSub += channelFollowers[ch]; hasSub=true; }
+    totalViews += views[ch];
+    totalLikes += likes[ch];
+  }
+  document.getElementById('ss-total-sub').textContent   = hasSub ? fmt(totalSub) : '—';
+  document.getElementById('ss-total-views').textContent = fmt(totalViews);
+  document.getElementById('ss-total-likes').textContent = fmt(totalLikes);
 }
 
 async function load() {
@@ -355,10 +440,11 @@ function renderTable() {
       <td style="font-size:11px;color:#FF0000">${c.youtube_likes!=null?c.youtube_likes.toLocaleString('sv-SE'):''}</td>
       <td class="plat-sep"><div style="display:flex;align-items:center;gap:3px">${c.facebook_posted?'<span style="color:#1877F2;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.facebook_posted?'#1877F2':'#bbb'};font-weight:600">${c.facebook_views!=null?c.facebook_views.toLocaleString('sv-SE'):'—'}</span></div></td>
       <td style="font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
-      <td class="num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
+      <td class="plat-sep num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('');
+  updateStats();
 }
 
 async function pick(id) {
