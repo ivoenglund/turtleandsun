@@ -63,6 +63,25 @@ async function scrapeTikTokStudio() {
   // Wait for React/JS to render the video list
   await sleep(3500);
 
+  // Scroll to load all videos (infinite scroll)
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: async () => {
+      let last = 0, attempts = 0;
+      while (attempts < 15) {
+        window.scrollTo(0, document.body.scrollHeight);
+        await new Promise(r => setTimeout(r, 1500));
+        const cur = document.querySelectorAll('a[href*="/video/"]').length;
+        if (cur === last) { attempts++; } else { attempts = 0; }
+        last = cur;
+        if (attempts >= 2) break;
+      }
+      window.scrollTo(0, 0);
+    }
+  });
+
+  await sleep(500);
+
   const [{result}] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
