@@ -842,8 +842,7 @@ function showPostModal(plat) {
       \${ttInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" placeholder="https://tiktok.com/..." value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Caption <button class="copy-btn" onclick="copyField('pm-caption')">📋 Copy</button></label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
-      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Hashtags <button class="copy-btn" onclick="copyField('pm-hashtags')">📋 Copy</button></label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
+      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Caption + Hashtags <button class="copy-btn" onclick="copyField('pm-caption')">📋 Copy</button></label><textarea id="pm-caption" rows="6">${esc(pd.caption && pd.hashtags && !pd.caption.includes(pd.hashtags.slice(0,15)) ? pd.caption + '\n\n' + pd.hashtags : (pd.caption||''))}</textarea><input type="hidden" id="pm-hashtags" value="${esc(pd.hashtags||'')}"></div>
       ${vidUrl ? '<div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Video <button class="copy-btn" onclick="saveToTikTokFolder()">⬇️ Save to C:\\TikTok</button></label></div>' : ''}`;
   } else if (plat === 'instagram') {
     const igInfoRow = (pd.post_url || pd.posted_at)
@@ -1005,7 +1004,7 @@ async function savePost() {
   body.post_url  = g('pm-url')  || null;
   if (plat === 'tiktok' || plat === 'instagram') {
     body.caption   = g('pm-caption')   || null;
-    body.hashtags  = g('pm-hashtags')  || null;
+    body.hashtags  = plat === 'tiktok' ? null : (g('pm-hashtags') || null);
     body.alt_text  = g('pm-alt')       || null;
   }
   if (plat === 'youtube') {
