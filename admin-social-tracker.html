@@ -1375,6 +1375,7 @@ function renderCal(clips){
     CAL_PLATS.forEach(p=>{
       let ds=null;
       if(p.key==='youtube'){ds=c.yt_posted_at?fd(c.yt_posted_at):(c.yt_scheduled_at?fd(c.yt_scheduled_at):null);}
+      else if(p.key==='tiktok'){ds=(c.tiktok_post_url&&c.tiktok_posted_at)?fd(c.tiktok_posted_at):null;}
       else{const v=c[p.dateKey];ds=v?fd(v):null;}
       if(!ds)return;
       if(!byPlatDay[p.key][ds])byPlatDay[p.key][ds]=[];

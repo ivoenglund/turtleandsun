@@ -7627,6 +7627,7 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         sc.fb_post_url,
         sc.fb_caption,
         sc.tiktok_posted_at,
+        sc.tiktok_post_url,
         sc.instagram_posted_at,
         sc.fb_posted_at,
         sc.created_at,
