@@ -24,15 +24,15 @@ h1{font-size:18px;font-weight:700}
 
 .list-wrap{background:#fff;border-radius:10px;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.07)}
 table{width:100%;border-collapse:collapse}
-thead th{font-size:11px;font-weight:700;color:#555;padding:8px 9px;border-bottom:2px solid #b0aba4;text-align:left;white-space:nowrap;background:#dedad5;position:sticky;top:0;z-index:1}
+thead th{font-size:11px;font-weight:700;color:#555;padding:5px 7px;border-bottom:2px solid #b0aba4;text-align:left;white-space:nowrap;background:#dedad5;position:sticky;top:0;z-index:1}
 tbody tr{border-bottom:1px solid #a8a29c;cursor:pointer}
 tbody tr:hover{background:#faf8f4}
 tbody tr.sel{background:#e8f5e9;box-shadow:inset 3px 0 0 #1C2A14}
-td{padding:7px 9px;vertical-align:middle}
-.concept-name{font-weight:700;font-size:13px}
-.ref-tag{font-size:10px;color:#888;margin-top:1px}
-.tags-row{display:flex;flex-wrap:nowrap;gap:3px;margin-top:3px;overflow:hidden}
-.tag{font-size:10px;padding:1px 6px;border-radius:20px}
+td{padding:4px 7px;vertical-align:middle}
+.concept-name{font-weight:700;font-size:12px}
+.ref-tag{font-size:10px;color:#aaa;margin-top:0}
+.tags-row{display:flex;flex-wrap:nowrap;gap:2px;margin-top:1px;overflow:hidden}
+.tag{font-size:9px;padding:0px 5px;border-radius:20px;line-height:1.6}
 .tag-subj{background:#e8f5e9;color:#1C2A14;border:1px solid #1C2A14}
 .tag-occ{background:#fffde7;color:#856700;border:1px solid #F9A825}
 .tag-gen{background:#f5f5f5;color:#555;border:1px solid #ddd}
@@ -170,20 +170,20 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           <table>
             <thead>
               <tr>
-                <th class="num" style="width:28px;color:#aaa">#</th>
-                <th style="width:18%">Concept</th>
-                <th style="width:100px">Tags</th>
+                <th class="num" style="width:24px;color:#aaa">#</th>
+                <th style="width:130px">Concept</th>
+                <th style="width:160px">Tags</th>
                 <th id="th-tiktok" style="width:52px;color:#1C0A00;border-left:2px solid #a8a29c">TikTok</th>
-                <th style="width:40px;color:#1C0A00;font-weight:400;font-size:10px">❤ Likes</th>
+                <th style="width:38px;color:#1C0A00;font-weight:400;font-size:10px">❤ Likes</th>
                 <th id="th-instagram" style="width:52px;color:#C13584;border-left:2px solid #a8a29c">Instagram</th>
-                <th style="width:40px;color:#C13584;font-weight:400;font-size:10px">❤ Likes</th>
+                <th style="width:38px;color:#C13584;font-weight:400;font-size:10px">❤ Likes</th>
                 <th id="th-youtube" style="width:52px;color:#FF0000;border-left:2px solid #a8a29c">YouTube</th>
-                <th style="width:40px;color:#FF0000;font-weight:400;font-size:10px">❤ Likes</th>
+                <th style="width:38px;color:#FF0000;font-weight:400;font-size:10px">❤ Likes</th>
                 <th id="th-facebook" style="width:52px;color:#1877F2;border-left:2px solid #a8a29c">Facebook</th>
-                <th style="width:40px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
-                <th class="num" style="width:66px;border-left:2px solid #a8a29c">Total views</th>
-                <th class="num" style="width:56px">Total likes</th>
-                <th style="width:60px">Added</th>
+                <th style="width:38px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
+                <th class="num" style="width:62px;border-left:2px solid #a8a29c">Total views</th>
+                <th class="num" style="width:54px">Total likes</th>
+                <th style="width:54px">Added</th>
               </tr>
             </thead>
             <tbody id="clips-body">
@@ -511,7 +511,7 @@ function renderTable() {
     ].filter(Boolean).join('');
     return `<tr onclick="pick(${c.id})" id="row-${c.id}" class="${selId===c.id?'sel':''}">
       <td class="num" style="color:#bbb;font-size:11px;font-weight:700">#${c.id}</td>
-      <td><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
+      <td style="white-space:nowrap"><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
       <td class="plat-sep num" style="${!c.tiktok_posted?'background:#ede9e1;':''}"><span style="font-size:11px;color:${c.tiktok_posted?'#1C0A00':'#bbb'};font-weight:600">${c.tiktok_views!=null?c.tiktok_views.toLocaleString('sv-SE'):'—'}</span></td>
       <td class="num" style="${!c.tiktok_posted?'background:#ede9e1;':''}font-size:11px;color:#1C0A00">${c.tiktok_likes!=null?c.tiktok_likes.toLocaleString('sv-SE'):''}</td>
