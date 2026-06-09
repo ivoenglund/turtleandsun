@@ -842,8 +842,8 @@ function showPostModal(plat) {
       \${ttInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" placeholder="https://tiktok.com/..." value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Caption + Hashtags <button class="copy-btn" onclick="copyField('pm-caption')">📋 Copy</button></label><textarea id="pm-caption" rows="6">${esc(pd.caption && pd.hashtags && !pd.caption.includes(pd.hashtags.slice(0,15)) ? pd.caption + '\n\n' + pd.hashtags : (pd.caption||''))}</textarea><input type="hidden" id="pm-hashtags" value="${esc(pd.hashtags||'')}"></div>
-      ${vidUrl ? '<div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Video <button class="copy-btn" onclick="saveToTikTokFolder()">⬇️ Save to C:\\TikTok</button></label></div>' : ''}`;
+      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Caption + Hashtags <button class="copy-btn" onclick="copyField('pm-caption')">Copy</button></label><textarea id="pm-caption" rows="6">${esc(pd.caption && pd.hashtags && !pd.caption.includes(pd.hashtags.slice(0,15)) ? pd.caption + '\n\n' + pd.hashtags : (pd.caption||''))}</textarea><input type="hidden" id="pm-hashtags" value="${esc(pd.hashtags||'')}"></div>
+      ${vidUrl ? '<div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Video <button class="copy-btn" onclick="saveToTikTokFolder()">Save video</button></label></div>' : ''}`;
   } else if (plat === 'instagram') {
     const igInfoRow = (pd.post_url || pd.posted_at)
       ? `<div id="ig-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
@@ -1111,10 +1111,10 @@ async function saveToTikTokFolder() {
     const d = await r.json();
     if (d.ok) {
       btn.textContent = '✅ Saved!';
-      setTimeout(() => { btn.textContent = '⬇️ Save to C:\TikTok'; btn.disabled = false; }, 2000);
+      setTimeout(() => { btn.textContent = 'Save video'; btn.disabled = false; }, 2000);
     } else { throw new Error(d.error); }
   } catch(e) {
-    btn.textContent = '⬇️ Save to C:\TikTok'; btn.disabled = false;
+    btn.textContent = 'Save video'; btn.disabled = false;
     if (e.message.includes('fetch') || e.message.includes('Failed')) {
       alert('Helper not running.\n\nDouble-click:\nC:\\turtleandsun\\tiktok-helper\\start.bat');
     } else { alert('Save failed: ' + e.message); }
@@ -1126,7 +1126,7 @@ function copyField(id) {
   if (!el) return;
   navigator.clipboard.writeText(el.value).then(() => {
     const btn = el.closest('.form-row')?.querySelector('.copy-btn');
-    if (btn) { const t = btn.textContent; btn.textContent = '✅ Copied!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = t; btn.classList.remove('copied'); }, 1200); }
+    if (btn) { const t = btn.textContent; btn.textContent = 'Copied'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = t; btn.classList.remove('copied'); }, 1200); }
   });
 }
 
