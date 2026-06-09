@@ -69,23 +69,33 @@ async function scrapeTikTokStudio() {
       const linkEls = [...document.querySelectorAll('a[href*="/video/"]')];
       const videos = [];
 
+      const seen = new Set();
       for (const linkEl of linkEls) {
         const url = linkEl.href;
         const videoId = url.match(/\/video\/(\d+)/)?.[1];
-        if (!videoId) continue;
+        if (!videoId || seen.has(videoId)) continue;
+        seen.add(videoId);
 
-        // Walk up to find the row container
+        // Walk up until this container has exactly one video link
         let row = linkEl.parentElement;
-        for (let i = 0; i < 8 && row && row !== document.body; i++) {
-          if (row.innerText && /\d/.test(row.innerText) && row.querySelectorAll('a[href*="/video/"]').length === 1) break;
+        while (row && row !== document.body) {
+          if (row.querySelectorAll('a[href*="/video/"]').length === 1) {
+            const txt = row.innerText || '';
+            if (txt.split('\n').length > 3) break;
+          }
           row = row.parentElement;
         }
 
-        // Extract all standalone numbers from the row text
-        const allText = (row?.innerText || '').split('\n').map(t => t.trim()).filter(Boolean);
-        const nums = allText.filter(t => /^\d+$/.test(t)).map(Number);
+        // Stats appear after "Alla" (Swedish for "All" = Public privacy setting)
+        const parts = (row?.innerText || '').split('\n').map(t => t.trim()).filter(Boolean);
+        const allaIdx = parts.findIndex(p => p === 'Alla' || p.startsWith('Alla '));
+        let views = 0, likes = 0, comments = 0;
+        if (allaIdx >= 0) {
+          const nums = parts.slice(allaIdx + 1).filter(t => /^\d+$/.test(t)).map(Number);
+          views = nums[0] || 0; likes = nums[1] || 0; comments = nums[2] || 0;
+        }
 
-        videos.push({ url, videoId, views: nums[0] || 0, likes: nums[1] || 0, comments: nums[2] || 0 });
+        videos.push({ url, videoId, views, likes, comments });
       }
       return videos;
     }
