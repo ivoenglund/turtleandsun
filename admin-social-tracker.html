@@ -47,7 +47,10 @@ td{padding:4px 7px;vertical-align:middle}
 
 /* Bottom panel */
 .bottom-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;margin-top:0}
-.bp-head{background:#1C2A14;color:#FFE800;padding:8px 14px;display:grid;grid-template-columns:342px 120px 120px 120px 120px 1fr;align-items:center}
+/* bp-head grid mirrors the table colgroup exactly:
+   left-fixed = 24+130+160 = 314px | plat-pair = 45×2 = 90px | right = 62+54+54 = 170px */
+.bp-head{background:#1C2A14;color:#FFE800;padding:8px 0;display:grid;grid-template-columns:314px 90px 90px 90px 90px 170px;align-items:center}
+.tracker-block{width:max-content}
 .bp-head h2{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bp-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
 .bp-body{padding:16px}
@@ -145,7 +148,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 </style>
 </head>
 <body>
-<div style="display:grid;grid-template-columns:160px 1088px;width:1280px;align-items:start;padding:0 16px;gap:0">
+<div style="display:grid;grid-template-columns:160px 1fr;max-width:1280px;width:100%;align-items:start;padding:0 16px;gap:0">
 
   <!-- LEFT: persistent sticky video column -->
   <div id="side-col" style="position:sticky;top:0;align-self:start;padding:0 10px;display:flex;flex-direction:column;align-items:center">
@@ -165,7 +168,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
           <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
         </div>
       </div>
-      <div class="layout" id="layout">
+      <div class="tracker-block">
         <div class="list-wrap">
           <table>
             <colgroup>
@@ -182,16 +185,16 @@ table.st td.yt{color:#0F6E56;font-weight:700}
             </colgroup>
             <thead>
               <tr>
-                <th class="num" style="width:24px;color:#aaa">#</th>
-                <th style="width:130px">Concept</th>
-                <th style="width:160px">Tags</th>
+                <th class="num" style="color:#aaa">#</th>
+                <th>Concept</th>
+                <th>Tags</th>
                 <th id="th-tiktok" colspan="2" style="color:#1C0A00;border-left:2px solid #a8a29c;text-align:center">TikTok</th>
                 <th id="th-instagram" colspan="2" style="color:#C13584;border-left:2px solid #a8a29c;text-align:center">Instagram</th>
                 <th id="th-youtube" colspan="2" style="color:#FF0000;border-left:2px solid #a8a29c;text-align:center">YouTube</th>
                 <th id="th-facebook" colspan="2" style="color:#1877F2;border-left:2px solid #a8a29c;text-align:center">Facebook</th>
-                <th class="num" style="width:62px;border-left:2px solid #a8a29c">Total views</th>
-                <th class="num" style="width:54px">Total likes</th>
-                <th style="width:54px">Added</th>
+                <th class="num" style="border-left:2px solid #a8a29c">Total views</th>
+                <th class="num">Total likes</th>
+                <th>Added</th>
               </tr>
             </thead>
             <tbody id="clips-body">
@@ -199,10 +202,8 @@ table.st td.yt{color:#0F6E56;font-weight:700}
             </tbody>
           </table>
         </div>
+        <div id="bottom-panel" style="display:none"></div>
       </div>
-    </div>
-    <div>
-      <div id="bottom-panel" style="display:block"></div>
     </div>
     <div style="padding:0 0 24px 0">
       <div style="margin-bottom:0">
@@ -605,11 +606,11 @@ function renderPanel() {
 
   panel.innerHTML = `
     <div class="bp-head">
-      <div style="min-width:0">
+      <div style="min-width:0;padding:0 8px 0 14px">
         <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
       </div>
       ${platEditBtns}
-      <div style="display:flex;justify-content:flex-end;align-items:center">
+      <div style="display:flex;justify-content:flex-end;align-items:center;padding-right:14px">
         <button onclick="closePanel()">&#x2715;</button>
       </div>
     </div>
@@ -1461,10 +1462,4 @@ function renderCal(clips){
       const nums=dc.map((c,i)=>'<span class="cal-num'+(c.id===selId?' sel-num':'')+'" title="'+esc(c.concept||'Clip')+'" onclick="pick('+c.id+')">'+(i+1)+'</span>').join('');
       html+='<div class="cal-cell'+(ds===todayStr?' today-day':'')+'">'+nums+'</div>';
     });
-    html+='</div>';
-  });
-  document.getElementById('cal-body').innerHTML=html;
-}
-</script>
-</body>
-</html>
+    html
