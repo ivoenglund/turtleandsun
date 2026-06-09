@@ -844,7 +844,7 @@ function showPostModal(plat) {
       <div class="form-row"><label>Post URL</label><input id="pm-url" placeholder="https://tiktok.com/..." value="${esc(pd.post_url||'')}"></div>
       <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Caption <button class="copy-btn" onclick="copyField('pm-caption')">📋 Copy</button></label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
       <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Hashtags <button class="copy-btn" onclick="copyField('pm-hashtags')">📋 Copy</button></label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
-      ${vidUrl ? '<div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Video <a href="' + esc(vidUrl) + '" download="clip-' + selId + '.mp4" class="copy-btn" style="text-decoration:none">⬇️ Download video</a></label></div>' : ''}`;
+      ${vidUrl ? '<div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Video <button class="copy-btn" onclick="saveToTikTokFolder()">⬇️ Save to C:\\TikTok</button></label></div>' : ''}`;
   } else if (plat === 'instagram') {
     const igInfoRow = (pd.post_url || pd.posted_at)
       ? `<div id="ig-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
@@ -1100,6 +1100,27 @@ async function uploadToTikTok() {
   }
 }
 
+
+async function saveToTikTokFolder() {
+  const clip = (clips||[]).find(x => x.id === selId);
+  if (!clip?.output_url) return alert('No video yet for this clip.');
+  const filename = 'clip-' + selId + '.mp4';
+  const btn = event.target;
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    const r = await fetch('http://127.0.0.1:3999/save?url=' + encodeURIComponent(clip.output_url) + '&filename=' + filename);
+    const d = await r.json();
+    if (d.ok) {
+      btn.textContent = '✅ Saved!';
+      setTimeout(() => { btn.textContent = '⬇️ Save to C:\TikTok'; btn.disabled = false; }, 2000);
+    } else { throw new Error(d.error); }
+  } catch(e) {
+    btn.textContent = '⬇️ Save to C:\TikTok'; btn.disabled = false;
+    if (e.message.includes('fetch') || e.message.includes('Failed')) {
+      alert('Helper not running.\n\nDouble-click:\nC:\\turtleandsun\\tiktok-helper\\start.bat');
+    } else { alert('Save failed: ' + e.message); }
+  }
+}
 
 function copyField(id) {
   const el = document.getElementById(id);
