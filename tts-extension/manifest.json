@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Turtle & Sun — TikTok Helper",
+  "version": "1.0",
+  "description": "Auto-fills TikTok Studio upload from the Turtle & Sun admin panel.",
+  "permissions": ["tabs", "scripting", "storage"],
+  "host_permissions": [
+    "https://www.tiktok.com/*",
+    "https://turtleandsun.com/*",
+    "https://*.r2.dev/*",
+    "https://*.cloudflarestorage.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.tiktok.com/upload*"],
+      "js": ["tiktok-content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://turtleandsun.com/admin/*"],
+      "js": ["admin-relay.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

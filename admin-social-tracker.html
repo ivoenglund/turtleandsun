@@ -921,7 +921,7 @@ function showPostModal(plat) {
         : postModalPlat === 'youtube' && !ytConnected
         ? '<a href="/admin/youtube/connect" class="btn btn-primary" style="background:#FF0000;color:#fff;text-decoration:none">Connect YouTube</a>'
         : postModalPlat === 'tiktok' && ttConnected
-          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-upload-btn" onclick="uploadToTikTok()" style="background:#1C0A00;color:#fff;margin-left:6px">▶ Upload to TikTok</button>'
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-autofill-btn" onclick="autofillTikTok()" style="background:#010101;color:#25F4EE;border:2px solid #25F4EE;margin-left:6px" title="Opens TikTok Studio and fills in the video + caption automatically">🤖 Auto-fill TikTok</button>'
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
           : postModalPlat === 'instagram' && igConnected
@@ -1083,13 +1083,47 @@ async function uploadToTikTok() {
     document.getElementById('post-modal-bg').remove();
     await load();
     await pick(selId);
-    alert('✅ Queued in Buffer! TikTok will post it automatically from your Buffer queue.');
+    alert('✅ Sent to TikTok inbox! Publish it in TikTok Studio.');
   } catch(e) {
     alert('TikTok upload failed: ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to TikTok'; }
   }
 }
 
+
+async function autofillTikTok() {
+  const btn = document.getElementById('tt-autofill-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Filling…'; }
+  try {
+    const clip = (clips || []).find(c => c.id === selId);
+    if (!clip || !clip.output_url) throw new Error('No video generated yet for this clip.');
+    const caption  = document.getElementById('pm-caption')?.value?.trim()  || clip.tiktok_caption  || clip.concept || '';
+    const hashtags = document.getElementById('pm-hashtags')?.value?.trim() || clip.tiktok_hashtags || '';
+    const filename = `clip-${selId}.mp4`;
+
+    // Send to extension via admin-relay.js content script
+    window.postMessage({ type: 'TTS_POST_TIKTOK', data: { videoUrl: clip.output_url, caption, hashtags, filename } }, '*');
+
+    // Listen for reply
+    const reply = await new Promise((resolve, reject) => {
+      const handler = (e) => {
+        if (e.data?.type === 'TTS_POST_TIKTOK_REPLY') {
+          window.removeEventListener('message', handler);
+          resolve(e.data);
+        }
+      };
+      window.addEventListener('message', handler);
+      setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Extension did not respond — is the Turtle & Sun Chrome extension installed?')); }, 8000);
+    });
+
+    if (!reply.ok) throw new Error(reply.error || 'Extension error');
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Auto-fill TikTok'; }
+    // Extension will show a banner in TikTok Studio when done
+  } catch(e) {
+    alert('Auto-fill failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Auto-fill TikTok'; }
+  }
+}
 
 async function editOnInstagram() {
   const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
