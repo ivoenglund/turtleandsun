@@ -182,6 +182,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th id="th-facebook" style="width:52px;color:#1877F2;border-left:2px solid #a8a29c">Facebook</th>
                 <th style="width:44px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
                 <th class="num" style="width:72px;border-left:2px solid #a8a29c">Total views</th>
+                <th class="num" style="width:62px">Total likes</th>
                 <th style="width:70px">Added</th>
               </tr>
             </thead>
@@ -497,6 +498,7 @@ function renderTable() {
   }
   tbody.innerHTML = clips.map(c => {
     const tv = (+c.tiktok_views)+(+c.instagram_views)+(+c.youtube_views)+(+c.facebook_views);
+    const tl = (+c.tiktok_likes)+(+c.instagram_likes)+(+c.youtube_likes)+(+c.facebook_likes);
     const tagHtml = [
       c.subject ? `<span class="tag tag-subj">${esc(c.subject)}${c.subject_name?' · '+esc(c.subject_name):''}</span>` : '',
       c.occasion && c.occasion!=='general' ? `<span class="tag tag-occ">${esc(c.occasion)}</span>` : '',
@@ -514,6 +516,7 @@ function renderTable() {
       <td class="plat-sep"><div style="display:flex;align-items:center;gap:3px">${c.facebook_posted?'<span style="color:#1877F2;font-size:10px;line-height:1">✓</span>':''}<span style="font-size:11px;color:${c.facebook_posted?'#1877F2':'#bbb'};font-weight:600">${c.facebook_views!=null?c.facebook_views.toLocaleString('sv-SE'):'—'}</span></div></td>
       <td style="font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="plat-sep num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
+      <td class="num">${tl ? tl.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('');
