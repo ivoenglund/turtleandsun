@@ -500,8 +500,8 @@ function renderTable() {
   let totTT_v=0,totTT_l=0,totIG_v=0,totIG_l=0,totYT_v=0,totYT_l=0,totFB_v=0,totFB_l=0;
   for(const _c of clips){totTT_v+=(+_c.tiktok_views)||0;totTT_l+=(+_c.tiktok_likes)||0;totIG_v+=(+_c.instagram_views)||0;totIG_l+=(+_c.instagram_likes)||0;totYT_v+=(+_c.youtube_views)||0;totYT_l+=(+_c.youtube_likes)||0;totFB_v+=(+_c.facebook_views)||0;totFB_l+=(+_c.facebook_likes)||0;}
   const totAllViews=totTT_v+totIG_v+totYT_v+totFB_v,totAllLikes=totTT_l+totIG_l+totYT_l+totFB_l;
-  const fn=v=>v?v.toLocaleString('sv-SE'):'—';
-  const totRow=`<tr style="background:#dedad5;font-weight:700;border-top:2px solid #888"><td colspan="3" style="font-size:11px;color:#555;padding:7px 9px;letter-spacing:.04em;text-transform:uppercase">Total (${clips.length} clips)</td><td class="plat-sep num" style="color:#1C0A00;padding:7px 9px">${fn(totTT_v)}</td><td class="num" style="color:#1C0A00;padding:7px 9px">${fn(totTT_l)}</td><td class="plat-sep num" style="color:#C13584;padding:7px 9px">${fn(totIG_v)}</td><td class="num" style="color:#C13584;padding:7px 9px">${fn(totIG_l)}</td><td class="plat-sep num" style="color:#FF0000;padding:7px 9px">${fn(totYT_v)}</td><td class="num" style="color:#FF0000;padding:7px 9px">${fn(totYT_l)}</td><td class="plat-sep num" style="color:#1877F2;padding:7px 9px">${fn(totFB_v)}</td><td class="num" style="color:#1877F2;padding:7px 9px">${fn(totFB_l)}</td><td class="plat-sep num" style="font-size:13px;padding:7px 9px">${fn(totAllViews)}</td><td class="num" style="font-size:13px;padding:7px 9px">${fn(totAllLikes)}</td><td></td></tr>`;
+  const fn=v=>v?v.toLocaleString('sv-SE'):'-';
+  const totRow='<tr style="background:#dedad5;font-weight:700;border-top:2px solid #888">'+'<td colspan="3" style="font-size:11px;color:#555;padding:7px 9px;text-transform:uppercase">Total ('+clips.length+' clips)</td>'+'<td class="plat-sep num" style="color:#1C0A00;padding:7px 9px">'+fn(totTT_v)+'</td>'+'<td class="num" style="color:#1C0A00;padding:7px 9px">'+fn(totTT_l)+'</td>'+'<td class="plat-sep num" style="color:#C13584;padding:7px 9px">'+fn(totIG_v)+'</td>'+'<td class="num" style="color:#C13584;padding:7px 9px">'+fn(totIG_l)+'</td>'+'<td class="plat-sep num" style="color:#FF0000;padding:7px 9px">'+fn(totYT_v)+'</td>'+'<td class="num" style="color:#FF0000;padding:7px 9px">'+fn(totYT_l)+'</td>'+'<td class="plat-sep num" style="color:#1877F2;padding:7px 9px">'+fn(totFB_v)+'</td>'+'<td class="num" style="color:#1877F2;padding:7px 9px">'+fn(totFB_l)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:7px 9px">'+fn(totAllViews)+'</td>'+'<td class="num" style="font-size:13px;padding:7px 9px">'+fn(totAllLikes)+'</td>'+'<td></td></tr>';
   tbody.innerHTML = clips.map(c => {
     const tv = (+c.tiktok_views)+(+c.instagram_views)+(+c.youtube_views)+(+c.facebook_views);
     const tl = (+c.tiktok_likes)+(+c.instagram_likes)+(+c.youtube_likes)+(+c.facebook_likes);
@@ -1450,4 +1450,13 @@ function renderCal(clips){
       if(d>dim){html+='<div class="cal-cell no-day"></div>';return;}
       const ds=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const dc=byPlatDay[plat.key][ds]||[];
-      const nums=dc.map((c,i)=>'<span class="cal-num'+(c.id===selId?' sel-num':'')+'" title="'+esc(c.concept||'Clip')+'
+      const nums=dc.map((c,i)=>'<span class="cal-num'+(c.id===selId?' sel-num':'')+'" title="'+esc(c.concept||'Clip')+'" onclick="pick('+c.id+')">'+(i+1)+'</span>').join('');
+      html+='<div class="cal-cell'+(ds===todayStr?' today-day':'')+'">'+nums+'</div>';
+    });
+    html+='</div>';
+  });
+  document.getElementById('cal-body').innerHTML=html;
+}
+</script>
+</body>
+</html>
