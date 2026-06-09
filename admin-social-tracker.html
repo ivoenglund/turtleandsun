@@ -47,7 +47,7 @@ td{padding:4px 7px;vertical-align:middle}
 
 /* Bottom panel */
 .bottom-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;margin-top:0}
-.bp-head{background:#1C2A14;color:#FFE800;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bp-head{background:#1C2A14;color:#FFE800;padding:8px 14px;display:grid;grid-template-columns:342px 120px 120px 120px 120px 1fr;align-items:center}
 .bp-head h2{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bp-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
 .bp-body{padding:16px}
@@ -173,14 +173,10 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th class="num" style="width:24px;color:#aaa">#</th>
                 <th style="width:130px">Concept</th>
                 <th style="width:160px">Tags</th>
-                <th id="th-tiktok" style="width:52px;color:#1C0A00;border-left:2px solid #a8a29c">TikTok</th>
-                <th style="width:38px;color:#1C0A00;font-weight:400;font-size:10px">❤ Likes</th>
-                <th id="th-instagram" style="width:52px;color:#C13584;border-left:2px solid #a8a29c">Instagram</th>
-                <th style="width:38px;color:#C13584;font-weight:400;font-size:10px">❤ Likes</th>
-                <th id="th-youtube" style="width:52px;color:#FF0000;border-left:2px solid #a8a29c">YouTube</th>
-                <th style="width:38px;color:#FF0000;font-weight:400;font-size:10px">❤ Likes</th>
-                <th id="th-facebook" style="width:52px;color:#1877F2;border-left:2px solid #a8a29c">Facebook</th>
-                <th style="width:38px;color:#1877F2;font-weight:400;font-size:10px">❤ Likes</th>
+                <th id="th-tiktok" colspan="2" style="color:#1C0A00;border-left:2px solid #a8a29c;text-align:center">TikTok</th>
+                <th id="th-instagram" colspan="2" style="color:#C13584;border-left:2px solid #a8a29c;text-align:center">Instagram</th>
+                <th id="th-youtube" colspan="2" style="color:#FF0000;border-left:2px solid #a8a29c;text-align:center">YouTube</th>
+                <th id="th-facebook" colspan="2" style="color:#1877F2;border-left:2px solid #a8a29c;text-align:center">Facebook</th>
                 <th class="num" style="width:62px;border-left:2px solid #a8a29c">Total views</th>
                 <th class="num" style="width:54px">Total likes</th>
                 <th style="width:54px">Added</th>
@@ -331,7 +327,7 @@ async function loadFollowers() {
         if (!el) continue;
         const count = d[ch];
         if (count != null) {
-          el.innerHTML = labels[ch] + '<br><span style="font-weight:400;font-size:10px;color:' + color + ';opacity:0.8">' + fmtFollowers(count) + '</span>';
+          el.innerHTML = labels[ch] + ' <span style="font-weight:400;font-size:10px;color:' + color + ';opacity:0.8">' + fmtFollowers(count) + '</span>';
         }
       }
     }
@@ -592,17 +588,17 @@ function renderPanel() {
 
   // Action buttons — TikTok | Instagram | YouTube | Facebook (matches table column order)
   const platEditBtns = ['tiktok','instagram','youtube','facebook'].map(p =>
-    `<button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:${PLAT_COLORS[p]};color:#fff;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button>`
+    `<div style="display:flex;justify-content:center;align-items:center"><button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:none;background:${PLAT_COLORS[p]};color:#fff;cursor:pointer" onclick="showPostModal('${p}')">${PF[p]} ✎</button></div>`
   ).join('');
 
   panel.innerHTML = `
     <div class="bp-head">
-      <div style="min-width:0;flex:1">
+      <div style="min-width:0">
         <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-        ${platEditBtns}
-        <button onclick="closePanel()" style="margin-left:4px">&#x2715;</button>
+      ${platEditBtns}
+      <div style="display:flex;justify-content:flex-end;align-items:center">
+        <button onclick="closePanel()">&#x2715;</button>
       </div>
     </div>
     <div class="bp-body">
