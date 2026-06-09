@@ -116,6 +116,9 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .plat-label{padding:3px 5px;display:flex;align-items:center;justify-content:flex-end;border-right:1px solid #b0aa9e;background:#e8e4dc}
 .plat-pill{font-size:9px;font-weight:700;padding:2px 5px;border-radius:20px}
 .plat-tiktok{background:#1C0A00;color:#fff}
+.copy-btn{font-size:11px;padding:2px 9px;border-radius:4px;border:1px solid #ddd;background:#fff;cursor:pointer;color:#444;line-height:1.4}
+.copy-btn:hover{background:#f0f0f0}
+.copy-btn.copied{background:#d4edda;border-color:#b2dfdb;color:#2e7d32}
 .plat-instagram{background:#C13584;color:#fff}
 .plat-youtube{background:#FF0000;color:#fff}
 .plat-facebook{background:#1877F2;color:#fff}
@@ -829,12 +832,14 @@ function showPostModal(plat) {
              <span style="color:#888;font-weight:700">Status</span><span>Sent to TikTok inbox — publish in TikTok Studio</span>
            </div>
          </div>` : '';
+    const vidUrl = (clips||[]).find(x=>x.id===selId)?.output_url||'';
     fields = `
-      ${ttInfoRow}
+      \${ttInfoRow}
       <div class="form-row"><label>Posted date</label><input id="pm-date" type="date" value="${fd(pd.posted_at)}"></div>
       <div class="form-row"><label>Post URL</label><input id="pm-url" placeholder="https://tiktok.com/..." value="${esc(pd.post_url||'')}"></div>
-      <div class="form-row"><label>Caption</label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
-      <div class="form-row"><label>Hashtags</label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>`;
+      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Caption <button class="copy-btn" onclick="copyField('pm-caption')">📋 Copy</button></label><textarea id="pm-caption" rows="3">${esc(pd.caption||'')}</textarea></div>
+      <div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Hashtags <button class="copy-btn" onclick="copyField('pm-hashtags')">📋 Copy</button></label><textarea id="pm-hashtags" rows="2">${esc(pd.hashtags||'')}</textarea></div>
+      ${vidUrl ? '<div class="form-row"><label style="display:flex;justify-content:space-between;align-items:center">Video <a href="' + esc(vidUrl) + '" download="clip-' + selId + '.mp4" class="copy-btn" style="text-decoration:none">⬇️ Download video</a></label></div>' : ''}`;
   } else if (plat === 'instagram') {
     const igInfoRow = (pd.post_url || pd.posted_at)
       ? `<div id="ig-live-panel" style="background:#faf8f4;border-radius:7px;padding:9px 11px;margin-bottom:12px;font-size:11px;color:#555">
@@ -921,7 +926,7 @@ function showPostModal(plat) {
         : postModalPlat === 'youtube' && !ytConnected
         ? '<a href="/admin/youtube/connect" class="btn btn-primary" style="background:#FF0000;color:#fff;text-decoration:none">Connect YouTube</a>'
         : postModalPlat === 'tiktok' && ttConnected
-          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><button class="btn btn-primary" id="tt-autofill-btn" onclick="autofillTikTok()" style="background:#010101;color:#25F4EE;border:2px solid #25F4EE;margin-left:6px" title="Opens TikTok Studio and fills in the video + caption automatically">🤖 Auto-fill TikTok</button>'
+          ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="https://www.tiktok.com/tiktokstudio/upload" target="_blank" class="btn btn-primary" style="background:#010101;color:#25F4EE;border:2px solid #25F4EE;margin-left:6px;text-decoration:none">🎵 Open TikTok Studio</a>'
           : postModalPlat === 'tiktok' && !ttConnected
           ? '<button class="btn btn-secondary" onclick="savePost()">Save</button><a href="/admin/tiktok/connect" class="btn btn-primary" style="background:#1C0A00;color:#fff;margin-left:6px;text-decoration:none">Connect TikTok</a>'
           : postModalPlat === 'instagram' && igConnected
@@ -1090,6 +1095,15 @@ async function uploadToTikTok() {
   }
 }
 
+
+function copyField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.value).then(() => {
+    const btn = el.closest('.form-row')?.querySelector('.copy-btn');
+    if (btn) { const t = btn.textContent; btn.textContent = '✅ Copied!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = t; btn.classList.remove('copied'); }, 1200); }
+  });
+}
 
 async function autofillTikTok() {
   const btn = document.getElementById('tt-autofill-btn');
