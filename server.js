@@ -3111,7 +3111,7 @@ function tiktokOAuthUrl() {
   const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
   const params = new URLSearchParams({
     client_key:    process.env.TIKTOK_CLIENT_KEY,
-    scope:         'video.upload,user.info.basic',
+    scope:         'video.upload,video.list,user.info.basic',
     response_type: 'code',
     redirect_uri:  base + '/admin/tiktok/callback',
     state:         'admin',
@@ -8058,9 +8058,24 @@ app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (
 
 // POST /admin/api/tracker/fetch-tiktok-stats -- batch TikTok stats via Video Query API
 async function fetchTikTokStatsBatch() {
-  const { rows } = await pool.query(
-    `SELECT id, tiktok_video_id FROM social_clips WHERE tiktok_video_id IS NOT NULL AND tiktok_video_id <> '' ORDER BY id DESC LIMIT 50`
+  // Get clips with video_id, or extract it from post_url on the fly
+  const { rows: rawRows } = await pool.query(
+    `SELECT id, tiktok_video_id, tiktok_post_url FROM social_clips
+     WHERE (tiktok_video_id IS NOT NULL AND tiktok_video_id <> '')
+        OR (tiktok_post_url IS NOT NULL AND tiktok_post_url LIKE '%/video/%')
+     ORDER BY id DESC LIMIT 50`
   );
+  // Ensure video_id is set (extract from URL if missing)
+  for (const r of rawRows) {
+    if (!r.tiktok_video_id && r.tiktok_post_url) {
+      const m = r.tiktok_post_url.match(/\/video\/(\d+)/);
+      if (m) {
+        r.tiktok_video_id = m[1];
+        await pool.query(`UPDATE social_clips SET tiktok_video_id=$2, updated_at=NOW() WHERE id=$1`, [r.id, m[1]]);
+      }
+    }
+  }
+  const rows = rawRows.filter(r => r.tiktok_video_id);
   if (!rows.length) return { updated: 0 };
 
   // Refresh token
