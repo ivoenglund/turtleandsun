@@ -3246,10 +3246,9 @@ async function getTikTokAccessToken() {
 }
 
 // POST /admin/api/tracker/clips/:id/upload-tiktok
-// Sends the clip video to TikTok using PULL_FROM_URL (TikTok fetches from R2).
-// Privacy SELF_ONLY → lands in creator inbox as draft; Ivo publishes from TikTok Studio.
+// Posts the clip to TikTok via Buffer (Buffer holds the approved TikTok API access).
+// Requires BUFFER_API_KEY and BUFFER_TIKTOK_CHANNEL_ID env vars.
 app.post('/admin/api/tracker/clips/:id/upload-tiktok', requireRole('admin'), async (req, res) => {
-  const https5 = require('https');
   const id = parseInt(req.params.id);
   try {
     const { rows } = await pool.query(
@@ -3258,64 +3257,79 @@ app.post('/admin/api/tracker/clips/:id/upload-tiktok', requireRole('admin'), asy
     const clip = rows[0];
     if (!clip.output_url) return res.status(400).json({ error: 'Clip not generated yet' });
 
-    const accessToken = await getTikTokAccessToken();
+    const bufferApiKey = process.env.BUFFER_API_KEY;
+    const channelId    = process.env.BUFFER_TIKTOK_CHANNEL_ID;
+    if (!bufferApiKey) return res.status(500).json({ error: 'BUFFER_API_KEY env var not set' });
+    if (!channelId)    return res.status(500).json({ error: 'BUFFER_TIKTOK_CHANNEL_ID env var not set' });
 
-    // Build title: caption + hashtags (max 2200 chars for TikTok)
-    const caption   = clip.tiktok_caption   || clip.concept || 'Loveogram by Turtle and Sun';
-    const hashtags  = clip.tiktok_hashtags  || '';
-    const title     = (caption + (hashtags ? '\n\n' + hashtags : '')).slice(0, 2200);
+    // Build caption (max 2200 chars for TikTok)
+    const caption  = clip.tiktok_caption  || clip.concept || 'Loveogram by Turtle and Sun';
+    const hashtags = clip.tiktok_hashtags || '';
+    const text     = (caption + (hashtags ? '\n\n' + hashtags : '')).slice(0, 2200);
 
-    const payload = JSON.stringify({
-      post_info: {
-        title,
-        privacy_level:              'SELF_ONLY',
-        disable_duet:               false,
-        disable_comment:            false,
-        disable_stitch:             false,
-        video_cover_timestamp_ms:   1000,
+    // Buffer GraphQL createPost — assets format updated May 25 2026
+    const bufRes = await fetch('https://api.buffer.com', {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + bufferApiKey,
       },
-      source_info: {
-        source:    'PULL_FROM_URL',
-        video_url: clip.output_url,
-      },
+      body: JSON.stringify({
+        query: `
+          mutation CreatePost($text: String!, $channelId: String!, $videoUrl: String!) {
+            createPost(input: {
+              text: $text
+              channelId: $channelId
+              schedulingType: automatic
+              mode: addToQueue
+              assets: [{ video: { url: $videoUrl } }]
+            }) {
+              ... on PostActionSuccess { post { id } }
+              ... on MutationError { message }
+            }
+          }
+        `,
+        variables: { text, channelId, videoUrl: clip.output_url },
+      }),
     });
 
-    const ttRes = await new Promise((resolve, reject) => {
-      const r = https5.request({
-        hostname: 'open.tiktokapis.com',
-        path: '/v2/post/publish/inbox/video/init/',
-        method: 'POST',
-        headers: {
-          'Authorization':  'Bearer ' + accessToken,
-          'Content-Type':   'application/json; charset=UTF-8',
-          'Content-Length': Buffer.byteLength(payload),
-        },
-      }, res2 => {
-        let d = '';
-        res2.on('data', c => d += c);
-        res2.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
-      });
-      r.on('error', reject);
-      r.write(payload);
-      r.end();
-    });
-
-    if (ttRes.error && ttRes.error.code !== 'ok') {
-      throw new Error(ttRes.error.message || JSON.stringify(ttRes));
+    if (!bufRes.ok) throw new Error('Buffer API HTTP ' + bufRes.status);
+    const bufData = await bufRes.json();
+    if (bufData.errors && bufData.errors.length) {
+      throw new Error(bufData.errors.map(e => e.message).join('; '));
     }
+    const result = bufData?.data?.createPost;
+    if (!result) throw new Error('No createPost in response: ' + JSON.stringify(bufData));
+    if (result.message) throw new Error('Buffer error: ' + result.message);
 
-    const publish_id = (ttRes.data || {}).publish_id;
-    if (!publish_id) throw new Error('No publish_id returned: ' + JSON.stringify(ttRes));
-
-    // Store publish_id as tiktok_video_id so we can track status
+    const bufferId = result.post?.id || 'queued';
     await pool.query(
       `UPDATE social_clips SET tiktok_video_id=$2, tiktok_posted_at=NOW(), updated_at=NOW() WHERE id=$1`,
-      [id, publish_id]);
+      [id, bufferId]);
 
-    console.log('[upload-tiktok] clip', id, 'publish_id', publish_id);
-    res.json({ ok: true, publish_id });
+    console.log('[upload-tiktok-buffer] clip', id, 'buffer post id', bufferId);
+    res.json({ ok: true, buffer_post_id: bufferId });
   } catch(e) {
-    console.error('[upload-tiktok]', e.message);
+    console.error('[upload-tiktok-buffer]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/buffer-channels
+// Lists all Buffer channels — use this to find the TikTok channel ID for BUFFER_TIKTOK_CHANNEL_ID.
+app.get('/admin/api/tracker/buffer-channels', requireRole('admin'), async (req, res) => {
+  try {
+    const bufferApiKey = process.env.BUFFER_API_KEY;
+    if (!bufferApiKey) return res.status(500).json({ error: 'BUFFER_API_KEY env var not set' });
+    const bufRes = await fetch('https://api.buffer.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + bufferApiKey },
+      body: JSON.stringify({ query: '{ channels { id name service } }' }),
+    });
+    const bufData = await bufRes.json();
+    if (bufData.errors) throw new Error(bufData.errors.map(e => e.message).join('; '));
+    res.json(bufData?.data?.channels || []);
+  } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });

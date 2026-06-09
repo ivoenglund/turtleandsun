@@ -1083,7 +1083,7 @@ async function uploadToTikTok() {
     document.getElementById('post-modal-bg').remove();
     await load();
     await pick(selId);
-    alert('✅ Sent to TikTok inbox! Publish it in TikTok Studio.');
+    alert('✅ Queued in Buffer! TikTok will post it automatically from your Buffer queue.');
   } catch(e) {
     alert('TikTok upload failed: ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = '▶ Upload to TikTok'; }
