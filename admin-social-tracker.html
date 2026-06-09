@@ -722,13 +722,14 @@ async function fetchIG(btn) {
 async function fetchAll(btn) {
   btn.disabled = true; btn.textContent = 'Fetching…';
   try {
-    const [ytR, igR, fbR] = await Promise.all([
+    const [ytR, igR, fbR, ttR] = await Promise.all([
       fetch('/admin/api/tracker/fetch-youtube-stats', { method:'POST' }),
       fetch('/admin/api/tracker/fetch-instagram-stats', { method:'POST' }),
       fetch('/admin/api/tracker/fetch-facebook-stats', { method:'POST' }),
+      fetch('/admin/api/tracker/fetch-tiktok-stats', { method:'POST' }),
     ]);
-    const [yt, ig, fb] = await Promise.all([ytR.json(), igR.json(), fbR.json()]);
-    const total = (yt.updated||0) + (ig.updated||0) + (fb.updated||0);
+    const [yt, ig, fb, tt] = await Promise.all([ytR.json(), igR.json(), fbR.json(), ttR.json()]);
+    const total = (yt.updated||0) + (ig.updated||0) + (fb.updated||0) + (tt.updated||0);
     btn.textContent = `✓ Updated ${total} item${total===1?'':'s'}`;
     await load();
     if (selId) { await loadStats(selId); renderPanel(); }

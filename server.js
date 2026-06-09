@@ -7796,8 +7796,10 @@ app.post('/admin/api/tracker/clips/:id/posts', requireRole('admin'), async (req,
     if (!platform) return res.status(400).json({ error: 'platform required' });
     let sql, params;
     if (platform === 'tiktok') {
-      sql = 'UPDATE social_clips SET tiktok_posted_at=$2, tiktok_post_url=$3, tiktok_caption=$4, tiktok_hashtags=$5, updated_at=NOW() WHERE id=$1';
-      params = [id, posted_at||null, post_url||null, caption||null, hashtags||null];
+      const ttVidMatch = (post_url||'').match(/\/video\/(\d+)/);
+      const ttVidId = ttVidMatch ? ttVidMatch[1] : null;
+      sql = 'UPDATE social_clips SET tiktok_posted_at=$2, tiktok_post_url=$3, tiktok_caption=$4, tiktok_hashtags=$5, tiktok_video_id=COALESCE($6, tiktok_video_id), updated_at=NOW() WHERE id=$1';
+      params = [id, posted_at||null, post_url||null, caption||null, hashtags||null, ttVidId];
     } else if (platform === 'instagram') {
       sql = 'UPDATE social_clips SET instagram_posted_at=$2, instagram_post_url=$3, instagram_caption=$4, instagram_hashtags=$5, instagram_alt_text=$6, updated_at=NOW() WHERE id=$1';
       params = [id, posted_at||null, post_url||null, caption||null, hashtags||null, alt_text||null];
@@ -8048,6 +8050,77 @@ app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (
     res.json({ ok: true, updated: result.updated });
   } catch (e) {
     console.error('[tracker/fetch-youtube-stats]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// POST /admin/api/tracker/fetch-tiktok-stats -- batch TikTok stats via Video Query API
+async function fetchTikTokStatsBatch() {
+  const { rows } = await pool.query(
+    `SELECT id, tiktok_video_id FROM social_clips WHERE tiktok_video_id IS NOT NULL AND tiktok_video_id <> '' ORDER BY id DESC LIMIT 50`
+  );
+  if (!rows.length) return { updated: 0 };
+
+  // Refresh token
+  const ttRow = await pool.query("SELECT access_token, refresh_token, token_expiry FROM platform_tokens WHERE platform='tiktok'");
+  if (!ttRow.rows.length) throw new Error('TikTok not connected');
+  let { access_token, refresh_token, token_expiry } = ttRow.rows[0];
+  if (!access_token) throw new Error('TikTok access token missing');
+
+  // Refresh if expired
+  if (token_expiry && new Date(token_expiry) < new Date()) {
+    const rr = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY, client_secret: process.env.TIKTOK_CLIENT_SECRET, grant_type: 'refresh_token', refresh_token })
+    });
+    const rd = await rr.json();
+    if (rd.access_token) {
+      access_token = rd.access_token;
+      await pool.query(
+        `UPDATE platform_tokens SET access_token=$1, token_expiry=$2, updated_at=NOW() WHERE platform='tiktok'`,
+        [rd.access_token, new Date(Date.now() + (rd.expires_in||86400)*1000)]
+      );
+    }
+  }
+
+  const videoIds = rows.map(r => r.tiktok_video_id);
+  const qr = await fetch('https://open.tiktokapis.com/v2/video/query/?fields=id,play_count,like_count,comment_count,share_count', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filters: { video_ids: videoIds } })
+  });
+  const qd = await qr.json();
+  console.log('[tiktok-stats] query response:', JSON.stringify(qd).slice(0, 300));
+
+  const videos = qd.data?.videos || [];
+  let updated = 0;
+  for (const v of videos) {
+    const clip = rows.find(r => r.tiktok_video_id === v.id);
+    if (!clip) continue;
+    const views    = v.play_count    || 0;
+    const likes    = v.like_count    || 0;
+    const comments = v.comment_count || 0;
+    const shares   = v.share_count   || 0;
+    await pool.query(
+      `INSERT INTO clip_stats (social_clip_id, platform, stat_date, views, likes, comments, shares, source)
+       VALUES ($1, 'tiktok', CURRENT_DATE, $2, $3, $4, $5, 'api')
+       ON CONFLICT (social_clip_id, platform, stat_date)
+       DO UPDATE SET views=$2, likes=$3, comments=$4, shares=$5, source='api'`,
+      [clip.id, views, likes, comments, shares]
+    );
+    updated++;
+  }
+  return { updated };
+}
+
+app.post('/admin/api/tracker/fetch-tiktok-stats', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await fetchTikTokStatsBatch();
+    res.json({ ok: true, updated: result.updated });
+  } catch (e) {
+    console.error('[tracker/fetch-tiktok-stats]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
