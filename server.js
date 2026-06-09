@@ -8053,6 +8053,81 @@ app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (
 });
 
 
+// ── Channel daily stats snapshot ─────────────────────────────────────────────
+async function fetchChannelDailyStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  const platforms = ['youtube', 'instagram', 'facebook', 'tiktok'];
+  for (const platform of platforms) {
+    try {
+      let subscribers = 0;
+      if (platform === 'youtube') {
+        const ytRow = await pool.query("SELECT channel_id FROM platform_tokens WHERE platform='youtube'");
+        if (ytRow.rows.length && ytRow.rows[0].channel_id) {
+          const ytKey = process.env.YOUTUBE_API_KEY;
+          const r = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${encodeURIComponent(ytRow.rows[0].channel_id)}&key=${ytKey}`);
+          const d = await r.json();
+          const s = d.items && d.items[0] && d.items[0].statistics;
+          if (s) subscribers = parseInt(s.subscriberCount) || 0;
+        }
+      } else if (platform === 'instagram') {
+        try {
+          const { token, igUserId } = await getInstagramToken();
+          const r = await fetch(`https://graph.facebook.com/v21.0/${igUserId}?fields=followers_count&access_token=${token}`);
+          const d = await r.json();
+          if (!d.error) subscribers = d.followers_count || 0;
+        } catch(e) { /* not connected */ }
+      } else if (platform === 'facebook') {
+        try {
+          const { token, pageId } = await getFacebookToken();
+          const r = await fetch(`https://graph.facebook.com/v21.0/${pageId}?fields=fan_count,followers_count&access_token=${token}`);
+          const d = await r.json();
+          if (!d.error) subscribers = d.followers_count || d.fan_count || 0;
+        } catch(e) { /* not connected */ }
+      } else if (platform === 'tiktok') {
+        const ttRow = await pool.query("SELECT access_token FROM platform_tokens WHERE platform='tiktok'");
+        if (ttRow.rows.length && ttRow.rows[0].access_token) {
+          const r = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=follower_count', {
+            headers: { 'Authorization': 'Bearer ' + ttRow.rows[0].access_token }
+          });
+          const d = await r.json();
+          if (d.data && d.data.user) subscribers = d.data.user.follower_count || 0;
+        }
+      }
+      const sRow = await pool.query(
+        `SELECT COALESCE(SUM(views), 0) AS tv, COALESCE(SUM(likes), 0) AS tl FROM clip_stats WHERE platform=$1`,
+        [platform]
+      );
+      const total_views = parseInt(sRow.rows[0].tv) || 0;
+      const total_likes = parseInt(sRow.rows[0].tl) || 0;
+      await pool.query(
+        `INSERT INTO channel_daily_stats (platform, stat_date, subscribers, total_views, total_likes)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (platform, stat_date) DO UPDATE SET
+           subscribers = EXCLUDED.subscribers,
+           total_views = EXCLUDED.total_views,
+           total_likes = EXCLUDED.total_likes`,
+        [platform, today, subscribers, total_views, total_likes]
+      );
+      console.log(`[channel-daily-stats] ${platform}: subs=${subscribers} views=${total_views} likes=${total_likes}`);
+    } catch(e) {
+      console.warn(`[channel-daily-stats] ${platform}:`, e.message);
+    }
+  }
+}
+
+// GET /admin/api/tracker/channel-daily-stats — time-series for summary chart
+app.get('/admin/api/tracker/channel-daily-stats', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT platform, stat_date::text, subscribers, total_views, total_likes
+       FROM channel_daily_stats ORDER BY stat_date ASC, platform`
+    );
+    res.json(rows);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /admin/api/tracker/channel-followers -- subscriber/follower counts for all connected channels
 app.get('/admin/api/tracker/channel-followers', requireRole('admin'), async (req, res) => {
   const result = {};
@@ -8134,6 +8209,15 @@ cron.schedule('0 8 * * *', async () => {
     console.log('[ig-stats-cron] updated', result.updated, 'clips');
   } catch (err) {
     console.error('[ig-stats-cron]', err.message);
+  }
+}, { timezone: 'UTC' });
+
+cron.schedule('0 9 * * *', async () => {
+  try {
+    await fetchChannelDailyStats();
+    console.log('[channel-daily-cron] snapshot saved');
+  } catch (err) {
+    console.error('[channel-daily-cron]', err.message);
   }
 }, { timezone: 'UTC' });
 

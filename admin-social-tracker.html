@@ -309,22 +309,29 @@ function fmtFollowers(n) {
   return String(n);
 }
 
+let channelDailyStats = [];
+
 async function loadFollowers() {
   try {
-    const r = await fetch('/admin/api/tracker/channel-followers');
-    if (!r.ok) return;
-    const d = await r.json();
-    channelFollowers = d;
-    const map = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
-    const labels = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook' };
-    for (const [ch, color] of Object.entries(map)) {
-      const el = document.getElementById('th-' + ch);
-      if (!el) continue;
-      const count = d[ch];
-      if (count != null) {
-        el.innerHTML = labels[ch] + '<br><span style="font-weight:400;font-size:10px;color:' + color + ';opacity:0.8">' + fmtFollowers(count) + '</span>';
+    const [r, dr] = await Promise.all([
+      fetch('/admin/api/tracker/channel-followers'),
+      fetch('/admin/api/tracker/channel-daily-stats'),
+    ]);
+    if (r.ok) {
+      const d = await r.json();
+      channelFollowers = d;
+      const map = { tiktok:'#1C0A00', instagram:'#C13584', youtube:'#FF0000', facebook:'#1877F2' };
+      const labels = { tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook' };
+      for (const [ch, color] of Object.entries(map)) {
+        const el = document.getElementById('th-' + ch);
+        if (!el) continue;
+        const count = d[ch];
+        if (count != null) {
+          el.innerHTML = labels[ch] + '<br><span style="font-weight:400;font-size:10px;color:' + color + ';opacity:0.8">' + fmtFollowers(count) + '</span>';
+        }
       }
     }
+    if (dr.ok) { channelDailyStats = await dr.json(); }
     updateStats();
   } catch(e) { console.warn('loadFollowers:', e.message); }
 }
@@ -386,48 +393,79 @@ function setSummaryMetric(m) {
 function updateStats() {
   const canvas = document.getElementById('summary-chart');
   if (!canvas) return;
-  const chs = ['tiktok','instagram','youtube','facebook'];
-  const views = {tiktok:0,instagram:0,youtube:0,facebook:0};
-  const likes = {tiktok:0,instagram:0,youtube:0,facebook:0};
-  for (const c of clips) {
-    for (const ch of chs) {
-      views[ch] += (+c[ch+'_views'])||0;
-      likes[ch] += (+c[ch+'_likes'])||0;
-    }
-  }
-  const dataMap = {
-    subscribers: chs.map(ch => channelFollowers[ch] || 0),
-    views:       chs.map(ch => views[ch]),
-    likes:       chs.map(ch => likes[ch]),
-  };
-  const labels = ['TikTok','Instagram','YouTube','Facebook'];
-  const colors = chs.map(ch => PLAT_COLORS[ch]);
-  const data = dataMap[summaryMetric];
   if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
-  summaryChart = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: colors.map(c => c + 'cc'),
-        borderColor: colors,
-        borderWidth: 1,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ctx.parsed.y.toLocaleString('sv-SE') } }
-      },
-      scales: {
-        x: { ticks: { font: { size: 11 }, color: colors }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+
+  const chs = ['tiktok','instagram','youtube','facebook'];
+  const metricKey = { subscribers: 'subscribers', views: 'total_views', likes: 'total_likes' }[summaryMetric];
+
+  if (channelDailyStats.length) {
+    // Line chart: day-by-day time series per platform
+    const dates = [...new Set(channelDailyStats.map(r => r.stat_date))].sort();
+    const datasets = chs.map(p => {
+      const byDate = {};
+      channelDailyStats.filter(r => r.platform === p).forEach(r => { byDate[r.stat_date] = parseInt(r[metricKey]) || 0; });
+      if (!Object.keys(byDate).length) return null;
+      return {
+        label: PF[p],
+        data: dates.map(d => byDate[d] ?? null),
+        borderColor: PLAT_COLORS[p],
+        backgroundColor: PLAT_COLORS[p] + '22',
+        tension: 0.3, spanGaps: true, pointRadius: 3, pointHoverRadius: 5,
+      };
+    }).filter(Boolean);
+    summaryChart = new Chart(canvas, {
+      type: 'line',
+      data: { labels: dates, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { font: { size: 10 }, boxWidth: 12 } } },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  } else {
+    // Fallback bar chart (no history yet — shows current snapshot)
+    const views = {tiktok:0,instagram:0,youtube:0,facebook:0};
+    const likes = {tiktok:0,instagram:0,youtube:0,facebook:0};
+    for (const c of clips) {
+      for (const ch of chs) {
+        views[ch] += (+c[ch+'_views'])||0;
+        likes[ch] += (+c[ch+'_likes'])||0;
       }
     }
-  });
+    const dataMap = {
+      subscribers: chs.map(ch => channelFollowers[ch] || 0),
+      views:       chs.map(ch => views[ch]),
+      likes:       chs.map(ch => likes[ch]),
+    };
+    const colors = chs.map(ch => PLAT_COLORS[ch]);
+    summaryChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: ['TikTok','Instagram','YouTube','Facebook'],
+        datasets: [{
+          data: dataMap[summaryMetric],
+          backgroundColor: colors.map(c => c + 'cc'),
+          borderColor: colors,
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ctx.parsed.y.toLocaleString('sv-SE') } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 11 }, color: colors }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
 }
 
 async function load() {

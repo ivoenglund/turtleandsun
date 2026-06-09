@@ -883,6 +883,17 @@ async function initDb() {
       UNIQUE (social_clip_id, platform, stat_date)
     );
 
+    CREATE TABLE IF NOT EXISTS channel_daily_stats (
+      id          SERIAL PRIMARY KEY,
+      platform    TEXT NOT NULL,
+      stat_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+      subscribers INTEGER NOT NULL DEFAULT 0,
+      total_views BIGINT NOT NULL DEFAULT 0,
+      total_likes BIGINT NOT NULL DEFAULT 0,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (platform, stat_date)
+    );
+
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS subject         TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS subject_name    TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS occasion        TEXT;
@@ -1018,7 +1029,4 @@ async function seedGallery() {
        style.category, style.prompt_text, style.fal_model]
     );
   }
-  console.log('Gallery styles seeded');
-}
-
-module.exports = { pool, initDb, seedGallery };
+  console.l
