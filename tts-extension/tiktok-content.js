@@ -1,5 +1,5 @@
-// Runs on tiktok.com/upload.
-// Receives FILL_TIKTOK from background, sets the video file and fills caption/hashtags.
+// Runs on tiktok.com/tiktokstudio/upload.
+// Receives FILL_TIKTOK from background, drops the video file and fills caption/hashtags.
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type !== 'FILL_TIKTOK') return;
@@ -10,18 +10,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function fillTikTok({ caption, hashtags, videoBytes, filename }) {
   console.log('[TTS] Starting TikTok fill…');
 
-  // ── 1. Set the video file ──────────────────────────────────────────────────
-  const fileInput = await waitFor('input[type="file"]', 15000);
+  // ── 1. Build the File object ───────────────────────────────────────────────
   const blob = new Blob([new Uint8Array(videoBytes)], { type: 'video/mp4' });
   const file = new File([blob], filename, { type: 'video/mp4' });
-  const dt = new DataTransfer();
+  const dt   = new DataTransfer();
   dt.items.add(file);
-  fileInput.files = dt.files;
-  fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-  console.log('[TTS] Video file set:', filename);
 
-  // ── 2. Wait for the caption editor to appear (after video processes) ───────
-  // TikTok uses a Draft.js contenteditable div for the caption
+  // ── 2. Find the upload drop zone (div.upload is TikTok's container) ────────
+  const dropZone = await waitFor('div.upload', 15000);
+  console.log('[TTS] Drop zone found');
+
+  // ── 3. Dispatch drag-and-drop events ─────────────────────────────────────
+  for (const type of ['dragenter', 'dragover']) {
+    dropZone.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+    await sleep(80);
+  }
+  dropZone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  console.log('[TTS] Drop event fired');
+
+  // ── 4. Fallback: set file input via native setter so React sees the change ─
+  await sleep(800);
+  const fileInput = document.querySelector('input[type="file"]');
+  if (fileInput) {
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'files')?.set;
+    if (nativeSetter) nativeSetter.call(fileInput, dt.files);
+    else fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    fileInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    console.log('[TTS] File input fallback triggered');
+  }
+
+  // ── 5. Wait for caption editor (appears after TikTok processes the video) ──
   const captionSelectors = [
     '.public-DraftEditor-content',
     '[contenteditable="true"][data-testid*="caption"]',
@@ -30,7 +49,7 @@ async function fillTikTok({ caption, hashtags, videoBytes, filename }) {
   ];
 
   let captionEl = null;
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < 60; attempt++) {
     await sleep(750);
     for (const sel of captionSelectors) {
       const el = document.querySelector(sel);
@@ -39,32 +58,30 @@ async function fillTikTok({ caption, hashtags, videoBytes, filename }) {
     if (captionEl) break;
   }
 
-  if (!captionEl) throw new Error('Caption field not found after 30 s');
+  if (!captionEl) {
+    showBanner('⚠️ Video dropped — caption field not found. Fill it manually.');
+    return { ok: true };
+  }
   console.log('[TTS] Caption field found');
 
-  // ── 3. Type caption + hashtags ─────────────────────────────────────────────
+  // ── 6. Fill caption + hashtags ─────────────────────────────────────────────
   captionEl.focus();
   await sleep(200);
-
   const fullText = caption + (hashtags ? '\n\n' + hashtags : '');
-
-  // Clear existing text then insert
   document.execCommand('selectAll', false, null);
   await sleep(100);
   document.execCommand('delete', false, null);
   await sleep(100);
   document.execCommand('insertText', false, fullText);
 
-  // Fallback: set innerText and dispatch input event
   if (!captionEl.textContent.trim()) {
     captionEl.innerText = fullText;
     captionEl.dispatchEvent(new InputEvent('input', { bubbles: true }));
   }
 
-  console.log('[TTS] Caption filled — ready to review and post!');
-
-  // Flash a banner so user knows it's done
-  showBanner('✅ Turtle & Sun: video + caption filled. Review and click Post!');
+  console.log('[TTS] Done — ready to review and post!');
+  showBanner('✅ Turtle & Sun: video dropped + caption filled. Review and click Post!');
+  return { ok: true };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,8 +91,8 @@ function waitFor(selector, timeout = 10000) {
     const el = document.querySelector(selector);
     if (el) return resolve(el);
     const obs = new MutationObserver(() => {
-      const el = document.querySelector(selector);
-      if (el) { obs.disconnect(); resolve(el); }
+      const found = document.querySelector(selector);
+      if (found) { obs.disconnect(); resolve(found); }
     });
     obs.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => { obs.disconnect(); reject(new Error('Timeout: ' + selector)); }, timeout);
@@ -96,5 +113,5 @@ function showBanner(text) {
   `;
   div.textContent = text;
   document.body.appendChild(div);
-  setTimeout(() => div.remove(), 8000);
+  setTimeout(() => div.remove(), 10000);
 }
