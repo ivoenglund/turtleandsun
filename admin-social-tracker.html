@@ -189,16 +189,6 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         </div>
       </div>
     </div>
-    <!-- Stats summary chart panel -->
-    <div style="margin:10px 0 6px 0;padding:10px 14px 12px 14px;background:#eceae6;border:1px solid #b0aba4;border-radius:8px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-        <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-right:6px">All clips</span>
-        <button id="ssbtn-subscribers" onclick="setSummaryMetric('subscribers')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Subscribers</button>
-        <button id="ssbtn-views"       onclick="setSummaryMetric('views')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Views</button>
-        <button id="ssbtn-likes"       onclick="setSummaryMetric('likes')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button>
-      </div>
-      <div style="position:relative;height:180px"><canvas id="summary-chart"></canvas></div>
-    </div>
     <div>
       <div id="bottom-panel" style="display:block"></div>
     </div>
@@ -210,6 +200,16 @@ table.st td.yt{color:#0F6E56;font-weight:700}
       <div class="cal-wrap" id="cal-wrap">
         <div id="cal-body"></div>
       </div>
+    </div>
+    <!-- Stats summary chart panel -->
+    <div style="margin:16px 0 24px 0;padding:10px 14px 12px 14px;background:#eceae6;border:1px solid #b0aba4;border-radius:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:700;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-right:6px">All clips</span>
+        <button id="ssbtn-subscribers" onclick="setSummaryMetric('subscribers')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Subscribers</button>
+        <button id="ssbtn-views"       onclick="setSummaryMetric('views')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Views</button>
+        <button id="ssbtn-likes"       onclick="setSummaryMetric('likes')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button>
+      </div>
+      <div style="position:relative;height:220px"><canvas id="summary-chart"></canvas></div>
     </div>
   </div>
 
