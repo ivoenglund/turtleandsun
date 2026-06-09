@@ -149,7 +149,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 
   <!-- LEFT: persistent sticky video column -->
   <div id="side-col" style="position:sticky;top:0;align-self:start;padding:0 10px;display:flex;flex-direction:column;align-items:center">
-    <video id="side-video-el" controls playsinline style="width:140px;border-radius:8px;background:#111;display:none"></video>
+    <video id="side-video-el" controls playsinline draggable="true" title="Drag this video into TikTok Studio to upload it" style="width:140px;border-radius:8px;background:#111;display:none;cursor:grab"></video>
     <div id="side-video-ph" style="aspect-ratio:9/16;width:140px;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#444;font-size:11px;text-align:center;padding:8px">Select a clip</div>
   </div>
 
@@ -637,6 +637,11 @@ function updateSideVideo(c) {
     vid.src = c.output_url;
     vid.style.display = 'block';
     ph.style.display  = 'none';
+    vid.ondragstart = (e) => {
+      const filename = 'clip-' + (c.id||'video') + '.mp4';
+      e.dataTransfer.setData('DownloadURL', 'video/mp4:' + filename + ':' + c.output_url);
+      e.dataTransfer.effectAllowed = 'copy';
+    };
   } else {
     vid.src = '';
     vid.style.display = 'none';
