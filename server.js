@@ -8094,7 +8094,12 @@ async function fetchChannelDailyStats(overrideDate) {
         }
       }
       const sRow = await pool.query(
-        `SELECT COALESCE(SUM(views), 0) AS tv, COALESCE(SUM(likes), 0) AS tl FROM clip_stats WHERE platform=$1`,
+        `SELECT COALESCE(SUM(v.views), 0) AS tv, COALESCE(SUM(v.likes), 0) AS tl
+         FROM (
+           SELECT DISTINCT ON (social_clip_id) views, likes
+           FROM clip_stats WHERE platform=$1
+           ORDER BY social_clip_id, stat_date DESC
+         ) v`,
         [platform]
       );
       const total_views = parseInt(sRow.rows[0].tv) || 0;
