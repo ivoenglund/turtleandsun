@@ -9,7 +9,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handlePostTikTok(data) {
-  const UPLOAD_URL = 'https://www.tiktok.com/upload';
+  const UPLOAD_URL = 'https://www.tiktok.com/tiktokstudio/upload';
 
   // Download video as ArrayBuffer in background (bypasses CORS on content script side)
   const res = await fetch(data.videoUrl);
@@ -18,7 +18,7 @@ async function handlePostTikTok(data) {
   const videoBytes = Array.from(new Uint8Array(arrayBuffer)); // serialisable
 
   // Find existing TikTok upload tab
-  const tabs = await chrome.tabs.query({ url: 'https://www.tiktok.com/upload*' });
+  const tabs = await chrome.tabs.query({ url: 'https://www.tiktok.com/tiktokstudio/upload*' });
 
   let tabId;
   if (tabs.length > 0) {

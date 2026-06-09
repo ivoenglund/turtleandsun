@@ -15,7 +15,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.tiktok.com/upload*"],
+      "matches": ["https://www.tiktok.com/tiktokstudio/upload*"],
       "js": ["tiktok-content.js"],
       "run_at": "document_idle"
     },
