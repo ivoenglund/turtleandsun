@@ -8054,8 +8054,8 @@ app.post('/admin/api/tracker/fetch-youtube-stats', requireRole('admin'), async (
 
 
 // ── Channel daily stats snapshot ─────────────────────────────────────────────
-async function fetchChannelDailyStats() {
-  const today = new Date().toISOString().slice(0, 10);
+async function fetchChannelDailyStats(overrideDate) {
+  const today = overrideDate || new Date().toISOString().slice(0, 10);
   const platforms = ['youtube', 'instagram', 'facebook', 'tiktok'];
   for (const platform of platforms) {
     try {
@@ -8123,6 +8123,17 @@ app.get('/admin/api/tracker/channel-daily-stats', requireRole('admin'), async (r
        FROM channel_daily_stats ORDER BY stat_date ASC, platform`
     );
     res.json(rows);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /admin/api/tracker/run-channel-stats?date=YYYY-MM-DD — manual trigger
+app.post('/admin/api/tracker/run-channel-stats', requireRole('admin'), async (req, res) => {
+  const date = (req.query.date || '').match(/^\d{4}-\d{2}-\d{2}$/) ? req.query.date : null;
+  try {
+    await fetchChannelDailyStats(date || undefined);
+    res.json({ ok: true, date: date || new Date().toISOString().slice(0, 10) });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
