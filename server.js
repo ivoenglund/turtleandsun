@@ -3088,7 +3088,21 @@ app.get('/admin/youtube/callback', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.get('/admin/api/youtube/status', requireRole('admin'), async (req, res) => {
+// 5-minute in-memory cache for platform status checks. These hit external
+// APIs (Instagram was measured at 14.6s) and were choking page loads.
+const _statusCache = {};
+function statusCacheMw(key) {
+  return (req, res, next) => {
+    if (req.query.fresh === '1') { delete _statusCache[key]; }
+    const hit = _statusCache[key];
+    if (hit && Date.now() - hit.at < 5 * 60 * 1000) return res.json(hit.body);
+    const orig = res.json.bind(res);
+    res.json = (b) => { if (res.statusCode < 400) _statusCache[key] = { at: Date.now(), body: b }; return orig(b); };
+    next();
+  };
+}
+
+app.get('/admin/api/youtube/status', requireRole('admin'), statusCacheMw('youtube'), async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at FROM platform_tokens WHERE platform='youtube'`);
     if (!rows.length) return res.json({ connected: false });
@@ -3221,7 +3235,7 @@ app.get('/admin/tiktok/callback', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.get('/admin/api/tiktok/status', requireRole('admin'), async (req, res) => {
+app.get('/admin/api/tiktok/status', requireRole('admin'), statusCacheMw('tiktok'), async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at FROM platform_tokens WHERE platform='tiktok'`);
     if (!rows.length) return res.json({ connected: false });
@@ -3534,7 +3548,7 @@ app.get('/admin/instagram/callback', requireRole('admin'), async (req, res) => {
   }
 });
 
-app.get('/admin/api/instagram/status', requireRole('admin'), async (req, res) => {
+app.get('/admin/api/instagram/status', requireRole('admin'), statusCacheMw('instagram'), async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at, token_expiry FROM platform_tokens WHERE platform='instagram'`);
     if (!rows.length) return res.json({ connected: false });
@@ -3652,7 +3666,7 @@ async function getFacebookToken() {
   return { token: row.access_token, pageId: row.channel_id || '1127984543734705' };
 }
 
-app.get('/admin/api/facebook/status', requireRole('admin'), async (req, res) => {
+app.get('/admin/api/facebook/status', requireRole('admin'), statusCacheMw('facebook'), async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT channel_id, channel_title, updated_at, token_expiry FROM platform_tokens WHERE platform='facebook'`);
     if (!rows.length) return res.json({ connected: false });

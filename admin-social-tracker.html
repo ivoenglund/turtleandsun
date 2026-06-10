@@ -31,6 +31,7 @@ tbody tr.sel{background:#e8f5e9;box-shadow:inset 3px 0 0 #1C2A14}
 td{padding:4px 7px;vertical-align:middle}
 .concept-name{font-weight:700;font-size:12px}
 .ref-tag{font-size:10px;color:#aaa;margin-top:0}
+.clk-loading{color:#b8a200;animation:clkblink 1s ease-in-out infinite}@keyframes clkblink{0%,100%{opacity:1}50%{opacity:.25}}
 .tags-row{display:flex;flex-wrap:nowrap;gap:2px;margin-top:1px;overflow:hidden}
 .tag{font-size:9px;padding:0px 5px;border-radius:20px;line-height:1.6}
 .tag-subj{background:#e8f5e9;color:#1C2A14;border:1px solid #1C2A14}
@@ -487,9 +488,10 @@ async function load() {
   clips = d.rows || [];
   renderTable();
   // 2. Everything else loads in the background and fills in when ready.
+  // Clicks right away; platform statuses + follower stats 3s later so they
+  // never compete with the first paint.
   loadClicksBg();
-  loadStatusesBg();
-  loadFollowers();
+  setTimeout(() => { loadStatusesBg(); loadFollowers(); }, 3000);
 }
 
 function loadClicksBg() {
@@ -534,7 +536,7 @@ function renderTable() {
   const totAllViews=totTT_v+totIG_v+totYT_v+totFB_v,totAllLikes=totTT_l+totIG_l+totYT_l+totFB_l;
   let totClicks=0; for(const _c of clips){totClicks+=(+_c.clicks)||0;}
   const fn=v=>v?v.toLocaleString('sv-SE'):'-';
-  const totRow='<tr style="background:#dedad5;font-weight:700;border-top:2px solid #888">'+'<td colspan="3" style="font-size:11px;color:#555;padding:4px 7px;text-transform:uppercase">Total ('+clips.length+' clips)</td>'+'<td class="plat-sep num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_v)+'</td>'+'<td class="num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_l)+'</td>'+'<td class="plat-sep num" style="color:#C13584;padding:4px 7px">'+fn(totIG_v)+'</td>'+'<td class="num" style="color:#C13584;padding:4px 7px">'+fn(totIG_l)+'</td>'+'<td class="plat-sep num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_v)+'</td>'+'<td class="num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_l)+'</td>'+'<td class="plat-sep num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_v)+'</td>'+'<td class="num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_l)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px">'+fn(totAllViews)+'</td>'+'<td class="num" style="font-size:13px;padding:4px 7px">'+fn(totAllLikes)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px;color:#1C2A14">'+fn(totClicks)+'</td>'+'<td></td></tr>';
+  const totRow='<tr style="background:#dedad5;font-weight:700;border-top:2px solid #888">'+'<td colspan="3" style="font-size:11px;color:#555;padding:4px 7px;text-transform:uppercase">Total ('+clips.length+' clips)</td>'+'<td class="plat-sep num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_v)+'</td>'+'<td class="num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_l)+'</td>'+'<td class="plat-sep num" style="color:#C13584;padding:4px 7px">'+fn(totIG_v)+'</td>'+'<td class="num" style="color:#C13584;padding:4px 7px">'+fn(totIG_l)+'</td>'+'<td class="plat-sep num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_v)+'</td>'+'<td class="num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_l)+'</td>'+'<td class="plat-sep num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_v)+'</td>'+'<td class="num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_l)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px">'+fn(totAllViews)+'</td>'+'<td class="num" style="font-size:13px;padding:4px 7px">'+fn(totAllLikes)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px;color:#1C2A14">'+(clips.length&&clips[0].clicks===undefined?'<span class="clk-loading">•••</span>':fn(totClicks))+'</td>'+'<td></td></tr>';
   tbody.innerHTML = clips.map(c => {
     const tv = (+c.tiktok_views)+(+c.instagram_views)+(+c.youtube_views)+(+c.facebook_views);
     const tl = (+c.tiktok_likes)+(+c.instagram_likes)+(+c.youtube_likes)+(+c.facebook_likes);
@@ -556,7 +558,7 @@ function renderTable() {
       <td class="num" style="${!c.facebook_posted?'background:#ede9e1;':''}font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="plat-sep num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td class="num">${tl ? tl.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
-      <td class="plat-sep num" title="YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${(+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—'}</td>
+      <td class="plat-sep num" title="${c.clicks===undefined?'Loading clicks…':`YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}`}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${c.clicks===undefined ? '<span class="clk-loading">•••</span>' : ((+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—')}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('') + totRow;
