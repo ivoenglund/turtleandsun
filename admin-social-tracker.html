@@ -221,6 +221,11 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         <button id="ssbtn-subscribers" onclick="setSummaryMetric('subscribers')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Subscribers</button>
         <button id="ssbtn-views"       onclick="setSummaryMetric('views')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Views</button>
         <button id="ssbtn-likes"       onclick="setSummaryMetric('likes')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button>
+        <button id="ssbtn-clicks"      onclick="setSummaryMetric('clicks')"      style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Clicks</button>
+        <span style="margin-left:auto;display:flex;gap:4px">
+          <button id="ssmode-acc"   onclick="setSummaryMode('acc')"   style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Accumulated</button>
+          <button id="ssmode-daily" onclick="setSummaryMode('daily')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Daily</button>
+        </span>
       </div>
       <div style="position:relative;height:220px"><canvas id="summary-chart"></canvas></div>
     </div>
@@ -326,10 +331,12 @@ let channelDailyStats = [];
 
 async function loadFollowers() {
   try {
-    const [r, dr] = await Promise.all([
+    const [r, dr, cr] = await Promise.all([
       fetch('/admin/api/tracker/channel-followers'),
       fetch('/admin/api/tracker/channel-daily-stats'),
+      fetch('/admin/api/tracker/clicks-daily'),
     ]);
+    if (cr.ok) { const cd = await cr.json(); clicksDaily = cd.rows || []; }
     if (r.ok) {
       const d = await r.json();
       channelFollowers = d;
@@ -351,6 +358,17 @@ async function loadFollowers() {
 
 let summaryChart = null;
 let summaryMetric = 'subscribers';
+let summaryMode = 'acc';
+let clicksDaily = [];
+
+function setSummaryMode(m) {
+  summaryMode = m;
+  ['acc','daily'].forEach(k => {
+    const b = document.getElementById('ssmode-' + k);
+    if (b) { b.style.background = k===m ? '#333' : '#fff'; b.style.color = k===m ? '#fff' : '#555'; }
+  });
+  updateStats();
+}
 let clipMetric = 'views';
 let clipStats = [];
 
@@ -396,7 +414,7 @@ function renderClipChart() {
 
 function setSummaryMetric(m) {
   summaryMetric = m;
-  ['subscribers','views','likes'].forEach(k => {
+  ['subscribers','views','likes','clicks'].forEach(k => {
     const b = document.getElementById('ssbtn-'+k);
     if (b) { b.style.background = k===m ? '#333' : '#fff'; b.style.color = k===m ? '#fff' : '#555'; }
   });
@@ -409,18 +427,28 @@ function updateStats() {
   if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
 
   const chs = ['tiktok','instagram','youtube','facebook'];
-  const metricKey = { subscribers: 'subscribers', views: 'total_views', likes: 'total_likes' }[summaryMetric];
+  const metricKey = { subscribers: 'subscribers', views: 'total_views', likes: 'total_likes', clicks: 'clicks' }[summaryMetric];
+  const isClicks = summaryMetric === 'clicks';
+  const source = isClicks ? clicksDaily : channelDailyStats;
 
-  if (channelDailyStats.length) {
-    // Line chart: day-by-day time series per platform
-    const dates = [...new Set(channelDailyStats.map(r => r.stat_date))].sort();
+  if (source.length) {
+    // Line chart: day-by-day time series per platform.
+    // subscribers/views/likes are cumulative snapshots; clicks are native daily counts.
+    // 'Accumulated' shows running totals, 'Daily' shows per-day change.
+    const dates = [...new Set(source.map(r => r.stat_date))].sort();
     const datasets = chs.map(p => {
       const byDate = {};
-      channelDailyStats.filter(r => r.platform === p).forEach(r => { byDate[r.stat_date] = parseInt(r[metricKey]) || 0; });
+      source.filter(r => r.platform === p).forEach(r => { byDate[r.stat_date] = parseInt(r[metricKey]) || 0; });
       if (!Object.keys(byDate).length) return null;
+      let vals = dates.map(d => byDate[d] ?? null);
+      if (summaryMode === 'acc' && isClicks) {
+        let run = 0; vals = vals.map(v => { run += (v || 0); return run; });
+      } else if (summaryMode === 'daily' && !isClicks) {
+        let prev = null; vals = vals.map(v => { if (v == null) return null; const diff = prev == null ? null : Math.max(0, v - prev); prev = v; return diff; });
+      }
       return {
         label: PF[p],
-        data: dates.map(d => byDate[d] ?? null),
+        data: vals,
         borderColor: PLAT_COLORS[p],
         backgroundColor: PLAT_COLORS[p] + '22',
         tension: 0.3, spanGaps: true, pointRadius: 3, pointHoverRadius: 5,
@@ -448,10 +476,18 @@ function updateStats() {
         likes[ch] += (+c[ch+'_likes'])||0;
       }
     }
+    const clicksByCh = {tiktok:0,instagram:0,youtube:0,facebook:0};
+    for (const c2 of clips) {
+      clicksByCh.tiktok    += (+c2.clicks_tiktok)||0;
+      clicksByCh.instagram += (+c2.clicks_instagram)||0;
+      clicksByCh.youtube   += (+c2.clicks_youtube)||0;
+      clicksByCh.facebook  += (+c2.clicks_facebook)||0;
+    }
     const dataMap = {
       subscribers: chs.map(ch => channelFollowers[ch] || 0),
       views:       chs.map(ch => views[ch]),
       likes:       chs.map(ch => likes[ch]),
+      clicks:      chs.map(ch => clicksByCh[ch]),
     };
     const colors = chs.map(ch => PLAT_COLORS[ch]);
     summaryChart = new Chart(canvas, {

@@ -7731,6 +7731,26 @@ app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
   }
 });
 
+// GET /admin/api/tracker/clicks-daily -- clicks per day per platform (summary chart)
+app.get('/admin/api/tracker/clicks-daily', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT created_at::date::text AS stat_date,
+             CASE src WHEN 'yt' THEN 'youtube' WHEN 'tt' THEN 'tiktok'
+                      WHEN 'ig' THEN 'instagram' WHEN 'fb' THEN 'facebook' END AS platform,
+             COUNT(*)::int AS clicks
+      FROM visits
+      WHERE src IN ('yt','tt','ig','fb')
+      GROUP BY 1, 2
+      ORDER BY 1
+    `);
+    res.json({ rows });
+  } catch (e) {
+    console.error('[tracker/clicks-daily]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /admin/api/tracker/clips -- create a new tracker clip (no triplet required)
 app.post('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
   try {
