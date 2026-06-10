@@ -193,7 +193,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th id="th-facebook" colspan="2" style="color:#1877F2;border-left:2px solid #a8a29c;text-align:center">Facebook</th>
                 <th class="num" style="width:62px;border-left:2px solid #a8a29c">Total views</th>
                 <th class="num" style="width:54px">Total likes</th>
-                <th class="num" style="width:54px;border-left:2px solid #a8a29c">Visits</th>
+                <th class="num" style="width:54px;border-left:2px solid #a8a29c">Funnel</th>
                 <th style="width:54px">Added</th>
               </tr>
             </thead>
@@ -221,7 +221,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         <button id="ssbtn-subscribers" onclick="setSummaryMetric('subscribers')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Subscribers</button>
         <button id="ssbtn-views"       onclick="setSummaryMetric('views')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Views</button>
         <button id="ssbtn-likes"       onclick="setSummaryMetric('likes')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button>
-        <button id="ssbtn-clicks"      onclick="setSummaryMetric('clicks')"      style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Visits</button>
+        <button id="ssbtn-clicks"      onclick="setSummaryMetric('clicks')"      style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Funnel</button>
         <span style="margin-left:auto;display:flex;gap:4px">
           <button id="ssmode-acc"   onclick="setSummaryMode('acc')"   style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Accumulated</button>
           <button id="ssmode-daily" onclick="setSummaryMode('daily')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Daily</button>
@@ -371,10 +371,21 @@ function setSummaryMode(m) {
 }
 let clipMetric = 'views';
 let clipStats = [];
+let clipMode = 'acc';
+let clipVisitsDaily = [];
+
+function setClipMode(m) {
+  clipMode = m;
+  ['acc','daily'].forEach(k => {
+    const b = document.getElementById('cmode-' + k);
+    if (b) { b.style.background = k===m ? '#333' : '#fff'; b.style.color = k===m ? '#fff' : '#555'; }
+  });
+  renderClipChart();
+}
 
 function setClipMetric(m) {
   clipMetric = m;
-  ['views','likes','comments'].forEach(k => {
+  ['views','likes','comments','funnel'].forEach(k => {
     const b = document.getElementById('cbtn-'+k);
     if (b) { b.style.background = k===m ? '#333' : '#fff'; b.style.color = k===m ? '#fff' : '#555'; }
   });
@@ -383,23 +394,34 @@ function setClipMetric(m) {
 
 function renderClipChart() {
   const ctx = document.getElementById('views-chart');
-  if (!ctx || !clipStats.length) return;
+  const isFunnel = clipMetric === 'funnel';
+  const source = isFunnel ? clipVisitsDaily : clipStats;
+  if (!ctx) return;
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-  const dates = [...new Set(clipStats.map(s => fd(s.stat_date)))].sort();
+  if (!source.length) return;
+  // views/likes/comments are cumulative snapshots; funnel (visits) is native daily.
+  const dates = [...new Set(source.map(s => fd(s.stat_date)))].sort();
+  const asBar = clipMode === 'daily';
   const datasets = ['tiktok','instagram','youtube','facebook'].map(p => {
     const byDate = {};
-    clipStats.filter(s => s.platform === p).forEach(s => { byDate[fd(s.stat_date)] = s[clipMetric] || 0; });
+    source.filter(s => s.platform === p).forEach(s => { byDate[fd(s.stat_date)] = (isFunnel ? s.visits : s[clipMetric]) || 0; });
     if (!Object.keys(byDate).length) return null;
+    let vals = dates.map(d => byDate[d] ?? null);
+    if (clipMode === 'acc' && isFunnel) {
+      let run = 0; vals = vals.map(v => { run += (v || 0); return run; });
+    } else if (clipMode === 'daily' && !isFunnel) {
+      let prev = null; vals = vals.map(v => { if (v == null) return null; const diff = prev == null ? null : Math.max(0, v - prev); prev = v; return diff; });
+    }
     return {
       label: PF[p],
-      data: dates.map(d => byDate[d] ?? null),
+      data: vals,
       borderColor: PLAT_COLORS[p],
-      backgroundColor: PLAT_COLORS[p] + '22',
-      tension: 0.3, spanGaps: true, pointRadius: 3,
+      backgroundColor: PLAT_COLORS[p] + (asBar ? 'cc' : '22'),
+      ...(asBar ? { borderWidth: 1, borderRadius: 3 } : { tension: 0.3, spanGaps: true, pointRadius: 3 }),
     };
   }).filter(Boolean);
   chartInstance = new Chart(ctx, {
-    type: 'line',
+    type: asBar ? 'bar' : 'line',
     data: { labels: dates, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -446,16 +468,19 @@ function updateStats() {
       } else if (summaryMode === 'daily' && !isClicks) {
         let prev = null; vals = vals.map(v => { if (v == null) return null; const diff = prev == null ? null : Math.max(0, v - prev); prev = v; return diff; });
       }
+      const asBar = summaryMode === 'daily';
       return {
         label: PF[p],
         data: vals,
         borderColor: PLAT_COLORS[p],
-        backgroundColor: PLAT_COLORS[p] + '22',
-        tension: 0.3, spanGaps: true, pointRadius: 3, pointHoverRadius: 5,
+        backgroundColor: PLAT_COLORS[p] + (asBar ? 'cc' : '22'),
+        ...(asBar
+          ? { borderWidth: 1, borderRadius: 3 }
+          : { tension: 0.3, spanGaps: true, pointRadius: 3, pointHoverRadius: 5 }),
       };
     }).filter(Boolean);
     summaryChart = new Chart(canvas, {
-      type: 'line',
+      type: summaryMode === 'daily' ? 'bar' : 'line',
       data: { labels: dates, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -594,7 +619,7 @@ function renderTable() {
       <td class="num" style="${!c.facebook_posted?'background:#ede9e1;':''}font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="plat-sep num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td class="num">${tl ? tl.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
-      <td class="plat-sep num" title="${c.clicks===undefined?'Loading visits…':`YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}`}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${c.clicks===undefined ? '<span class="clk-loading">•••</span>' : ((+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—')}</td>
+      <td class="plat-sep num" title="${c.clicks===undefined?'Loading funnel…':`YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}`}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${c.clicks===undefined ? '<span class="clk-loading">•••</span>' : ((+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—')}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('') + totRow;
@@ -681,15 +706,21 @@ function renderPanel() {
       <div class="bp-chart">
         ${ytInfoHtml}
         ${ytPubHtml}
-        ${stats.length ? '<div style="display:flex;gap:5px;margin-bottom:6px"><button id="cbtn-views" onclick="setClipMetric(\'views\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Views</button><button id="cbtn-likes" onclick="setClipMetric(\'likes\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button><button id="cbtn-comments" onclick="setClipMetric(\'comments\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Comments</button></div><div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — click ↻ Fetch all stats above.</div>'}
+        ${stats.length ? '<div style="display:flex;gap:5px;margin-bottom:6px"><button id="cbtn-views" onclick="setClipMetric(\'views\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Views</button><button id="cbtn-likes" onclick="setClipMetric(\'likes\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button><button id="cbtn-comments" onclick="setClipMetric(\'comments\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Comments</button><button id="cbtn-funnel" onclick="setClipMetric(\'funnel\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Funnel</button><span style="margin-left:auto;display:flex;gap:4px"><button id="cmode-acc" onclick="setClipMode(\'acc\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Accumulated</button><button id="cmode-daily" onclick="setClipMode(\'daily\')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Daily</button></span></div><div class="bp-canvas-wrap"><canvas id="views-chart"></canvas></div>' : '<div class="bp-no-stats">No stats yet — click ↻ Fetch all stats above.</div>'}
     </div>`;
 
   panel.style.display = 'block';
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+  clipVisitsDaily = [];
+  fetch('/admin/api/tracker/clips/' + c.id + '/visits-daily')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { clipVisitsDaily = (d && d.rows) || []; if (clipMetric === 'funnel') renderClipChart(); })
+    .catch(() => {});
   if (stats.length) {
     clipStats = stats;
     clipMetric = 'views';
+    clipMode = 'acc';
     renderClipChart();
   }
   setTimeout(positionSideVideo,80);

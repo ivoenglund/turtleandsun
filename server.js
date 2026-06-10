@@ -474,6 +474,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Lightweight health check (also warms the DB pool when pinged externally)
+app.get('/healthz', async (req, res) => {
+  try { await pool.query('SELECT 1'); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false }); }
+});
+
 // Short typeable attribution links: /yt -> /?src=yt, /yt38 -> /?src=yt&ref=c38
 // Usable in end cards, spoken CTAs, and pinned comments (where links aren't clickable).
 app.get(/^\/(yt|tt|ig|fb)(\d+)?$/, async (req, res) => {
@@ -7727,6 +7733,27 @@ app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
     res.json({ rows });
   } catch (e) {
     console.error('[tracker/clicks]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/clips/:id/visits-daily -- one clip's visits per day per platform
+app.get('/admin/api/tracker/clips/:id(\\d+)/visits-daily', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT v.created_at::date::text AS stat_date,
+             CASE v.src WHEN 'yt' THEN 'youtube' WHEN 'tt' THEN 'tiktok'
+                        WHEN 'ig' THEN 'instagram' WHEN 'fb' THEN 'facebook' ELSE 'other' END AS platform,
+             COUNT(*)::int AS visits
+      FROM visits v
+      JOIN social_clips sc ON v.ref = sc.ref_tag
+      WHERE sc.id = $1 AND v.src IS NOT NULL
+      GROUP BY 1, 2
+      ORDER BY 1
+    `, [parseInt(req.params.id)]);
+    res.json({ rows });
+  } catch (e) {
+    console.error('[tracker/visits-daily]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
