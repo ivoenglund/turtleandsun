@@ -259,6 +259,18 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
       console.error('Order insert error:', err.message);
     }
 
+    // Funnel: credit the purchase to the originating clip/platform (from checkout metadata).
+    try {
+      const attrRef = (session.metadata && session.metadata.attr_ref) || null;
+      const attrSrc = (session.metadata && session.metadata.attr_src) || null;
+      await pool.query(
+        'INSERT INTO funnel_events (kind, ref, src, email, order_id) VALUES ($1,$2,$3,$4,$5)',
+        ['purchase', attrRef || null, attrSrc || null, email || null, orderId || null]
+      );
+    } catch (err) {
+      console.error('[funnel] purchase event:', err.message);
+    }
+
     // Mark a review win-back discount code as used, if one was applied to this order.
     if (session.metadata && session.metadata.discount_code && orderId) {
       reviews.markDiscountUsed(session.metadata.discount_code, orderId).catch((e) => console.error('[webhook] markDiscountUsed:', e.message));
@@ -437,6 +449,14 @@ app.use((req, res, next) => {
   const TAG_RE = /^[a-zA-Z0-9_-]{1,40}$/;
   const visitRef = TAG_RE.test(String(req.query.ref || '')) ? String(req.query.ref) : null;
   const visitSrc = TAG_RE.test(String(req.query.src || '')) ? String(req.query.src).toLowerCase() : null;
+
+  // Remember attribution for 30 days so previews/purchases can be credited
+  // to the clip/platform that brought this visitor (last touch wins).
+  if (visitRef || visitSrc) {
+    const cookieOpts = { maxAge: 30 * 24 * 3600 * 1000, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' };
+    if (visitRef) res.cookie('ts_ref', visitRef, cookieOpts);
+    if (visitSrc) res.cookie('ts_src', visitSrc, cookieOpts);
+  }
 
   res.on('finish', () => {
     const ip = visitorIp(req) || 'unknown';
@@ -1901,6 +1921,8 @@ app.post('/create-checkout-session', async (req, res) => {
       email: email || '',
       orientation: orientation || '',
       currency,
+      attr_ref: req.cookies?.ts_ref || '',
+      attr_src: req.cookies?.ts_src || '',
     };
     // Review win-back discount - applied IN-APP (no Stripe coupon). We reduce the
     // unit price by the code's percent_off before creating the session.
@@ -1945,6 +1967,12 @@ app.post('/preview', async (req, res) => {
   if (!image_url) return res.status(400).json({ error: 'image_url is required' });
   if (!email) return res.status(400).json({ error: 'email is required' });
   markEngaged(req);
+
+  // Funnel: credit this preview to the clip/platform that brought the visitor.
+  pool.query(
+    'INSERT INTO funnel_events (kind, ref, src, email) VALUES ($1,$2,$3,$4)',
+    ['preview', req.cookies?.ts_ref || null, req.cookies?.ts_src || null, email]
+  ).catch((e) => console.error('[funnel] preview event:', e.message));
 
   // Per-connection rate limit — caps free-preview abuse / fal cost from one source.
   const _previewIp = previewClientIp(req);
@@ -7730,6 +7758,20 @@ app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
       WHERE sc.ref_tag IS NOT NULL
       GROUP BY sc.id
     `);
+    const { rows: fe } = await pool.query(`
+      SELECT sc.id,
+             COUNT(*) FILTER (WHERE f.kind = 'preview')::int  AS previews,
+             COUNT(*) FILTER (WHERE f.kind = 'purchase')::int AS purchases
+      FROM social_clips sc
+      JOIN funnel_events f ON f.ref = sc.ref_tag
+      WHERE sc.ref_tag IS NOT NULL
+      GROUP BY sc.id
+    `);
+    const feMap = {};
+    fe.forEach(r => feMap[r.id] = r);
+    rows.forEach(r => { const m = feMap[r.id]; r.previews = m ? m.previews : 0; r.purchases = m ? m.purchases : 0; });
+    // Clips with funnel events but no visits yet
+    fe.forEach(r => { if (!rows.find(x => x.id === r.id)) rows.push({ id: r.id, clicks: 0, clicks_youtube: 0, clicks_tiktok: 0, clicks_instagram: 0, clicks_facebook: 0, previews: r.previews, purchases: r.purchases }); });
     res.json({ rows });
   } catch (e) {
     console.error('[tracker/clicks]', e.message);

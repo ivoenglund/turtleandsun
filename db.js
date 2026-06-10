@@ -935,6 +935,21 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_visits_ref ON visits(ref) WHERE ref IS NOT NULL;
   `);
 
+  // Funnel events (2026-06-11): preview/purchase stamped with the visitor's
+  // attribution cookie (ts_ref/ts_src) so the tracker can show visits -> previews -> purchases.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS funnel_events (
+      id         SERIAL PRIMARY KEY,
+      kind       TEXT NOT NULL CHECK (kind IN ('preview','purchase')),
+      ref        TEXT,
+      src        TEXT,
+      email      TEXT,
+      order_id   INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_funnel_events_ref ON funnel_events(ref) WHERE ref IS NOT NULL;
+  `);
+
   // Platform OAuth tokens (single-admin, keyed by platform name)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS platform_tokens (
