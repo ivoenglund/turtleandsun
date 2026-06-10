@@ -47,7 +47,7 @@ td{padding:4px 7px;vertical-align:middle}
 
 /* Bottom panel */
 .bottom-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;width:100%}
-.bp-head{background:#1C2A14;color:#FFE800;padding:8px 0;display:grid;grid-template-columns:314fr 90fr 90fr 90fr 90fr 170fr;align-items:center}
+.bp-head{background:#1C2A14;color:#FFE800;padding:8px 0;display:grid;grid-template-columns:314fr 90fr 90fr 90fr 90fr 224fr;align-items:center}
 .bp-head h2{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bp-head button{background:none;border:none;color:#FFE800;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
 .bp-body{padding:16px}
@@ -179,6 +179,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
               <col style="width:62px">
               <col style="width:54px">
               <col style="width:54px">
+              <col style="width:54px">
             </colgroup>
             <thead>
               <tr>
@@ -191,11 +192,12 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th id="th-facebook" colspan="2" style="color:#1877F2;border-left:2px solid #a8a29c;text-align:center">Facebook</th>
                 <th class="num" style="width:62px;border-left:2px solid #a8a29c">Total views</th>
                 <th class="num" style="width:54px">Total likes</th>
+                <th class="num" style="width:54px;border-left:2px solid #a8a29c">Clicks</th>
                 <th style="width:54px">Added</th>
               </tr>
             </thead>
             <tbody id="clips-body">
-              <tr><td colspan="9" class="empty">Loading…</td></tr>
+              <tr><td colspan="15" class="empty">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -499,15 +501,16 @@ async function load() {
 function renderTable() {
   const tbody = document.getElementById('clips-body');
   if (!clips.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
     return;
   }
   // Column totals
   let totTT_v=0,totTT_l=0,totIG_v=0,totIG_l=0,totYT_v=0,totYT_l=0,totFB_v=0,totFB_l=0;
   for(const _c of clips){totTT_v+=(+_c.tiktok_views)||0;totTT_l+=(+_c.tiktok_likes)||0;totIG_v+=(+_c.instagram_views)||0;totIG_l+=(+_c.instagram_likes)||0;totYT_v+=(+_c.youtube_views)||0;totYT_l+=(+_c.youtube_likes)||0;totFB_v+=(+_c.facebook_views)||0;totFB_l+=(+_c.facebook_likes)||0;}
   const totAllViews=totTT_v+totIG_v+totYT_v+totFB_v,totAllLikes=totTT_l+totIG_l+totYT_l+totFB_l;
+  let totClicks=0; for(const _c of clips){totClicks+=(+_c.clicks)||0;}
   const fn=v=>v?v.toLocaleString('sv-SE'):'-';
-  const totRow='<tr style="background:#dedad5;font-weight:700;border-top:2px solid #888">'+'<td colspan="3" style="font-size:11px;color:#555;padding:4px 7px;text-transform:uppercase">Total ('+clips.length+' clips)</td>'+'<td class="plat-sep num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_v)+'</td>'+'<td class="num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_l)+'</td>'+'<td class="plat-sep num" style="color:#C13584;padding:4px 7px">'+fn(totIG_v)+'</td>'+'<td class="num" style="color:#C13584;padding:4px 7px">'+fn(totIG_l)+'</td>'+'<td class="plat-sep num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_v)+'</td>'+'<td class="num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_l)+'</td>'+'<td class="plat-sep num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_v)+'</td>'+'<td class="num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_l)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px">'+fn(totAllViews)+'</td>'+'<td class="num" style="font-size:13px;padding:4px 7px">'+fn(totAllLikes)+'</td>'+'<td></td></tr>';
+  const totRow='<tr style="background:#dedad5;font-weight:700;border-top:2px solid #888">'+'<td colspan="3" style="font-size:11px;color:#555;padding:4px 7px;text-transform:uppercase">Total ('+clips.length+' clips)</td>'+'<td class="plat-sep num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_v)+'</td>'+'<td class="num" style="color:#1C0A00;padding:4px 7px">'+fn(totTT_l)+'</td>'+'<td class="plat-sep num" style="color:#C13584;padding:4px 7px">'+fn(totIG_v)+'</td>'+'<td class="num" style="color:#C13584;padding:4px 7px">'+fn(totIG_l)+'</td>'+'<td class="plat-sep num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_v)+'</td>'+'<td class="num" style="color:#FF0000;padding:4px 7px">'+fn(totYT_l)+'</td>'+'<td class="plat-sep num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_v)+'</td>'+'<td class="num" style="color:#1877F2;padding:4px 7px">'+fn(totFB_l)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px">'+fn(totAllViews)+'</td>'+'<td class="num" style="font-size:13px;padding:4px 7px">'+fn(totAllLikes)+'</td>'+'<td class="plat-sep num" style="font-size:13px;padding:4px 7px;color:#1C2A14">'+fn(totClicks)+'</td>'+'<td></td></tr>';
   tbody.innerHTML = clips.map(c => {
     const tv = (+c.tiktok_views)+(+c.instagram_views)+(+c.youtube_views)+(+c.facebook_views);
     const tl = (+c.tiktok_likes)+(+c.instagram_likes)+(+c.youtube_likes)+(+c.facebook_likes);
@@ -529,6 +532,7 @@ function renderTable() {
       <td class="num" style="${!c.facebook_posted?'background:#ede9e1;':''}font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="plat-sep num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td class="num">${tl ? tl.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
+      <td class="plat-sep num" title="YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${(+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—'}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('') + totRow;

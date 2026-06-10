@@ -433,6 +433,11 @@ app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
   req.requestId = requestId;
 
+  // Click attribution from social links: /?ref=<clip ref_tag>&src=<yt|tt|ig|fb>
+  const TAG_RE = /^[a-zA-Z0-9_-]{1,40}$/;
+  const visitRef = TAG_RE.test(String(req.query.ref || '')) ? String(req.query.ref) : null;
+  const visitSrc = TAG_RE.test(String(req.query.src || '')) ? String(req.query.src).toLowerCase() : null;
+
   res.on('finish', () => {
     const ip = visitorIp(req) || 'unknown';
     const statusCode = res.statusCode;
@@ -454,10 +459,11 @@ app.use((req, res, next) => {
         await pool.query(
           `INSERT INTO visits
              (ip, method, path, status_code, user_agent, referrer,
-              country, region, city, lat, lng, user_id, request_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+              country, region, city, lat, lng, user_id, request_id, ref, src)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [ip, method, reqPath, statusCode, userAgent, referrer,
-           geo.country, geo.region, geo.city, geo.lat, geo.lng, userId, requestId]
+           geo.country, geo.region, geo.city, geo.lat, geo.lng, userId, requestId,
+           visitRef, visitSrc]
         );
       } catch (err) {
         console.error('[visits] insert error:', err.message);
@@ -7642,7 +7648,12 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         COALESCE(tt.likes, 0) AS tiktok_likes,
         COALESCE(ig.likes, 0) AS instagram_likes,
         COALESCE(yt.likes, 0) AS youtube_likes,
-        COALESCE(fb.likes, 0) AS facebook_likes
+        COALESCE(fb.likes, 0) AS facebook_likes,
+        COALESCE(clk.total, 0) AS clicks,
+        COALESCE(clk.yt, 0) AS clicks_youtube,
+        COALESCE(clk.tt, 0) AS clicks_tiktok,
+        COALESCE(clk.ig, 0) AS clicks_instagram,
+        COALESCE(clk.fb, 0) AS clicks_facebook
       FROM social_clips sc
       LEFT JOIN concepts c ON c.id = sc.concept_id
       LEFT JOIN LATERAL (
@@ -7661,6 +7672,14 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         SELECT views, likes FROM clip_stats WHERE social_clip_id=sc.id AND platform='facebook'
         ORDER BY stat_date DESC LIMIT 1
       ) fb ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE v.src = 'yt')::int AS yt,
+               COUNT(*) FILTER (WHERE v.src = 'tt')::int AS tt,
+               COUNT(*) FILTER (WHERE v.src = 'ig')::int AS ig,
+               COUNT(*) FILTER (WHERE v.src = 'fb')::int AS fb
+        FROM visits v WHERE sc.ref_tag IS NOT NULL AND v.ref = sc.ref_tag
+      ) clk ON TRUE
       ORDER BY sc.created_at DESC
       LIMIT 500
     `);

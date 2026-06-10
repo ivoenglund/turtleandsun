@@ -927,6 +927,14 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS facebook_video_id   TEXT;
   `);
 
+  // Click attribution (2026-06-10): ?ref=<clip ref_tag>&src=<yt|tt|ig|fb> on
+  // inbound links from social posts. Captured by the visits middleware.
+  await pool.query(`
+    ALTER TABLE visits ADD COLUMN IF NOT EXISTS ref TEXT;
+    ALTER TABLE visits ADD COLUMN IF NOT EXISTS src TEXT;
+    CREATE INDEX IF NOT EXISTS idx_visits_ref ON visits(ref) WHERE ref IS NOT NULL;
+  `);
+
   // Platform OAuth tokens (single-admin, keyed by platform name)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS platform_tokens (
