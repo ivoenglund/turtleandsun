@@ -1065,7 +1065,7 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
 
     const visitsResult = await pool.query(
       `SELECT v.id, v.ip, v.created_at, v.method, v.path, v.status_code, v.user_agent,
-              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged,
+              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged, v.scroll_pct, v.dwell_ms,
               u.email AS email, l.label AS label
        FROM visits v
        LEFT JOIN users u ON v.user_id = u.id
@@ -1805,6 +1805,19 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 // Marks the session as engaged so it stands out in /admin/visits.
 app.post('/api/engage', async (req, res) => {
   markEngaged(req);
+  // Optional engagement metrics from the landing-page beacon
+  const scroll = parseInt(req.body && req.body.scroll_pct);
+  const dwell  = parseInt(req.body && req.body.dwell_ms);
+  if (Number.isFinite(scroll) || Number.isFinite(dwell)) {
+    const ip = visitorIp(req) || 'unknown';
+    pool.query(
+      `UPDATE visits SET
+         scroll_pct = GREATEST(COALESCE(scroll_pct, 0), $2),
+         dwell_ms   = GREATEST(COALESCE(dwell_ms, 0), $3)
+       WHERE ip = $1 AND created_at > NOW() - INTERVAL '30 minutes'`,
+      [ip, Number.isFinite(scroll) ? Math.min(scroll, 100) : 0, Number.isFinite(dwell) ? Math.min(dwell, 3600000) : 0]
+    ).catch((e) => console.error('[engage] metrics:', e.message));
+  }
   res.json({ ok: true });
 });
 

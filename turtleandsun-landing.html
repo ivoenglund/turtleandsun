@@ -699,6 +699,24 @@ function tsBeacon() {
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('touchstart', onTouch, { passive: true });
   window.addEventListener('keydown', onKey);
+
+  // Engagement metrics: deepest scroll + time on page, sent when the user leaves.
+  var t0 = Date.now(), maxScroll = 0, reported = false;
+  window.addEventListener('scroll', function () {
+    var doc = document.documentElement;
+    var denom = (doc.scrollHeight - window.innerHeight) || 1;
+    var pct = Math.round(((window.scrollY || 0) / denom) * 100);
+    if (pct > maxScroll) maxScroll = Math.min(pct, 100);
+  }, { passive: true });
+  function sendMetrics() {
+    if (reported) return; reported = true;
+    try {
+      var payload = JSON.stringify({ scroll_pct: maxScroll, dwell_ms: Date.now() - t0 });
+      navigator.sendBeacon('/api/engage', new Blob([payload], { type: 'application/json' }));
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') sendMetrics(); });
+  window.addEventListener('pagehide', sendMetrics);
 })();
 
 // Click-to-select behaviour for gallery cards. Marks the card visually

@@ -932,6 +932,8 @@ async function initDb() {
   await pool.query(`
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS ref TEXT;
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS src TEXT;
+    ALTER TABLE visits ADD COLUMN IF NOT EXISTS scroll_pct INTEGER;
+    ALTER TABLE visits ADD COLUMN IF NOT EXISTS dwell_ms INTEGER;
     CREATE INDEX IF NOT EXISTS idx_visits_ref ON visits(ref) WHERE ref IS NOT NULL;
   `);
 

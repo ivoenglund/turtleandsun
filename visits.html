@@ -106,6 +106,7 @@ tr:hover td{background:#fffdf5;}
     </label>
     <label><input type="checkbox" id="f-flagged"> Show flagged only</label>
     <label><input type="checkbox" id="f-engaged"> Humans only</label>
+    <label><input type="checkbox" id="f-hideme"> Hide my IP</label>
   </div>
 
   <div class="cap-note" id="cap-note">Showing the most recent 5000 matching rows (result capped).</div>
@@ -219,6 +220,8 @@ function groupByIp(visits) {
       latestUA: latest.user_agent || '',
       anyFlagged: vs.some(x => x.flagged),
       anyEngaged: vs.some(x => x.engaged),
+      maxScroll: vs.reduce((m, x) => x.scroll_pct != null && x.scroll_pct > m ? x.scroll_pct : m, -1),
+      maxDwell: vs.reduce((m, x) => x.dwell_ms != null && x.dwell_ms > m ? x.dwell_ms : m, -1),
       latestId: latest.id,
       latestFlagged: !!latest.flagged,
       email: emailForIp,
@@ -451,7 +454,7 @@ function rowHtml(g) {
     </td>
     <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}</td>
     <td class="${g.hits >= 50 ? 'hits-high' : ''}">${g.hits}</td>
-    <td>${esc(g.sessionDuration)}</td>
+    <td>${esc(g.sessionDuration)}${(g.maxScroll >= 0 || g.maxDwell >= 0) ? ` <span class="muted" style="font-size:11px" title="Deepest scroll · time on landing page">${g.maxScroll >= 0 ? g.maxScroll + '%' : ''}${g.maxScroll >= 0 && g.maxDwell >= 0 ? ' · ' : ''}${g.maxDwell >= 0 ? Math.round(g.maxDwell / 1000) + 's' : ''}</span>` : ''}</td>
     <td>${g.spent > 0 ? `${Math.round(g.spent)} ${esc((g.spentCurrency || 'sek').toUpperCase())}${g.ordersCount > 1 ? ` <span class="muted">(${g.ordersCount} orders)</span>` : ''}` : '—'}</td>
     <td>${esc(g.latestPath)}</td>
     <td class="ua" title="${esc(g.latestUA)}">${esc(uaShort)}</td>
@@ -476,7 +479,10 @@ function rowHtml(g) {
 }
 
 function renderTable() {
-  const groups = sortGroups(groupByIp(allVisits));
+  let groups = sortGroups(groupByIp(allVisits));
+  if (document.getElementById('f-hideme').checked) {
+    groups = groups.filter(g => (g.label || '').trim().toLowerCase() !== 'me');
+  }
   const totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
   if (page > totalPages) page = totalPages;
   const start = (page - 1) * PAGE_SIZE;
@@ -560,6 +566,11 @@ async function editLabel(ip, current) {
 document.getElementById('f-range').addEventListener('change', fetchData);
 document.getElementById('f-flagged').addEventListener('change', fetchData);
 document.getElementById('f-engaged').addEventListener('change', fetchData);
+document.getElementById('f-hideme').addEventListener('change', () => {
+  try { localStorage.setItem('ts_hideme', document.getElementById('f-hideme').checked ? '1' : ''); } catch (e) {}
+  renderTable();
+});
+try { if (localStorage.getItem('ts_hideme') === '1') document.getElementById('f-hideme').checked = true; } catch (e) {}
 document.getElementById('f-sort').addEventListener('change', () => {
   sortMode = document.getElementById('f-sort').value;
   page = 1;
