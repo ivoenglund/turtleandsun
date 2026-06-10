@@ -2764,6 +2764,8 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
       `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url, t.image_url]);
+      // Auto-assign click-attribution ref tag (c<id>) so tagged links work from day one
+      await pool.query(`UPDATE social_clips SET ref_tag = 'c' || id WHERE id = $1 AND ref_tag IS NULL`, [row.id]);
       created.push(row.id);
     }
     res.json({ created });
