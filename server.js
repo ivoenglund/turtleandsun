@@ -494,6 +494,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Flagged-IP blocking ─────────────────────────────────────────────────────
+// Any IP with a flagged visit row is refused service: ~3s fake "loading" delay,
+// then an empty page. Exemptions: IPs labeled 'me', and admin/auth/login/webhook
+// paths (so you can never lock yourself out). Attempts are still logged in
+// /admin/visits because this runs AFTER the visitor-logging middleware.
+let _blockedIps = new Set();
+let _blockedRefreshedAt = 0;
+async function refreshBlockedIps() {
+  _blockedRefreshedAt = Date.now();
+  try {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT v.ip FROM visits v
+      WHERE v.flagged = TRUE
+        AND NOT EXISTS (SELECT 1 FROM ip_labels l WHERE l.ip = v.ip AND LOWER(TRIM(l.label)) = 'me')
+    `);
+    _blockedIps = new Set(rows.map(r => r.ip));
+  } catch (e) { console.error('[block] refresh:', e.message); }
+}
+setTimeout(refreshBlockedIps, 5000); // initial load after boot
+
+app.use((req, res, next) => {
+  const p = req.path;
+  if (p.startsWith('/admin') || p.startsWith('/auth') || p === '/login' || p === '/webhook' || p === '/healthz') return next();
+  if (Date.now() - _blockedRefreshedAt > 60 * 1000) refreshBlockedIps(); // refresh in background
+  if (_blockedIps.has(visitorIp(req) || '')) {
+    setTimeout(() => {
+      try {
+        res.status(403).type('html').send('<!doctype html><html><head><title>Loading…</title><style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.s{width:40px;height:40px;border:4px solid #eee;border-top-color:#999;border-radius:50%;animation:r 1s linear infinite}@keyframes r{to{transform:rotate(360deg)}}</style></head><body><div class="s"></div></body></html>');
+      } catch (e) { /* client gone */ }
+    }, 3000);
+    return;
+  }
+  next();
+});
+
 // Lightweight health check (also warms the DB pool when pinged externally)
 app.get('/healthz', async (req, res) => {
   try { await pool.query('SELECT 1'); res.json({ ok: true }); }
