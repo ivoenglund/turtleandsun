@@ -18,7 +18,7 @@ body{font-family:Arial,sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#
 .stat{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
 .stat-val{font-size:26px;font-weight:800;color:#3A6B20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .stat-lbl{font-size:13px;color:rgba(60,20,0,0.55);margin-top:4px;}
-.filter-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:#fff;border-radius:10px;padding:8px 14px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.07);font-size:13px;}
 .filter-bar label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
 .filter-bar select,.filter-bar input[type=text]{font:inherit;font-size:13px;padding:7px 10px;border:1px solid #d8d2c4;border-radius:7px;background:#fff;}
 .filter-bar input[type=text]{min-width:220px;flex:1;}
@@ -34,16 +34,17 @@ body{font-family:Arial,sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#
 .loc-filter{display:none;font-size:12px;background:#fde7e7;color:#a02020;padding:6px 12px;border-radius:8px;margin-bottom:12px;align-items:center;gap:10px;}
 .loc-filter button{font:inherit;font-size:12px;border:none;background:#a02020;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;}
 .table-wrap{overflow-x:auto;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
-table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
-th{background:#1C0A00;color:#FFF9E6;text-align:left;padding:10px 14px;font-weight:600;white-space:nowrap;}
-td{padding:9px 14px;border-bottom:1px solid #f0ede6;vertical-align:middle;white-space:nowrap;}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:12px;}
+th{background:#1C0A00;color:#FFF9E6;text-align:left;padding:6px 8px;font-weight:600;white-space:nowrap;position:sticky;top:0;z-index:5;}
+td{padding:4px 8px;border-bottom:1px solid #f0ede6;vertical-align:middle;white-space:nowrap;line-height:1.5;}
+td.path-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;}
 tr:last-child td{border-bottom:none;}
 tr.flagged td{background:#fff5f5;}
 tr.engaged td{background:#eaf5e1;}
 tr.engaged.flagged td{background:#f5e8d0;}
 .human-badge{display:inline-block;background:#3A6B20;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle;}
 tr:hover td{background:#fffdf5;}
-.ua{max-width:280px;overflow:hidden;text-overflow:ellipsis;}
+.ua{max-width:150px;overflow:hidden;text-overflow:ellipsis;}
 .ip-link{color:#2a5db0;cursor:pointer;text-decoration:underline;}
 .status-2{color:#1b5e20;font-weight:700;}
 .status-3{color:#856404;font-weight:700;}
@@ -149,8 +150,13 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 }
 function fmtTime(iso) {
+  // Compact: "11/6 14:32" — full timestamp available via fmtTimeFull (tooltips).
   const d = new Date(iso);
-  return d.toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' });
+  const s = d.toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return s.replace(',', '');
+}
+function fmtTimeFull(iso) {
+  return new Date(iso).toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' });
 }
 function statusClass(code) {
   if (!code) return '';
@@ -444,8 +450,8 @@ function rowHtml(g) {
   const uaShort = g.latestUA.length > 40 ? g.latestUA.slice(0, 40) + '…' : g.latestUA;
   const open = expandedIp === g.ip;
   let html = `<tr class="ip-row ${g.anyFlagged ? 'flagged' : ''} ${g.anyEngaged ? 'engaged' : ''}" data-ip="${esc(g.ip)}">
-    <td>${esc(fmtTime(g.firstSeen))}</td>
-    <td>${esc(fmtTime(g.lastSeen))}</td>
+    <td title="${esc(fmtTimeFull(g.firstSeen))}">${esc(fmtTime(g.firstSeen))}</td>
+    <td title="${esc(fmtTimeFull(g.lastSeen))}">${esc(fmtTime(g.lastSeen))}</td>
     <td>
       <span class="expand-caret">${open ? '▾' : '▸'}</span>${esc(g.ip)}
       <span class="ip-edit" data-ip="${esc(g.ip)}" data-label="${esc(g.label || '')}" title="Edit label">✎</span>
@@ -456,7 +462,7 @@ function rowHtml(g) {
     <td class="${g.hits >= 50 ? 'hits-high' : ''}">${g.hits}</td>
     <td>${esc(g.sessionDuration)}${(g.maxScroll >= 0 || g.maxDwell >= 0) ? ` <span class="muted" style="font-size:11px" title="Deepest scroll · time on landing page">${g.maxScroll >= 0 ? g.maxScroll + '%' : ''}${g.maxScroll >= 0 && g.maxDwell >= 0 ? ' · ' : ''}${g.maxDwell >= 0 ? Math.round(g.maxDwell / 1000) + 's' : ''}</span>` : ''}</td>
     <td>${g.spent > 0 ? `${Math.round(g.spent)} ${esc((g.spentCurrency || 'sek').toUpperCase())}${g.ordersCount > 1 ? ` <span class="muted">(${g.ordersCount} orders)</span>` : ''}` : '—'}</td>
-    <td>${esc(g.latestPath)}</td>
+    <td class="path-cell" title="${esc(g.latestPath)}">${esc(g.latestPath)}</td>
     <td class="ua" title="${esc(g.latestUA)}">${esc(uaShort)}</td>
     <td><button class="flag-btn ${g.latestFlagged ? 'on' : ''}" data-id="${g.latestId}" data-flagged="${g.latestFlagged}">${g.latestFlagged ? 'Flagged' : 'Flag'}</button>${g.anyFlagged ? '<span class="flag-badge" title="Has flagged visits">⚑</span>' : ''}</td>
   </tr>`;
