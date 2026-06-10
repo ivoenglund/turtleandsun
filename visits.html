@@ -70,6 +70,7 @@ tr:hover td{background:#fffdf5;}
 .pill-social{background:#f3e5f5;color:#6a1b9a;}
 .pill-tool{background:#fff3cd;color:#856404;}
 .pill-bot{background:#fde7e7;color:#a02020;}
+.pill-src{background:#e3f0ff;color:#185FA5;}
 .ip-label{display:inline-block;background:#c8e6c9;color:#1b5e20;font-size:11px;font-weight:700;padding:1px 7px;border-radius:8px;margin-top:3px;}
 .ip-email{display:block;font-size:11px;color:rgba(60,20,0,0.6);margin-top:3px;}
 .ip-edit{cursor:pointer;margin-left:6px;opacity:0.45;font-size:12px;}
@@ -84,6 +85,7 @@ tr:hover td{background:#fffdf5;}
   <div class="stats">
     <div class="stat"><div class="stat-val" id="st-total">—</div><div class="stat-lbl">Total visits today (UTC)</div></div>
     <div class="stat"><div class="stat-val" id="st-ips">—</div><div class="stat-lbl">Unique IPs today</div></div>
+    <div class="stat"><div class="stat-val" id="st-humans" style="color:#3A6B20">—</div><div class="stat-lbl">Humans today</div></div>
     <div class="stat"><div class="stat-val" id="st-country">—</div><div class="stat-lbl">Top country today</div></div>
     <div class="stat"><div class="stat-val" id="st-path">—</div><div class="stat-lbl">Top path today</div></div>
     <div class="stat"><div class="stat-val" id="st-sales">—</div><div class="stat-lbl">Sales (in range)</div></div>
@@ -118,7 +120,7 @@ tr:hover td{background:#fffdf5;}
       <thead>
         <tr>
           <th>First seen</th><th>Last seen</th><th>IP</th><th>Country</th>
-          <th>Hits</th><th>Session</th><th>Spent</th><th>Latest path</th><th>User-Agent</th><th>Flag</th>
+          <th>Hits</th><th>Session</th><th>Spent</th><th>Journey</th><th>User-Agent</th><th>Flag</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -228,6 +230,14 @@ function groupByIp(visits) {
       anyEngaged: vs.some(x => x.engaged),
       maxScroll: vs.reduce((m, x) => x.scroll_pct != null && x.scroll_pct > m ? x.scroll_pct : m, -1),
       maxDwell: vs.reduce((m, x) => x.dwell_ms != null && x.dwell_ms > m ? x.dwell_ms : m, -1),
+      attrSrc: (vs.find(x => x.src) || {}).src || null,
+      attrRef: (vs.find(x => x.ref) || {}).ref || null,
+      trail: (() => {
+        const chron = [...vs].reverse(); // oldest first
+        const t = [];
+        for (const x of chron) { if (!t.length || t[t.length - 1] !== x.path) t.push(x.path); }
+        return t;
+      })(),
       latestId: latest.id,
       latestFlagged: !!latest.flagged,
       email: emailForIp,
@@ -281,6 +291,7 @@ async function fetchData() {
 function renderStats(s) {
   document.getElementById('st-total').textContent = s.total_today;
   document.getElementById('st-ips').textContent = s.unique_ips_today;
+  document.getElementById('st-humans').textContent = s.humans_today ?? '—';
   document.getElementById('st-country').textContent = s.top_country
     ? `${flagEmoji(s.top_country.country)} ${s.top_country.country} (${s.top_country.c})` : '—';
   document.getElementById('st-path').textContent = s.top_path
@@ -456,13 +467,14 @@ function rowHtml(g) {
       <span class="expand-caret">${open ? '▾' : '▸'}</span>${esc(g.ip)}
       <span class="ip-edit" data-ip="${esc(g.ip)}" data-label="${esc(g.label || '')}" title="Edit label">✎</span>
       ${g.anyEngaged ? '<span class="human-badge" title="Did something a bot would not (clicked gallery, uploaded, paid, etc.)">Human</span>' : ''}
+      ${(g.attrSrc || g.attrRef) ? `<span class="pill pill-src" title="Arrived via a tagged clip link">${esc([g.attrSrc, g.attrRef].filter(Boolean).join(' · '))}</span>` : ''}
       ${g.label ? `<span class="ip-label">${esc(g.label)}</span>` : (g.email ? `<span class="ip-email">${esc(g.email)}</span>` : '')}
     </td>
     <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}</td>
     <td class="${g.hits >= 50 ? 'hits-high' : ''}">${g.hits}</td>
     <td>${esc(g.sessionDuration)}${(g.maxScroll >= 0 || g.maxDwell >= 0) ? ` <span class="muted" style="font-size:11px" title="Deepest scroll · time on landing page">${g.maxScroll >= 0 ? g.maxScroll + '%' : ''}${g.maxScroll >= 0 && g.maxDwell >= 0 ? ' · ' : ''}${g.maxDwell >= 0 ? Math.round(g.maxDwell / 1000) + 's' : ''}</span>` : ''}</td>
     <td>${g.spent > 0 ? `${Math.round(g.spent)} ${esc((g.spentCurrency || 'sek').toUpperCase())}${g.ordersCount > 1 ? ` <span class="muted">(${g.ordersCount} orders)</span>` : ''}` : '—'}</td>
-    <td class="path-cell" title="${esc(g.latestPath)}">${esc(g.latestPath)}</td>
+    <td class="path-cell" title="${esc(g.trail.join(' → '))}">${esc(g.trail.length > 4 ? g.trail.slice(0, 4).join(' → ') + ' → …' : g.trail.join(' → '))}</td>
     <td class="ua" title="${esc(g.latestUA)}">${esc(uaShort)}</td>
     <td><button class="flag-btn ${g.latestFlagged ? 'on' : ''}" data-id="${g.latestId}" data-flagged="${g.latestFlagged}">${g.latestFlagged ? 'Flagged' : 'Flag'}</button>${g.anyFlagged ? '<span class="flag-badge" title="Has flagged visits">⚑</span>' : ''}</td>
   </tr>`;

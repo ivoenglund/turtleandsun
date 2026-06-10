@@ -1065,7 +1065,7 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
 
     const visitsResult = await pool.query(
       `SELECT v.id, v.ip, v.created_at, v.method, v.path, v.status_code, v.user_agent,
-              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged, v.scroll_pct, v.dwell_ms,
+              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged, v.scroll_pct, v.dwell_ms, v.ref, v.src,
               u.email AS email, l.label AS label
        FROM visits v
        LEFT JOIN users u ON v.user_id = u.id
@@ -1076,10 +1076,14 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
       params
     );
 
-    const [totals, topCountry, topPath, salesByEmailRes, salesTotalRes] = await Promise.all([
+    const [totals, humansToday, topCountry, topPath, salesByEmailRes, salesTotalRes] = await Promise.all([
       pool.query(
         `SELECT COUNT(*)::int AS total, COUNT(DISTINCT ip)::int AS unique_ips
          FROM visits WHERE created_at >= ${UTC_DAY_START}`
+      ),
+      pool.query(
+        `SELECT COUNT(DISTINCT ip)::int AS humans
+         FROM visits WHERE created_at >= ${UTC_DAY_START} AND engaged = TRUE`
       ),
       pool.query(
         `SELECT country, COUNT(*)::int AS c FROM visits
@@ -1124,6 +1128,7 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
       stats: {
         total_today: totals.rows[0].total,
         unique_ips_today: totals.rows[0].unique_ips,
+        humans_today: humansToday.rows[0].humans,
         top_country: topCountry.rows[0] || null,
         top_path: topPath.rows[0] || null,
         sales_total: salesTotalRes.rows[0].total,
