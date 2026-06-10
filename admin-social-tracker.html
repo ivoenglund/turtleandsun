@@ -193,7 +193,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
                 <th id="th-facebook" colspan="2" style="color:#1877F2;border-left:2px solid #a8a29c;text-align:center">Facebook</th>
                 <th class="num" style="width:62px;border-left:2px solid #a8a29c">Total views</th>
                 <th class="num" style="width:54px">Total likes</th>
-                <th class="num" style="width:54px;border-left:2px solid #a8a29c">Clicks</th>
+                <th class="num" style="width:54px;border-left:2px solid #a8a29c">Visits</th>
                 <th style="width:54px">Added</th>
               </tr>
             </thead>
@@ -221,7 +221,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         <button id="ssbtn-subscribers" onclick="setSummaryMetric('subscribers')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Subscribers</button>
         <button id="ssbtn-views"       onclick="setSummaryMetric('views')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Views</button>
         <button id="ssbtn-likes"       onclick="setSummaryMetric('likes')"       style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Likes</button>
-        <button id="ssbtn-clicks"      onclick="setSummaryMetric('clicks')"      style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Clicks</button>
+        <button id="ssbtn-clicks"      onclick="setSummaryMetric('clicks')"      style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Visits</button>
         <span style="margin-left:auto;display:flex;gap:4px">
           <button id="ssmode-acc"   onclick="setSummaryMode('acc')"   style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#333;color:#fff">Accumulated</button>
           <button id="ssmode-daily" onclick="setSummaryMode('daily')" style="padding:3px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid #b0aba4;cursor:pointer;background:#fff;color:#555">Daily</button>
@@ -594,7 +594,7 @@ function renderTable() {
       <td class="num" style="${!c.facebook_posted?'background:#ede9e1;':''}font-size:11px;color:#1877F2">${c.facebook_likes!=null?c.facebook_likes.toLocaleString('sv-SE'):''}</td>
       <td class="plat-sep num">${tv ? tv.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
       <td class="num">${tl ? tl.toLocaleString('sv-SE') : '<span class="muted">—</span>'}</td>
-      <td class="plat-sep num" title="${c.clicks===undefined?'Loading clicks…':`YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}`}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${c.clicks===undefined ? '<span class="clk-loading">•••</span>' : ((+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—')}</td>
+      <td class="plat-sep num" title="${c.clicks===undefined?'Loading visits…':`YT ${(+c.clicks_youtube)||0} · TT ${(+c.clicks_tiktok)||0} · IG ${(+c.clicks_instagram)||0} · FB ${(+c.clicks_facebook)||0}`}" style="font-weight:700;color:${(+c.clicks)?'#1C2A14':'#bbb'}">${c.clicks===undefined ? '<span class="clk-loading">•••</span>' : ((+c.clicks) ? (+c.clicks).toLocaleString('sv-SE') : '—')}</td>
       <td style="font-size:11px;color:#888">${fmtDate(c.created_at)}</td>
     </tr>`;
   }).join('') + totRow;
