@@ -7666,12 +7666,7 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         COALESCE(tt.likes, 0) AS tiktok_likes,
         COALESCE(ig.likes, 0) AS instagram_likes,
         COALESCE(yt.likes, 0) AS youtube_likes,
-        COALESCE(fb.likes, 0) AS facebook_likes,
-        COALESCE(clk.total, 0) AS clicks,
-        COALESCE(clk.yt, 0) AS clicks_youtube,
-        COALESCE(clk.tt, 0) AS clicks_tiktok,
-        COALESCE(clk.ig, 0) AS clicks_instagram,
-        COALESCE(clk.fb, 0) AS clicks_facebook
+        COALESCE(fb.likes, 0) AS facebook_likes
       FROM social_clips sc
       LEFT JOIN concepts c ON c.id = sc.concept_id
       LEFT JOIN LATERAL (
@@ -7690,20 +7685,34 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         SELECT views, likes FROM clip_stats WHERE social_clip_id=sc.id AND platform='facebook'
         ORDER BY stat_date DESC LIMIT 1
       ) fb ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS total,
-               COUNT(*) FILTER (WHERE v.src = 'yt')::int AS yt,
-               COUNT(*) FILTER (WHERE v.src = 'tt')::int AS tt,
-               COUNT(*) FILTER (WHERE v.src = 'ig')::int AS ig,
-               COUNT(*) FILTER (WHERE v.src = 'fb')::int AS fb
-        FROM visits v WHERE sc.ref_tag IS NOT NULL AND v.ref = sc.ref_tag
-      ) clk ON TRUE
       ORDER BY sc.created_at DESC
       LIMIT 500
     `);
     res.json({ rows });
   } catch (e) {
     console.error('[tracker/clips/list]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /admin/api/tracker/clicks -- click counts per clip (loaded async by the UI)
+app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT sc.id,
+             COUNT(v.*)::int AS clicks,
+             COUNT(*) FILTER (WHERE v.src = 'yt')::int AS clicks_youtube,
+             COUNT(*) FILTER (WHERE v.src = 'tt')::int AS clicks_tiktok,
+             COUNT(*) FILTER (WHERE v.src = 'ig')::int AS clicks_instagram,
+             COUNT(*) FILTER (WHERE v.src = 'fb')::int AS clicks_facebook
+      FROM social_clips sc
+      JOIN visits v ON v.ref = sc.ref_tag
+      WHERE sc.ref_tag IS NOT NULL
+      GROUP BY sc.id
+    `);
+    res.json({ rows });
+  } catch (e) {
+    console.error('[tracker/clicks]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

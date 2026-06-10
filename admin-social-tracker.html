@@ -481,21 +481,45 @@ function updateStats() {
 }
 
 async function load() {
-  const [r, ttR, igR, fbR, ytR] = await Promise.all([
-    fetch('/admin/api/tracker/clips'),
-    fetch('/admin/api/tiktok/status'),
-    fetch('/admin/api/instagram/status'),
-    fetch('/admin/api/facebook/status'),
-    fetch('/admin/api/youtube/status'),
-  ]);
+  // 1. Fast path: clip list only — render the table immediately.
+  const r = await fetch('/admin/api/tracker/clips');
   const d = await r.json();
   clips = d.rows || [];
-  if (ttR.ok) { const ttD = await ttR.json(); ttConnected = !!ttD.connected; }
-  if (igR.ok) { const igD = await igR.json(); igConnected = !!igD.connected; }
-  if (fbR.ok) { const fbD = await fbR.json(); fbConnected = !!fbD.connected; }
-  if (ytR.ok) { const ytD = await ytR.json(); ytConnected = !!ytD.connected; }
   renderTable();
+  // 2. Everything else loads in the background and fills in when ready.
+  loadClicksBg();
+  loadStatusesBg();
   loadFollowers();
+}
+
+function loadClicksBg() {
+  fetch('/admin/api/tracker/clicks')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !d.rows) return;
+      const map = {};
+      d.rows.forEach(x => map[x.id] = x);
+      let changed = false;
+      clips.forEach(c => {
+        const m = map[c.id];
+        const v = m ? m.clicks : 0;
+        if (c.clicks !== v) changed = true;
+        c.clicks            = v;
+        c.clicks_youtube    = m ? m.clicks_youtube : 0;
+        c.clicks_tiktok     = m ? m.clicks_tiktok : 0;
+        c.clicks_instagram  = m ? m.clicks_instagram : 0;
+        c.clicks_facebook   = m ? m.clicks_facebook : 0;
+      });
+      if (changed || d.rows.length) renderTable();
+    })
+    .catch(() => {});
+}
+
+function loadStatusesBg() {
+  fetch('/admin/api/tiktok/status').then(r => r.ok ? r.json() : null).then(d => { if (d) ttConnected = !!d.connected; }).catch(() => {});
+  fetch('/admin/api/instagram/status').then(r => r.ok ? r.json() : null).then(d => { if (d) igConnected = !!d.connected; }).catch(() => {});
+  fetch('/admin/api/facebook/status').then(r => r.ok ? r.json() : null).then(d => { if (d) fbConnected = !!d.connected; }).catch(() => {});
+  fetch('/admin/api/youtube/status').then(r => r.ok ? r.json() : null).then(d => { if (d) ytConnected = !!d.connected; }).catch(() => {});
 }
 
 function renderTable() {
