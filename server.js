@@ -474,6 +474,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Short typeable attribution links: /yt -> /?src=yt, /yt38 -> /?src=yt&ref=c38
+// Usable in end cards, spoken CTAs, and pinned comments (where links aren't clickable).
+app.get(/^\/(yt|tt|ig|fb)(\d+)?$/, (req, res) => {
+  const src = req.params[0];
+  const clip = req.params[1];
+  res.redirect(302, '/?src=' + src + (clip ? '&ref=c' + clip : ''));
+});
+
 // Block direct-by-filename access to non-public *.html (route handlers use
 // res.sendFile and bypass this URL-path check, so gated pages still render).
 const PUBLIC_HTML = new Set([
