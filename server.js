@@ -7779,6 +7779,18 @@ app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
   }
 });
 
+// POST /admin/api/funnel/reset -- wipe tagged visits + funnel events (clears test data)
+app.post('/admin/api/funnel/reset', requireRole('admin'), async (req, res) => {
+  try {
+    const v = await pool.query('DELETE FROM visits WHERE ref IS NOT NULL OR src IS NOT NULL');
+    const f = await pool.query('DELETE FROM funnel_events');
+    res.json({ ok: true, visits_deleted: v.rowCount, funnel_events_deleted: f.rowCount });
+  } catch (e) {
+    console.error('[funnel/reset]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /admin/api/tracker/clips/:id/visits-daily -- one clip's visits per day per platform
 app.get('/admin/api/tracker/clips/:id(\\d+)/visits-daily', requireRole('admin'), async (req, res) => {
   try {

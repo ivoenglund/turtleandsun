@@ -670,6 +670,37 @@ function tsBeacon() {
   try { fetch('/api/engage', { method: 'POST', keepalive: true }).catch(function(){}); } catch (e) {}
 }
 
+// Passive human detection — real browsers scroll, move a pointer, touch, or
+// stay with the page visible; almost no bot does. Fires the beacon once per
+// session on the first such signal, so humans show up in /admin/visits even
+// if they never click anything.
+(function () {
+  var sent = false;
+  try { if (sessionStorage.getItem('ts_engaged')) return; } catch (e) {}
+  function fire() {
+    if (sent) return; sent = true;
+    try { sessionStorage.setItem('ts_engaged', '1'); } catch (e) {}
+    tsBeacon(); cleanup();
+  }
+  var moves = 0;
+  function onMove()   { if (++moves >= 3) fire(); }
+  function onScroll() { if ((window.scrollY || 0) > 200) fire(); }
+  function onTouch()  { fire(); }
+  function onKey()    { fire(); }
+  var dwell = setTimeout(function () { if (document.visibilityState === 'visible') fire(); }, 10000);
+  function cleanup() {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('touchstart', onTouch);
+    window.removeEventListener('keydown', onKey);
+    clearTimeout(dwell);
+  }
+  window.addEventListener('pointermove', onMove, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('touchstart', onTouch, { passive: true });
+  window.addEventListener('keydown', onKey);
+})();
+
 // Click-to-select behaviour for gallery cards. Marks the card visually
 // selected, highlights the matching filter chip, updates the description
 // panel above the gallery, and pushes the selected style into step 2 of
