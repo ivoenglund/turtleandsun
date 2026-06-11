@@ -5269,7 +5269,7 @@ function conceptAdminPage(title, body) {
 </style></head><body class="ts-nav-loggedin ts-nav-admin">
 <div class="sun"></div>
 <script src="/currency.js?v=20260526a"></script>
-<script src="/nav.js?v=20260611a"></script>
+<script src="/nav.js?v=20260611b"></script>
 <script>NavBar.init({ requireAuth: true });</script>
 ${devRibbonHtml()}
 <div class="wrap">${body}</div>

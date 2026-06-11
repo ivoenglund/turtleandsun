@@ -26,6 +26,10 @@
     '.ts-nav-dd-link.ts-active{color:#3A6B20;font-weight:700;opacity:1;}' +
     '.ts-nav-dd-logout{color:#c0392b!important;opacity:1!important;}' +
     '.ts-nav-dd-sep{height:1px;background:rgba(28,10,0,0.07);margin:6px 0;}' +
+    '.ts-nav-dd-wide{width:440px;}' +
+    '.ts-nav-dd-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;}' +
+    '.ts-nav-dd-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:rgba(28,10,0,0.4);margin:9px 0 2px;}' +
+    '.ts-nav-drawer-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:rgba(28,10,0,0.4);padding:8px 20px 2px;}' +
     '.ts-nav-drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:1999;}' +
     '.ts-nav-drawer-overlay.open{display:block;}' +
     '.ts-nav-drawer{position:fixed;top:0;right:0;bottom:0;width:280px;background:#FFF9E6;z-index:2000;transform:translateX(100%);transition:transform 0.25s ease;overflow-y:auto;padding:16px 0;box-shadow:-4px 0 24px rgba(0,0,0,0.12);}' +
@@ -58,15 +62,6 @@
     var dd =
       '<div class="ts-nav-dd" id="ts-nav-dd">' +
         '<div class="ts-nav-dd-email ts-nav-auth" id="ts-nav-dd-email"></div>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin"><strong>Dashboard</strong></a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/studio">↳ Studio</a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/social-clips">↳ Produce</a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/social-tracker">↳ Tracker</a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/concepts">↳ Concepts</a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/gallery">↳ Gallery</a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/reviews">↳ Reviews</a>' +
-        '<a class="ts-nav-dd-link ts-nav-admin-only" href="/admin/visits">↳ Visits</a>' +
-        '<div class="ts-nav-dd-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
@@ -85,6 +80,40 @@
         '<a class="ts-nav-dd-link ts-nav-guest" href="/login">Log in</a>' +
       '</div>';
 
+    function dashLink(href, label) {
+      return '<a class="ts-nav-dd-link" href="' + href + '">' + label + '</a>';
+    }
+    var dashDd =
+      '<div class="ts-nav-dd ts-nav-dd-wide" id="ts-nav-dash-dd">' +
+        '<a class="ts-nav-dd-link" href="/admin" style="font-weight:700">Open dashboard &rarr;</a>' +
+        '<div class="ts-nav-dd-sep"></div>' +
+        '<div class="ts-nav-dd-grid">' +
+          '<div>' +
+            '<div class="ts-nav-dd-head">Content</div>' +
+            dashLink('/admin/studio', 'Studio') +
+            dashLink('/admin/social-clips', 'Produce') +
+            dashLink('/admin/social-tracker', 'Tracker') +
+            dashLink('/admin/concepts', 'Concepts library') +
+            dashLink('/admin/gallery', 'Gallery') +
+            dashLink('/admin/reviews', 'Reviews') +
+            '<div class="ts-nav-dd-head">Occasions</div>' +
+            dashLink('/admin/occasions', 'Gifting occasions') +
+          '</div>' +
+          '<div>' +
+            '<div class="ts-nav-dd-head">Ops</div>' +
+            dashLink('/admin/digest', 'Daily digest') +
+            dashLink('/admin/failed-deliveries', 'Failed deliveries') +
+            dashLink('/admin/visits', 'Visits & map') +
+            dashLink('/admin/generations', 'Generation review') +
+            dashLink('/admin/assets', 'Asset storage') +
+            '<div class="ts-nav-dd-head">Pricing</div>' +
+            dashLink('/admin/currencies', 'Currencies & FX') +
+            '<div class="ts-nav-dd-head">Developing</div>' +
+            dashLink('/admin/email', 'Email engine') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
     var drawer =
       '<div class="ts-nav-drawer" id="ts-nav-drawer">' +
         '<div class="ts-nav-drawer-header">' +
@@ -96,14 +125,15 @@
         '<a class="ts-nav-drawer-link" href="/pricing">Pricing</a>' +
         '<a class="ts-nav-drawer-link" href="/faq">FAQ</a>' +
         '<div class="ts-nav-drawer-sep"></div>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin"><strong>Dashboard</strong></a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/studio">↳ Studio</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-clips">↳ Produce</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-tracker">↳ Tracker</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/concepts">↳ Concepts</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/gallery">↳ Gallery</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/reviews">↳ Reviews</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">↳ Visits</a>' +
+        '<div class="ts-nav-drawer-head ts-nav-admin-only">Dashboard</div>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin"><strong>Open dashboard &rarr;</strong></a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/studio">Studio</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-clips">Produce</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-tracker">Tracker</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/concepts">Concepts</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/gallery">Gallery</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/reviews">Reviews</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
         '<div class="ts-nav-drawer-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
@@ -138,6 +168,10 @@
               '<div class="ts-nav-account-wrap">' +
                 '<button class="ts-nav-account-btn" id="ts-nav-account-btn">Account</button>' +
                 dd +
+              '</div>' +
+              '<div class="ts-nav-account-wrap ts-nav-admin-only">' +
+                '<button class="ts-nav-account-btn" id="ts-nav-dash-btn">Dashboard</button>' +
+                dashDd +
               '</div>' +
               '<button class="ts-nav-hamburger" id="ts-nav-hamburger">&#9776;</button>' +
             '</div>' +
@@ -197,20 +231,36 @@
     var drawer = document.getElementById('ts-nav-drawer');
     var drawerClose = document.getElementById('ts-nav-drawer-close');
 
+    var dashBtn = document.getElementById('ts-nav-dash-btn');
+    var dashDd = document.getElementById('ts-nav-dash-dd');
+
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
+      if (dashDd) dashDd.classList.remove('open');
       dd.classList.toggle('open');
     });
+
+    if (dashBtn && dashDd) {
+      dashBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dd.classList.remove('open');
+        dashDd.classList.toggle('open');
+      });
+    }
 
     document.addEventListener('click', function (e) {
       if (dd.classList.contains('open') && !btn.contains(e.target) && !dd.contains(e.target)) {
         dd.classList.remove('open');
+      }
+      if (dashDd && dashDd.classList.contains('open') && !dashBtn.contains(e.target) && !dashDd.contains(e.target)) {
+        dashDd.classList.remove('open');
       }
     });
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         dd.classList.remove('open');
+        if (dashDd) dashDd.classList.remove('open');
         closeDrawer();
       }
     });
