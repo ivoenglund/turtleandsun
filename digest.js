@@ -85,14 +85,26 @@ async function gatherDigestSections() {
     productsHtml = `Image: ${counts.image}<br>Video: ${counts.video}<br>Bundle: ${counts.bundle}`;
   } catch (e) { console.error('[digest] products error:', e.message); productsHtml = '(error)'; }
 
-  // 3) VISITORS (last 24h) — total unique + humans (engaged = TRUE)
+  // 3) VISITORS (last 24h) — total unique IPs + strict humans:
+  // engaged, never a bot-ish UA, never a datacenter ASN, not labeled 'me'.
+  // Keep the regexes in sync with DATACENTER_ASN_RE in server.js.
+  const DC_RE = 'amazon|^aws|ec2|^google$|google-cloud|microsoft|azure|digitalocean|hetzner|^ovh|alibaba|tencent|oracle|linode|vultr|choopa|m247|datacamp|leaseweb|contabo|fastly|cloudflare|akamai|hostinger|ionos|scaleway|upcloud|kamatera|softlayer|huawei';
+  const BOT_UA_RE = 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget';
   let visitorsHtml;
   try {
     const tot = await pool.query(
       `SELECT
-         COUNT(DISTINCT ip)::int AS total,
-         COUNT(DISTINCT ip) FILTER (WHERE engaged = TRUE)::int AS humans
-       FROM visits WHERE created_at >= NOW() - INTERVAL '24 hours'`
+         (SELECT COUNT(DISTINCT ip)::int FROM visits WHERE created_at >= NOW() - INTERVAL '24 hours') AS total,
+         (SELECT COUNT(*)::int FROM (
+            SELECT v.ip FROM visits v
+            LEFT JOIN ip_labels il ON il.ip = v.ip
+            WHERE v.created_at >= NOW() - INTERVAL '24 hours'
+            GROUP BY v.ip
+            HAVING BOOL_OR(v.engaged)
+               AND NOT BOOL_OR(COALESCE(v.user_agent,'') ~* '${BOT_UA_RE}')
+               AND NOT BOOL_OR(COALESCE(v.asn_org,'') ~* '${DC_RE}')
+               AND NOT BOOL_OR(COALESCE(il.label,'') ILIKE 'me')
+          ) h) AS humans`
     );
     const top = await pool.query(
       `SELECT country, COUNT(DISTINCT ip)::int AS n FROM visits
@@ -116,7 +128,7 @@ async function gatherDigestSections() {
     visitorsHtml =
       `<strong>${totalN}</strong> unique visitors · ` +
       `<strong style="color:#3A6B20;">${humansN} human${humansN === 1 ? '' : 's'}</strong> ` +
-      `<span style="color:#888;">(${humanPct}% engaged)</span><br><br>` +
+      `<span style="color:#888;">(${humanPct}% — bots, datacenters & own IP excluded)</span><br><br>` +
       `<span style="color:#888;">Top countries</span><br>${list}<br><br>` +
       `<span style="color:#888;">Suspicious activity (IPs with &gt; 30 visits in 24h)</span><br>${suspList}`;
   } catch (e) { console.error('[digest] visitors error:', e.message); visitorsHtml = '(error)'; }

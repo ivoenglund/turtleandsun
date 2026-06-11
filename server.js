@@ -1119,10 +1119,16 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
          FROM visits WHERE created_at >= ${UTC_DAY_START}`
       ),
       pool.query(
-        `SELECT COUNT(DISTINCT ip)::int AS humans
-         FROM visits WHERE created_at >= ${UTC_DAY_START} AND engaged = TRUE
-           AND (asn_org IS NULL OR asn_org !~* '${DATACENTER_ASN_RE}')
-           AND (user_agent IS NULL OR user_agent !~* 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget')`
+        `SELECT COUNT(*)::int AS humans FROM (
+           SELECT v.ip FROM visits v
+           LEFT JOIN ip_labels il ON il.ip = v.ip
+           WHERE v.created_at >= ${UTC_DAY_START}
+           GROUP BY v.ip
+           HAVING BOOL_OR(v.engaged)
+              AND NOT BOOL_OR(COALESCE(v.user_agent,'') ~* 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget')
+              AND NOT BOOL_OR(COALESCE(v.asn_org,'') ~* '${DATACENTER_ASN_RE}')
+              AND NOT BOOL_OR(COALESCE(il.label,'') ILIKE 'me')
+         ) h`
       ),
       pool.query(
         `SELECT country, COUNT(*)::int AS c FROM visits
