@@ -937,6 +937,25 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_visits_ref ON visits(ref) WHERE ref IS NOT NULL;
   `);
 
+  // Concept dimensions (2026-06-11): every concept is a coordinate in
+  // subject x occasion x action space. Replaces the comma-separated
+  // filter_category as the source of truth for filtering and pickers.
+  await pool.query(`
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS subject  TEXT NOT NULL DEFAULT 'pet';
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS occasion TEXT NOT NULL DEFAULT 'general';
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS action   TEXT NOT NULL DEFAULT 'royal-portrait';
+  `);
+  // One-time backfill from slug patterns (idempotent: only rows still on defaults)
+  await pool.query(`
+    UPDATE concepts SET occasion = 'fathers-day' WHERE slug ILIKE '%father%' AND occasion = 'general';
+    UPDATE concepts SET occasion = 'mothers-day' WHERE slug ILIKE '%mother%' AND occasion = 'general';
+    UPDATE concepts SET occasion = 'birthday'    WHERE slug ILIKE '%birthday%' AND occasion = 'general';
+    UPDATE concepts SET occasion = 'christmas'   WHERE slug ILIKE '%christmas%' AND occasion = 'general';
+    UPDATE concepts SET action = 'talking' WHERE (slug ILIKE '%talking%' OR name ILIKE '%talking%') AND action = 'royal-portrait';
+    UPDATE concepts SET action = 'singing' WHERE (slug ILIKE '%singing%' OR name ILIKE '%singing%') AND action = 'royal-portrait';
+    UPDATE concepts SET subject = 'human' WHERE slug ILIKE '%person%' OR slug ILIKE '%human%';
+  `);
+
   // Funnel events (2026-06-11): preview/purchase stamped with the visitor's
   // attribution cookie (ts_ref/ts_src) so the tracker can show visits -> previews -> purchases.
   await pool.query(`

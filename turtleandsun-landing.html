@@ -532,9 +532,17 @@ html,body{overflow-x:hidden;}
     <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Type</span>
     <button class="fb on" data-kind="all">All</button>
   </div>
-  <div class="gallery-bar" id="galleryBar">
+  <div class="gallery-bar" id="galleryBarSubject">
+    <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Subject</span>
+    <button class="fb on" data-dim="subject" data-val="all">All</button>
+  </div>
+  <div class="gallery-bar" id="galleryBarOccasion">
     <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Occasion</span>
-    <button class="fb on" data-filter="all">All</button>
+    <button class="fb on" data-dim="occasion" data-val="all">All</button>
+  </div>
+  <div class="gallery-bar" id="galleryBarAction">
+    <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">What happens</span>
+    <button class="fb on" data-dim="action" data-val="all">All</button>
   </div>
   <div class="g-section-label" id="g1-label" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.55);letter-spacing:0.04em;margin:6px 0 8px;">Videos</div>
   <div class="g-grid" id="g1"></div>
@@ -658,17 +666,42 @@ window.showDesc = function(cat) {
   panel.style.display = 'flex';
 };
 
-window.setF = function(cat, btn) {
-  // Only toggle chips in the STYLE bar — the type bar has its own state
-  document.querySelectorAll('#galleryBar .fb').forEach(function(b){ b.classList.remove('on'); });
-  if (btn) {
-    btn.classList.add('on');
-  } else {
-    var match = document.querySelector('#galleryBar .fb[data-filter="' + cat + '"]');
-    if (match) match.classList.add('on');
+window.setDim = function(dim, val, btn) {
+  var barId = 'galleryBar' + dim.charAt(0).toUpperCase() + dim.slice(1);
+  document.querySelectorAll('#' + barId + ' .fb').forEach(function(b){ b.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
+  window.tsGalleryFilter[dim] = val;
+  window.showDescDims();
+  loadGallery(undefined, undefined);
+};
+
+// Description panel driven by the three dimensions: show the concepts that
+// match the current subject/occasion/action selection.
+window.showDescDims = function() {
+  var f = window.tsGalleryFilter;
+  if (f.subject === 'all' && f.occasion === 'all' && f.action === 'all') { window.showDesc('all'); return; }
+  var panel = document.getElementById('styleDesc');
+  var titleEl = document.getElementById('styleDescTitle');
+  var textEl = document.getElementById('styleDescText');
+  if (!panel || !titleEl || !textEl) return;
+  var matching = (window.tsGalleryConcepts || []).filter(function(c){
+    return (f.subject === 'all'  || c.subject === f.subject)
+        && (f.occasion === 'all' || c.occasion === f.occasion)
+        && (f.action === 'all'   || c.action === f.action);
+  });
+  function escHtml2(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  if (!matching.length) {
+    titleEl.innerHTML = '';
+    textEl.innerHTML = 'Nothing here yet — new occasions are added all the time.';
+    panel.style.display = 'flex';
+    return;
   }
-  window.showDesc(cat);
-  loadGallery(cat, undefined);
+  titleEl.innerHTML = matching.map(function(c){
+    return '<span style="opacity:0.55;font-weight:600;">Style ·</span> ' + escHtml2(c.name);
+  }).join('<span style="opacity:0.4;margin:0 6px;">·</span>');
+  textEl.innerHTML = matching.map(function(c){ return c.description ? escHtml2(c.description) : ''; })
+    .filter(Boolean).join('<br><br>') || 'Browse the items below.';
+  panel.style.display = 'flex';
 };
 
 window.setK = function(kind, btn) {
@@ -764,13 +797,17 @@ function selectCard(card, item) {
     panel.style.display = 'flex';
   }
 
-  // 2) Filter chip highlight
-  var firstCat = String(concept.filter_category || '').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean)[0];
-  if (firstCat) {
-    document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
-    var chip = document.querySelector('.fb[data-filter="' + firstCat + '"]');
+  // 2) Dimension chip highlight — light up this concept's coordinates
+  [['subject', concept.subject], ['occasion', concept.occasion], ['action', concept.action]].forEach(function(pair){
+    var dim = pair[0], val = pair[1];
+    if (!val) return;
+    var barId = 'galleryBar' + dim.charAt(0).toUpperCase() + dim.slice(1);
+    var bar = document.getElementById(barId);
+    if (!bar) return;
+    bar.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('on'); });
+    var chip = bar.querySelector('.fb[data-val="' + val + '"]') || bar.querySelector('.fb[data-val="all"]');
     if (chip) chip.classList.add('on');
-  }
+  });
 
   // 3) Step 2 — title + preview thumb
   var step2Title = document.getElementById('step2Title');
@@ -854,11 +891,13 @@ function resetStep2() {
 // Wire the static "All" buttons in both filter rows immediately so they work
 // even if /gallery/meta fails or hasn't responded yet.
 (function wireAllChips(){
-  var allStyle = document.querySelector('#galleryBar .fb[data-filter="all"]');
-  if (allStyle && !allStyle._wired) {
-    allStyle.addEventListener('click', function(){ window.setF('all', allStyle); });
-    allStyle._wired = true;
-  }
+  ['Subject','Occasion','Action'].forEach(function(D){
+    var btn = document.querySelector('#galleryBar' + D + ' .fb[data-val="all"]');
+    if (btn && !btn._wired) {
+      btn.addEventListener('click', function(){ window.setDim(D.toLowerCase(), 'all', btn); });
+      btn._wired = true;
+    }
+  });
   var allKind = document.querySelector('#galleryKindBar .fb[data-kind="all"]');
   if (allKind && !allKind._wired) {
     allKind.addEventListener('click', function(){ window.setK('all', allKind); });
@@ -883,19 +922,27 @@ async function loadGalleryMeta() {
     const data = await res.json();
     window.tsGalleryConcepts = data.concepts || [];
 
-    const bar = document.getElementById('galleryBar');
-    if (!bar) return;
-    bar.querySelectorAll('.fb[data-filter]').forEach(function(b){
-      if (b.getAttribute('data-filter') !== 'all') b.remove();
-    });
-    (data.filters || []).forEach(function(cat){
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'fb';
-      b.setAttribute('data-filter', cat);
-      b.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
-      b.addEventListener('click', function(){ window.setF(cat, b); });
-      bar.appendChild(b);
+    const dims = data.dimensions || { subjects: [], occasions: [], actions: [] };
+    function prettyDim(v){ return v.split('-').map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' '); }
+    [['Subject', dims.subjects], ['Occasion', dims.occasions], ['Action', dims.actions]].forEach(function(pair){
+      const D = pair[0], values = pair[1] || [];
+      const bar = document.getElementById('galleryBar' + D);
+      if (!bar) return;
+      bar.querySelectorAll('.fb[data-dim]').forEach(function(b){
+        if (b.getAttribute('data-val') !== 'all') b.remove();
+      });
+      values.forEach(function(v){
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'fb';
+        b.setAttribute('data-dim', D.toLowerCase());
+        b.setAttribute('data-val', v);
+        b.textContent = prettyDim(v);
+        b.addEventListener('click', function(){ window.setDim(D.toLowerCase(), v, b); });
+        bar.appendChild(b);
+      });
+      // Hide a dimension row entirely while it has fewer than 2 real choices
+      bar.style.display = values.length >= 2 ? '' : 'none';
     });
 
     // Kind chips — dynamic from the kinds actually present in the data
@@ -916,9 +963,7 @@ async function loadGalleryMeta() {
     }
 
     // Refresh the panel copy now that we know the concept list
-    var active = bar.querySelector('.fb.on');
-    var activeCat = active ? active.getAttribute('data-filter') : 'all';
-    window.showDesc(activeCat);
+    window.showDescDims();
   } catch (e) {
     console.warn('[gallery] meta error:', e);
   }
@@ -1218,7 +1263,7 @@ window._tsAttachVideoActivators = function(cardEl, videoEl) {
 };
 
 // Current filter selections — driven by chips, both axes can be combined.
-window.tsGalleryFilter = { category: 'all', kind: 'all' };
+window.tsGalleryFilter = { category: 'all', kind: 'all', subject: 'all', occasion: 'all', action: 'all' };
 
 // Dynamically size gallery columns based on the rendered item count and the
 // viewport width. Fewer items = bigger tiles; more items = revert to the
@@ -1262,6 +1307,9 @@ async function loadGallery(category, kind) {
   const qs = [];
   if (cur.category && cur.category !== 'all') qs.push('category=' + encodeURIComponent(cur.category));
   if (cur.kind && cur.kind !== 'all')         qs.push('kind=' + encodeURIComponent(cur.kind));
+  ['subject','occasion','action'].forEach(function(d){
+    if (cur[d] && cur[d] !== 'all') qs.push(d + '=' + encodeURIComponent(cur[d]));
+  });
   const url = qs.length ? '/gallery?' + qs.join('&') : '/gallery';
   try {
     const res = await fetch(url);
@@ -1710,6 +1758,9 @@ NavBar.init({ requireAuth: false }).then(status => {
           source_url: t.before_url || null, // backwards-compatible alias used by pickStyle
           input_type: r.input_type || 'image_video',
           no_free_preview: !!r.no_free_preview,
+          subject: r.subject || 'pet',
+          occasion: r.occasion || 'general',
+          action: r.action || 'royal-portrait',
         };
       }).filter(function(c){ return c.triplets.some(function(t){ return t.image_url || t.video_url || t.before_url; }); });
       if (concepts.length > 6) concepts = concepts.slice(0, 6);
@@ -1827,13 +1878,27 @@ NavBar.init({ requireAuth: false }).then(status => {
 
   function buildChips(){
     chipsEl.innerHTML = '';
-    concepts.forEach(function(c, i){
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ts-chip' + (i === current ? ' on' : '');
-      btn.innerHTML = '<span class="ts-dot"></span><span class="ts-chip-label">' + escapeHtml(c.name) + '</span>';
-      btn.addEventListener('click', function(){ pickStyle(i, true); });
-      chipsEl.appendChild(btn);
+    // Group by occasion; show a small occasion header when more than one occasion exists
+    var occList = [];
+    concepts.forEach(function(c){ var o = c.occasion || 'general'; if (occList.indexOf(o) === -1) occList.push(o); });
+    var showHeaders = occList.length > 1;
+    function prettyOcc(v){ return String(v).split('-').map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' '); }
+    occList.forEach(function(occ){
+      if (showHeaders) {
+        var h = document.createElement('div');
+        h.style.cssText = 'font-family:Plus Jakarta Sans,sans-serif;font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:rgba(28,10,0,0.45);margin:8px 0 4px;';
+        h.textContent = prettyOcc(occ);
+        chipsEl.appendChild(h);
+      }
+      concepts.forEach(function(c, i){
+        if ((c.occasion || 'general') !== occ) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ts-chip' + (i === current ? ' on' : '');
+        btn.innerHTML = '<span class="ts-dot"></span><span class="ts-chip-label">' + escapeHtml(c.name) + '</span>';
+        btn.addEventListener('click', function(){ pickStyle(i, true); });
+        chipsEl.appendChild(btn);
+      });
     });
   }
   function buildOutputs(){

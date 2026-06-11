@@ -2164,7 +2164,7 @@ app.post('/generate-video', async (req, res) => {
 app.get('/gallery/meta', async (req, res) => {
   try {
     const conceptsRes = await pool.query(
-      `SELECT DISTINCT c.id, c.slug, c.name, c.description, c.filter_category, c.sort_order
+      `SELECT DISTINCT c.id, c.slug, c.name, c.description, c.filter_category, c.subject, c.occasion, c.action, c.sort_order
        FROM concepts c
        JOIN concept_media cm ON cm.concept_id = c.id
        WHERE c.active = TRUE AND cm.active = TRUE
@@ -2190,6 +2190,25 @@ app.get('/gallery/meta', async (req, res) => {
     itemsRes.rows.forEach((row) => accumulate(row.filter_category));
     const filters = Array.from(filterSet).sort();
 
+    // Dimension chips: distinct values across active concepts that have media
+    const dimsRes = await pool.query(
+      `SELECT DISTINCT c.subject, c.occasion, c.action
+       FROM concepts c
+       JOIN concept_media cm ON cm.concept_id = c.id
+       WHERE c.active = TRUE AND cm.active = TRUE`
+    );
+    const dims = { subjects: new Set(), occasions: new Set(), actions: new Set() };
+    dimsRes.rows.forEach((r) => {
+      if (r.subject)  dims.subjects.add(r.subject);
+      if (r.occasion) dims.occasions.add(r.occasion);
+      if (r.action)   dims.actions.add(r.action);
+    });
+    const dimensions = {
+      subjects:  Array.from(dims.subjects).sort(),
+      occasions: Array.from(dims.occasions).sort(),
+      actions:   Array.from(dims.actions).sort(),
+    };
+
     const kindsRes = await pool.query(
       `SELECT DISTINCT cm.kind
        FROM concept_media cm
@@ -2197,7 +2216,7 @@ app.get('/gallery/meta', async (req, res) => {
        WHERE cm.active = TRUE AND c.active = TRUE`
     );
     const kinds = kindsRes.rows.map((r) => r.kind).sort();
-    res.json({ filters, concepts, kinds });
+    res.json({ filters, concepts, kinds, dimensions });
   } catch (err) {
     console.error('[gallery/meta] error:', err.message);
     res.status(500).json({ error: 'Failed to load gallery meta', details: err.message });
@@ -2213,10 +2232,10 @@ app.get('/api/widget-concepts', async (req, res) => {
   try {
     const { rows: concepts } = await pool.query(
       `SELECT id, name, before_image_url, after_image_url, example_video_url, sort_order,
-              price_tier, input_type
+              price_tier, input_type, subject, occasion, action
        FROM concepts
        WHERE active = TRUE
-       ORDER BY sort_order ASC, id ASC
+       ORDER BY occasion ASC, sort_order ASC, id ASC
        LIMIT 12`
     );
     // Premium concepts (talking pet, family portrait, etc.) skip the free
@@ -2514,10 +2533,16 @@ app.get('/admin/triplets', requireRole('admin'), async (req, res) => {
 });
 
 app.get('/gallery', async (req, res) => {
-  const { category, kind } = req.query;
+  const { category, kind, subject, occasion, action } = req.query;
   try {
     const params = [];
     let where = `WHERE cm.active = TRUE AND c.active = TRUE`;
+    for (const [col, val] of [['subject', subject], ['occasion', occasion], ['action', action]]) {
+      if (val && val !== 'all') {
+        params.push(String(val).toLowerCase());
+        where += ` AND c.${col} = $${params.length}`;
+      }
+    }
     if (category && category !== 'all') {
       params.push(`%${category}%`);
       // filter_category is comma-separated on both the concept and the item.
@@ -2532,7 +2557,7 @@ app.get('/gallery', async (req, res) => {
       `SELECT cm.id, cm.kind, cm.url, cm.thumbnail_url, cm.caption, cm.sort_order, cm.is_primary,
               cm.source_url,
               c.id AS concept_id, c.slug AS concept_slug, c.name AS concept_name,
-              c.description AS concept_description, c.filter_category
+              c.description AS concept_description, c.filter_category, c.subject, c.occasion, c.action
        FROM concept_media cm
        JOIN concepts c ON c.id = cm.concept_id
        ${where}
@@ -5336,7 +5361,7 @@ emailEngine.register(app, { requireRole, escapeHtml, conceptAdminPage });
 app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, slug, name, filter_category, input_type, before_image_url, after_image_url,
+      `SELECT id, slug, name, filter_category, subject, occasion, action, input_type, before_image_url, after_image_url,
               example_video_url, active, sort_order
        FROM concepts ORDER BY sort_order ASC, id ASC`
     );
@@ -5475,7 +5500,7 @@ app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
         <td>${after}</td>
         <td>${video}</td>
         <td><strong>${escapeHtml(c.name)}</strong><br><span class="muted">${escapeHtml(c.slug)}</span></td>
-        <td>${escapeHtml(c.filter_category)}</td>
+        <td><span class="muted">${escapeHtml(c.subject || 'pet')} · ${escapeHtml(c.occasion || 'general')} · ${escapeHtml(c.action || 'royal-portrait')}</span></td>
         <td>${escapeHtml(c.input_type)}</td>
         <td>
           <form class="inline" method="POST" action="/admin/concepts/toggle/${c.id}">
@@ -5598,8 +5623,15 @@ function conceptFormBody(concept, errorMsg) {
           <span class="muted">Lowercase, no spaces — e.g. royal-portrait</span></div>
       </div>
       <div class="row">
-        <div class="field"><label>Filter category *</label><input type="text" name="filter_category" value="${v('filter_category')}" required>
-          <span class="muted">Comma-separated, e.g. <code>royal, pets</code>. Each value becomes a separate filter chip on the landing gallery.</span></div>
+        <div class="field"><label>Subject *</label><input type="text" name="subject" list="dl-subject" value="${v('subject') || 'pet'}" required>
+          <datalist id="dl-subject"><option value="pet"><option value="dog"><option value="cat"><option value="human"><option value="family"><option value="other"></datalist>
+          <span class="muted">Who is in the photo.</span></div>
+        <div class="field"><label>Occasion *</label><input type="text" name="occasion" list="dl-occasion" value="${v('occasion') || 'general'}" required>
+          <datalist id="dl-occasion"><option value="general"><option value="birthday"><option value="fathers-day"><option value="mothers-day"><option value="name-day"><option value="christmas"><option value="valentines"><option value="easter"><option value="graduation"><option value="memorial"></datalist>
+          <span class="muted">Why you'd send it.</span></div>
+        <div class="field"><label>Action *</label><input type="text" name="action" list="dl-action" value="${v('action') || 'royal-portrait'}" required>
+          <datalist id="dl-action"><option value="royal-portrait"><option value="talking"><option value="singing"><option value="gift-giving"><option value="dancing"></datalist>
+          <span class="muted">What happens in the result. These three drive the landing filters, the picker, and the demo.</span></div>
         <div class="field"><label>Input type</label><select name="input_type" id="inputTypeSelect" onchange="applyInputType(this.value)">${inputTypeOptions}</select>
           <span class="muted">Controls which tabs are visible: image_video = both, image = only Image tab, video = only Video tab.</span></div>
         <div class="field"><label>Sort order</label><input type="number" name="sort_order" value="${c.sort_order == null ? 0 : escapeHtml(c.sort_order)}"></div>
@@ -6235,7 +6267,12 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
   try {
     const name = (req.body.name || '').trim();
     const slug = (req.body.slug || '').trim();
-    const filterCategory = (req.body.filter_category || '').trim();
+    const normDim = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, '-');
+    const dimSubject  = normDim(req.body.subject)  || 'pet';
+    const dimOccasion = normDim(req.body.occasion) || 'general';
+    const dimAction   = normDim(req.body.action)   || 'royal-portrait';
+    // filter_category is derived — single source of truth is the three dimensions
+    const filterCategory = [dimSubject, dimOccasion, dimAction].join(', ');
     const imagePrompt = (req.body.image_prompt || '').trim();
     const videoPrompt = (req.body.video_prompt || '').trim() || null;
     const socialCaption = (req.body.social_caption || '').trim() || null;
@@ -6328,6 +6365,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            user_input_variable = $18, user_input_max_length = $19,
            image_input_extras = $20, video_input_extras = $21, description = $22,
            price_tier = $23, unit_price_sek_minor = $24, pricing_rules = $25,
+           subject = $27, occasion = $28, action = $29,
            updated_at = NOW()
          WHERE id = $26`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
@@ -6335,7 +6373,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
          imageInputExtras, videoInputExtras, description,
          priceTier, unitPriceSekMinor, pricingRules,
-         editId]
+         editId, dimSubject, dimOccasion, dimAction]
       );
     } else {
       await pool.query(
@@ -6344,13 +6382,15 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
             image_prompt, video_prompt, fal_image_model, fal_video_model, social_caption, active, sort_order,
             user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length,
             image_input_extras, video_input_extras, description,
-            price_tier, unit_price_sek_minor, pricing_rules)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+            price_tier, unit_price_sek_minor, pricing_rules,
+            subject, occasion, action)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
         [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
          imageInputExtras, videoInputExtras, description,
-         priceTier, unitPriceSekMinor, pricingRules]
+         priceTier, unitPriceSekMinor, pricingRules,
+         dimSubject, dimOccasion, dimAction]
       );
     }
     res.redirect('/admin/concepts?saved=1' + (warn ? '&warn=' + encodeURIComponent(warn) : ''));
