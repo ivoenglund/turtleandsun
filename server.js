@@ -3438,14 +3438,22 @@ async function getYouTubeAccessToken() {
 
 // ── TikTok OAuth + Upload ──────────────────────────────────────────────────
 
+// TikTok app review rejected the admin-gated redirect URI (reviewers must be
+// able to reach it). The callback is now public at /auth/tiktok/callback and
+// protected by a single-use state token minted when the admin starts the flow.
+const tiktokOAuthStates = new Map(); // state -> expiry (ms)
+
 function tiktokOAuthUrl() {
   const base = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
+  const state = require('crypto').randomBytes(16).toString('hex');
+  tiktokOAuthStates.set(state, Date.now() + 10 * 60 * 1000);
+  for (const [s, exp] of tiktokOAuthStates) if (exp < Date.now()) tiktokOAuthStates.delete(s); // prune
   const params = new URLSearchParams({
     client_key:    process.env.TIKTOK_CLIENT_KEY,
     scope:         'video.upload,user.info.basic',
     response_type: 'code',
-    redirect_uri:  base + '/admin/tiktok/callback',
-    state:         'admin',
+    redirect_uri:  base + '/auth/tiktok/callback',
+    state,
   });
   return 'https://www.tiktok.com/v2/auth/authorize/?' + params.toString();
 }
@@ -3455,8 +3463,12 @@ app.get('/admin/tiktok/connect', requireRole('admin'), (req, res) => {
   res.redirect(tiktokOAuthUrl());
 });
 
-app.get('/admin/tiktok/callback', requireRole('admin'), async (req, res) => {
-  const { code, error } = req.query;
+app.get('/auth/tiktok/callback', async (req, res) => {
+  const { code, error, state } = req.query;
+  const stateExp = tiktokOAuthStates.get(state);
+  if (state) tiktokOAuthStates.delete(state); // single use
+  if (!stateExp || stateExp < Date.now())
+    return res.redirect('/admin/social-tracker?tt_error=' + encodeURIComponent('Invalid or expired state — start again from Connect TikTok'));
   if (error || !code) return res.redirect('/admin/social-tracker?tt_error=' + encodeURIComponent(error || 'no_code'));
   const https5 = require('https');
   const base   = (process.env.APP_BASE_URL || 'https://turtleandsun.com').replace(/\/$/, '');
@@ -3467,7 +3479,7 @@ app.get('/admin/tiktok/callback', requireRole('admin'), async (req, res) => {
       client_secret: process.env.TIKTOK_CLIENT_SECRET,
       code,
       grant_type:    'authorization_code',
-      redirect_uri:  base + '/admin/tiktok/callback',
+      redirect_uri:  base + '/auth/tiktok/callback',
     }).toString();
 
     const tokData = await new Promise((resolve, reject) => {
