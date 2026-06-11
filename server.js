@@ -7994,6 +7994,8 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
         sc.tiktok_post_url,
         sc.instagram_posted_at,
         sc.fb_posted_at,
+        sc.yt_scheduled_at,
+        sc.tiktok_planned_at, sc.instagram_planned_at, sc.yt_planned_at, sc.fb_planned_at,
         sc.created_at,
         (sc.tiktok_posted_at IS NOT NULL OR sc.published_tiktok)      AS tiktok_posted,
         (sc.instagram_posted_at IS NOT NULL OR sc.published_instagram) AS instagram_posted,
@@ -8184,6 +8186,22 @@ app.put('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) =
 });
 
 // DELETE /admin/api/tracker/clips/:id
+// POST /admin/api/tracker/clips/:id/plan — set/clear per-platform planned publish dates
+// Body: { plan: { tiktok: 'YYYY-MM-DD'|null, instagram: ..., youtube: ..., facebook: ... } }
+app.post('/admin/api/tracker/clips/:id(\\d+)/plan', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const cols = { tiktok: 'tiktok_planned_at', instagram: 'instagram_planned_at', youtube: 'yt_planned_at', facebook: 'fb_planned_at' };
+  try {
+    const plan = req.body.plan || {};
+    for (const [plat, col] of Object.entries(cols)) {
+      if (plan[plat] === undefined) continue;
+      const v = plan[plat] && /^\d{4}-\d{2}-\d{2}$/.test(String(plan[plat])) ? plan[plat] : null;
+      await pool.query(`UPDATE social_clips SET ${col} = $2, updated_at = NOW() WHERE id = $1`, [id, v]);
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.delete('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('DELETE FROM social_clips WHERE id = $1', [parseInt(req.params.id)]);

@@ -971,6 +971,16 @@ async function initDb() {
       FROM concepts c WHERE c.id = sc.concept_id AND sc.occasion IS NULL;
   `);
 
+  // Publish planner (2026-06-11): per-platform planned publish dates.
+  // The tracker shows a "Publish today" strip for planned-but-not-posted
+  // clips; the content calendar shows them as dashed ghosts.
+  await pool.query(`
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_planned_at    DATE;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_planned_at DATE;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_planned_at        DATE;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_planned_at        DATE;
+  `);
+
   // Funnel events (2026-06-11): preview/purchase stamped with the visitor's
   // attribution cookie (ts_ref/ts_src) so the tracker can show visits -> previews -> purchases.
   await pool.query(`

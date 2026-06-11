@@ -129,6 +129,9 @@ table.st td.yt{color:#0F6E56;font-weight:700}
 .cal-num{font-size:10px;font-weight:700;cursor:pointer;color:#1C2A14;padding:1px 2px;border-radius:3px;line-height:1.3}
 .cal-num:hover{background:#FFE800}
 .cal-num.sel-num{background:#FFE800;outline:1px solid #856700}
+.cal-num.cal-num-planned{color:#998c6e;outline:1px dashed #b0a890;background:transparent}
+.due-chip{border:none;border-radius:14px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;color:#fff}
+.due-chip:hover{opacity:.85}
 .pill-tiktok{background:#1C0A00;color:#fff}
 .pill-instagram{background:#C13584;color:#fff}
 .pill-youtube{background:#FF0000;color:#fff}
@@ -167,6 +170,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         </div>
       </div>
       <div id="tracker-block" style="width:100%;display:flex;flex-direction:column;gap:28px">
+        <div id="due-strip" style="display:none;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:10px 12px;flex-wrap:wrap;gap:6px;align-items:center"></div>
         <div class="list-wrap">
           <table style="width:100%">
             <colgroup>
@@ -548,6 +552,7 @@ async function load() {
   const d = await r.json();
   clips = d.rows || [];
   renderTable();
+  renderDueStrip();
   // 2. Everything else loads in the background and fills in when ready.
   // Clicks right away; platform statuses + follower stats 3s later so they
   // never compete with the first paint.
@@ -700,7 +705,8 @@ function renderPanel() {
         <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span> <a href="/admin/social-clips/${c.id}" style="font-size:10px;color:#FFE800;text-decoration:none;font-weight:600;margin-left:6px">Open clip &#8594;</a></h2>
       </div>
       ${platEditBtns}
-      <div style="display:flex;justify-content:flex-end;align-items:center;padding-right:14px">
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;padding-right:14px">
+        <button style="padding:3px 9px;font-size:10px;font-weight:700;border-radius:5px;border:1px solid #FFE800;background:transparent;color:#FFE800;cursor:pointer" onclick="showPlanModal()" title="Plan publish dates per platform">&#128197; Plan</button>
         <button onclick="closePanel()">&#x2715;</button>
       </div>
     </div>
@@ -1467,6 +1473,81 @@ NavBar.init({ requireAuth: true }).then(async () => {
   loadCal();
 });
 
+// ── Publish planner ─────────────────────────────────────────
+const PLAN_PLATS = [
+  ['tiktok',    'tiktok_planned_at',    'tiktok_posted',    'TikTok'],
+  ['instagram', 'instagram_planned_at', 'instagram_posted', 'Instagram'],
+  ['youtube',   'yt_planned_at',        'youtube_posted',   'YouTube'],
+  ['facebook',  'fb_planned_at',        'facebook_posted',  'Facebook'],
+];
+
+function renderDueStrip(){
+  const el=document.getElementById('due-strip');
+  if(!el)return;
+  const today=new Date().toISOString().slice(0,10);
+  const due=[];
+  (clips||[]).forEach(c=>{PLAN_PLATS.forEach(([key,pcol,postedCol,label])=>{
+    const pd=c[pcol]?fd(c[pcol]):null;
+    if(pd&&pd<=today&&!c[postedCol])due.push({c,key,label,pd,overdue:pd<today});
+  });});
+  if(!due.length){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='flex';
+  el.innerHTML='<span style="font-weight:700;font-size:12px;margin-right:4px">&#128204; Publish today:</span>'+
+    due.map(d=>'<button class="due-chip" style="background:'+(PLAT_COLORS[d.key]||'#555')+'" onclick="dueOpen('+d.c.id+',\''+d.key+'\')">'+
+      esc(d.c.concept||'Clip')+' <span style="opacity:.75">'+esc(d.c.ref_tag||('c'+d.c.id))+'</span> &rarr; '+d.label+
+      (d.overdue?' <span style="text-decoration:underline">overdue '+d.pd+'</span>':'')+
+      '</button>').join('');
+}
+
+function dueOpen(id,plat){
+  pick(id);
+  setTimeout(()=>showPostModal(plat),700); // give the panel time to load post data
+}
+
+function showPlanModal(){
+  const c=clips.find(x=>x.id===selId);
+  if(!c)return;
+  const existing=document.getElementById('plan-modal-bg');
+  if(existing)existing.remove();
+  const rows=PLAN_PLATS.map(([key,pcol,postedCol,label])=>{
+    const posted=!!c[postedCol];
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">'+
+      '<span class="plat-pill plat-'+key+'" style="width:78px;text-align:center;display:inline-block">'+label+'</span>'+
+      (posted
+        ?'<span style="font-size:11px;color:#3A6B20;font-weight:700">&#10003; posted</span>'
+        :'<input type="date" id="plan-'+key+'" value="'+(c[pcol]?fd(c[pcol]):'')+'" style="padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px">'+
+         '<button style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:11px" onclick="document.getElementById(\'plan-'+key+'\').value=\'\'">clear</button>')+
+      '</div>';
+  }).join('');
+  const div=document.createElement('div');
+  div.id='plan-modal-bg';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center';
+  div.innerHTML='<div style="background:#fff;border-radius:12px;padding:18px;width:340px;max-width:92vw">'+
+    '<div style="font-weight:700;font-size:14px;margin-bottom:12px">&#128197; Plan &mdash; '+esc(c.concept||'')+' <span style="font-weight:400;color:#999;font-size:11px">'+esc(c.ref_tag||('c'+c.id))+'</span></div>'+
+    rows+
+    '<div style="font-size:10px;color:#aaa;margin-top:4px">Planned clips show in the &#128204; strip on their day and as dashed numbers in the calendar.</div>'+
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'+
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'plan-modal-bg\').remove()">Cancel</button>'+
+      '<button class="btn btn-primary" style="background:#1C2A14;color:#FFE800" onclick="savePlan()">Save plan</button>'+
+    '</div></div>';
+  document.body.appendChild(div);
+}
+
+async function savePlan(){
+  const plan={};
+  PLAN_PLATS.forEach(([key])=>{
+    const el=document.getElementById('plan-'+key);
+    if(el)plan[key]=el.value||null;
+  });
+  const r=await fetch('/admin/api/tracker/clips/'+selId+'/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan})});
+  const d=await r.json().catch(()=>({}));
+  const bg=document.getElementById('plan-modal-bg');
+  if(bg)bg.remove();
+  if(!d.ok){alert(d.error||'Save failed');return;}
+  await load();
+  renderCal(clips);
+}
+
 // ── Embedded content calendar ───────────────────────────────
 const CAL_PLATS = [
   { key:'tiktok',    label:'TikTok',    dateKey:'tiktok_posted_at',    cls:'tiktok' },
@@ -1543,15 +1624,25 @@ function renderCal(clips){
   const todayStr=calIso(new Date());
   const byPlatDay={};
   CAL_PLATS.forEach(p=>{byPlatDay[p.key]={};});
+  const PLAN_COL={tiktok:'tiktok_planned_at',instagram:'instagram_planned_at',youtube:'yt_planned_at',facebook:'fb_planned_at'};
+  const POSTED_COL={tiktok:'tiktok_posted',instagram:'instagram_posted',youtube:'youtube_posted',facebook:'facebook_posted'};
   clips.forEach(c=>{
     CAL_PLATS.forEach(p=>{
       let ds=null;
       if(p.key==='youtube'){ds=c.yt_posted_at?fd(c.yt_posted_at):(c.yt_scheduled_at?fd(c.yt_scheduled_at):null);}
       else if(p.key==='tiktok'){ds=(c.tiktok_post_url&&c.tiktok_posted_at)?fd(c.tiktok_posted_at):null;}
       else{const v=c[p.dateKey];ds=v?fd(v):null;}
-      if(!ds)return;
-      if(!byPlatDay[p.key][ds])byPlatDay[p.key][ds]=[];
-      byPlatDay[p.key][ds].push(c);
+      if(ds){
+        if(!byPlatDay[p.key][ds])byPlatDay[p.key][ds]=[];
+        byPlatDay[p.key][ds].push({c:c,planned:false});
+      }
+      // Planned-but-not-posted: dashed ghost on the planned day
+      const pv=c[PLAN_COL[p.key]];
+      if(pv&&!c[POSTED_COL[p.key]]){
+        const pds=fd(pv);
+        if(!byPlatDay[p.key][pds])byPlatDay[p.key][pds]=[];
+        byPlatDay[p.key][pds].push({c:c,planned:true});
+      }
     });
   });
   if(!calCurrentYM){const n=new Date();calCurrentYM=[n.getFullYear(),n.getMonth()];}
@@ -1571,7 +1662,7 @@ function renderCal(clips){
       if(d>dim){html+='<div class="cal-cell no-day"></div>';return;}
       const ds=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const dc=byPlatDay[plat.key][ds]||[];
-      const nums=dc.map((c,i)=>'<span class="cal-num'+(c.id===selId?' sel-num':'')+'" title="'+esc(c.concept||'Clip')+'" onclick="pick('+c.id+')">'+(i+1)+'</span>').join('');
+      const nums=dc.map((e,i)=>'<span class="cal-num'+(e.c.id===selId?' sel-num':'')+(e.planned?' cal-num-planned':'')+'" title="'+esc(e.c.concept||'Clip')+(e.planned?' — planned':'')+'" onclick="pick('+e.c.id+')">'+(i+1)+'</span>').join('');
       html+='<div class="cal-cell'+(ds===todayStr?' today-day':'')+'">'+nums+'</div>';
     });
     html+='</div>';
