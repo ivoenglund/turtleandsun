@@ -2192,7 +2192,7 @@ app.get('/gallery/meta', async (req, res) => {
 
     // Dimension chips: distinct values across active concepts that have media
     const dimsRes = await pool.query(
-      `SELECT DISTINCT c.subject, c.occasion, c.action
+      `SELECT DISTINCT COALESCE(cm.subject, c.subject) AS subject, c.occasion, c.action
        FROM concepts c
        JOIN concept_media cm ON cm.concept_id = c.id
        WHERE c.active = TRUE AND cm.active = TRUE`
@@ -2537,11 +2537,17 @@ app.get('/gallery', async (req, res) => {
   try {
     const params = [];
     let where = `WHERE cm.active = TRUE AND c.active = TRUE`;
-    for (const [col, val] of [['subject', subject], ['occasion', occasion], ['action', action]]) {
+    for (const [col, val] of [['occasion', occasion], ['action', action]]) {
       if (val && val !== 'all') {
         params.push(String(val).toLowerCase());
         where += ` AND c.${col} = $${params.length}`;
       }
+    }
+    if (subject && subject !== 'all') {
+      params.push(String(subject).toLowerCase());
+      // Subject lives on the example media (one concept shows many species);
+      // falls back to the concept's subject when the item has none.
+      where += ` AND COALESCE(cm.subject, c.subject) = $${params.length}`;
     }
     if (category && category !== 'all') {
       params.push(`%${category}%`);
@@ -2557,7 +2563,7 @@ app.get('/gallery', async (req, res) => {
       `SELECT cm.id, cm.kind, cm.url, cm.thumbnail_url, cm.caption, cm.sort_order, cm.is_primary,
               cm.source_url,
               c.id AS concept_id, c.slug AS concept_slug, c.name AS concept_name,
-              c.description AS concept_description, c.filter_category, c.subject, c.occasion, c.action
+              c.description AS concept_description, c.filter_category, COALESCE(cm.subject, c.subject) AS subject, c.occasion, c.action
        FROM concept_media cm
        JOIN concepts c ON c.id = cm.concept_id
        ${where}
@@ -6639,7 +6645,7 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
     if (filterConcept) { mediaParams.push(filterConcept); mediaWhere.push(`cm.concept_id = $${mediaParams.length}`); }
     const { rows: allMedia } = await pool.query(
       `SELECT cm.id, cm.kind, cm.url, cm.concept_id, cm.created_at, cm.sort_order, cm.is_primary,
-              cm.active, cm.filter_category, cm.source_url, c.name AS concept_name
+              cm.active, cm.filter_category, cm.subject, cm.source_url, c.name AS concept_name, c.subject AS concept_subject
        FROM concept_media cm
        JOIN concepts c ON c.id = cm.concept_id
        ${mediaWhere.length ? 'WHERE ' + mediaWhere.join(' AND ') : ''}
@@ -6727,7 +6733,8 @@ app.get('/admin/gallery', requireRole('admin'), async (req, res) => {
           <label title="CONCEPT — which concept this media item belongs to. Change here to move the item to another concept (e.g. move a dog photo from Royal Portrait → Talking Pet).">Concept <select name="concept_id">${CONCEPT_SELECT_OPTS(m.concept_id)}</select></label>
           ${badges ? `<div class="m-badges" title="This media item is currently used in these triplet slots. If you delete it, those slots will go empty.">${badges}</div>` : ''}
           <label title="KIND — image or video. Determines whether the file is used as a Before/After Picture (image) or as an After Video (video).">Kind <select name="kind">${KIND_OPTS(m.kind)}</select></label>
-          <label title="FILTERS — comma-separated tags used on the public /gallery page filter chips (e.g. pet, royal, family). An item shows up under a chip if either its own tags or its concept's tags match.">Filters <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="e.g. pet, royal"></label>
+          <label title="SUBJECT — what species/who is in THIS example (dog, cat, human, parrot…). Drives the Subject filter on the landing gallery. Leave empty to inherit the concept's subject.">Subject <input type="text" name="subject" value="${escapeHtml(m.subject || '')}" placeholder="inherit (${escapeHtml(m.concept_subject || 'pet')})"></label>
+          <label title="FILTERS — legacy comma-separated tags (kept for back-compat).">Filters <input type="text" name="filter_category" value="${escapeHtml(m.filter_category || '')}" placeholder="e.g. pet, royal"></label>
           <div class="m-row">
             <label class="m-flex" title="SORT — display order within the concept. Lower numbers appear first.">Sort <input type="number" name="sort_order" value="${m.sort_order || 0}"></label>
             <label class="m-chk" title="ACTIVE — master switch for this media item. When OFF, the item is hidden from the public gallery and from new triplet slot pickers. Triplets that already reference it will show a broken slot."><input type="checkbox" name="active"${m.active ? ' checked' : ''}> Active</label>
@@ -7060,6 +7067,7 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
     const isPrimary = req.body.is_primary === 'on' || req.body.is_primary === 'true';
     const active = !(req.body.active === 'false' || req.body.active === '0' || req.body.active === 'off');
     const filterCategory = req.body.filter_category == null ? null : (String(req.body.filter_category).trim() || null);
+    const mediaSubject = req.body.subject == null ? null : (String(req.body.subject).trim().toLowerCase().replace(/\s+/g, '-') || null);
     const sourceUrl = req.body.source_url == null ? null : (String(req.body.source_url).trim() || null);
 
     if (isPrimary) {
@@ -7075,9 +7083,10 @@ app.post('/admin/media/:id/update', requireRole('admin'), async (req, res) => {
          is_primary = $4,
          active = $5,
          filter_category = $6,
-         source_url = $7
+         source_url = $7,
+         subject = $10
        WHERE id = $8`,
-      [caption, kind, sortOrder, isPrimary, active, filterCategory, sourceUrl, mediaId, conceptId]
+      [caption, kind, sortOrder, isPrimary, active, filterCategory, sourceUrl, mediaId, conceptId, mediaSubject]
     );
 
     if (req.headers.accept === 'application/json' || req.xhr) return res.json({ ok: true });
