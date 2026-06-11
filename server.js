@@ -967,6 +967,8 @@ app.get('/admin', requireRole('admin'), (req, res) => {
 
     ${section('\u{1F3A8} Content',
       card('Studio', 'Concepts with triplet grids — drop a photo to make a new triplet.', '/admin/studio') +
+      card('Produce', 'Filter triplets by dimension, make clips (Style A/B), track render status.', '/admin/social-clips') +
+      card('Tracker', 'Track published videos: platform metadata, view stats, YouTube auto-fetch.', '/admin/social-tracker') +
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
       card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery') +
       card('Triplets', 'Group Before / After-Picture / After-Video into rolling demo sets.', '/admin/triplets') +
@@ -983,9 +985,7 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email') +
       card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
       card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets') +
-      card('Social clips', 'Create before/after clips for TikTok, Instagram Reels, and YouTube Shorts.', '/admin/social-clips') +
-      card('Content Calendar', 'Weekly calendar of posted and scheduled social videos by platform.', '/admin/social-calendar') +
-      card('Social Tracker', 'Track published videos: platform metadata, view stats, YouTube auto-fetch.', '/admin/social-tracker')
+      card('Content Calendar', 'Weekly calendar of posted and scheduled social videos by platform.', '/admin/social-calendar')
     )}
 
     <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
