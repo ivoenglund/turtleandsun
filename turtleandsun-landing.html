@@ -55,9 +55,9 @@ body{font-family:'DM Sans',sans-serif;font-weight:300;color:#1C0A00;background:l
 .btn-order:hover{background:#1C0A00;}
 .gallery-bar{display:flex;align-items:center;gap:8px;margin:10px 0 8px;flex-wrap:nowrap;overflow:hidden;}
 .glabel{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:#1C0A00;margin-right:4px;}
-.fb{padding:6px 12px;border:1.5px solid rgba(0,0,0,0.14);border-radius:22px;background:transparent;color:rgba(60,20,0,0.6);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;}
-.fb:hover{border-color:rgba(0,0,0,0.35);color:#1C0A00;}
-.fb.on{background:#1C2A14;border-color:#1C2A14;color:white;}
+.fb{padding:7px 14px;border:1.5px solid rgba(28,10,0,0.15);border-radius:999px;background:rgba(255,255,255,0.55);color:#1C0A00;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.fb:hover{border-color:rgba(28,10,0,0.4);background:rgba(255,255,255,0.8);}
+.fb.on{background:#1C0A00;border-color:#1C0A00;color:#FFE800;}
 .g-grid{display:block;column-width:200px;columns:auto;column-gap:10px;margin-bottom:0;
   /* Break out of the 1100px .wrap to use the full viewport width minus a comfortable side margin.
      Column count auto-fills based on column-width: ~3 cols at 700px, 6 at 1200px, 8 at 1600px, 11 at 2200px. */
@@ -396,7 +396,7 @@ html,body{overflow-x:hidden;}
 
     <div class="ts-headers">
       <div class="ts-dh-item"><span class="ts-dh-num">1</span><span class="ts-dh-text">Upload a photo</span></div>
-      <div class="ts-dh-item"><span class="ts-dh-num">2</span><span class="ts-dh-text">Pick a look</span></div>
+      <div class="ts-dh-item"><span class="ts-dh-num">2</span><span class="ts-dh-text">Pick an occasion</span></div>
       <div class="ts-dh-item ts-dh-span2"><span class="ts-dh-num">3</span><span class="ts-dh-text"><span class="ts-accent">Get something to keep</span></span></div>
     </div>
 
@@ -425,7 +425,7 @@ html,body{overflow-x:hidden;}
 
       <!-- 2. CHIPS + RATIO -->
       <div class="ts-col ts-chips-col">
-        <div class="ts-mobile-step"><span class="ts-ms-num">2</span><span class="ts-ms-text">Pick a look</span></div>
+        <div class="ts-mobile-step"><span class="ts-ms-num">2</span><span class="ts-ms-text">Pick an occasion</span></div>
         <div class="ts-chips-wrap">
           <div class="ts-chips" id="ts-chips"></div>
           <div class="ts-ratios">
@@ -523,30 +523,6 @@ html,body{overflow-x:hidden;}
   </div>
   <!-- ============ END HERO WIDGET ============ -->
 
-  <!-- Occasions strip: shows visitors the breadth of uses beyond what's in season -->
-  <div class="ts-occasions" aria-label="Occasions we cover">
-    <div class="ts-occ-title">One pet. Every occasion.</div>
-    <div class="ts-occ-chips">
-      <span class="ts-occ-chip">🎂 Birthdays</span>
-      <span class="ts-occ-chip">🎁 Father's Day</span>
-      <span class="ts-occ-chip">🌸 Mother's Day</span>
-      <span class="ts-occ-chip">📅 Name days</span>
-      <span class="ts-occ-chip">🎄 Christmas</span>
-      <span class="ts-occ-chip">❤️ Valentine's</span>
-      <span class="ts-occ-chip">🎓 Graduations</span>
-      <span class="ts-occ-chip">👶 New baby</span>
-      <span class="ts-occ-chip">🕯️ In loving memory</span>
-      <span class="ts-occ-chip">☀️ Just because</span>
-    </div>
-  </div>
-  <style>
-  .ts-occasions{margin:26px 0 6px;text-align:center;}
-  .ts-occ-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1C0A00;margin-bottom:12px;}
-  .ts-occ-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 10px;}
-  .ts-occ-chip{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:#1C0A00;background:rgba(255,255,255,0.55);border:1.5px solid rgba(28,10,0,0.15);border-radius:999px;padding:7px 14px;white-space:nowrap;}
-  @media(max-width:760px){.ts-occ-chip{font-size:12px;padding:6px 11px;}}
-  </style>
-
   <div id="styleDesc" style="display:flex;margin:20px 0 16px;padding:14px 20px;background:rgba(255,220,60,0.4);border-radius:12px;border:1.5px solid rgba(0,0,0,0.1);flex-direction:column;align-items:flex-start;gap:6px;">
     <div id="styleDescTitle" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:700;color:#1C0A00;"></div>
     <div id="styleDescText" style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(60,20,0,0.8);line-height:1.5;"></div>
@@ -557,7 +533,7 @@ html,body{overflow-x:hidden;}
     <button class="fb on" data-kind="all">All</button>
   </div>
   <div class="gallery-bar" id="galleryBar">
-    <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Style</span>
+    <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">Occasion</span>
     <button class="fb on" data-filter="all">All</button>
   </div>
   <div class="g-section-label" id="g1-label" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.55);letter-spacing:0.04em;margin:6px 0 8px;">Videos</div>
@@ -1998,7 +1974,7 @@ NavBar.init({ requireAuth: false }).then(status => {
       demoEl.classList.add('has-preview');
     } else {
       stillTitle.textContent = 'Free preview';
-      stillSub.textContent = cur ? 'in "' + cur.name + '"' : 'Pick a look';
+      stillSub.textContent = cur ? 'in "' + cur.name + '"' : 'Pick an occasion';
     }
     setGenerateBtnState();
   }
