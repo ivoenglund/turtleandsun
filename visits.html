@@ -182,6 +182,13 @@ function classifyUA(ua) {
   if (/bot|crawler|spider|scrape/i.test(ua)) return 'bot';
   return 'human';
 }
+// Hosting/cloud ASN orgs — JS-executing crawlers from these networks are
+// not humans even when the engaged flag is set. Mirrors DATACENTER_ASN_RE
+// in server.js.
+function isDatacenter(asnOrg) {
+  return !!asnOrg && /amazon|^aws|ec2|^google$|google-cloud|microsoft|azure|digitalocean|hetzner|^ovh|alibaba|tencent|oracle|linode|vultr|choopa|m247|datacamp|leaseweb|contabo|fastly|cloudflare|akamai|hostinger|ionos|scaleway|upcloud|kamatera|softlayer|huawei/i.test(asnOrg);
+}
+
 function botBadge(cat) {
   const map = { search: ['🔍 Search', 'pill-search'], social: ['📱 Social', 'pill-social'], tool: ['🛠 Tool', 'pill-tool'], bot: ['🤖 Bot', 'pill-bot'] };
   return map[cat] ? `<span class="pill ${map[cat][1]}">${map[cat][0]}</span>` : '';
@@ -226,6 +233,7 @@ function groupByIp(visits) {
       city: latest.city,
       latestPath: latest.path,
       latestUA: latest.user_agent || '',
+      asn: latest.asn_org || vs.map(v => v.asn_org).find(Boolean) || '',
       anyFlagged: vs.some(x => x.flagged),
       anyEngaged: vs.some(x => x.engaged),
       maxScroll: vs.reduce((m, x) => x.scroll_pct != null && x.scroll_pct > m ? x.scroll_pct : m, -1),
@@ -276,7 +284,13 @@ async function fetchData() {
   // least one engaged row. Saves a round trip to the server.
   if (engagedOnly) {
     const engagedIps = new Set((data.visits || []).filter((v) => v.engaged).map((v) => v.ip));
-    data.visits = (data.visits || []).filter((v) => engagedIps.has(v.ip));
+    // Exclude IPs that ever sent a bot-ish UA or sit in a datacenter ASN —
+    // headless crawlers execute JS and set engaged, but they aren't humans.
+    const notHuman = new Set();
+    (data.visits || []).forEach((v) => {
+      if (classifyUA(v.user_agent) !== 'human' || isDatacenter(v.asn_org)) notHuman.add(v.ip);
+    });
+    data.visits = (data.visits || []).filter((v) => engagedIps.has(v.ip) && !notHuman.has(v.ip));
   }
   allVisits = data.visits;
   window._salesByEmail = data.salesByEmail || {};
@@ -470,7 +484,7 @@ function rowHtml(g) {
       ${(g.attrSrc || g.attrRef) ? `<span class="pill pill-src" title="Arrived via a tagged clip link">${esc([g.attrSrc, g.attrRef].filter(Boolean).join(' · '))}</span>` : ''}
       ${g.label ? `<span class="ip-label">${esc(g.label)}</span>` : (g.email ? `<span class="ip-email">${esc(g.email)}</span>` : '')}
     </td>
-    <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}</td>
+    <td>${flagEmoji(g.country)} ${esc(g.country || '')}${botBadge(classifyUA(g.latestUA))}${isDatacenter(g.asn) ? `<span class="pill pill-bot" title="${esc(g.asn)}">&#127970; DC</span>` : ''}</td>
     <td class="${g.hits >= 50 ? 'hits-high' : ''}">${g.hits}</td>
     <td>${esc(g.sessionDuration)}${(g.maxScroll >= 0 || g.maxDwell >= 0) ? ` <span class="muted" style="font-size:11px" title="Deepest scroll · time on landing page">${g.maxScroll >= 0 ? g.maxScroll + '%' : ''}${g.maxScroll >= 0 && g.maxDwell >= 0 ? ' · ' : ''}${g.maxDwell >= 0 ? Math.round(g.maxDwell / 1000) + 's' : ''}</span>` : ''}</td>
     <td>${g.spent > 0 ? `${Math.round(g.spent)} ${esc((g.spentCurrency || 'sek').toUpperCase())}${g.ordersCount > 1 ? ` <span class="muted">(${g.ordersCount} orders)</span>` : ''}` : '—'}</td>

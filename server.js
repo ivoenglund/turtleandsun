@@ -479,11 +479,11 @@ app.use((req, res, next) => {
         await pool.query(
           `INSERT INTO visits
              (ip, method, path, status_code, user_agent, referrer,
-              country, region, city, lat, lng, user_id, request_id, ref, src)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+              country, region, city, lat, lng, user_id, request_id, ref, src, asn_org)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [ip, method, reqPath, statusCode, userAgent, referrer,
            geo.country, geo.region, geo.city, geo.lat, geo.lng, userId, requestId,
-           visitRef, visitSrc]
+           visitRef, visitSrc, geo.asn_org || null]
         );
       } catch (err) {
         console.error('[visits] insert error:', err.message);
@@ -1077,6 +1077,10 @@ app.get('/admin/visits', requireRole('admin'), (req, res) => {
 const VISITS_MAX_ROWS = 5000;
 const UTC_DAY_START = `date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`;
 
+// ASN orgs that are hosting/cloud providers — JS-executing crawlers from
+// these networks must not count as "humans". (GeoLite2-ASN org strings.)
+const DATACENTER_ASN_RE = 'amazon|^aws|ec2|^google$|google-cloud|microsoft|azure|digitalocean|hetzner|^ovh|alibaba|tencent|oracle|linode|vultr|choopa|m247|datacamp|leaseweb|contabo|fastly|cloudflare|akamai|hostinger|ionos|scaleway|upcloud|kamatera|softlayer|huawei';
+
 app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
   try {
     const { from, to, search, flagged_only } = req.query;
@@ -1098,7 +1102,7 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
 
     const visitsResult = await pool.query(
       `SELECT v.id, v.ip, v.created_at, v.method, v.path, v.status_code, v.user_agent,
-              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged, v.scroll_pct, v.dwell_ms, v.ref, v.src,
+              v.referrer, v.country, v.region, v.city, v.lat, v.lng, v.user_id, v.request_id, v.flagged, v.engaged, v.scroll_pct, v.dwell_ms, v.ref, v.src, v.asn_org,
               u.email AS email, l.label AS label
        FROM visits v
        LEFT JOIN users u ON v.user_id = u.id
@@ -1116,7 +1120,9 @@ app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
       ),
       pool.query(
         `SELECT COUNT(DISTINCT ip)::int AS humans
-         FROM visits WHERE created_at >= ${UTC_DAY_START} AND engaged = TRUE`
+         FROM visits WHERE created_at >= ${UTC_DAY_START} AND engaged = TRUE
+           AND (asn_org IS NULL OR asn_org !~* '${DATACENTER_ASN_RE}')
+           AND (user_agent IS NULL OR user_agent !~* 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget')`
       ),
       pool.query(
         `SELECT country, COUNT(*)::int AS c FROM visits

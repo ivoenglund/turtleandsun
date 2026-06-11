@@ -975,6 +975,7 @@ async function initDb() {
   // The tracker shows a "Publish today" strip for planned-but-not-posted
   // clips; the content calendar shows them as dashed ghosts.
   await pool.query(`
+    ALTER TABLE visits ADD COLUMN IF NOT EXISTS asn_org TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_planned_at    DATE;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_planned_at DATE;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_planned_at        DATE;
