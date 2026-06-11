@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio — Turtle and Sun Admin</title>
+<script src="/nav.js?v=20260602a"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px}
+.page{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.subtitle{color:#666;font-size:12px;margin-bottom:16px}
+.flash{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:12px}
+.flash-ok{background:#d4edda;color:#155724}
+.flash-err{background:#f8d7da;color:#721c24}
+
+/* ── Concept section ──────────────────────────────────────── */
+.concept-sec{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px;overflow:hidden}
+.concept-sec.inactive{opacity:.55}
+.concept-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1C2A14;color:#fff;flex-wrap:wrap}
+.concept-head h2{font-size:14px;font-weight:700;color:#FFE800}
+.concept-head .slug{font-family:monospace;font-size:10px;opacity:.6}
+.dim-chip{font-size:9px;font-weight:700;padding:2px 8px;border-radius:9px;background:rgba(255,232,0,.15);color:#FFE800}
+.concept-head .spacer{flex:1}
+.concept-head a{color:#fff;font-size:11px;text-decoration:none;opacity:.8}
+.concept-head a:hover{opacity:1;text-decoration:underline}
+.inactive-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:9px;background:#c0392b;color:#fff}
+
+/* ── Triplet grid ─────────────────────────────────────────── */
+.triplet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;padding:12px}
+.tcard{border:1px solid #e8e2d6;border-radius:10px;overflow:hidden;background:#fcfbf8}
+.tcard.t-inactive{opacity:.5}
+.tcard-head{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #f0ece2;font-size:11px}
+.tcard-head .tnum{font-weight:700}
+.tcard-head .spacer{flex:1}
+.tcard-head label{display:flex;align-items:center;gap:4px;font-size:10px;color:#555;cursor:pointer}
+.tcard-head .del{background:none;border:none;color:#c0392b;font-size:13px;cursor:pointer;padding:0 2px}
+.media3{display:flex;gap:1px;background:#eee}
+.mslot{flex:1;min-width:0}
+.mthumb{height:110px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:10px;color:#bbb;position:relative}
+.mthumb img,.mthumb video{width:100%;height:100%;object-fit:cover}
+.mthumb .mlabel{position:absolute;top:4px;left:4px;background:rgba(28,42,20,.85);color:#FFE800;font-size:8px;font-weight:700;padding:1px 6px;border-radius:7px;letter-spacing:.5px}
+.mthumb.gen{background:#fff8d6}
+.spin{width:16px;height:16px;border:2px solid #e0a800;border-top-color:transparent;border-radius:50%;animation:rot 1s linear infinite;margin-bottom:4px}
+@keyframes rot{to{transform:rotate(360deg)}}
+.mctrl{display:flex;gap:4px;align-items:center;padding:4px;border-top:1px solid #f0ece2}
+.mctrl select{flex:1;min-width:0;font-size:9px;padding:2px;border:1px solid #ddd;border-radius:4px;background:#fff;color:#555}
+.mctrl input[type=checkbox]{width:12px;height:12px;cursor:pointer}
+.gen-note{font-size:9px;color:#b08c00;text-align:center;padding:3px}
+.err-note{font-size:9px;color:#c0392b;padding:4px 8px}
+
+/* ── New triplet card ─────────────────────────────────────── */
+.new-card{border:2px dashed #c9c2b4;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:170px;cursor:pointer;color:#888;gap:6px;background:#fcfbf8;transition:all .15s}
+.new-card:hover,.new-card.drag-over{border-color:#1C2A14;color:#1C2A14;background:#f5f3ea}
+.new-card .plus{font-size:26px;font-weight:700}
+.new-card .nc-sub{font-size:10px;color:#aaa}
+.new-card select{font-size:10px;padding:3px 6px;border:1px solid #ddd;border-radius:5px;background:#fff;color:#555}
+.empty-state{text-align:center;padding:32px;color:#aaa;font-size:13px}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Studio</h1>
+  <p class="subtitle">Every concept with its triplets. Drop a photo on &ldquo;+ New triplet&rdquo; to run the concept&rsquo;s prompts and grow the grid. Multiple triplets per concept is the point.
+    <a href="/admin/social-clips" style="color:#1C2A14;font-weight:700">Produce &rarr;</a> &middot;
+    <a href="/admin/social-tracker" style="color:#1C2A14;font-weight:700">Tracker &rarr;</a></p>
+  <div id="flash" style="display:none" class="flash"></div>
+  <div id="concepts"><div class="empty-state">Loading&hellip;</div></div>
+</div>
+
+<input type="file" id="file-input" accept="image/*" style="display:none">
+
+<script>
+let DATA = { concepts: [], triplets: [], jobs: {} };
+let pollTimer = null;
+let pendingConcept = null; // concept id awaiting a file pick
+const SUBJECTS = ['', 'dog', 'cat', 'snake', 'lobster', 'human', 'family', 'pet', 'other'];
+
+async function load() {
+  const r = await fetch('/admin/api/studio/concepts');
+  DATA = await r.json();
+  render();
+  schedulePoll();
+}
+
+function jobFor(tripletId) { return DATA.jobs && DATA.jobs[tripletId]; }
+function anyRunning() {
+  return Object.values(DATA.jobs || {}).some(j => j.stage === 'image' || j.stage === 'video');
+}
+
+function schedulePoll() {
+  if (anyRunning() && !pollTimer) pollTimer = setInterval(pollJobs, 5000);
+  if (!anyRunning() && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+async function pollJobs() {
+  const r = await fetch('/admin/api/studio/jobs');
+  const jobs = await r.json();
+  // Any job that finished since last poll -> full reload to pick up new media
+  const finished = Object.keys(jobs).some(id =>
+    (jobs[id].stage === 'done' || jobs[id].stage === 'error') &&
+    DATA.jobs[id] && DATA.jobs[id].stage !== jobs[id].stage);
+  DATA.jobs = jobs;
+  if (finished) { await load(); return; }
+  render();
+  schedulePoll();
+}
+
+function subjectSelect(mediaId, current) {
+  return '<select onchange="patchMedia(' + mediaId + ', { subject: this.value })" title="Subject tag">'
+    + SUBJECTS.map(s => '<option value="' + s + '"' + ((current || '') === s ? ' selected' : '') + '>'
+        + (s || '— subject —') + '</option>').join('')
+    + '</select>';
+}
+
+function mediaSlot(label, m, genStage) {
+  // m = { id, url, subject, active, isVideo } or null
+  if (!m && genStage) {
+    return '<div class="mslot"><div class="mthumb gen"><div style="text-align:center"><div class="spin" style="margin:0 auto 4px"></div>'
+      + 'Generating ' + genStage + '&hellip;</div></div><div class="gen-note">runs concept prompt</div></div>';
+  }
+  if (!m) return '<div class="mslot"><div class="mthumb">No ' + label.toLowerCase() + '</div></div>';
+  const media = m.isVideo
+    ? '<video src="' + esc(m.url) + '" muted playsinline preload="none" onmouseenter="this.play()" onmouseleave="this.pause()"></video>'
+    : '<img src="' + esc(m.url) + '" loading="lazy">';
+  return '<div class="mslot">'
+    + '<div class="mthumb"><span class="mlabel">' + label + '</span>' + media + '</div>'
+    + '<div class="mctrl">' + subjectSelect(m.id, m.subject)
+    + '<input type="checkbox" ' + (m.active !== false ? 'checked' : '') + ' title="Active"'
+    + ' onchange="patchMedia(' + m.id + ', { active: this.checked })"></div>'
+    + '</div>';
+}
+
+function tripletCard(t) {
+  const job = jobFor(t.id);
+  const genImage = job && job.stage === 'image';
+  const genVideo = job && job.stage === 'video';
+  const before = t.before_id ? { id: t.before_id, url: t.before_url, subject: t.before_subject, active: t.before_active } : null;
+  const after  = t.image_id  ? { id: t.image_id,  url: t.image_url,  subject: t.image_subject,  active: t.image_active } : null;
+  const video  = t.video_id  ? { id: t.video_id,  url: t.video_url,  subject: t.video_subject,  active: t.video_active, isVideo: true } : null;
+  return '<div class="tcard' + (t.active ? '' : ' t-inactive') + '">'
+    + '<div class="tcard-head">'
+    +   '<span class="tnum">Triplet #' + t.triplet_number + '</span>'
+    +   (job && job.stage === 'error' ? '<span style="color:#c0392b;font-weight:700;font-size:10px">generation failed</span>' : '')
+    +   '<span class="spacer"></span>'
+    +   '<label><input type="checkbox" ' + (t.active ? 'checked' : '') + ' onchange="toggleTriplet(' + t.id + ')"> active</label>'
+    +   '<button class="del" title="Delete triplet" onclick="deleteTriplet(' + t.id + ')">&#x2715;</button>'
+    + '</div>'
+    + '<div class="media3">'
+    +   mediaSlot('BEFORE', before, null)
+    +   mediaSlot('AFTER', after, genImage ? 'image' : null)
+    +   mediaSlot('VIDEO', video, (genImage || genVideo) && !video ? (genVideo ? 'video' : 'image first') : null)
+    + '</div>'
+    + (job && job.stage === 'error' ? '<div class="err-note">' + esc(job.error || 'Unknown error') + '</div>' : '')
+    + '</div>';
+}
+
+function newCard(c) {
+  if (!c.has_image_prompt) {
+    return '<div class="new-card" style="cursor:default" title="Add an image prompt on the concept first">'
+      + '<span class="plus" style="opacity:.3">+</span><span class="nc-sub">No image prompt &mdash; '
+      + '<a href="/admin/concepts/edit/' + c.id + '" style="color:#1C2A14">edit concept</a></span></div>';
+  }
+  return '<div class="new-card" id="nc-' + c.id + '"'
+    + ' onclick="pickPhoto(' + c.id + ', event)"'
+    + ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"'
+    + ' ondragleave="this.classList.remove(\'drag-over\')"'
+    + ' ondrop="dropPhoto(event, ' + c.id + ')">'
+    + '<span class="plus">+</span><span>New triplet</span>'
+    + '<span class="nc-sub">drop photo or click &middot; runs concept prompts</span>'
+    + '<select id="nc-subj-' + c.id + '" onclick="event.stopPropagation()" title="Subject for the new media (defaults to concept subject)">'
+    + SUBJECTS.map(s => '<option value="' + s + '"' + (s === (c.subject || '') ? ' selected' : '') + '>'
+        + (s || 'subject: concept default') + '</option>').join('')
+    + '</select>'
+    + '</div>';
+}
+
+function render() {
+  const wrap = document.getElementById('concepts');
+  if (!DATA.concepts.length) { wrap.innerHTML = '<div class="empty-state">No concepts yet.</div>'; return; }
+  wrap.innerHTML = DATA.concepts.map(c => {
+    const trips = DATA.triplets.filter(t => t.concept_id === c.id);
+    const dims = [c.subject, c.occasion !== 'general' ? c.occasion : null, c.action]
+      .filter(Boolean).map(v => '<span class="dim-chip">' + esc(v) + '</span>').join(' ');
+    return '<div class="concept-sec' + (c.active ? '' : ' inactive') + '">'
+      + '<div class="concept-head">'
+      +   '<h2>' + esc(c.name) + '</h2><span class="slug">' + esc(c.slug) + '</span>' + dims
+      +   (c.active ? '' : '<span class="inactive-badge">inactive</span>')
+      +   '<span class="spacer"></span>'
+      +   '<span style="font-size:10px;opacity:.7">' + trips.length + ' triplet' + (trips.length === 1 ? '' : 's') + '</span>'
+      +   '<a href="/admin/concepts/edit/' + c.id + '">Edit concept &rarr;</a>'
+      + '</div>'
+      + '<div class="triplet-grid">'
+      +   trips.map(tripletCard).join('')
+      +   newCard(c)
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ── Actions ────────────────────────────────────────────────
+async function patchMedia(id, patch) {
+  const r = await fetch('/admin/api/studio/media/' + id, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  const d = await r.json();
+  if (!d.ok) showFlash(d.error || 'Save failed', 'err');
+}
+
+async function toggleTriplet(id) {
+  const r = await fetch('/admin/triplets/' + id + '/toggle', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ field: 'active' }),
+  });
+  const d = await r.json();
+  if (!d.ok) { showFlash(d.error || 'Toggle failed', 'err'); return; }
+  const t = DATA.triplets.find(x => x.id === id);
+  if (t) { t.active = d.value; render(); }
+}
+
+async function deleteTriplet(id) {
+  if (!confirm('Delete this triplet? (Media items stay in the library.)')) return;
+  await fetch('/admin/triplets/' + id + '/delete', { method: 'POST', headers: { 'Accept': 'application/json' } });
+  await load();
+}
+
+function pickPhoto(conceptId, ev) {
+  if (ev && (ev.target.tagName === 'SELECT' || ev.target.tagName === 'OPTION' || ev.target.tagName === 'A')) return;
+  pendingConcept = conceptId;
+  document.getElementById('file-input').click();
+}
+
+document.getElementById('file-input').addEventListener('change', function () {
+  if (this.files[0] && pendingConcept) submitPhoto(pendingConcept, this.files[0]);
+  this.value = '';
+});
+
+function dropPhoto(ev, conceptId) {
+  ev.preventDefault();
+  const card = document.getElementById('nc-' + conceptId);
+  if (card) card.classList.remove('drag-over');
+  const f = ev.dataTransfer.files[0];
+  if (f && f.type.indexOf('image/') === 0) submitPhoto(conceptId, f);
+}
+
+async function submitPhoto(conceptId, file) {
+  const card = document.getElementById('nc-' + conceptId);
+  if (card) card.innerHTML = '<div class="spin"></div><span>Uploading&hellip;</span>';
+  const subjSel = document.getElementById('nc-subj-' + conceptId);
+  const fd = new FormData();
+  fd.append('photo', file);
+  if (subjSel && subjSel.value) fd.append('subject', subjSel.value);
+  try {
+    const r = await fetch('/admin/api/studio/concepts/' + conceptId + '/new-triplet', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Upload failed');
+    showFlash('Triplet #' + d.triplet_number + ' created — generating image, then video. This can take a few minutes.', 'ok');
+    await load();
+  } catch (e) {
+    showFlash(e.message, 'err');
+    await load();
+  }
+}
+
+function showFlash(msg, type) {
+  const el = document.getElementById('flash');
+  el.textContent = msg;
+  el.className = 'flash flash-' + type;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 8000);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+NavBar.init({ requireAuth: true }).then(load);
+</script>
+</body>
+</html>

@@ -966,6 +966,7 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     )}
 
     ${section('\u{1F3A8} Content',
+      card('Studio', 'Concepts with triplet grids — drop a photo to make a new triplet.', '/admin/studio') +
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
       card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery') +
       card('Triplets', 'Group Before / After-Picture / After-Video into rolling demo sets.', '/admin/triplets') +
@@ -2397,6 +2398,145 @@ app.post('/admin/triplets/:id/toggle', requireRole('admin'), async (req, res) =>
   } catch (err) {
     console.error('[triplet-toggle] error:', err.message);
     res.status(500).json({ error: 'Toggle failed' });
+  }
+});
+
+// ====================================================================
+// Studio (Stage 3 pipeline redesign) — concepts with triplet card grids.
+// "+ New triplet": drop a photo -> run the concept's image + video prompts
+// via fal -> media rows + triplet appear as a card. Generation runs in the
+// background; progress is tracked in-process and polled by the page.
+// ====================================================================
+app.get('/admin/studio', requireRole('admin'), (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'admin-studio.html'));
+});
+
+// In-process job tracker for "+ New triplet" generation.
+// tripletId -> { stage: 'image'|'video'|'done'|'error', error?, concept_id }
+const studioJobs = {};
+
+app.get('/admin/api/studio/jobs', requireRole('admin'), (req, res) => res.json(studioJobs));
+
+// One payload: all concepts + their triplets (with per-media subject/active)
+app.get('/admin/api/studio/concepts', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows: concepts } = await pool.query(`
+      SELECT id, slug, name, subject, occasion, action, active,
+             (image_prompt IS NOT NULL AND image_prompt <> '') AS has_image_prompt,
+             (video_prompt IS NOT NULL AND video_prompt <> '') AS has_video_prompt
+      FROM concepts ORDER BY active DESC, sort_order ASC, name ASC`);
+    const { rows: triplets } = await pool.query(`
+      SELECT t.id, t.concept_id, t.triplet_number, t.active, t.in_rolling_demo, t.in_gallery,
+             bm.id AS before_id, bm.url AS before_url, bm.subject AS before_subject, bm.active AS before_active,
+             im.id AS image_id,  im.url AS image_url,  im.subject AS image_subject,  im.active AS image_active,
+             vm.id AS video_id,  vm.url AS video_url,  vm.subject AS video_subject,  vm.active AS video_active
+      FROM concept_triplets t
+      LEFT JOIN concept_media bm ON bm.id = t.before_media_id
+      LEFT JOIN concept_media im ON im.id = t.image_media_id
+      LEFT JOIN concept_media vm ON vm.id = t.video_media_id
+      ORDER BY t.concept_id ASC, t.sort_order ASC, t.triplet_number ASC`);
+    res.json({ concepts, triplets, jobs: studioJobs });
+  } catch (e) {
+    console.error('[studio/concepts]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Lightweight media patch — only subject and/or active, nothing else touched.
+app.post('/admin/api/studio/media/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const hasSubject = req.body.subject !== undefined;
+    const subject = hasSubject
+      ? (String(req.body.subject || '').trim().toLowerCase().replace(/\s+/g, '-') || null)
+      : null;
+    const active = (typeof req.body.active === 'boolean') ? req.body.active : null;
+    const { rows } = await pool.query(`
+      UPDATE concept_media SET
+        subject = CASE WHEN $2::boolean THEN $3 ELSE subject END,
+        active  = COALESCE($4, active)
+      WHERE id = $1
+      RETURNING id, subject, active`,
+      [id, hasSubject, subject, active]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, ...rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// "+ New triplet": photo upload -> before media + triplet now, generation async
+app.post('/admin/api/studio/concepts/:id(\\d+)/new-triplet', requireRole('admin'), upload.single('photo'), async (req, res) => {
+  const conceptId = parseInt(req.params.id);
+  try {
+    const { rows } = await pool.query('SELECT * FROM concepts WHERE id = $1', [conceptId]);
+    if (!rows.length) return res.status(404).json({ error: 'Concept not found' });
+    const concept = rows[0];
+    if (!req.file || !req.file.buffer) return res.status(400).json({ error: 'photo file is required' });
+    if (!concept.image_prompt || !String(concept.image_prompt).trim())
+      return res.status(400).json({ error: 'Concept has no image prompt' });
+
+    // 1) Store the before photo + media row (subject inherits from concept unless given)
+    const up = await uploadStream(req.file.buffer, {
+      kind: 'concept_media', contentType: req.file.mimetype, originalName: req.file.originalname,
+    });
+    const beforeUrl = up.secure_url;
+    const subj = (String(req.body.subject || '').trim() || concept.subject || '')
+      .toLowerCase().replace(/\s+/g, '-') || null;
+    const { rows: [bm] } = await pool.query(
+      `INSERT INTO concept_media (concept_id, kind, url, caption, sort_order, subject)
+       VALUES ($1, 'image', $2, 'before', 0, $3) RETURNING id`,
+      [conceptId, beforeUrl, subj]);
+
+    // 2) Triplet row immediately (next free number) — card shows up at once
+    const existing = await pool.query(
+      `SELECT triplet_number FROM concept_triplets WHERE concept_id = $1`, [conceptId]);
+    const taken = new Set(existing.rows.map(r => r.triplet_number));
+    let n = 1; while (taken.has(n)) n++;
+    const { rows: [t] } = await pool.query(
+      `INSERT INTO concept_triplets (concept_id, triplet_number, before_media_id, active)
+       VALUES ($1, $2, $3, TRUE) RETURNING id`,
+      [conceptId, n, bm.id]);
+
+    studioJobs[t.id] = { stage: 'image', concept_id: conceptId, started_at: new Date().toISOString() };
+    res.json({ ok: true, triplet_id: t.id, triplet_number: n });
+
+    // 3) Background: concept image prompt -> after image, then video prompt -> after video
+    (async () => {
+      try {
+        const imagePrompt = applyUserInput(concept.image_prompt, concept, null);
+        const genI = await generation.generateImage({
+          modelId: (concept.fal_image_model || '').trim() || 'fal-ai/kling-image/o1',
+          prompt: imagePrompt, photoUrl: beforeUrl, orientation: null, inputExtras: null,
+        });
+        const r2i = await downloadAndStore({ remoteUrl: genI.url, kind: 'concept_media' });
+        const { rows: [im] } = await pool.query(
+          `INSERT INTO concept_media (concept_id, kind, url, sort_order, subject)
+           VALUES ($1, 'image', $2, 0, $3) RETURNING id`,
+          [conceptId, r2i.url, subj]);
+        await pool.query(`UPDATE concept_triplets SET image_media_id = $2 WHERE id = $1`, [t.id, im.id]);
+
+        if (concept.video_prompt && String(concept.video_prompt).trim()) {
+          studioJobs[t.id].stage = 'video';
+          const videoPrompt = applyUserInput(concept.video_prompt, concept, null);
+          const genV = await generation.generateVideo({
+            modelId: (concept.fal_video_model || '').trim() || 'fal-ai/kling-video/v3/pro/image-to-video',
+            prompt: videoPrompt, photoUrl: r2i.url, orientation: null, inputExtras: null,
+          });
+          const r2v = await downloadAndStore({ remoteUrl: genV.url, kind: 'concept_media' });
+          const { rows: [vm] } = await pool.query(
+            `INSERT INTO concept_media (concept_id, kind, url, sort_order, subject)
+             VALUES ($1, 'video', $2, 0, $3) RETURNING id`,
+            [conceptId, r2v.url, subj]);
+          await pool.query(`UPDATE concept_triplets SET video_media_id = $2 WHERE id = $1`, [t.id, vm.id]);
+        }
+        studioJobs[t.id].stage = 'done';
+      } catch (e) {
+        console.error('[studio new-triplet] generation:', e.message);
+        studioJobs[t.id] = Object.assign({}, studioJobs[t.id], { stage: 'error', error: e.message });
+      }
+    })();
+  } catch (e) {
+    console.error('[studio new-triplet]', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
