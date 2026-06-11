@@ -8195,17 +8195,24 @@ app.get('/admin/api/tracker/stats-grid', requireRole('admin'), async (req, res) 
   try {
     const start = month + '-01';
     const { rows: stats } = await pool.query(
-      `SELECT social_clip_id AS clip_id, stat_date::text AS date, views, source
+      `SELECT social_clip_id AS clip_id, stat_date::text AS date, views, likes, comments, shares, source
        FROM clip_stats
        WHERE platform = $1 AND stat_date >= $2::date AND stat_date < ($2::date + interval '1 month')
        ORDER BY social_clip_id, stat_date`, [platform, start]);
     const { rows: baselines } = await pool.query(
-      `SELECT DISTINCT ON (social_clip_id) social_clip_id AS clip_id, views
+      `SELECT DISTINCT ON (social_clip_id) social_clip_id AS clip_id, views, likes, comments
        FROM clip_stats WHERE platform = $1 AND stat_date < $2::date
        ORDER BY social_clip_id, stat_date DESC`, [platform, start]);
+    // Site clicks attributed to each clip's ref tag (?ref=c<id>), per day —
+    // these are events, not cumulative snapshots.
+    const { rows: clicks } = await pool.query(
+      `SELECT sc.id AS clip_id, v.created_at::date::text AS date, COUNT(*)::int AS n
+       FROM visits v JOIN social_clips sc ON sc.ref_tag = v.ref
+       WHERE v.ref IS NOT NULL AND v.created_at >= $1::date AND v.created_at < ($1::date + interval '1 month')
+       GROUP BY sc.id, v.created_at::date`, [start]);
     const { rows: clips } = await pool.query(
       `SELECT id, COALESCE(concept_name, '') AS concept, ref_tag FROM social_clips ORDER BY id`);
-    res.json({ platform, month, stats, baselines, clips });
+    res.json({ platform, month, stats, baselines, clicks, clips });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

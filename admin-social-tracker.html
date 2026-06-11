@@ -1376,8 +1376,9 @@ NavBar.init({ requireAuth: true }).then(async () => {
   loadCal();
 });
 
-// ── Daily views grid (spreadsheet export) ───────────────────
-let gridData = null, gridMode = 'daily';
+// ── Stats grid (spreadsheet export) ─────────────────────────
+let gridData = null, gridMode = 'daily', gridMetric = 'views';
+const GRID_METRICS = [['views','Views'],['likes','Likes'],['comments','Comments'],['clicks','Clicks']];
 
 function showStatsGrid(){
   const existing=document.getElementById('grid-modal-bg'); if(existing)existing.remove();
@@ -1387,10 +1388,12 @@ function showStatsGrid(){
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML='<div style="background:#fff;border-radius:12px;padding:16px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;gap:10px">'+
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-      '<h3 style="margin:0;font-size:15px">&#128202; Views grid</h3>'+
+      '<h3 style="margin:0;font-size:15px">&#128202; Stats grid</h3>'+
       '<select id="grid-plat" style="padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px">'+
         ['youtube','tiktok','instagram','facebook'].map(p=>'<option value="'+p+'">'+PF[p]+'</option>').join('')+'</select>'+
       '<input type="month" id="grid-month" value="'+month+'" style="padding:4px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px">'+
+      '<span id="grid-metric-seg" style="display:inline-flex;border:1px solid #ccc;border-radius:6px;overflow:hidden">'+
+        GRID_METRICS.map(([k,l])=>'<button id="grid-met-'+k+'" onclick="gridSetMetric(\''+k+'\')" style="padding:4px 10px;border:none;font-size:11px;font-weight:700;cursor:pointer">'+l+'</button>').join('')+'</span>'+
       '<span style="display:inline-flex;border:1px solid #ccc;border-radius:6px;overflow:hidden">'+
         '<button id="grid-mode-daily" onclick="gridSetMode(\'daily\')" style="padding:4px 10px;border:none;font-size:11px;font-weight:700;cursor:pointer">Daily</button>'+
         '<button id="grid-mode-total" onclick="gridSetMode(\'total\')" style="padding:4px 10px;border:none;font-size:11px;font-weight:700;cursor:pointer">Total</button></span>'+
@@ -1404,18 +1407,23 @@ function showStatsGrid(){
   document.body.appendChild(div);
   document.getElementById('grid-plat').onchange=loadGrid;
   document.getElementById('grid-month').onchange=loadGrid;
-  gridModeButtons();
+  gridButtons();
   loadGrid();
 }
 
-function gridModeButtons(){
+function gridButtons(){
+  GRID_METRICS.forEach(([k])=>{
+    const b=document.getElementById('grid-met-'+k); if(!b)return;
+    b.style.background=gridMetric===k?'#1C2A14':'#fff'; b.style.color=gridMetric===k?'#FFE800':'#555';
+  });
   const d=document.getElementById('grid-mode-daily'), t=document.getElementById('grid-mode-total');
   if(!d||!t)return;
   d.style.background=gridMode==='daily'?'#1C2A14':'#fff'; d.style.color=gridMode==='daily'?'#FFE800':'#555';
   t.style.background=gridMode==='total'?'#1C2A14':'#fff'; t.style.color=gridMode==='total'?'#FFE800':'#555';
 }
 
-function gridSetMode(m){ gridMode=m; gridModeButtons(); renderGrid(); }
+function gridSetMode(m){ gridMode=m; gridButtons(); renderGrid(); }
+function gridSetMetric(m){ gridMetric=m; gridButtons(); renderGrid(); }
 
 async function loadGrid(){
   const plat=document.getElementById('grid-plat').value;
@@ -1433,28 +1441,48 @@ function gridMatrix(){
   const [y,m]=d.month.split('-').map(Number);
   const dim=new Date(y,m,0).getDate();
   const days=Array.from({length:dim},(_,i)=>i+1);
-  const byClip={};
-  (d.stats||[]).forEach(s=>{(byClip[s.clip_id]=byClip[s.clip_id]||{})[s.date]={v:s.views,src:s.source||'api'};});
-  const base={}; (d.baselines||[]).forEach(b=>{base[b.clip_id]=b.views;});
   const meta={}; (d.clips||[]).forEach(c=>meta[c.id]=c);
   const rows=[];
-  Object.keys(byClip).map(Number).sort((a,b)=>a-b).forEach(id=>{
-    const snaps=byClip[id]; const mt=meta[id]||{};
-    let last=(base[id]!=null)?base[id]:null;
-    let prev=null; // previous cumulative value, for dip detection
-    const cells=days.map(dd=>{
-      const ds=d.month+'-'+String(dd).padStart(2,'0');
-      const s=snaps[ds];
-      if(s==null)return '';
-      const v=s.v;
-      let out=(gridMode==='total')?v:((last==null)?v:Math.max(0,v-last));
-      const dip=(prev!=null&&v<prev); // cumulative going DOWN = corrupt row
-      last=v; prev=v;
-      return {n:out,src:s.src,date:ds,clipId:id,dip:dip};
+
+  if(gridMetric==='clicks'){
+    // Clicks are per-day events (site visits via ?ref=) — Daily is native,
+    // Total is a running sum. Not platform-specific, not deletable.
+    const byClip={};
+    (d.clicks||[]).forEach(s=>{(byClip[s.clip_id]=byClip[s.clip_id]||{})[s.date]=s.n;});
+    Object.keys(byClip).map(Number).sort((a,b)=>a-b).forEach(id=>{
+      const snaps=byClip[id]; const mt=meta[id]||{};
+      let run=0;
+      const cells=days.map(dd=>{
+        const ds=d.month+'-'+String(dd).padStart(2,'0');
+        const v=snaps[ds];
+        if(v!=null)run+=v;
+        if(gridMode==='daily')return v==null?'':{n:v,src:'visits',date:ds,clipId:id,noDel:true};
+        return (v==null&&run===0)?'':{n:run,src:'visits',date:ds,clipId:id,noDel:true};
+      });
+      rows.push({concept:mt.concept||('clip '+id),ref:mt.ref_tag||('c'+id),cells});
     });
-    rows.push({concept:mt.concept||('clip '+id),ref:mt.ref_tag||('c'+id),cells});
-  });
-  // TOTAL row: per-day sum of numeric cells
+  } else {
+    const byClip={};
+    (d.stats||[]).forEach(s=>{(byClip[s.clip_id]=byClip[s.clip_id]||{})[s.date]={v:s[gridMetric]||0,src:s.source||'api'};});
+    const base={}; (d.baselines||[]).forEach(b=>{base[b.clip_id]=b[gridMetric];});
+    Object.keys(byClip).map(Number).sort((a,b)=>a-b).forEach(id=>{
+      const snaps=byClip[id]; const mt=meta[id]||{};
+      let last=(base[id]!=null)?base[id]:null;
+      let prev=null;
+      const cells=days.map(dd=>{
+        const ds=d.month+'-'+String(dd).padStart(2,'0');
+        const s=snaps[ds];
+        if(s==null)return '';
+        const v=s.v;
+        let out=(gridMode==='total')?v:((last==null)?v:Math.max(0,v-last));
+        const dip=(prev!=null&&v<prev);
+        last=v; prev=v;
+        return {n:out,src:s.src,date:ds,clipId:id,dip:dip};
+      });
+      rows.push({concept:mt.concept||('clip '+id),ref:mt.ref_tag||('c'+id),cells});
+    });
+  }
+
   if(rows.length){
     const totals=days.map((_,i)=>{
       let any=false,sum=0;
@@ -1469,7 +1497,7 @@ function gridMatrix(){
 function renderGrid(){
   const el=document.getElementById('grid-body'); if(!el)return;
   const mx=gridMatrix();
-  if(!mx||!mx.rows.length){el.innerHTML='<div style="padding:20px;color:#888">No stats for this platform and month.</div>';return;}
+  if(!mx||!mx.rows.length){el.innerHTML='<div style="padding:20px;color:#888">No '+gridMetric+' data for this selection.</div>';return;}
   const th='padding:3px 7px;border:1px solid #e5e0d5;background:#f5f2ea;font-weight:700;text-align:right;position:sticky;top:0';
   const td='padding:2px 7px;border:1px solid #efece4;text-align:right;font-variant-numeric:tabular-nums';
   let h='<table style="border-collapse:collapse;white-space:nowrap">'+
@@ -1481,7 +1509,7 @@ function renderGrid(){
        '<td style="'+td+';text-align:left;font-family:monospace;color:#888;'+bold+'">'+esc(r.ref)+'</td>'+
        r.cells.map(c2=>{
          if(c2==='')return '<td style="'+td+';'+bold+'"></td>';
-         if(r.isTotal)return '<td style="'+td+';'+bold+'">'+c2.n+'</td>';
+         if(r.isTotal||c2.noDel)return '<td style="'+td+';'+bold+'"'+(c2.date?' title="'+c2.date+' · '+esc(c2.src||'')+'"':'')+'>'+c2.n+'</td>';
          const warn=c2.dip?'background:#fde0e0;color:#a33;font-weight:700;':'';
          return '<td style="'+td+';'+warn+'cursor:pointer" title="'+c2.date+' · source: '+esc(c2.src)+(c2.dip?' · ⚠ total went DOWN — likely bad row':'')+' · click to delete this snapshot" onclick="delGridCell('+c2.clipId+',\''+c2.date+'\','+c2.n+')">'+c2.n+'</td>';
        }).join('')+'</tr>';
