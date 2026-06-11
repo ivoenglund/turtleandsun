@@ -835,25 +835,41 @@ async function fetchIG(btn) {
 
 async function fetchAll(btn) {
   btn.disabled = true; btn.textContent = 'Fetching…';
+  const parts = [];   // per-platform results, including failures
+  const fails = [];
+  async function callFetch(url, label) {
+    try {
+      const r = await fetch(url, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) { parts.push(label + ' ✗'); fails.push(label + ': ' + (d.error || 'HTTP ' + r.status)); return 0; }
+      parts.push(label + ' ' + (d.updated || 0));
+      return d.updated || 0;
+    } catch(e) { parts.push(label + ' ✗'); fails.push(label + ': ' + e.message); return 0; }
+  }
   try {
-    // Fetch YouTube, Instagram, Facebook via server API
-    const [ytR, igR, fbR] = await Promise.all([
-      fetch('/admin/api/tracker/fetch-youtube-stats', { method:'POST' }),
-      fetch('/admin/api/tracker/fetch-instagram-stats', { method:'POST' }),
-      fetch('/admin/api/tracker/fetch-facebook-stats', { method:'POST' }),
-    ]);
-    const [yt, ig, fb] = await Promise.all([ytR.json(), igR.json(), fbR.json()]);
-    let total = (yt.updated||0) + (ig.updated||0) + (fb.updated||0);
+    let total = 0;
+    total += await callFetch('/admin/api/tracker/fetch-youtube-stats', 'YT');
+    total += await callFetch('/admin/api/tracker/fetch-instagram-stats', 'IG');
+    total += await callFetch('/admin/api/tracker/fetch-facebook-stats', 'FB');
 
-    // Fetch TikTok stats via Chrome extension scraping TikTok Studio
+    // TikTok: Chrome extension scrapes TikTok Studio; if it returns nothing
+    // (extension missing / not logged in / layout change), fall back to the
+    // Video Query API (works once the TikTok app is approved + connected).
     btn.textContent = 'Fetching TikTok…';
-    const ttUpdated = await fetchTikTokViaExtension();
-    total += ttUpdated;
+    const ttExt = await fetchTikTokViaExtension();
+    if (ttExt > 0) { parts.push('TT ' + ttExt + ' (ext)'); total += ttExt; }
+    else { total += await callFetch('/admin/api/tracker/fetch-tiktok-stats', 'TT'); }
 
-    btn.textContent = `✓ Updated ${total} item${total===1?'':'s'}`;
+    // Re-snapshot today's channel totals so the daily chart shows this fetch
+    // immediately instead of waiting for the 09:00 UTC cron.
+    btn.textContent = 'Updating chart…';
+    await fetch('/admin/api/tracker/run-channel-stats', { method: 'POST' }).catch(() => {});
+
+    btn.textContent = '✓ ' + parts.join(' · ');
+    if (fails.length) alert('Some platforms failed:\n' + fails.join('\n'));
     await load();
     if (selId) { await loadStats(selId); renderPanel(); }
-    setTimeout(() => { btn.disabled=false; btn.textContent='↻ Fetch all stats'; }, 3000);
+    setTimeout(() => { btn.disabled=false; btn.textContent='↻ Fetch all stats'; }, 6000);
   } catch(e) {
     btn.disabled = false; btn.textContent = '↻ Fetch all stats';
     alert('Fetch stats error: ' + e.message);
