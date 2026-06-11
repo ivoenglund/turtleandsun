@@ -2832,7 +2832,10 @@ app.get('/admin/api/social-clips/triplets', requireRole('admin'), async (req, re
   try {
     const { rows } = await pool.query(`
       SELECT t.id, t.concept_id, t.triplet_number, c.name AS concept_name,
-             bm.url AS before_url, im.url AS image_url, vm.url AS video_url
+             bm.url AS before_url, im.url AS image_url, vm.url AS video_url,
+             COALESCE(bm.subject, im.subject, c.subject) AS subject,
+             c.occasion, c.action,
+             (SELECT COUNT(*)::int FROM social_clips sc WHERE sc.triplet_id = t.id) AS clip_count
       FROM concept_triplets t
       LEFT JOIN concepts c ON c.id = t.concept_id
       LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
@@ -2876,7 +2879,8 @@ app.get('/admin/api/social-clips', requireRole('admin'), async (req, res) => {
 
 // Queue one or more triplets — creates pending social_clip rows
 app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res) => {
-  const { triplet_ids } = req.body; // array of triplet IDs
+  const { triplet_ids, clip_style } = req.body; // array of triplet IDs + optional style (1=A, 3=B)
+  const styleVal = (clip_style === 3 || clip_style === 1) ? clip_style : 1;
   if (!Array.isArray(triplet_ids) || triplet_ids.length === 0)
     return res.status(400).json({ error: 'triplet_ids must be a non-empty array' });
   try {
@@ -2899,11 +2903,11 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
       // editable on the clip detail page (Stage 1 pipeline redesign).
       const { rows: [row] } = await pool.query(`
         INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url, after_image_url,
-                                  subject, occasion, action)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                                  subject, occasion, action, clip_style)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id
       `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url, t.image_url,
-          t.inh_subject || null, t.inh_occasion || null, t.inh_action || null]);
+          t.inh_subject || null, t.inh_occasion || null, t.inh_action || null, styleVal]);
       // Auto-assign click-attribution ref tag (c<id>) so tagged links work from day one
       await pool.query(`UPDATE social_clips SET ref_tag = 'c' || id WHERE id = $1 AND ref_tag IS NULL`, [row.id]);
       created.push(row.id);
