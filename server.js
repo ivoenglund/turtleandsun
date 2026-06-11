@@ -8195,7 +8195,7 @@ app.get('/admin/api/tracker/stats-grid', requireRole('admin'), async (req, res) 
   try {
     const start = month + '-01';
     const { rows: stats } = await pool.query(
-      `SELECT social_clip_id AS clip_id, stat_date::text AS date, views
+      `SELECT social_clip_id AS clip_id, stat_date::text AS date, views, source
        FROM clip_stats
        WHERE platform = $1 AND stat_date >= $2::date AND stat_date < ($2::date + interval '1 month')
        ORDER BY social_clip_id, stat_date`, [platform, start]);
@@ -8206,6 +8206,21 @@ app.get('/admin/api/tracker/stats-grid', requireRole('admin'), async (req, res) 
     const { rows: clips } = await pool.query(
       `SELECT id, COALESCE(concept_name, '') AS concept, ref_tag FROM social_clips ORDER BY id`);
     res.json({ platform, month, stats, baselines, clips });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /admin/api/tracker/stats-cell — remove one bad snapshot row
+// Body: { clip_id, platform, date }  (used from the views grid to clean
+// up corrupt entries, e.g. manual daily-views typed in as totals)
+app.delete('/admin/api/tracker/stats-cell', requireRole('admin'), async (req, res) => {
+  const { clip_id, platform, date } = req.body || {};
+  if (!parseInt(clip_id) || !['tiktok','instagram','youtube','facebook'].includes(String(platform)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(date)))
+    return res.status(400).json({ error: 'clip_id, platform, date required' });
+  try {
+    const r = await pool.query(
+      `DELETE FROM clip_stats WHERE social_clip_id=$1 AND platform=$2 AND stat_date=$3::date`,
+      [parseInt(clip_id), platform, date]);
+    res.json({ ok: true, deleted: r.rowCount });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

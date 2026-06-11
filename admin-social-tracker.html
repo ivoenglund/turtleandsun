@@ -1434,20 +1434,23 @@ function gridMatrix(){
   const dim=new Date(y,m,0).getDate();
   const days=Array.from({length:dim},(_,i)=>i+1);
   const byClip={};
-  (d.stats||[]).forEach(s=>{(byClip[s.clip_id]=byClip[s.clip_id]||{})[s.date]=s.views;});
+  (d.stats||[]).forEach(s=>{(byClip[s.clip_id]=byClip[s.clip_id]||{})[s.date]={v:s.views,src:s.source||'api'};});
   const base={}; (d.baselines||[]).forEach(b=>{base[b.clip_id]=b.views;});
   const meta={}; (d.clips||[]).forEach(c=>meta[c.id]=c);
   const rows=[];
   Object.keys(byClip).map(Number).sort((a,b)=>a-b).forEach(id=>{
     const snaps=byClip[id]; const mt=meta[id]||{};
     let last=(base[id]!=null)?base[id]:null;
+    let prev=null; // previous cumulative value, for dip detection
     const cells=days.map(dd=>{
       const ds=d.month+'-'+String(dd).padStart(2,'0');
-      const v=snaps[ds];
-      if(v==null)return '';
+      const s=snaps[ds];
+      if(s==null)return '';
+      const v=s.v;
       let out=(gridMode==='total')?v:((last==null)?v:Math.max(0,v-last));
-      last=v;
-      return out;
+      const dip=(prev!=null&&v<prev); // cumulative going DOWN = corrupt row
+      last=v; prev=v;
+      return {n:out,src:s.src,date:ds,clipId:id,dip:dip};
     });
     rows.push({concept:mt.concept||('clip '+id),ref:mt.ref_tag||('c'+id),cells});
   });
@@ -1455,8 +1458,8 @@ function gridMatrix(){
   if(rows.length){
     const totals=days.map((_,i)=>{
       let any=false,sum=0;
-      rows.forEach(r=>{if(r.cells[i]!=='' ){any=true;sum+=r.cells[i];}});
-      return any?sum:'';
+      rows.forEach(r=>{const cc=r.cells[i];if(cc!==''){any=true;sum+=cc.n;}});
+      return any?{n:sum}:'';
     });
     rows.push({concept:'TOTAL',ref:'',cells:totals,isTotal:true});
   }
@@ -1476,7 +1479,12 @@ function renderGrid(){
     const bold=r.isTotal?'font-weight:700;background:#faf8f2;':'';
     h+='<tr><td style="'+td+';text-align:left;'+bold+'">'+esc(r.concept)+'</td>'+
        '<td style="'+td+';text-align:left;font-family:monospace;color:#888;'+bold+'">'+esc(r.ref)+'</td>'+
-       r.cells.map(c2=>'<td style="'+td+';'+bold+'">'+(c2===''?'':c2)+'</td>').join('')+'</tr>';
+       r.cells.map(c2=>{
+         if(c2==='')return '<td style="'+td+';'+bold+'"></td>';
+         if(r.isTotal)return '<td style="'+td+';'+bold+'">'+c2.n+'</td>';
+         const warn=c2.dip?'background:#fde0e0;color:#a33;font-weight:700;':'';
+         return '<td style="'+td+';'+warn+'cursor:pointer" title="'+c2.date+' · source: '+esc(c2.src)+(c2.dip?' · ⚠ total went DOWN — likely bad row':'')+' · click to delete this snapshot" onclick="delGridCell('+c2.clipId+',\''+c2.date+'\','+c2.n+')">'+c2.n+'</td>';
+       }).join('')+'</tr>';
   });
   h+='</table>';
   el.innerHTML=h;
@@ -1485,12 +1493,21 @@ function renderGrid(){
 async function copyGrid(){
   const mx=gridMatrix(); if(!mx||!mx.rows.length)return;
   const lines=[['Clip','Ref',...mx.days].join('\t')];
-  mx.rows.forEach(r=>lines.push([r.concept,r.ref,...r.cells].join('\t')));
+  mx.rows.forEach(r=>lines.push([r.concept,r.ref,...r.cells.map(c2=>c2===''?'':c2.n)].join('\t')));
   try{
     await navigator.clipboard.writeText(lines.join('\n'));
     document.getElementById('grid-copied').textContent='✓ copied';
     setTimeout(()=>{const e=document.getElementById('grid-copied');if(e)e.textContent='';},2500);
   }catch(e){ alert('Clipboard blocked: '+e.message); }
+}
+
+async function delGridCell(clipId,date,val){
+  const plat=document.getElementById('grid-plat').value;
+  if(!confirm('Delete the '+PF[plat]+' snapshot for clip '+clipId+' on '+date+' (value '+val+')?\nUse this to remove corrupt rows — the next Fetch all stats rebuilds today\'s data.'))return;
+  const r=await fetch('/admin/api/tracker/stats-cell',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({clip_id:clipId,platform:plat,date:date})});
+  const d=await r.json().catch(()=>({}));
+  if(!d.ok){alert(d.error||'Delete failed');return;}
+  loadGrid();
 }
 
 // ── Publish planner ─────────────────────────────────────────
