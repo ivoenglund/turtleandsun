@@ -962,7 +962,9 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     ${section('\u{1F4C5} Daily — what to check this morning',
       card('Daily digest', 'Live revenue, visitors, humans, delivery health.', '/admin/digest') +
       card('Failed deliveries', 'Orders that failed generation or email.', '/admin/failed-deliveries') +
-      card('Visits & visitors map', 'Traffic log, geo map, and IP labels.', '/admin/visits')
+      card('Visits & visitors map', 'Traffic log, geo map, and IP labels.', '/admin/visits') +
+      card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
+      card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets')
     )}
 
     ${section('\u{1F3A8} Content',
@@ -971,7 +973,6 @@ app.get('/admin', requireRole('admin'), (req, res) => {
       card('Tracker', 'Track published videos: platform metadata, view stats, YouTube auto-fetch.', '/admin/social-tracker') +
       card('Concepts library', 'Manage style concepts and prompts.', '/admin/concepts') +
       card('Gallery', 'Manage public gallery items (images, videos, cards, books).', '/admin/gallery') +
-      card('Triplets', 'Group Before / After-Picture / After-Video into rolling demo sets.', '/admin/triplets') +
       card('Reviews', 'Moderate customer reviews; approve to publish on the landing.', '/admin/reviews')
     )}
 
@@ -980,16 +981,12 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     )}
 
     ${section('\u{1F4C6} Occasions & campaigns',
-      card('Gifting occasions', 'National occasions, live dates, markets — what the campaign agent runs on.', '/admin/occasions') +
-      card('Campaign queue', 'What is queued to draft, print, and send.', '/admin/occasions/queue') +
-      card('Email engine', 'Lifecycle email: templates, sequences, enrollments, unsubscribes.', '/admin/email') +
-      card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
-      card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets') +
-      card('Content Calendar', 'Weekly calendar of posted and scheduled social videos by platform.', '/admin/social-calendar')
+      card('Gifting occasions', 'National occasions, live dates, markets — the reminder list for what to run.', '/admin/occasions')
     )}
 
-    <h2 class="admin-section">\u{1F527} Developer mode <span class="admin-section-sub">— admin-only, never visible to customers</span></h2>
+    <h2 class="admin-section">\u{1F527} Developing <span class="admin-section-sub">— work in progress + dev tools, never visible to customers</span></h2>
     <div class="admin-grid">
+      ${card('Email engine', 'Lifecycle email: templates, sequences, enrollments. Work in progress.', '/admin/email')}
       <form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">
         <input type="hidden" name="return_to" value="/admin">
         <button type="submit" class="admin-card" style="background:${cachedDevMode ? '#FFE800' : '#fff'};border:1px solid ${cachedDevMode ? '#1C0A00' : '#eee'};text-align:left;cursor:pointer;width:100%;font-family:inherit;">
@@ -5272,7 +5269,7 @@ function conceptAdminPage(title, body) {
 </style></head><body class="ts-nav-loggedin ts-nav-admin">
 <div class="sun"></div>
 <script src="/currency.js?v=20260526a"></script>
-<script src="/nav.js?v=20260526b"></script>
+<script src="/nav.js?v=20260611a"></script>
 <script>NavBar.init({ requireAuth: true });</script>
 ${devRibbonHtml()}
 <div class="wrap">${body}</div>
