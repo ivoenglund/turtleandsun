@@ -8186,6 +8186,29 @@ app.put('/admin/api/tracker/clips/:id', requireRole('admin'), async (req, res) =
 });
 
 // DELETE /admin/api/tracker/clips/:id
+// GET /admin/api/tracker/stats-grid?platform=youtube&month=2026-06
+// Per-clip, per-day view snapshots for one platform/month + the last
+// snapshot before the month (baseline for day-1 daily deltas).
+app.get('/admin/api/tracker/stats-grid', requireRole('admin'), async (req, res) => {
+  const platform = ['tiktok','instagram','youtube','facebook'].includes(String(req.query.platform)) ? req.query.platform : 'youtube';
+  const month = /^\d{4}-\d{2}$/.test(String(req.query.month || '')) ? req.query.month : new Date().toISOString().slice(0, 7);
+  try {
+    const start = month + '-01';
+    const { rows: stats } = await pool.query(
+      `SELECT social_clip_id AS clip_id, stat_date::text AS date, views
+       FROM clip_stats
+       WHERE platform = $1 AND stat_date >= $2::date AND stat_date < ($2::date + interval '1 month')
+       ORDER BY social_clip_id, stat_date`, [platform, start]);
+    const { rows: baselines } = await pool.query(
+      `SELECT DISTINCT ON (social_clip_id) social_clip_id AS clip_id, views
+       FROM clip_stats WHERE platform = $1 AND stat_date < $2::date
+       ORDER BY social_clip_id, stat_date DESC`, [platform, start]);
+    const { rows: clips } = await pool.query(
+      `SELECT id, COALESCE(concept_name, '') AS concept, ref_tag FROM social_clips ORDER BY id`);
+    res.json({ platform, month, stats, baselines, clips });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /admin/api/tracker/clips/:id/plan — set/clear per-platform planned publish dates
 // Body: { plan: { tiktok: 'YYYY-MM-DD'|null, instagram: ..., youtube: ..., facebook: ... } }
 app.post('/admin/api/tracker/clips/:id(\\d+)/plan', requireRole('admin'), async (req, res) => {

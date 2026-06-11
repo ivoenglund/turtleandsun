@@ -166,7 +166,7 @@ table.st td.yt{color:#0F6E56;font-weight:700}
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-secondary" onclick="fetchAll(this)" style="background:#1C2A14;color:#FFE800;border-color:#1C2A14">&#8635; Fetch all stats</button>
-          <button class="btn btn-primary" onclick="showAddModal()">+ Add clip</button>
+          <button class="btn btn-primary" onclick="showStatsGrid()">&#128202; Stats grid</button>
         </div>
       </div>
       <div id="tracker-block" style="width:100%;display:flex;flex-direction:column;gap:28px">
@@ -235,76 +235,6 @@ table.st td.yt{color:#0F6E56;font-weight:700}
     </div>
   </div>
 
-</div>
-
-<!-- Add clip modal -->
-<div class="modal-bg" id="add-modal" style="display:none">
-  <div class="modal">
-    <h3>Add clip</h3>
-    <div class="form-row">
-      <label>Concept name *</label>
-      <input id="f-concept" placeholder="e.g. Royal Portrait">
-    </div>
-    <div class="form-row">
-      <label>Ref tag * <span style="font-weight:400;color:#aaa">(unique ID for attribution)</span></label>
-      <input id="f-ref" placeholder="e.g. tns-rp-jun05">
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="form-row">
-        <label>Subject</label>
-        <select id="f-subject">
-          <option value="">—</option>
-          <option>dog</option><option>cat</option><option>human</option><option>family</option><option>other</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Subject name</label>
-        <input id="f-name" placeholder="e.g. Bella">
-      </div>
-      <div class="form-row">
-        <label>Occasion</label>
-        <select id="f-occasion">
-          <option value="">—</option>
-          <option value="general">General</option>
-          <option value="birthday">Birthday</option>
-          <option value="fathers-day">Father's Day</option>
-          <option value="mothers-day">Mother's Day</option>
-          <option value="christmas">Christmas</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Style</label>
-        <select id="f-style">
-          <option value="">—</option>
-          <option value="royal-portrait">Royal Portrait</option>
-          <option value="talking-pet">Talking Pet</option>
-          <option value="watercolor">Watercolor</option>
-          <option value="before-after">Before/After</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Mood</label>
-        <select id="f-mood">
-          <option value="">—</option>
-          <option>funny</option><option>heartfelt</option><option>dramatic</option><option>cute</option><option>elegant</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Custom tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></label>
-        <input id="f-custom" placeholder="e.g. before-after, transformation">
-      </div>
-    </div>
-    <div class="form-row">
-      <label>Notes</label>
-      <textarea id="f-notes" rows="2" placeholder="Optional"></textarea>
-    </div>
-    <div class="modal-btns">
-      <button class="btn btn-secondary" onclick="hideAddModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveClip()">Save clip</button>
-    </div>
-  </div>
 </div>
 
 <script src="/nav.js?v=20260602a"></script>
@@ -595,7 +525,7 @@ function loadStatusesBg() {
 function renderTable() {
   const tbody = document.getElementById('clips-body');
   if (!clips.length) {
-    tbody.innerHTML = '<tr><td colspan="15" class="empty">No clips yet. Click "+ Add clip" to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="empty">No clips yet &mdash; make clips on the Produce page.</td></tr>';
     return;
   }
   // Column totals
@@ -925,33 +855,6 @@ async function deleteClip(id) {
   await load();
 }
 
-// Add clip modal
-function showAddModal() { document.getElementById('add-modal').style.display='flex'; document.getElementById('f-concept').focus(); }
-function hideAddModal() { document.getElementById('add-modal').style.display='none'; }
-
-async function saveClip() {
-  const concept = document.getElementById('f-concept').value.trim();
-  const ref_tag = document.getElementById('f-ref').value.trim();
-  if (!concept || !ref_tag) { alert('Concept name and ref tag are required'); return; }
-  const custom_raw = document.getElementById('f-custom').value.trim();
-  const custom_tags = custom_raw ? custom_raw.split(',').map(s=>s.trim()).filter(Boolean) : [];
-  const body = {
-    concept, ref_tag,
-    subject: document.getElementById('f-subject').value || null,
-    subject_name: document.getElementById('f-name').value.trim() || null,
-    occasion: document.getElementById('f-occasion').value || null,
-    style: document.getElementById('f-style').value || null,
-    mood: document.getElementById('f-mood').value || null,
-    custom_tags,
-    notes: document.getElementById('f-notes').value.trim() || null,
-  };
-  const r = await fetch('/admin/api/tracker/clips', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-  const d = await r.json();
-  if (!r.ok) { alert(d.error); return; }
-  hideAddModal();
-  await load();
-  pick(d.clip.id);
-}
 
 // Post modal (add/edit platform info)
 let postModalPlat = null;
@@ -1472,6 +1375,123 @@ NavBar.init({ requireAuth: true }).then(async () => {
   if (clips.length) await pick(clips[0].id);
   loadCal();
 });
+
+// ── Daily views grid (spreadsheet export) ───────────────────
+let gridData = null, gridMode = 'daily';
+
+function showStatsGrid(){
+  const existing=document.getElementById('grid-modal-bg'); if(existing)existing.remove();
+  const month=new Date().toISOString().slice(0,7);
+  const div=document.createElement('div');
+  div.id='grid-modal-bg';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML='<div style="background:#fff;border-radius:12px;padding:16px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;gap:10px">'+
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+      '<h3 style="margin:0;font-size:15px">&#128202; Views grid</h3>'+
+      '<select id="grid-plat" style="padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px">'+
+        ['youtube','tiktok','instagram','facebook'].map(p=>'<option value="'+p+'">'+PF[p]+'</option>').join('')+'</select>'+
+      '<input type="month" id="grid-month" value="'+month+'" style="padding:4px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px">'+
+      '<span style="display:inline-flex;border:1px solid #ccc;border-radius:6px;overflow:hidden">'+
+        '<button id="grid-mode-daily" onclick="gridSetMode(\'daily\')" style="padding:4px 10px;border:none;font-size:11px;font-weight:700;cursor:pointer">Daily</button>'+
+        '<button id="grid-mode-total" onclick="gridSetMode(\'total\')" style="padding:4px 10px;border:none;font-size:11px;font-weight:700;cursor:pointer">Total</button></span>'+
+      '<button class="btn btn-primary" onclick="copyGrid()" style="font-size:11px">&#10697; Copy for spreadsheet</button>'+
+      '<span id="grid-copied" style="font-size:11px;color:#3A6B20;font-weight:700"></span>'+
+      '<span style="flex:1"></span>'+
+      '<button onclick="document.getElementById(\'grid-modal-bg\').remove()" style="background:none;border:none;font-size:16px;cursor:pointer">&#x2715;</button>'+
+    '</div>'+
+    '<div id="grid-body" style="overflow:auto;font-size:11px">Loading&hellip;</div>'+
+  '</div>';
+  document.body.appendChild(div);
+  document.getElementById('grid-plat').onchange=loadGrid;
+  document.getElementById('grid-month').onchange=loadGrid;
+  gridModeButtons();
+  loadGrid();
+}
+
+function gridModeButtons(){
+  const d=document.getElementById('grid-mode-daily'), t=document.getElementById('grid-mode-total');
+  if(!d||!t)return;
+  d.style.background=gridMode==='daily'?'#1C2A14':'#fff'; d.style.color=gridMode==='daily'?'#FFE800':'#555';
+  t.style.background=gridMode==='total'?'#1C2A14':'#fff'; t.style.color=gridMode==='total'?'#FFE800':'#555';
+}
+
+function gridSetMode(m){ gridMode=m; gridModeButtons(); renderGrid(); }
+
+async function loadGrid(){
+  const plat=document.getElementById('grid-plat').value;
+  const month=document.getElementById('grid-month').value;
+  document.getElementById('grid-body').textContent='Loading…';
+  try{
+    const r=await fetch('/admin/api/tracker/stats-grid?platform='+plat+'&month='+encodeURIComponent(month));
+    gridData=await r.json();
+  }catch(e){ document.getElementById('grid-body').textContent='Error: '+e.message; return; }
+  renderGrid();
+}
+
+function gridMatrix(){
+  const d=gridData; if(!d||!d.month)return null;
+  const [y,m]=d.month.split('-').map(Number);
+  const dim=new Date(y,m,0).getDate();
+  const days=Array.from({length:dim},(_,i)=>i+1);
+  const byClip={};
+  (d.stats||[]).forEach(s=>{(byClip[s.clip_id]=byClip[s.clip_id]||{})[s.date]=s.views;});
+  const base={}; (d.baselines||[]).forEach(b=>{base[b.clip_id]=b.views;});
+  const meta={}; (d.clips||[]).forEach(c=>meta[c.id]=c);
+  const rows=[];
+  Object.keys(byClip).map(Number).sort((a,b)=>a-b).forEach(id=>{
+    const snaps=byClip[id]; const mt=meta[id]||{};
+    let last=(base[id]!=null)?base[id]:null;
+    const cells=days.map(dd=>{
+      const ds=d.month+'-'+String(dd).padStart(2,'0');
+      const v=snaps[ds];
+      if(v==null)return '';
+      let out=(gridMode==='total')?v:((last==null)?v:Math.max(0,v-last));
+      last=v;
+      return out;
+    });
+    rows.push({concept:mt.concept||('clip '+id),ref:mt.ref_tag||('c'+id),cells});
+  });
+  // TOTAL row: per-day sum of numeric cells
+  if(rows.length){
+    const totals=days.map((_,i)=>{
+      let any=false,sum=0;
+      rows.forEach(r=>{if(r.cells[i]!=='' ){any=true;sum+=r.cells[i];}});
+      return any?sum:'';
+    });
+    rows.push({concept:'TOTAL',ref:'',cells:totals,isTotal:true});
+  }
+  return {days,rows};
+}
+
+function renderGrid(){
+  const el=document.getElementById('grid-body'); if(!el)return;
+  const mx=gridMatrix();
+  if(!mx||!mx.rows.length){el.innerHTML='<div style="padding:20px;color:#888">No stats for this platform and month.</div>';return;}
+  const th='padding:3px 7px;border:1px solid #e5e0d5;background:#f5f2ea;font-weight:700;text-align:right;position:sticky;top:0';
+  const td='padding:2px 7px;border:1px solid #efece4;text-align:right;font-variant-numeric:tabular-nums';
+  let h='<table style="border-collapse:collapse;white-space:nowrap">'+
+    '<tr><th style="'+th+';text-align:left">Clip</th><th style="'+th+';text-align:left">Ref</th>'+
+    mx.days.map(d=>'<th style="'+th+'">'+d+'</th>').join('')+'</tr>';
+  mx.rows.forEach(r=>{
+    const bold=r.isTotal?'font-weight:700;background:#faf8f2;':'';
+    h+='<tr><td style="'+td+';text-align:left;'+bold+'">'+esc(r.concept)+'</td>'+
+       '<td style="'+td+';text-align:left;font-family:monospace;color:#888;'+bold+'">'+esc(r.ref)+'</td>'+
+       r.cells.map(c2=>'<td style="'+td+';'+bold+'">'+(c2===''?'':c2)+'</td>').join('')+'</tr>';
+  });
+  h+='</table>';
+  el.innerHTML=h;
+}
+
+async function copyGrid(){
+  const mx=gridMatrix(); if(!mx||!mx.rows.length)return;
+  const lines=[['Clip','Ref',...mx.days].join('\t')];
+  mx.rows.forEach(r=>lines.push([r.concept,r.ref,...r.cells].join('\t')));
+  try{
+    await navigator.clipboard.writeText(lines.join('\n'));
+    document.getElementById('grid-copied').textContent='✓ copied';
+    setTimeout(()=>{const e=document.getElementById('grid-copied');if(e)e.textContent='';},2500);
+  }catch(e){ alert('Clipboard blocked: '+e.message); }
+}
 
 // ── Publish planner ─────────────────────────────────────────
 const PLAN_PLATS = [
