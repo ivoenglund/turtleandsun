@@ -8215,7 +8215,16 @@ app.get('/admin/api/tracker/stats-grid', requireRole('admin'), async (req, res) 
        GROUP BY sc.id, v.created_at::date`, [start]);
     const { rows: clips } = await pool.query(
       `SELECT id, COALESCE(concept_name, '') AS concept, ref_tag FROM social_clips ORDER BY id`);
-    res.json({ platform, month, stats, baselines, clicks, clips });
+    // Channel subscribers per day (from the daily channel snapshot) + the
+    // last value before the month as baseline for day-1 deltas.
+    const { rows: subs } = await pool.query(
+      `SELECT stat_date::text AS date, subscribers FROM channel_daily_stats
+       WHERE platform = $1 AND stat_date >= $2::date AND stat_date < ($2::date + interval '1 month')
+       ORDER BY stat_date`, [platform, start]);
+    const { rows: subsBaseRows } = await pool.query(
+      `SELECT subscribers FROM channel_daily_stats
+       WHERE platform = $1 AND stat_date < $2::date ORDER BY stat_date DESC LIMIT 1`, [platform, start]);
+    res.json({ platform, month, stats, baselines, clicks, clips, subs, subs_baseline: subsBaseRows.length ? subsBaseRows[0].subscribers : null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

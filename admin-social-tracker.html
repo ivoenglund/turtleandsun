@@ -1378,7 +1378,7 @@ NavBar.init({ requireAuth: true }).then(async () => {
 
 // ── Stats grid (spreadsheet export) ─────────────────────────
 let gridData = null, gridMode = 'daily', gridMetric = 'views';
-const GRID_METRICS = [['views','Views'],['likes','Likes'],['comments','Comments'],['clicks','Clicks']];
+const GRID_METRICS = [['views','Views'],['likes','Likes'],['comments','Comments'],['clicks','Clicks'],['subs','Subscribers']];
 
 function showStatsGrid(){
   const existing=document.getElementById('grid-modal-bg'); if(existing)existing.remove();
@@ -1444,6 +1444,25 @@ function gridMatrix(){
   const meta={}; (d.clips||[]).forEach(c=>meta[c.id]=c);
   const rows=[];
 
+  if(gridMetric==='subs'){
+    // One row: the channel itself. Cumulative subscriber count per day from
+    // the daily channel snapshot; Daily mode shows the day-to-day change.
+    const byDate={};
+    (d.subs||[]).forEach(s=>{byDate[s.date]=s.subscribers;});
+    let last=(d.subs_baseline!=null)?d.subs_baseline:null;
+    let prev=null;
+    const cells=days.map(dd=>{
+      const ds=d.month+'-'+String(dd).padStart(2,'0');
+      const v=byDate[ds];
+      if(v==null)return '';
+      let out=(gridMode==='total')?v:((last==null)?0:v-last);
+      last=v; prev=v;
+      // no dip flag: subscriber counts legitimately go down on unfollows
+      return {n:out,src:'channel',date:ds,clipId:0,noDel:true};
+    });
+    if(cells.some(c2=>c2!==''))rows.push({concept:PF[d.platform]+' channel',ref:'subs',cells});
+    return {days,rows};
+  }
   if(gridMetric==='clicks'){
     // Clicks are per-day events (site visits via ?ref=) — Daily is native,
     // Total is a running sum. Not platform-specific, not deletable.
