@@ -88,11 +88,13 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
 .style-btn{width:36px;height:36px;border-radius:8px;border:2px solid #ccc;background:#fff;font-weight:700;font-size:13px;cursor:pointer;color:#555}
 .style-btn:hover{border-color:#1C2A14;color:#1C2A14}
 .style-btn.active{background:#1C2A14;color:#FFE800;border-color:#1C2A14}
+.inherit-hint{font-size:9px;color:#9a8c6a;margin-top:2px;font-style:italic}
 </style>
 </head>
 <body>
 <div class="page">
   <a class="back" href="/admin/social-clips">← All clips</a>
+  <a class="back" href="/admin/social-tracker" style="float:right">Tracker →</a>
   <h1 id="page-title">Loading…</h1>
   <div class="meta-bar">
     <span id="page-meta" style="font-size:11px;color:#888"></span>
@@ -205,6 +207,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
               <option value="family">Family</option>
               <option value="other">Other</option>
             </select>
+            <div class="inherit-hint" id="hint-subject" style="display:none">inherited from concept</div>
           </div>
           <div>
             <div class="field-label">Name</div>
@@ -221,6 +224,18 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
               <option value="christmas">Christmas</option>
               <option value="other">Other</option>
             </select>
+            <div class="inherit-hint" id="hint-occasion" style="display:none">inherited from concept</div>
+          </div>
+          <div>
+            <div class="field-label">Action</div>
+            <select id="tag-action" class="field-input" onchange="debounceSave()">
+              <option value="">—</option>
+              <option value="royal-portrait">Royal portrait</option>
+              <option value="talking">Talking</option>
+              <option value="singing">Singing</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="inherit-hint" id="hint-action" style="display:none">inherited from concept</div>
           </div>
           <div>
             <div class="field-label">Mood</div>
@@ -231,6 +246,13 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
               <option value="dramatic">Dramatic</option>
               <option value="cute">Cute</option>
               <option value="elegant">Elegant</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Template</div>
+            <select id="tag-template" class="field-input" onchange="setStyle(parseInt(this.value))">
+              <option value="1">Style A</option>
+              <option value="3">Style B</option>
             </select>
           </div>
         </div>
@@ -604,6 +626,8 @@ function setStyle(n, silent) {
   document.getElementById('vb-fields').style.display = n === 3 ? '' : 'none';
   const sb = document.getElementById('style-badge');
   if (sb) sb.textContent = n === 3 ? 'Style B' : 'Style A';
+  const ts = document.getElementById('tag-template');
+  if (ts) ts.value = String(n);
   if (!silent) { _dirty = true; scheduleAutoSave(); }
 }
 
@@ -846,7 +870,13 @@ function populateMeta(clip) {
   sv('tag-subject',  clip.subject);
   sv('tag-name',     clip.subject_name);
   sv('tag-occasion', clip.occasion);
+  sv('tag-action',   clip.action);
   sv('tag-mood',     clip.mood);
+  // "Inherited" hints — shown while the value still matches the parent concept
+  [['subject', clip.concept_subject], ['occasion', clip.concept_occasion], ['action', clip.concept_action]].forEach(([dim, conceptVal]) => {
+    const hint = document.getElementById('hint-' + dim);
+    if (hint) hint.style.display = (conceptVal && clip[dim] === conceptVal) ? '' : 'none';
+  });
   sv('tag-custom',   (clip.custom_tags || []).join(', '));
   sv('tag-ref',      clip.ref_tag);
   sv('tt-date',      fd(clip.tiktok_posted_at));
@@ -877,6 +907,7 @@ function collectMeta() {
     subject:      gv('tag-subject'),
     subject_name: gv('tag-name'),
     occasion:     gv('tag-occasion'),
+    action:       gv('tag-action'),
     mood:         gv('tag-mood'),
     custom_tags:  custom_raw ? custom_raw.split(',').map(s=>s.trim()).filter(Boolean) : [],
     ref_tag:      gv('tag-ref'),

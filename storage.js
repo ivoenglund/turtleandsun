@@ -62,13 +62,19 @@ function extFromContentType(ct) {
   return '';
 }
 
-function uniqueKey({ kind, contentType, originalName }) {
+function uniqueKey({ kind, contentType, originalName, baseName }) {
   const folder = folderFor(kind);
   const random = crypto.randomBytes(8).toString('hex');
   const date = new Date().toISOString().slice(0, 10); // 2026-05-26
   let ext = '';
   if (originalName) ext = path.extname(originalName).toLowerCase();
   if (!ext) ext = extFromContentType(contentType);
+  if (baseName) {
+    // Human-readable filename prefix (e.g. social clip ref: c38_royal-portrait_dog).
+    // A short random suffix keeps regenerated versions from colliding in CDN caches.
+    const slug = String(baseName).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+    if (slug) return `${folder}/${date}/${slug}_${random.slice(0, 6)}${ext}`;
+  }
   return `${folder}/${date}/${random}${ext}`;
 }
 
@@ -76,12 +82,13 @@ function uniqueKey({ kind, contentType, originalName }) {
 //   kind         — 'upload' | 'concept_media' | 'gallery' | 'order' | other
 //   contentType  — MIME type, e.g. 'image/jpeg', 'video/mp4'
 //   originalName — original filename, used to pick the extension if MIME is vague
-async function uploadBuffer({ buffer, contentType, kind = 'misc', originalName }) {
+//   baseName     — optional human-readable filename prefix (slugified)
+async function uploadBuffer({ buffer, contentType, kind = 'misc', originalName, baseName }) {
   if (!client) throw new Error('R2 storage is not configured (env vars missing)');
   if (!buffer || !buffer.length) throw new Error('uploadBuffer: empty buffer');
   if (!PUBLIC_URL) throw new Error('R2_PUBLIC_URL is not set');
 
-  const key = uniqueKey({ kind, contentType, originalName });
+  const key = uniqueKey({ kind, contentType, originalName, baseName });
   await client.send(new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,

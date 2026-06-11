@@ -957,6 +957,20 @@ async function initDb() {
     UPDATE concepts SET subject = 'human' WHERE slug ILIKE '%person%' OR slug ILIKE '%human%';
   `);
 
+  // Stage 1 pipeline redesign (2026-06-11): clips carry the full dimension
+  // set. `action` joins subject/subject_name/occasion/mood already present.
+  // Backfill action + missing dims from the parent concept (idempotent:
+  // only NULL rows are touched).
+  await pool.query(`
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS action TEXT;
+    UPDATE social_clips sc SET action = c.action
+      FROM concepts c WHERE c.id = sc.concept_id AND sc.action IS NULL;
+    UPDATE social_clips sc SET subject = c.subject
+      FROM concepts c WHERE c.id = sc.concept_id AND sc.subject IS NULL;
+    UPDATE social_clips sc SET occasion = c.occasion
+      FROM concepts c WHERE c.id = sc.concept_id AND sc.occasion IS NULL;
+  `);
+
   // Funnel events (2026-06-11): preview/purchase stamped with the visitor's
   // attribution cookie (ts_ref/ts_src) so the tracker can show visits -> previews -> purchases.
   await pool.query(`

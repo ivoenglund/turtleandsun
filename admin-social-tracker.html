@@ -609,7 +609,7 @@ function renderTable() {
     ].filter(Boolean).join('');
     return `<tr onclick="pick(${c.id})" id="row-${c.id}" class="${selId===c.id?'sel':''}">
       <td class="num" style="color:#bbb;font-size:11px;font-weight:700">#${c.id}</td>
-      <td style="white-space:nowrap"><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag">${esc(c.ref_tag)}</div></td>
+      <td style="white-space:nowrap"><div class="concept-name">${esc(c.concept)}</div><div class="ref-tag"><a href="/admin/social-clips/${c.id}" onclick="event.stopPropagation()" style="color:inherit" title="Open clip detail">${esc(c.ref_tag)}</a></div></td>
       <td><div class="tags-row">${tagHtml||'<span class="muted">—</span>'}</div></td>
       <td class="plat-sep num" style="${!c.tiktok_posted?'background:#ede9e1;':''}"><span style="font-size:11px;color:${c.tiktok_posted?'#1C0A00':'#bbb'};font-weight:600">${c.tiktok_views!=null?c.tiktok_views.toLocaleString('sv-SE'):'—'}</span></td>
       <td class="num" style="${!c.tiktok_posted?'background:#ede9e1;':''}font-size:11px;color:#1C0A00">${c.tiktok_likes!=null?c.tiktok_likes.toLocaleString('sv-SE'):''}</td>
@@ -697,7 +697,7 @@ function renderPanel() {
   panel.innerHTML = `
     <div class="bp-head">
       <div style="min-width:0;padding:0 8px 0 14px">
-        <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span></h2>
+        <h2>${esc(c.concept)} <span style="font-size:11px;opacity:.7">${esc(c.ref_tag)}</span> <a href="/admin/social-clips/${c.id}" style="font-size:10px;color:#FFE800;text-decoration:none;font-weight:600;margin-left:6px">Open clip &#8594;</a></h2>
       </div>
       ${platEditBtns}
       <div style="display:flex;justify-content:flex-end;align-items:center;padding-right:14px">

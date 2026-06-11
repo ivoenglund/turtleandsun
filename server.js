@@ -2883,7 +2883,9 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
     const { rows: triplets } = await pool.query(`
       SELECT t.id, t.concept_id, c.name AS concept_name,
              bm.url AS before_url, vm.url AS video_url,
-             im.url AS image_url
+             im.url AS image_url,
+             COALESCE(bm.subject, im.subject, c.subject) AS inh_subject,
+             c.occasion AS inh_occasion, c.action AS inh_action
       FROM concept_triplets t
       JOIN concepts c ON c.id = t.concept_id
       LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
@@ -2893,11 +2895,15 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
     `, [triplet_ids]);
     const created = [];
     for (const t of triplets) {
+      // Dimensions auto-inherit from concept/triplet media — prefilled but
+      // editable on the clip detail page (Stage 1 pipeline redesign).
       const { rows: [row] } = await pool.query(`
-        INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url, after_image_url)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url, after_image_url,
+                                  subject, occasion, action)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
-      `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url, t.image_url]);
+      `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url, t.image_url,
+          t.inh_subject || null, t.inh_occasion || null, t.inh_action || null]);
       // Auto-assign click-attribution ref tag (c<id>) so tagged links work from day one
       await pool.query(`UPDATE social_clips SET ref_tag = 'c' || id WHERE id = $1 AND ref_tag IS NULL`, [row.id]);
       created.push(row.id);
@@ -2944,7 +2950,10 @@ app.get('/admin/api/social-clips/panel-url', requireRole('admin'), async (req, r
 // Get a single clip
 app.get('/admin/api/social-clips/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
-    const { rows } = await pool.query(`SELECT * FROM social_clips WHERE id = $1`, [parseInt(req.params.id)]);
+    const { rows } = await pool.query(`
+      SELECT sc.*, c.subject AS concept_subject, c.occasion AS concept_occasion, c.action AS concept_action
+      FROM social_clips sc LEFT JOIN concepts c ON c.id = sc.concept_id
+      WHERE sc.id = $1`, [parseInt(req.params.id)]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) {
@@ -2958,7 +2967,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
   const {
     video_overlay_text, before_y_offset, after_y_offset, panel_url, end_card_duration_s, before_pct,
     clip_style, show_before_s, rise_duration_s, rise_pause_s,
-    subject, subject_name, occasion, mood, custom_tags, ref_tag,
+    subject, subject_name, occasion, mood, action, custom_tags, ref_tag,
     tiktok_caption, tiktok_hashtags, tiktok_post_url, tiktok_posted_at,
     instagram_caption, instagram_hashtags, instagram_alt_text, instagram_post_url, instagram_posted_at,
     yt_title, yt_description, yt_keyword_tags, yt_video_id, yt_post_url, yt_posted_at,
@@ -3001,6 +3010,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         fb_caption            = $33,
         fb_post_url           = $34,
         fb_posted_at          = $35,
+        action                = $36,
         updated_at            = now()
       WHERE id = $1
       RETURNING *
@@ -3039,6 +3049,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         fb_caption ?? null,
         fb_post_url ?? null,
         fb_posted_at ?? null,
+        action ?? null,
     ]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
@@ -3051,11 +3062,29 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
 
 
 // ── Generate platform content (titles, captions, hashtags) ─────────────────
+// Dimension-driven composer (Stage 1 pipeline redesign): every caption is
+// assembled as {name/subject} {action-phrase} {occasion-line}. The action
+// phrase comes from the clip's `action` dimension (inherited from the
+// concept on queue, editable in the tag panel).
+const ACTION_PHRASES = {
+  // action → { past: fragment after the subject, gerund: titles/alt, noun: product term }
+  'royal-portrait': { past: 'got the royal portrait treatment 👑', gerund: 'becoming royalty',        noun: 'royal portrait' },
+  'talking':        { past: 'has something to say 🗣️',             gerund: 'speaking their mind',     noun: 'talking portrait' },
+  'singing':        { past: 'broke into song 🎤',                  gerund: 'singing their heart out', noun: 'singing portrait' },
+};
+function actionPhrase(clip, concept) {
+  const a = ACTION_PHRASES[clip.action];
+  if (a) return a;
+  return { past: `got turned into a ${concept} 👑`, gerund: `becoming a ${concept}`, noun: concept };
+}
+
 function buildPlatformContent(clip) {
   const subject  = clip.subject || 'pet';
   const name     = clip.subject_name;
   const concept  = clip.concept_name || clip.concept || 'Loveogram';
   const occasion = clip.occasion;
+  const action   = actionPhrase(clip, concept);
+  const refTag   = clip.ref_tag || ('c' + clip.id);
   const styleTag = clip.clip_style === 3 ? 'style-b' : 'style-a';
   const subj     = name ? name : ('a ' + subject);
   const pronoun  = (subject === 'human' || subject === 'family') ? 'them' : ('your ' + subject);
@@ -3082,20 +3111,22 @@ function buildPlatformContent(clip) {
   }[occasion] || '';
 
   const conceptTag = '#' + concept.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const capConcept = concept.charAt(0).toUpperCase() + concept.slice(1);
 
-  const ttCaption  = (name ? `We turned ${name} into a ${concept} 👑` : `We turned ${subj} into a ${concept} 👑`) + '\n\nWait for the after… 😍' + (occasionLine ? '\n\n' + occasionLine : '') + `\n\nCreate yours: turtleandsun.com/tt${clip.id}`;
+  // {name/subject} {action-phrase}
+  const hook = (name ? name : (subj.charAt(0).toUpperCase() + subj.slice(1))) + ' ' + action.past;
+
+  const ttCaption  = hook + '\n\nWait for the after… 😍' + (occasionLine ? '\n\n' + occasionLine : '') + `\n\nCreate yours: turtleandsun.com/tt${clip.id}`;
   const ttHashtags = [conceptTag, subjectTags, '#beforeandafter #petportrait #loveogram #turtleandsun #fyp', occasionTags, '#' + styleTag].filter(Boolean).join(' ');
 
-  const igCaption  = (name ? `${name} got the royal treatment 👑` : `Your ${subject} deserves a portrait worthy of a palace 👑`) + `\n\nTransformed into a timeless ${concept} by Turtle and Sun — the family photo you could never take.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create yours at turtleandsun.com/ig${clip.id} 🐢\nFrom 99 kr / ~$9`;
+  const igCaption  = hook + `\n\nTransformed into a timeless ${action.noun} by Turtle and Sun — the family photo you could never take.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create yours at turtleandsun.com/ig${clip.id} 🐢\nFrom 99 kr / ~$9`;
   const igHashtags = ['#petportrait', conceptTag, subjectTags, '#beforeandafter #loveogram #turtleandsun #aiart #petgift', occasionTags, '#' + styleTag].filter(Boolean).join(' ');
-  const igAlt      = `${subject} transformed from a photo into a ${concept} — before and after showing the original and the AI-generated portrait`;
+  const igAlt      = `${name || subject} ${action.gerund} — before and after showing the original photo and the AI-generated ${action.noun}`;
 
-  const ytTitle    = name ? `We turned ${name} into a ${concept} 👑 Wait for the after…` : `${subject.charAt(0).toUpperCase() + subject.slice(1)} becomes a ${concept} 👑 | Before & After`;
-  const ytDesc     = `${name ? name + ' got' : capConcept + ' transformation —'} the royal treatment! 👑🐾\n\nThis is a Loveogram — an AI-generated portrait that transforms your pet photo into a stunning ${concept}.\n\nCreate yours at turtleandsun.com/yt${clip.id}\nFrom 99 kr / ~$9 USD\n\n${occasionLine ? occasionLine + '\n\n' : ''}The family photo you could never take.\n5% of every order goes to the Turtleandsun Connection Fund 🐢\n\n#Shorts ${conceptTag} #loveogram #turtleandsun`;
-  const ytKw       = [subject + ' portrait', concept.toLowerCase(), 'pet transformation', 'before and after', 'AI pet art', subject + ' makeover', 'pet gift', 'loveogram', 'turtle and sun', subject + ' art', 'cute ' + subject, occasion && occasion !== 'general' ? occasion + ' gift' : '', 'AI art', styleTag].filter(Boolean).join(', ');
+  const ytTitle    = name ? `${name} ${action.past} Wait for the after…` : `${subject.charAt(0).toUpperCase() + subject.slice(1)} ${action.past} | Before & After`;
+  const ytDesc     = `${hook}\n\nThis is a Loveogram — an AI-generated portrait that transforms your ${subject === 'human' || subject === 'family' ? 'photo' : subject + ' photo'} into a stunning ${action.noun}.\n\nCreate yours at turtleandsun.com/yt${clip.id}\nFrom 99 kr / ~$9 USD\n\n${occasionLine ? occasionLine + '\n\n' : ''}The family photo you could never take.\n5% of every order goes to the Turtleandsun Connection Fund 🐢\n\n#Shorts ${conceptTag} #loveogram #turtleandsun\n\n· ${refTag}`;
+  const ytKw       = [subject + ' portrait', concept.toLowerCase(), (clip.action || 'royal-portrait').replace(/-/g, ' '), 'pet transformation', 'before and after', 'AI pet art', subject + ' makeover', 'pet gift', 'loveogram', 'turtle and sun', subject + ' art', 'cute ' + subject, occasion && occasion !== 'general' ? occasion + ' gift' : '', 'AI art', styleTag].filter(Boolean).join(', ');
 
-  const fbCaption  = (name ? `${name} is now royalty 👑` : `Your ${subject} deserves to be royalty 👑`) + ` We transformed ${pronoun} into a ${concept} using AI — and the result is stunning.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create your own Loveogram at turtleandsun.com/fb${clip.id} — from 99 kr.`;
+  const fbCaption  = hook + ` We transformed ${pronoun} into a ${action.noun} using AI — and the result is stunning.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create your own Loveogram at turtleandsun.com/fb${clip.id} — from 99 kr.`;
 
   return { tiktok_caption: ttCaption, tiktok_hashtags: ttHashtags, instagram_caption: igCaption, instagram_hashtags: igHashtags, instagram_alt_text: igAlt, yt_title: ytTitle, yt_description: ytDesc, yt_keyword_tags: ytKw, fb_caption: fbCaption };
 }
@@ -4462,15 +4493,18 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         });
       } // end style branch
 
-      // Upload clip + end card to R2
+      // Upload clip + end card to R2 — filename starts with the clip ref
+      // (e.g. c38_royal-portrait_dog.mp4) so downloads identify themselves.
       const { uploadBuffer } = require('./storage');
+      const clipRef   = clip.ref_tag || ('c' + id);
+      const refBase   = [clipRef, clip.action || clip.concept_name, clip.subject].filter(Boolean).join('_');
       const clipBuf = fs2.readFileSync(outFile);
-      const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip' });
+      const r2 = await uploadBuffer({ buffer: clipBuf, contentType: 'video/mp4', kind: 'social-clip', baseName: refBase });
       let endCardR2Url = null;
       try {
         const ecBuf = fs2.existsSync(endCardFile) ? fs2.readFileSync(endCardFile) : null;
         if (ecBuf) {
-          const ecR2 = await uploadBuffer({ buffer: ecBuf, contentType: 'image/jpeg', kind: 'social-clip-endcard' });
+          const ecR2 = await uploadBuffer({ buffer: ecBuf, contentType: 'image/jpeg', kind: 'social-clip-endcard', baseName: refBase + '_endcard' });
           endCardR2Url = ecR2.url;
         }
       } catch(e2) { console.warn('[social-clip] end card R2 upload failed:', e2.message); }
