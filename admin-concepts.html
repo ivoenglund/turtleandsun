@@ -76,11 +76,12 @@
         <th style="width:120px;">Action</th>
         <th style="width:100px;">Mood</th>
         <th style="width:80px;">Status</th>
-        <th style="width:200px;"></th>
+        <th style="width:140px;">Concept</th>
+        <th style="width:90px;">Samples</th>
       </tr>
     </thead>
     <tbody id="conceptBody">
-      <tr><td colspan="7" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
+      <tr><td colspan="8" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -141,7 +142,7 @@ function toggleNew() {
   // Insert a special row at the top
   var tr = document.createElement('tr');
   tr.id = 'newRow';
-  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tr.innerHTML = '<td colspan="8" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
   tbody.insertBefore(tr, tbody.firstChild);
   autoResizeIframe(document.getElementById('newIframe'));
 }
@@ -165,14 +166,14 @@ function loadConcepts() {
     })
     .catch(function(err){
       document.getElementById('conceptBody').innerHTML =
-        '<tr><td colspan="7" style="color:#a12a1a;padding:24px;">Error loading concepts: ' + err.message + '</td></tr>';
+        '<tr><td colspan="8" style="color:#a12a1a;padding:24px;">Error loading concepts: ' + err.message + '</td></tr>';
     });
 }
 
 function renderGrid(concepts) {
   var tbody = document.getElementById('conceptBody');
   if (!concepts.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
     return;
   }
   tbody.innerHTML = concepts.map(function(c) {
@@ -191,8 +192,10 @@ function renderGrid(concepts) {
       '<td>' + status + '</td>' +
       '<td style="white-space:nowrap;">' +
         '<button class="btn small" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
-        '<button class="btn small secondary" onclick="toggleSamples(' + c.id + ')">Samples</button> ' +
         '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + '\')">Delete</button>' +
+      '</td>' +
+      '<td>' +
+        '<button class="btn small secondary" onclick="toggleSamples(' + c.id + ')">Samples</button>' +
       '</td>' +
     '</tr>';  }).join('');
 }
@@ -215,7 +218,7 @@ function toggleEdit(id) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = id;
-  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tr.innerHTML = '<td colspan="8" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
   conceptRow.insertAdjacentElement('afterend', tr);
   autoResizeIframe(document.getElementById('editIframe-' + id));
 }
@@ -236,7 +239,7 @@ function toggleSamples(conceptId) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = 'samples-' + conceptId;
-  tr.innerHTML = '<td colspan="7"><div class="samples-wrap"><div class="samples-title">Samples for concept #' + conceptId + '</div><div id="samplesInner-' + conceptId + '"><em style="color:#aaa;font-size:12px;">Loading…</em></div></div></td>';
+  tr.innerHTML = '<td colspan="8"><div class="samples-wrap"><div class="samples-title">Samples for concept #' + conceptId + '</div><div id="samplesInner-' + conceptId + '"><em style="color:#aaa;font-size:12px;">Loading…</em></div></div></td>';
   conceptRow.insertAdjacentElement('afterend', tr);
 
   loadSamples(conceptId);
