@@ -6645,29 +6645,37 @@ app.get('/admin/api/concepts/:id/samples', requireRole('admin'), async (req, res
   }
 });
 
-// Add a sample: creates concept_media records for before + after, then a triplet.
-// Body: { before_url, after_url, after_type ('image'|'video'), caption? }
+// Add a sample triplet. Accepts either media IDs (from drag-and-drop) or URLs.
+// Body: { before_media_id, after_media_id, after_type } OR { before_url, after_url, after_type }
 app.post('/admin/api/concepts/:id/samples/add', requireRole('admin'), async (req, res) => {
   try {
     const conceptId = parseInt(req.params.id, 10);
     if (!conceptId) return res.status(400).json({ error: 'Bad concept id' });
-    const beforeUrl = (req.body.before_url || '').trim();
-    const afterUrl  = (req.body.after_url  || '').trim();
-    const afterType = req.body.after_type === 'video' ? 'video' : 'image';
     const caption   = (req.body.caption || '').trim() || null;
-    if (!beforeUrl || !afterUrl) return res.status(400).json({ error: 'before_url and after_url required' });
 
-    const bm = await pool.query(
-      `INSERT INTO concept_media (concept_id, kind, url, sort_order) VALUES ($1, 'image', $2, 0) RETURNING id`,
-      [conceptId, beforeUrl]
-    );
-    const beforeMediaId = bm.rows[0].id;
+    let beforeMediaId = req.body.before_media_id ? parseInt(req.body.before_media_id, 10) : null;
+    let afterMediaId  = req.body.after_media_id  ? parseInt(req.body.after_media_id,  10) : null;
+    const afterType   = req.body.after_type === 'video' ? 'video' : 'image';
 
-    const am = await pool.query(
-      `INSERT INTO concept_media (concept_id, kind, url, sort_order) VALUES ($1, $2, $3, 0) RETURNING id`,
-      [conceptId, afterType, afterUrl]
-    );
-    const afterMediaId = am.rows[0].id;
+    // Fallback: create media records from URLs if IDs not provided
+    if (!beforeMediaId) {
+      const beforeUrl = (req.body.before_url || '').trim();
+      if (!beforeUrl) return res.status(400).json({ error: 'before_media_id or before_url required' });
+      const bm = await pool.query(
+        `INSERT INTO concept_media (concept_id, kind, url, sort_order) VALUES ($1, 'image', $2, 0) RETURNING id`,
+        [conceptId, beforeUrl]
+      );
+      beforeMediaId = bm.rows[0].id;
+    }
+    if (!afterMediaId) {
+      const afterUrl = (req.body.after_url || '').trim();
+      if (!afterUrl) return res.status(400).json({ error: 'after_media_id or after_url required' });
+      const am = await pool.query(
+        `INSERT INTO concept_media (concept_id, kind, url, sort_order) VALUES ($1, $2, $3, 0) RETURNING id`,
+        [conceptId, afterType, afterUrl]
+      );
+      afterMediaId = am.rows[0].id;
+    }
 
     const existing = await pool.query(
       `SELECT triplet_number FROM concept_triplets WHERE concept_id = $1 ORDER BY triplet_number ASC`,

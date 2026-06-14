@@ -54,6 +54,12 @@
   #newRow td{padding:0;border-bottom:2px solid #3A6B20;}
   #newRow iframe{display:block;width:100%;border:none;background:#fafaf5;}
   footer.ts-footer{text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;}
+  /* Sample drop zones */
+  .sample-drop-zone{width:130px;height:100px;border:2px dashed #ccc;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:default;background:#fafaf5;transition:border-color 0.15s,background 0.15s;}
+  .sample-drop-zone.dragover{border-color:#3A6B20;background:#eef3ea;}
+  .sample-drop-zone .drop-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#aaa;}
+  .sample-drop-zone .drop-hint{font-size:11px;color:#bbb;text-align:center;padding:0 8px;}
+  .sample-drop-zone img,.sample-drop-zone video{max-width:120px;max-height:80px;border-radius:4px;object-fit:cover;}
   /* Lightbox */
   #lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;cursor:pointer;}
   #lightbox.open{display:flex;}
@@ -294,27 +300,66 @@ function renderSamples(conceptId, samples) {
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
-    '<div class="add-sample-form">' +
-      '<div><label>Before URL</label><input type="text" id="beforeUrl-' + conceptId + '" placeholder="https://…" style="width:260px;"></div>' +
-      '<div><label>After URL</label><input type="text" id="afterUrl-' + conceptId + '" placeholder="https://…" style="width:260px;"></div>' +
-      '<div><label>Type</label><select id="afterType-' + conceptId + '"><option value="image">image</option><option value="video">video</option></select></div>' +
-      '<div><label>&nbsp;</label><button class="btn small" onclick="addSample(' + conceptId + ')">+ Add sample</button></div>' +
+    '<div class="add-sample-form" style="gap:12px;">' +
+      '<div>' +
+        '<div class="drop-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:4px;">Before</div>' +
+        '<div class="sample-drop-zone" id="beforeDrop-' + conceptId + '"><span class="drop-hint">Drop from gallery</span></div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="drop-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:4px;">After</div>' +
+        '<div class="sample-drop-zone" id="afterDrop-' + conceptId + '"><span class="drop-hint">Drop from gallery</span></div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:flex-end;"><button class="btn small" onclick="addSample(' + conceptId + ')">+ Add sample</button></div>' +
     '</div>';
+
+  setupSampleDropZone(document.getElementById('beforeDrop-' + conceptId), conceptId, 'before');
+  setupSampleDropZone(document.getElementById('afterDrop-' + conceptId), conceptId, 'after');
+}
+
+var sampleDropData = {};
+
+function setupSampleDropZone(zone, conceptId, slot) {
+  if (!zone) return;
+  var key = conceptId + '-' + slot;
+  zone.addEventListener('dragover', function(e) {
+    var types = e.dataTransfer ? (e.dataTransfer.types || []) : [];
+    var ok = false;
+    for (var i = 0; i < types.length; i++) if (types[i] === 'application/x-ts-media') ok = true;
+    if (!ok) return;
+    e.preventDefault();
+    zone.classList.add('dragover');
+  });
+  zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+  zone.addEventListener('drop', function(e) {
+    zone.classList.remove('dragover');
+    var json = e.dataTransfer.getData('application/x-ts-media');
+    if (!json) return;
+    e.preventDefault();
+    var data;
+    try { data = JSON.parse(json); } catch(err) { return; }
+    sampleDropData[key] = data;
+    // Show preview
+    zone.innerHTML = data.kind === 'video'
+      ? '<video src="' + escHtml(data.url) + '" muted playsinline style="max-width:120px;max-height:88px;border-radius:4px;"></video>'
+      : '<img src="' + escHtml(data.url) + '" style="max-width:120px;max-height:88px;border-radius:4px;object-fit:cover;">';
+  });
 }
 
 function addSample(conceptId) {
-  var beforeUrl = (document.getElementById('beforeUrl-' + conceptId) || {}).value || '';
-  var afterUrl  = (document.getElementById('afterUrl-'  + conceptId) || {}).value || '';
-  var afterType = (document.getElementById('afterType-' + conceptId) || {}).value || 'image';
-  if (!beforeUrl.trim() || !afterUrl.trim()) { alert('Both Before URL and After URL are required.'); return; }
+  var beforeData = sampleDropData[conceptId + '-before'];
+  var afterData  = sampleDropData[conceptId + '-after'];
+  if (!beforeData) { alert('Drop a Before image from the gallery.'); return; }
+  if (!afterData)  { alert('Drop an After image or video from the gallery.'); return; }
   var fd = new FormData();
-  fd.append('before_url', beforeUrl.trim());
-  fd.append('after_url',  afterUrl.trim());
-  fd.append('after_type', afterType);
+  fd.append('before_media_id', beforeData.id);
+  fd.append('after_media_id',  afterData.id);
+  fd.append('after_type', afterData.kind);
   fetch('/admin/api/concepts/' + conceptId + '/samples/add', { method: 'POST', body: fd })
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (j.error) { alert('Error: ' + j.error); return; }
+      delete sampleDropData[conceptId + '-before'];
+      delete sampleDropData[conceptId + '-after'];
       loadSamples(conceptId);
     })
     .catch(function(err){ alert('Error: ' + err.message); });
