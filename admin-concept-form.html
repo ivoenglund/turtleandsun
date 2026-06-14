@@ -71,9 +71,13 @@
   <div id="flash" style="display:none" class="flash"></div>
 
   <div class="top">
-    <div style="display:flex;align-items:center;gap:0;">
+    <div style="display:flex;align-items:center;gap:10px;">
       <h1 id="pageTitle" style="margin:0;">New concept</h1>
       <span id="idBadge" class="id-badge" style="display:none;"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="saveStatus" style="font-size:13px;color:#888;"></span>
+      <button class="btn" type="submit" form="conceptForm" id="saveBtn">Save concept</button>
     </div>
   </div>
 
@@ -201,9 +205,6 @@
         </div>
       </div>
     </div>
-
-    <button class="btn" type="submit" id="saveBtn">Save concept</button>
-    <span id="saveStatus" style="margin-left:12px;font-size:13px;color:#888;"></span>
 
   </form>
 </div>
@@ -526,9 +527,26 @@ function onPromptInput() {
   }
 }
 
+// ── Dirty-state tracking ──────────────────────────────────────────────────────
+var formDirty = false;
+function markDirty() {
+  if (formDirty) return;
+  formDirty = true;
+  if (window.parent !== window) window.parent.postMessage({ type: 'form-dirty' }, location.origin);
+}
+function markClean() {
+  formDirty = false;
+  if (window.parent !== window) window.parent.postMessage({ type: 'form-clean' }, location.origin);
+}
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('conceptForm').addEventListener('input', markDirty);
+  document.getElementById('conceptForm').addEventListener('change', markDirty);
+});
+
 // ── Form submit: fill hidden fields before POST ────────────────────────────
 function setupFormSubmit() {
   document.getElementById('conceptForm').addEventListener('submit', function (e) {
+    markClean();
     var subject  = (document.getElementById('fSubject').value  || '').trim() || 'pet';
     var occasion = (document.getElementById('fOccasion').value || '').trim() || 'general';
     var action   = (document.getElementById('fAction').value   || '').trim() || 'royal-portrait';

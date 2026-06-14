@@ -76,11 +76,15 @@
 <script>
 var openExpandId = null;
 var newOpen = false;
+var formIsDirty = false;
 
 // ── Listen for save/delete messages from the iframe ────────────────────────
 window.addEventListener('message', function(e) {
   if (!e.data) return;
+  if (e.data.type === 'form-dirty') { formIsDirty = true; }
+  if (e.data.type === 'form-clean') { formIsDirty = false; }
   if (e.data.type === 'concept-saved') {
+    formIsDirty = false;
     showFlash('Concept saved.', 'ok');
     collapseAll();
     loadConcepts();
@@ -98,6 +102,11 @@ function showFlash(msg, kind) {
   setTimeout(function(){ el.innerHTML = ''; }, 4000);
 }
 
+function okToClose() {
+  if (!formIsDirty) return true;
+  return confirm('You have unsaved changes. Discard them?');
+}
+
 function collapseAll() {
   // Close any open expand rows
   document.querySelectorAll('.expand-row').forEach(function(r){ r.remove(); });
@@ -108,7 +117,8 @@ function collapseAll() {
 
 // ── New concept ────────────────────────────────────────────────────────────
 function toggleNew() {
-  if (newOpen) { closeNew(); return; }
+  if (newOpen) { if (!okToClose()) return; closeNew(); return; }
+  if (!okToClose()) return;
   collapseAll();
   newOpen = true;
   var tbody = document.getElementById('conceptBody');
@@ -174,9 +184,11 @@ function renderGrid(concepts) {
 function toggleEdit(id) {
   // If this one is already open, close it
   if (openExpandId === id) {
+    if (!okToClose()) return;
     collapseAll();
     return;
   }
+  if (!okToClose()) return;
   collapseAll();
   openExpandId = id;
 
