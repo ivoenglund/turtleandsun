@@ -324,7 +324,9 @@ function setupSampleDropZone(zone, conceptId, slot) {
   zone.addEventListener('dragover', function(e) {
     var types = e.dataTransfer ? (e.dataTransfer.types || []) : [];
     var ok = false;
-    for (var i = 0; i < types.length; i++) if (types[i] === 'application/x-ts-media') ok = true;
+    for (var i = 0; i < types.length; i++) {
+      if (types[i] === 'application/x-ts-media' || types[i] === 'text/uri-list' || types[i] === 'text/plain') ok = true;
+    }
     if (!ok) return;
     e.preventDefault();
     zone.classList.add('dragover');
@@ -332,13 +334,20 @@ function setupSampleDropZone(zone, conceptId, slot) {
   zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
   zone.addEventListener('drop', function(e) {
     zone.classList.remove('dragover');
-    var json = e.dataTransfer.getData('application/x-ts-media');
-    if (!json) return;
     e.preventDefault();
     var data;
-    try { data = JSON.parse(json); } catch(err) { return; }
+    var json = e.dataTransfer.getData('application/x-ts-media');
+    if (json) {
+      try { data = JSON.parse(json); } catch(err) {}
+    }
+    if (!data || !data.url) {
+      // Fallback: plain URL drag (from OS, browser image drag, etc.)
+      var url = (e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain') || '').trim().split('\n')[0].trim();
+      if (!url || !/^https?:\/\//i.test(url)) return;
+      var kind = /\.(mp4|mov|webm|avi)(\?|$)/i.test(url) ? 'video' : 'image';
+      data = { url: url, kind: kind };
+    }
     sampleDropData[key] = data;
-    // Show preview
     zone.innerHTML = data.kind === 'video'
       ? '<video src="' + escHtml(data.url) + '" muted playsinline style="max-width:120px;max-height:88px;border-radius:4px;"></video>'
       : '<img src="' + escHtml(data.url) + '" style="max-width:120px;max-height:88px;border-radius:4px;object-fit:cover;">';
@@ -351,8 +360,11 @@ function addSample(conceptId) {
   if (!beforeData) { alert('Drop a Before image from the gallery.'); return; }
   if (!afterData)  { alert('Drop an After image or video from the gallery.'); return; }
   var fd = new FormData();
-  fd.append('before_media_id', beforeData.id);
-  fd.append('after_media_id',  afterData.id);
+  // Use media ID if valid, otherwise send URL for server to create a new media record
+  if (beforeData.id && !isNaN(beforeData.id)) fd.append('before_media_id', beforeData.id);
+  else fd.append('before_url', beforeData.url);
+  if (afterData.id && !isNaN(afterData.id)) fd.append('after_media_id', afterData.id);
+  else fd.append('after_url', afterData.url);
   fd.append('after_type', afterData.kind);
   fetch('/admin/api/concepts/' + conceptId + '/samples/add', { method: 'POST', body: fd })
     .then(function(r){ return r.json(); })
