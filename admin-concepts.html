@@ -215,4 +215,154 @@ function toggleEdit(id) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = id;
-  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;bor
+  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  conceptRow.insertAdjacentElement('afterend', tr);
+  autoResizeIframe(document.getElementById('editIframe-' + id));
+}
+
+// ── Samples sub-grid ────────────────────────────────────────────
+function toggleSamples(conceptId) {
+  if (openSamplesId === conceptId) {
+    collapseAll();
+    return;
+  }
+  if (!okToClose()) return;
+  collapseAll();
+  openSamplesId = conceptId;
+
+  var conceptRow = document.querySelector('tr.concept-row[data-id="' + conceptId + '"]');
+  if (!conceptRow) return;
+
+  var tr = document.createElement('tr');
+  tr.className = 'expand-row';
+  tr.dataset.forId = 'samples-' + conceptId;
+  tr.innerHTML = '<td colspan="7"><div class="samples-wrap"><div class="samples-title">Samples for concept #' + conceptId + '</div><div id="samplesInner-' + conceptId + '"><em style="color:#aaa;font-size:12px;">Loading…</em></div></div></td>';
+  conceptRow.insertAdjacentElement('afterend', tr);
+
+  loadSamples(conceptId);
+}
+
+function loadSamples(conceptId) {
+  fetch('/admin/api/concepts/' + conceptId + '/samples')
+    .then(function(r){ return r.json(); })
+    .then(function(samples){ renderSamples(conceptId, samples); })
+    .catch(function(err){
+      var el = document.getElementById('samplesInner-' + conceptId);
+      if (el) el.innerHTML = '<span style="color:#a12a1a;font-size:12px;">Error: ' + escHtml(err.message) + '</span>';
+    });
+}
+
+function renderSamples(conceptId, samples) {
+  var el = document.getElementById('samplesInner-' + conceptId);
+  if (!el) return;
+
+  var rows = samples.map(function(s) {
+    var beforeThumb = s.before_url
+      ? '<img class="thumb" src="' + escHtml(s.before_url) + '" loading="lazy">'
+      : '<div class="thumb-missing">—</div>';
+    var afterUrl = s.image_url || s.video_url || '';
+    var afterType = s.video_url ? 'video' : 'image';
+    var afterThumb = afterUrl
+      ? (afterType === 'video'
+          ? '<video class="thumb" src="' + escHtml(afterUrl) + '" muted playsinline></video>'
+          : '<img class="thumb" src="' + escHtml(afterUrl) + '" loading="lazy">')
+      : '<div class="thumb-missing">—</div>';
+    var typeBadge = '<span class="sample-type-badge ' + afterType + '">' + afterType + '</span>';
+    var activeStr = s.active ? '<span class="badge active">On</span>' : '<span class="badge inactive">Off</span>';
+    return '<tr>' +
+      '<td style="color:#aaa;font-size:11px;">#' + s.triplet_number + '</td>' +
+      '<td>' + beforeThumb + '</td>' +
+      '<td>' + afterThumb + '</td>' +
+      '<td>' + typeBadge + '</td>' +
+      '<td>' + activeStr + '</td>' +
+      '<td><button class="btn small danger" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
+    '</tr>';
+  }).join('');
+
+  var tableHtml = samples.length
+    ? '<table class="samples-grid"><thead><tr><th>#</th><th>Before</th><th>After</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+    : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
+
+  el.innerHTML = tableHtml +
+    '<div class="add-sample-form">' +
+      '<div><label>Before URL</label><input type="text" id="beforeUrl-' + conceptId + '" placeholder="https://…" style="width:260px;"></div>' +
+      '<div><label>After URL</label><input type="text" id="afterUrl-' + conceptId + '" placeholder="https://…" style="width:260px;"></div>' +
+      '<div><label>Type</label><select id="afterType-' + conceptId + '"><option value="image">image</option><option value="video">video</option></select></div>' +
+      '<div><label>&nbsp;</label><button class="btn small" onclick="addSample(' + conceptId + ')">+ Add sample</button></div>' +
+    '</div>';
+}
+
+function addSample(conceptId) {
+  var beforeUrl = (document.getElementById('beforeUrl-' + conceptId) || {}).value || '';
+  var afterUrl  = (document.getElementById('afterUrl-'  + conceptId) || {}).value || '';
+  var afterType = (document.getElementById('afterType-' + conceptId) || {}).value || 'image';
+  if (!beforeUrl.trim() || !afterUrl.trim()) { alert('Both Before URL and After URL are required.'); return; }
+  var fd = new FormData();
+  fd.append('before_url', beforeUrl.trim());
+  fd.append('after_url',  afterUrl.trim());
+  fd.append('after_type', afterType);
+  fetch('/admin/api/concepts/' + conceptId + '/samples/add', { method: 'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) { alert('Error: ' + j.error); return; }
+      loadSamples(conceptId);
+    })
+    .catch(function(err){ alert('Error: ' + err.message); });
+}
+
+function deleteSample(conceptId, sampleId) {
+  if (!confirm('Delete this sample?')) return;
+  var fd = new FormData();
+  fetch('/admin/api/concepts/' + conceptId + '/samples/' + sampleId + '/delete', { method: 'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) { alert('Error: ' + j.error); return; }
+      loadSamples(conceptId);
+    })
+    .catch(function(err){ alert('Error: ' + err.message); });
+}
+
+// ── Delete ───────────────────────────────────────────────────────────────────────────
+function deleteConcept(id, name) {
+  if (!confirm('Delete concept "' + name + '"? This cannot be undone.')) return;
+  var fd = new FormData();
+  fetch('/admin/concepts/delete/' + id, { method: 'POST', body: fd })
+    .then(function(){ showFlash('Concept deleted.', 'ok'); loadConcepts(); })
+    .catch(function(){ showFlash('Delete failed.', 'err'); });
+}
+
+// ── Auto-resize iframe to fit its content ────────────────────────────────────────────
+function autoResizeIframe(iframe) {
+  function resize() {
+    try {
+      var h = iframe.contentDocument.body.scrollHeight;
+      iframe.style.height = (h + 32) + 'px';
+    } catch(e) {}
+  }
+  iframe.addEventListener('load', function() {
+    resize();
+    // Watch for content changes (dynamic fields)
+    try {
+      var mo = new MutationObserver(resize);
+      mo.observe(iframe.contentDocument.body, { childList:true, subtree:true, attributes:true });
+    } catch(e) {}
+    // Check if iframe navigated to saved/deleted URL
+    try {
+      var url = iframe.contentWindow.location.href;
+      if (url.indexOf('concept-saved') !== -1) {
+        showFlash('Concept saved.', 'ok');
+        collapseAll();
+        loadConcepts();
+      }
+    } catch(e) {}
+  });
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadConcepts();
+</script>
+</body>
+</html>
