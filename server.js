@@ -6394,18 +6394,11 @@ function conceptFormBody(concept, errorMsg) {
 }
 
 app.get('/admin/concepts/new', requireRole('admin'), (req, res) => {
-  res.send(conceptAdminPage('New concept', conceptFormBody(null, req.query.error)));
+  res.sendFile(path.join(__dirname, 'admin-concept-form.html'));
 });
 
-app.get('/admin/concepts/edit/:id', requireRole('admin'), async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM concepts WHERE id = $1', [req.params.id]);
-    if (!rows.length) return res.redirect('/admin/concepts?error=' + encodeURIComponent('Concept not found'));
-    res.send(conceptAdminPage('Edit concept', conceptFormBody(rows[0], req.query.error)));
-  } catch (err) {
-    console.error('[concepts] edit load error:', err.message);
-    res.status(500).send('Failed to load concept: ' + escapeHtml(err.message));
-  }
+app.get('/admin/concepts/edit/:id', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-concept-form.html'));
 });
 
 const conceptUploadFields = upload.fields([
@@ -6518,10 +6511,14 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
     let userInputMaxLength = parseInt(req.body.user_input_max_length, 10);
     if (!Number.isInteger(userInputMaxLength) || userInputMaxLength <= 0) userInputMaxLength = 50;
 
-    if (!name) return fail('Name is required.');
-    if (!slug) return fail('Slug is required.');
-    if (!filterCategory) return fail('Filter category is required.');
-    if (!imagePrompt) return fail('Image prompt is required.');
+    // Auto-generate name and slug from dimensions if not supplied by the new form
+    const effectiveName = name || [dimSubject, dimOccasion, dimAction].join(' · ');
+    const slugBase = (dimSubject + '-' + dimOccasion + '-' + dimAction)
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const effectiveSlug = slug ||
+      (editId ? slugBase + '-' + String(editId) : slugBase + '-' + String(Date.now()));
+    if (!filterCategory) return fail('Subject, occasion, and action are required.');
+    if (!imagePrompt && !videoPrompt) return fail('Prompt is required.');
 
     if (userInputEnabled) {
       if (!userInputLabel) return fail('Label is required when customer text input is enabled.');
@@ -6539,7 +6536,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
       }
     }
 
-    const dup = await pool.query('SELECT id FROM concepts WHERE slug = $1 AND id <> $2', [slug, editId || 0]);
+    const dup = await pool.query('SELECT id FROM concepts WHERE slug = $1 AND id <> $2', [effectiveSlug, editId || 0]);
     if (dup.rows.length) return fail('A concept with that slug already exists.');
 
     const uploadField = async (field, resourceType) => {
@@ -6573,7 +6570,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            subject = $27, occasion = $28, action = $29,
            updated_at = NOW()
          WHERE id = $26`,
-        [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
+        [effectiveSlug, effectiveName, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
          imageInputExtras, videoInputExtras, description,
@@ -6590,7 +6587,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
             price_tier, unit_price_sek_minor, pricing_rules,
             subject, occasion, action)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
-        [slug, name, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
+        [effectiveSlug, effectiveName, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
          imageInputExtras, videoInputExtras, description,
@@ -6764,6 +6761,33 @@ app.get('/admin/media/library', requireRole('admin'), async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('[media-library] error:', err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Concept form meta — model registry for the new concept admin form
+// ---------------------------------------------------------------------------
+app.get('/admin/api/concepts/form-meta', requireRole('admin'), (req, res) => {
+  try {
+    const models = {};
+    Object.entries(generation.MODELS).forEach(([id, m]) => {
+      models[id] = { kind: m.kind, label: m.label, description: m.description || '', fields: m.fields || [] };
+    });
+    res.json({ models });
+  } catch (err) {
+    console.error('[form-meta] error:', err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.get('/admin/api/concepts/:id(\\d+)/json', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM concepts WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[concepts/json] error:', err.message);
     res.status(500).json({ error: 'Failed' });
   }
 });

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Concept</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#1C0A00;margin:0;padding:0;min-height:100vh;display:flex;flex-direction:column;}
+    .wrap{max-width:860px;margin:0 auto;padding:8px 24px 64px;width:100%;box-sizing:border-box;flex:1;}
+    h1{font-size:24px;margin:0 0 20px;}
+    a{color:#3A6B20;}
+    .btn{display:inline-block;padding:10px 20px;background:#3A6B20;color:#FFF9E6;border:none;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;}
+    .btn:disabled{opacity:0.5;cursor:not-allowed;}
+    .flash{padding:12px 16px;border-radius:8px;margin-bottom:18px;font-size:14px;}
+    .flash.ok{background:#e3f3d8;color:#2c5016;}
+    .flash.err{background:#f7d9d4;color:#7a2114;}
+    .field{margin-bottom:18px;}
+    label{display:block;font-weight:700;font-size:13px;margin-bottom:6px;}
+    input[type=text],input[type=number],input[type=url],textarea,select{width:100%;padding:9px 11px;border:1px solid #ccc;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;}
+    input[type=text]:focus,input[type=number]:focus,input[type=url]:focus,textarea:focus,select:focus{outline:none;border-color:#3A6B20;box-shadow:0 0 0 2px rgba(58,107,32,0.15);}
+    textarea{min-height:90px;resize:vertical;}
+    .row{display:flex;gap:18px;flex-wrap:wrap;}
+    .row .field{flex:1;min-width:200px;}
+    .muted{color:#888;font-size:12px;margin-top:4px;}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+    footer.ts-footer{text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;}
+
+    /* ID badge */
+    .id-badge{display:inline-block;background:#1C2A14;color:#FFF9E6;border-radius:6px;padding:4px 14px;font-weight:700;font-size:16px;letter-spacing:0.03em;margin-left:10px;}
+
+    /* Section dividers */
+    .form-section{border:1px solid #e8e4da;border-radius:12px;padding:20px 22px;margin-bottom:20px;background:#fff;}
+    .section-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:#999;margin-bottom:16px;}
+
+    /* Tooltip trigger */
+    .tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#ddd;color:#555;border-radius:50%;font-size:10px;font-weight:700;cursor:default;margin-left:5px;vertical-align:middle;user-select:none;flex-shrink:0;}
+    .tip:hover{background:#3A6B20;color:#fff;}
+
+    /* Global tooltip popup */
+    #tip-popup{position:fixed;background:#1C2A14;color:#FFF9E6;padding:9px 13px;border-radius:9px;font-size:12px;line-height:1.55;max-width:270px;z-index:9999;pointer-events:none;display:none;box-shadow:0 3px 12px rgba(0,0,0,0.28);}
+
+    /* Model description */
+    .model-desc{background:#F5F3EE;border-radius:8px;padding:10px 12px;font-size:12px;color:#555;margin-top:8px;display:none;line-height:1.5;}
+
+    /* Prompt hint (when {1} detected) */
+    .prompt-hint{background:#FFF3C4;border-radius:7px;padding:9px 12px;font-size:12px;color:#1C0A00;margin-top:6px;display:none;}
+
+    /* Radio group */
+    .radio-group{display:flex;gap:22px;margin-top:4px;}
+    .radio-group label{font-weight:normal;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;}
+
+    /* Dynamic fields separator */
+    .dyn-sep{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:#bbb;margin:18px 0 12px;padding-top:14px;border-top:1px solid #eee;}
+  </style>
+</head>
+<body class="ts-nav-loggedin ts-nav-admin">
+
+<script src="/currency.js?v=20260526a"></script>
+<script src="/nav.js?v=20260611b"></script>
+<script>NavBar.init({ requireAuth: true });</script>
+<div class="sun"></div>
+
+<div class="wrap">
+
+  <div id="flash" style="display:none" class="flash"></div>
+
+  <div class="top">
+    <div style="display:flex;align-items:center;gap:0;">
+      <h1 id="pageTitle" style="margin:0;">New concept</h1>
+      <span id="idBadge" class="id-badge" style="display:none;"></span>
+    </div>
+    <a href="/admin/concepts">← Back to concepts</a>
+  </div>
+
+  <form id="conceptForm" method="POST" action="/admin/concepts/save" enctype="multipart/form-data">
+
+    <!-- Hidden fields for save endpoint compat -->
+    <input type="hidden" name="id"               id="fId">
+    <input type="hidden" name="name"             id="fName">
+    <input type="hidden" name="slug"             id="fSlug">
+    <input type="hidden" name="input_type"       id="fInputType"  value="image">
+    <input type="hidden" name="fal_image_model"  id="fFalImage">
+    <input type="hidden" name="fal_video_model"  id="fFalVideo">
+    <input type="hidden" name="image_prompt"     id="fImagePrompt">
+    <input type="hidden" name="video_prompt"     id="fVideoPrompt">
+    <input type="hidden" name="user_input_enabled"    id="fUIEnabled"  value="">
+    <input type="hidden" name="user_input_variable"   id="fUIVariable" value="">
+    <input type="hidden" name="user_input_label"      id="fUILabel"    value="Your text">
+    <input type="hidden" name="user_input_placeholder" id="fUIPlaceholder" value="">
+    <input type="hidden" name="user_input_max_length" value="100">
+    <input type="hidden" name="current_before_image_url"  id="fBeforeUrl"  value="">
+    <input type="hidden" name="current_after_image_url"   id="fAfterUrl"   value="">
+    <input type="hidden" name="current_example_video_url" id="fExampleUrl" value="">
+
+    <!-- ── SECTION 1: What it is ─────────────────────────────── -->
+    <div class="form-section">
+      <div class="section-label">What it is</div>
+      <div class="row">
+        <div class="field">
+          <label>Subject <span class="tip" data-tip="Who or what is in the photo — pet, dog, cat, human, family. Drives the filter chips on the landing page.">?</span></label>
+          <input type="text" name="subject" id="fSubject" list="dl-subject" placeholder="pet" required>
+          <datalist id="dl-subject">
+            <option value="pet"><option value="dog"><option value="cat">
+            <option value="human"><option value="family"><option value="other">
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Occasion <span class="tip" data-tip="Why someone would send this — birthday, fathers-day, mothers-day, christmas, general. Drives the occasion filter on the landing page.">?</span></label>
+          <input type="text" name="occasion" id="fOccasion" list="dl-occasion" placeholder="general" required>
+          <datalist id="dl-occasion">
+            <option value="general"><option value="birthday"><option value="fathers-day">
+            <option value="mothers-day"><option value="name-day"><option value="christmas">
+            <option value="easter"><option value="valentines"><option value="graduation">
+            <option value="memorial">
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Action <span class="tip" data-tip="What happens in the result — royal-portrait, talking, singing, dancing, posing. Drives the action filter on the landing page. This is what distinguishes two concepts with the same subject and occasion.">?</span></label>
+          <input type="text" name="action" id="fAction" list="dl-action" placeholder="royal-portrait" required>
+          <datalist id="dl-action">
+            <option value="royal-portrait"><option value="talking"><option value="singing">
+            <option value="dancing"><option value="posing"><option value="gift-giving">
+          </datalist>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Description <span class="tip" data-tip="Shown to the customer above the gallery on the landing page. Explain what this concept produces in plain, engaging language. Can be long — several sentences is fine.">?</span></label>
+        <textarea name="description" id="fDescription" rows="4"
+          placeholder="Your dog is transformed into a majestic royal portrait, painted in rich colours with a regal gilded background..."></textarea>
+      </div>
+    </div>
+
+    <!-- ── SECTION 2: Model & prompt ─────────────────────────── -->
+    <div class="form-section">
+      <div class="section-label">Model &amp; Prompt</div>
+
+      <div class="field">
+        <label>Model <span class="tip" data-tip="The AI model that generates the output. Image models produce a still picture; video models produce a clip. Choosing a model shows only the fields that model supports — irrelevant fields are hidden.">?</span></label>
+        <select id="fModelSelect" onchange="onModelChange()" style="max-width:520px;">
+          <option value="">— choose a model —</option>
+        </select>
+        <div class="model-desc" id="modelDesc"></div>
+      </div>
+
+      <div class="field" id="promptWrap" style="display:none;">
+        <label>
+          Prompt
+          <span class="tip" data-tip="The instruction sent to the AI model. For image models, reference the customer's uploaded photo as @Image1. Use {1} where the customer should fill in a word (e.g. a name). Use {2} for a second input, {3} for a third, etc. Example: 'A royal dog portrait of @Image1. The dog says: Happy birthday, {1}!'">?</span>
+        </label>
+        <textarea id="fPromptText" rows="6"
+          placeholder="Describe what should be generated. Use @Image1 for the customer photo. Use {1} if you want the customer to fill in a word."
+          oninput="onPromptInput()"></textarea>
+        <div id="promptHint" class="prompt-hint"></div>
+      </div>
+
+      <!-- Dynamic model-specific fields rendered here -->
+      <div id="modelFields"></div>
+    </div>
+
+    <!-- ── SECTION 3: Status & price ─────────────────────────── -->
+    <div class="form-section">
+      <div class="section-label">Status &amp; Price</div>
+      <div class="row">
+        <div class="field">
+          <label>Visible <span class="tip" data-tip="Whether this concept appears in the shop. Set to No while setting it up, flip to Yes when it's ready for customers.">?</span></label>
+          <div class="radio-group">
+            <label><input type="radio" name="active" value="on"  id="fVisYes"> Yes</label>
+            <label><input type="radio" name="active" value=""    id="fVisNo" checked> No</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Price tier <span class="tip" data-tip="Sets the baseline price shown to customers. Leave blank to inherit the default for this model type (image = 99 kr, video/talking = 149 kr).">?</span></label>
+          <select name="price_tier" id="fPriceTier">
+            <option value="">(default for model type)</option>
+            <option value="image">image — 99 kr</option>
+            <option value="video">video — 149 kr</option>
+            <option value="talking">talking — 149 kr</option>
+            <option value="bundle">bundle — 199 kr</option>
+            <option value="premium">premium — 399 kr</option>
+            <option value="premium_video">premium_video — 899 kr</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Price override (öre) <span class="tip" data-tip="Bypasses the tier and forces a specific SEK price. Enter in öre — smallest unit: 9900 = 99 kr, 14900 = 149 kr. Leave blank to use the tier above.">?</span></label>
+          <input type="number" name="unit_price_sek_minor" id="fPriceOverride"
+            placeholder="e.g. 9900 = 99 kr" min="0">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" type="submit" id="saveBtn">Save concept</button>
+    <span id="saveStatus" style="margin-left:12px;font-size:13px;color:#888;"></span>
+
+  </form>
+</div>
+
+<footer class="ts-footer">
+  <p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
+  <p>Turtle and Sun is a service by 3doc AB · Org.nr 556723-1864 · Fleminggatan 15, 112 26 Stockholm</p>
+</footer>
+
+<!-- Global tooltip popup -->
+<div id="tip-popup"></div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+var MODELS = {};           // { modelId: { kind, label, description, fields[] } }
+var editId  = null;        // integer if editing, null if new
+var currentModelId   = null;
+var currentModelKind = null; // 'image' | 'video'
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+  setupTooltips();
+  setupFormSubmit();
+
+  var params = new URLSearchParams(window.location.search);
+  editId = params.get('id') ? parseInt(params.get('id'), 10) : null;
+
+  loadMeta()
+    .then(function () {
+      if (editId) return loadConcept(editId);
+    })
+    .catch(function (e) {
+      showFlash('err', 'Failed to load: ' + e.message);
+    });
+});
+
+// ── Data loading ───────────────────────────────────────────────────────────
+function loadMeta() {
+  return fetch('/admin/api/concepts/form-meta')
+    .then(function (r) { if (!r.ok) throw new Error('form-meta ' + r.status); return r.json(); })
+    .then(function (meta) {
+      MODELS = meta.models || {};
+      populateModelSelect();
+    });
+}
+
+function loadConcept(id) {
+  return fetch('/admin/api/concepts/' + id + '/json')
+    .then(function (r) {
+      if (r.status === 404) throw new Error('Concept #' + id + ' not found');
+      if (!r.ok) throw new Error('concept/json ' + r.status);
+      return r.json();
+    })
+    .then(function (c) {
+      // Title + badge
+      document.getElementById('pageTitle').textContent = 'Edit concept';
+      document.getElementById('fId').value = id;
+      document.getElementById('idBadge').textContent = '#' + id;
+      document.getElementById('idBadge').style.display = '';
+
+      // Basic fields
+      setVal('fSubject',     c.subject   || 'pet');
+      setVal('fOccasion',    c.occasion  || 'general');
+      setVal('fAction',      c.action    || 'royal-portrait');
+      setVal('fDescription', c.description || '');
+
+      // Visible
+      if (c.active) {
+        document.getElementById('fVisYes').checked = true;
+      } else {
+        document.getElementById('fVisNo').checked = true;
+      }
+
+      // Pricing
+      setVal('fPriceTier', c.price_tier || '');
+      if (c.unit_price_sek_minor != null) {
+        setVal('fPriceOverride', c.unit_price_sek_minor);
+      }
+
+      // Preserve existing media URLs (for edit — keep what's already saved)
+      document.getElementById('fBeforeUrl').value  = c.before_image_url  || '';
+      document.getElementById('fAfterUrl').value   = c.after_image_url   || '';
+      document.getElementById('fExampleUrl').value = c.example_video_url || '';
+
+      // Determine model: prefer whichever matches input_type
+      var modelId = '';
+      if (c.input_type === 'video' || c.input_type === 'image_video') {
+        modelId = c.fal_video_model || c.fal_image_model || '';
+      } else {
+        modelId = c.fal_image_model || c.fal_video_model || '';
+      }
+
+      if (modelId && MODELS[modelId]) {
+        document.getElementById('fModelSelect').value = modelId;
+        onModelChange();
+
+        // Set prompt
+        var prompt = (c.input_type === 'video')
+          ? (c.video_prompt || c.image_prompt || '')
+          : (c.image_prompt || c.video_prompt || '');
+        document.getElementById('fPromptText').value = prompt;
+        onPromptInput();
+
+        // Restore dynamic field values from extras
+        var extras = (c.input_type === 'video')
+          ? (c.video_input_extras || {})
+          : (c.image_input_extras || {});
+        restoreExtras(extras, currentModelKind);
+      }
+
+      // User input fields (legacy)
+      if (c.user_input_enabled) {
+        document.getElementById('fUIEnabled').value  = 'on';
+        document.getElementById('fUIVariable').value = c.user_input_variable || '';
+        document.getElementById('fUILabel').value    = c.user_input_label    || 'Your text';
+        document.getElementById('fUIPlaceholder').value = c.user_input_placeholder || '';
+      }
+    });
+}
+
+// ── Model selector ─────────────────────────────────────────────────────────
+function populateModelSelect() {
+  var sel = document.getElementById('fModelSelect');
+  var imageModels = Object.entries(MODELS).filter(function (e) { return e[1].kind === 'image'; });
+  var videoModels = Object.entries(MODELS).filter(function (e) { return e[1].kind === 'video'; });
+
+  var html = '<option value="">— choose a model —</option>';
+
+  if (imageModels.length) {
+    html += '<optgroup label="── Image models ──">';
+    imageModels.forEach(function (e) {
+      html += '<option value="' + esc(e[0]) + '">' + esc(e[1].label) + '</option>';
+    });
+    html += '</optgroup>';
+  }
+  if (videoModels.length) {
+    html += '<optgroup label="── Video models ──">';
+    videoModels.forEach(function (e) {
+      html += '<option value="' + esc(e[0]) + '">' + esc(e[1].label) + '</option>';
+    });
+    html += '</optgroup>';
+  }
+
+  sel.innerHTML = html;
+}
+
+function onModelChange() {
+  var modelId = document.getElementById('fModelSelect').value;
+  var model   = MODELS[modelId] || null;
+
+  currentModelId   = modelId || null;
+  currentModelKind = model ? model.kind : null;
+
+  var descEl = document.getElementById('modelDesc');
+  if (model && model.description) {
+    descEl.textContent = model.description;
+    descEl.style.display = '';
+  } else {
+    descEl.textContent = '';
+    descEl.style.display = 'none';
+  }
+
+  document.getElementById('promptWrap').style.display = model ? '' : 'none';
+  document.getElementById('modelFields').innerHTML = model ? buildModelFields(model) : '';
+}
+
+// ── Dynamic model fields ───────────────────────────────────────────────────
+function buildModelFields(model) {
+  var prefix = model.kind + '_extra';
+  var html   = '';
+  var hasFields = false;
+
+  model.fields.forEach(function (f) {
+    if (f.source === 'prompt' || f.source === 'photo') return; // handled separately
+    if (!hasFields) {
+      html += '<div class="dyn-sep">Model settings</div>';
+      hasFields = true;
+    }
+    html += fieldHtml(f, prefix, null);
+  });
+
+  return html;
+}
+
+function restoreExtras(extras, kind) {
+  if (!kind) return;
+  var prefix = kind + '_extra';
+  Object.keys(extras).forEach(function (key) {
+    var name = prefix + '__' + key;
+    var el   = document.querySelector('[name="' + name + '"]');
+    if (!el) return;
+    var val  = extras[key];
+    if (el.type === 'checkbox') {
+      el.checked = !!val;
+    } else if (Array.isArray(val)) {
+      el.value = JSON.stringify(val, null, 2);
+    } else if (val != null) {
+      el.value = val;
+    }
+  });
+}
+
+function fieldHtml(f, prefix, savedVal) {
+  var name = prefix + '__' + f.name;
+  var val  = (savedVal !== null && savedVal !== undefined)
+    ? savedVal
+    : (f.default !== undefined ? f.default : '');
+
+  var tipHtml = f.help
+    ? ' <span class="tip" data-tip="' + esc(f.help) + '">?</span>'
+    : '';
+  var labelHtml = '<label>' + esc(f.label) + tipHtml + '</label>';
+  var widget    = '';
+
+  switch (f.type) {
+    case 'text':
+      widget = '<input type="text" name="' + name + '" value="' + esc(val) + '">';
+      break;
+    case 'textarea':
+      widget = '<textarea name="' + name + '">' + esc(val) + '</textarea>';
+      break;
+    case 'number':
+      widget = '<input type="number" step="1" name="' + name + '" value="' + esc(val) + '">';
+      break;
+    case 'float':
+      widget = '<input type="number" step="0.01" name="' + name + '" value="' + esc(val) + '">';
+      break;
+    case 'boolean':
+      widget = '<label style="font-weight:normal;display:flex;align-items:center;gap:8px;">'
+             + '<input type="checkbox" name="' + name + '" value="on"' + (val ? ' checked' : '') + '>'
+             + ' Enabled</label>';
+      break;
+    case 'enum':
+      var opts = (f.options || []).map(function (o) {
+        return '<option value="' + esc(o) + '"'
+             + (String(o) === String(val) ? ' selected' : '')
+             + '>' + esc(o) + '</option>';
+      }).join('');
+      widget = '<select name="' + name + '">' + opts + '</select>';
+      break;
+    case 'image_url':
+    case 'video_url':
+    case 'audio_url':
+      widget = '<input type="url" placeholder="https://..." name="' + name + '" value="' + esc(val) + '">';
+      break;
+    case 'image_urls': {
+      var joined = Array.isArray(val) ? val.join('\n') : (typeof val === 'string' ? val : '');
+      widget = '<textarea placeholder="One URL per line — customer photo is added automatically as @Image1" name="' + name + '">' + esc(joined) + '</textarea>';
+      break;
+    }
+    case 'elements_v3': {
+      var elJson = Array.isArray(val) ? JSON.stringify(val, null, 2) : '';
+      widget = '<textarea placeholder=\'[{"frontal_image_url":"...","reference_image_urls":["..."]}]\' name="' + name + '">' + esc(elJson) + '</textarea>';
+      break;
+    }
+    case 'multi_prompt': {
+      var mpJson = Array.isArray(val) ? JSON.stringify(val, null, 2) : '';
+      widget = '<textarea placeholder=\'[{"prompt":"Shot 1...","duration":"5"},{"prompt":"Shot 2...","duration":"5"}]\' name="' + name + '">' + esc(mpJson) + '</textarea>';
+      break;
+    }
+    default:
+      widget = '<input type="text" name="' + name + '" value="' + esc(val) + '">';
+  }
+
+  return '<div class="field">' + labelHtml + widget + '</div>';
+}
+
+// ── Prompt: {1}/{2}/… detection ────────────────────────────────────────────
+function onPromptInput() {
+  var prompt  = document.getElementById('fPromptText').value;
+  var hint    = document.getElementById('promptHint');
+  var numbers = [];
+  var re = /\{(\d+)\}/g;
+  var m;
+  while ((m = re.exec(prompt)) !== null) {
+    if (!numbers.includes(m[1])) numbers.push(m[1]);
+  }
+  numbers.sort(function (a, b) { return parseInt(a) - parseInt(b); });
+
+  if (numbers.length) {
+    var placeholders = numbers.map(function (n) { return '{' + n + '}'; }).join(', ');
+    hint.textContent = '💬 Customer will be asked to enter '
+      + numbers.length + ' text input' + (numbers.length > 1 ? 's' : '')
+      + ' (' + placeholders + ')';
+    hint.style.display = '';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+// ── Form submit: fill hidden fields before POST ────────────────────────────
+function setupFormSubmit() {
+  document.getElementById('conceptForm').addEventListener('submit', function (e) {
+    var subject  = (document.getElementById('fSubject').value  || '').trim() || 'pet';
+    var occasion = (document.getElementById('fOccasion').value || '').trim() || 'general';
+    var action   = (document.getElementById('fAction').value   || '').trim() || 'royal-portrait';
+
+    // Auto-generate name
+    document.getElementById('fName').value = subject + ' · ' + occasion + ' · ' + action;
+
+    // Auto-generate slug
+    var base = (subject + '-' + occasion + '-' + action)
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    document.getElementById('fSlug').value = editId
+      ? base + '-' + editId
+      : base + '-' + Date.now();
+
+    // Route model to the right hidden field
+    var modelId = document.getElementById('fModelSelect').value;
+    var model   = MODELS[modelId] || null;
+    if (model) {
+      if (model.kind === 'image') {
+        document.getElementById('fFalImage').value  = modelId;
+        document.getElementById('fFalVideo').value  = '';
+        document.getElementById('fInputType').value = 'image';
+      } else {
+        document.getElementById('fFalVideo').value  = modelId;
+        document.getElementById('fFalImage').value  = '';
+        document.getElementById('fInputType').value = 'video';
+      }
+    }
+
+    // Route prompt to both fields (save endpoint stores both; input_type controls which is used)
+    var promptVal = document.getElementById('fPromptText').value;
+    document.getElementById('fImagePrompt').value = promptVal;
+    document.getElementById('fVideoPrompt').value = promptVal;
+
+    // Auto-set user_input if {1} detected in prompt
+    if (/\{1\}/.test(promptVal)) {
+      document.getElementById('fUIEnabled').value  = 'on';
+      document.getElementById('fUIVariable').value = 'input1';
+    } else if (!document.getElementById('fUIEnabled').value) {
+      // Don't overwrite if already set via loaded concept data
+      document.getElementById('fUIEnabled').value  = '';
+      document.getElementById('fUIVariable').value = '';
+    }
+  });
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+function setupTooltips() {
+  var popup = document.getElementById('tip-popup');
+
+  document.addEventListener('mouseover', function (e) {
+    var tip = e.target.closest('.tip');
+    if (!tip) return;
+    var text = tip.getAttribute('data-tip');
+    if (!text) return;
+    popup.textContent = text;
+    popup.style.display = 'block';
+    positionTooltip(popup, tip);
+  });
+
+  document.addEventListener('mouseout', function (e) {
+    var tip = e.target.closest('.tip');
+    if (tip) popup.style.display = 'none';
+  });
+
+  document.addEventListener('scroll', function () {
+    popup.style.display = 'none';
+  }, true);
+}
+
+function positionTooltip(popup, anchor) {
+  var r   = anchor.getBoundingClientRect();
+  var pw  = 270;
+  var left = r.right + 10;
+  var top  = r.top - 4;
+  if (left + pw > window.innerWidth - 8) left = r.left - pw - 10;
+  if (left < 8) left = 8;
+  popup.style.left = left + 'px';
+  popup.style.top  = top + 'px';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function setVal(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.value = (val != null ? val : '');
+}
+
+function showFlash(type, msg) {
+  var el = document.getElementById('flash');
+  el.className = 'flash ' + type;
+  el.textContent = msg;
+  el.style.display = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+
+</body>
+</html>
