@@ -32,6 +32,22 @@
   .id-chip{font-size:11px;color:#aaa;font-weight:700;}
   .dim{font-weight:700;font-size:13px;color:#1C0A00;}
   .desc{color:#888;font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;}
+  /* Samples sub-grid */
+  .samples-wrap{padding:16px 20px 20px;background:#f7f5ef;}
+  .samples-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#3A6B20;margin-bottom:12px;}
+  .samples-grid{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e2d8;border-radius:8px;overflow:hidden;margin-bottom:14px;}
+  .samples-grid th{background:#f0ede6;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:7px 10px;text-align:left;border-bottom:1px solid #e6e2d8;}
+  .samples-grid td{padding:8px 10px;border-bottom:1px solid #f5f3ee;vertical-align:middle;font-size:12px;}
+  .samples-grid tr:last-child td{border-bottom:none;}
+  .thumb{width:56px;height:42px;object-fit:cover;border-radius:4px;display:block;background:#e6e2d8;}
+  .thumb-missing{width:56px;height:42px;border-radius:4px;background:#e6e2d8;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;}
+  .add-sample-form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:#fff;border:1px solid #e6e2d8;border-radius:8px;padding:12px 14px;}
+  .add-sample-form label{font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px;}
+  .add-sample-form input[type=text]{width:260px;padding:6px 10px;border:1px solid #d0ccc4;border-radius:6px;font-size:12px;font-family:inherit;}
+  .add-sample-form select{padding:6px 10px;border:1px solid #d0ccc4;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;}
+  .sample-type-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;}
+  .sample-type-badge.image{background:#dce8f5;color:#1a4e8a;}
+  .sample-type-badge.video{background:#f5dcf0;color:#7a1a6e;}
   .flash{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;}
   .flash.ok{background:#e3f3d8;color:#2c5016;}
   .flash.err{background:#f7d9d4;color:#7a2114;}
@@ -60,7 +76,7 @@
         <th style="width:120px;">Action</th>
         <th style="width:100px;">Mood</th>
         <th style="width:80px;">Status</th>
-        <th style="width:130px;"></th>
+        <th style="width:200px;"></th>
       </tr>
     </thead>
     <tbody id="conceptBody">
@@ -75,6 +91,7 @@
 
 <script>
 var openExpandId = null;
+var openSamplesId = null;
 var newOpen = false;
 var formIsDirty = false;
 
@@ -108,10 +125,9 @@ function okToClose() {
 }
 
 function collapseAll() {
-  // Close any open expand rows
   document.querySelectorAll('.expand-row').forEach(function(r){ r.remove(); });
   openExpandId = null;
-  // Close new row
+  openSamplesId = null;
   document.getElementById('newRow') && closeNew();
 }
 
@@ -175,6 +191,7 @@ function renderGrid(concepts) {
       '<td>' + status + '</td>' +
       '<td style="white-space:nowrap;">' +
         '<button class="btn small" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
+        '<button class="btn small secondary" onclick="toggleSamples(' + c.id + ')">Samples</button> ' +
         '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + '\')">Delete</button>' +
       '</td>' +
     '</tr>';  }).join('');
@@ -198,52 +215,4 @@ function toggleEdit(id) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = id;
-  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
-  conceptRow.insertAdjacentElement('afterend', tr);
-  autoResizeIframe(document.getElementById('editIframe-' + id));
-}
-
-// ── Delete ─────────────────────────────────────────────────────────────────
-function deleteConcept(id, name) {
-  if (!confirm('Delete concept "' + name + '"? This cannot be undone.')) return;
-  var fd = new FormData();
-  fetch('/admin/concepts/delete/' + id, { method: 'POST', body: fd })
-    .then(function(){ showFlash('Concept deleted.', 'ok'); loadConcepts(); })
-    .catch(function(){ showFlash('Delete failed.', 'err'); });
-}
-
-// ── Auto-resize iframe to fit its content ──────────────────────────────────
-function autoResizeIframe(iframe) {
-  function resize() {
-    try {
-      var h = iframe.contentDocument.body.scrollHeight;
-      iframe.style.height = (h + 32) + 'px';
-    } catch(e) {}
-  }
-  iframe.addEventListener('load', function() {
-    resize();
-    // Watch for content changes (dynamic fields)
-    try {
-      var mo = new MutationObserver(resize);
-      mo.observe(iframe.contentDocument.body, { childList:true, subtree:true, attributes:true });
-    } catch(e) {}
-    // Check if iframe navigated to saved/deleted URL
-    try {
-      var url = iframe.contentWindow.location.href;
-      if (url.indexOf('concept-saved') !== -1) {
-        showFlash('Concept saved.', 'ok');
-        collapseAll();
-        loadConcepts();
-      }
-    } catch(e) {}
-  });
-}
-
-function escHtml(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-loadConcepts();
-</script>
-</body>
-</html>
+  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;bor

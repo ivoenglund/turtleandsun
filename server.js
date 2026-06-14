@@ -6619,6 +6619,93 @@ app.get('/admin/api/concepts/:id(\\d+)/json', requireRole('admin'), async (req, 
 });
 
 // ---------------------------------------------------------------------------
+// Samples API — concept triplets management from admin-concepts grid
+// ---------------------------------------------------------------------------
+app.get('/admin/api/concepts/:id/samples', requireRole('admin'), async (req, res) => {
+  try {
+    const conceptId = parseInt(req.params.id, 10);
+    const { rows } = await pool.query(
+      `SELECT t.id, t.triplet_number, t.sort_order, t.active,
+              t.in_rolling_demo, t.in_gallery, t.caption,
+              bm.url AS before_url, bm.id AS before_media_id,
+              im.url AS image_url,  im.id AS image_media_id,
+              vm.url AS video_url,  vm.id AS video_media_id
+       FROM concept_triplets t
+       LEFT JOIN concept_media bm ON bm.id = t.before_media_id
+       LEFT JOIN concept_media im ON im.id = t.image_media_id
+       LEFT JOIN concept_media vm ON vm.id = t.video_media_id
+       WHERE t.concept_id = $1
+       ORDER BY t.sort_order ASC, t.triplet_number ASC`,
+      [conceptId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[samples] list error:', err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Add a sample: creates concept_media records for before + after, then a triplet.
+// Body: { before_url, after_url, after_type ('image'|'video'), caption? }
+app.post('/admin/api/concepts/:id/samples/add', requireRole('admin'), async (req, res) => {
+  try {
+    const conceptId = parseInt(req.params.id, 10);
+    if (!conceptId) return res.status(400).json({ error: 'Bad concept id' });
+    const beforeUrl = (req.body.before_url || '').trim();
+    const afterUrl  = (req.body.after_url  || '').trim();
+    const afterType = req.body.after_type === 'video' ? 'video' : 'image';
+    const caption   = (req.body.caption || '').trim() || null;
+    if (!beforeUrl || !afterUrl) return res.status(400).json({ error: 'before_url and after_url required' });
+
+    const bm = await pool.query(
+      `INSERT INTO concept_media (concept_id, kind, url, sort_order) VALUES ($1, 'image', $2, 0) RETURNING id`,
+      [conceptId, beforeUrl]
+    );
+    const beforeMediaId = bm.rows[0].id;
+
+    const am = await pool.query(
+      `INSERT INTO concept_media (concept_id, kind, url, sort_order) VALUES ($1, $2, $3, 0) RETURNING id`,
+      [conceptId, afterType, afterUrl]
+    );
+    const afterMediaId = am.rows[0].id;
+
+    const existing = await pool.query(
+      `SELECT triplet_number FROM concept_triplets WHERE concept_id = $1 ORDER BY triplet_number ASC`,
+      [conceptId]
+    );
+    const taken = new Set(existing.rows.map(r => r.triplet_number));
+    let n = 1;
+    while (taken.has(n)) n++;
+
+    const imageMediaId = afterType === 'image' ? afterMediaId : null;
+    const videoMediaId = afterType === 'video' ? afterMediaId : null;
+
+    await pool.query(
+      `INSERT INTO concept_triplets
+         (concept_id, triplet_number, sort_order, before_media_id, image_media_id, video_media_id, caption)
+       VALUES ($1, $2, 0, $3, $4, $5, $6)`,
+      [conceptId, n, beforeMediaId, imageMediaId, videoMediaId, caption]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[samples] add error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a sample triplet.
+app.post('/admin/api/concepts/:id/samples/:sampleId/delete', requireRole('admin'), async (req, res) => {
+  try {
+    const sampleId = parseInt(req.params.sampleId, 10);
+    await pool.query(`DELETE FROM concept_triplets WHERE id = $1`, [sampleId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[samples] delete error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /admin/gallery — dense triplet-card grid (new default view).
 // Grouped by concept. Each card shows the three thumbnails, concept · #N badge,
 // caption, and quick toggles for Active / Rolling demo / In bottom gallery.
