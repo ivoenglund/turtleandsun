@@ -18,6 +18,7 @@
   .btn.danger{background:#a12a1a;color:#fff;}
   .btn.secondary{background:#1C0A00;color:#fff;}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e2d8;border-radius:10px;overflow:hidden;}
+  #conceptTable{table-layout:fixed;}
   th{background:#FFF3C4;text-transform:uppercase;font-size:11px;letter-spacing:0.04em;font-weight:700;padding:10px 12px;text-align:left;border-bottom:1px solid #e6e2d8;}
   td{padding:9px 12px;border-bottom:1px solid #f0ede6;vertical-align:middle;font-size:13px;}
   tr:last-child td{border-bottom:none;}
@@ -33,9 +34,9 @@
   .dim{font-weight:700;font-size:13px;color:#1C0A00;}
   .desc{color:#888;font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;}
   /* Samples sub-grid */
-  .samples-wrap{padding:16px 20px 20px;background:#f7f5ef;}
-  .samples-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#3A6B20;margin-bottom:12px;}
-  .samples-grid{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e2d8;border-radius:8px;overflow:hidden;margin-bottom:14px;}
+  .samples-wrap{padding:0;background:#f7f5ef;}
+  .samples-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#3A6B20;margin:0;padding:12px 16px 8px;}
+  .samples-grid{width:100%;border-collapse:collapse;background:#fff;border-top:1px solid #d8d4cc;border-bottom:1px solid #d8d4cc;border-radius:0;overflow:hidden;margin-bottom:0;table-layout:fixed;}
   .samples-grid th{background:#f0ede6;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:7px 10px;text-align:left;border-bottom:1px solid #e6e2d8;}
   .samples-grid td{padding:8px 10px;border-bottom:1px solid #f5f3ee;vertical-align:middle;font-size:12px;}
   .samples-grid tr:last-child td{border-bottom:none;}
@@ -302,8 +303,8 @@ function renderSamples(conceptId, samples) {
       '<td>' + afterThumb + '</td>' +
       '<td>' + typeBadge + '</td>' +
       '<td>' + tog(s.id,'active',s.active,conceptId) + '</td>' +
-      '<td>' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + '</td>' +
-      '<td>' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
+      '<td style="white-space:nowrap">' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + ' ' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
+      '<td></td>' +
       '<td><button class="btn small danger" title="Permanently delete this sample" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
       '<td>' + (s.clip_count > 0
         ? '<a class="btn small secondary" href="/admin/social-clips/' + s.clip_id + '" title="Open the social media clip editor for this sample">Edit clip</a>'
@@ -312,11 +313,11 @@ function renderSamples(conceptId, samples) {
   }).join('');
 
   var tableHtml = samples.length
-    ? '<table class="samples-grid"><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample entirely">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th></th><th title="Social media clip linked to this sample">Clip</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    ? '<table class="samples-grid"><colgroup><col style="width:40px"><col style="width:120px"><col style="width:100px"><col style="width:120px"><col style="width:100px"><col style="width:80px"><col style="width:140px"><col style="width:90px"><col></colgroup><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample">Active</th><th title="Rolling demo · Gallery visibility">Rolling · Gallery</th><th></th><th title="Delete this sample"></th><th title="Social media clip for this sample">Clip</th></tr></thead><tbody>' + rows + '</tbody></table>'
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
-    '<div class="add-sample-form" style="gap:12px;">' +
+    '<div class="add-sample-form" style="gap:12px;margin:14px 16px 16px;">' +
       '<div>' +
         '<div class="drop-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:4px;">Before</div>' +
         '<div class="sample-drop-zone" id="beforeDrop-' + conceptId + '" title="Drag the original customer photo here from the gallery window"><span class="drop-hint">Drop from gallery</span></div>' +
