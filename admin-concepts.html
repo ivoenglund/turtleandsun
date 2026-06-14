@@ -91,10 +91,11 @@
         <th style="width:80px;" title="Visible = shown to customers. Hidden = draft or inactive.">Status</th>
         <th style="width:140px;" title="Edit or permanently delete this concept">Concept</th>
         <th style="width:90px;" title="Before/After sample pairs — drag media from the gallery to add">Samples</th>
+        <th style="width:100px;" title="Social media clip generated from this concept's sample">Clip</th>
       </tr>
     </thead>
     <tbody id="conceptBody">
-      <tr><td colspan="8" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
+      <tr><td colspan="9" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -156,7 +157,7 @@ function toggleNew() {
   // Insert a special row at the top
   var tr = document.createElement('tr');
   tr.id = 'newRow';
-  tr.innerHTML = '<td colspan="8" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tr.innerHTML = '<td colspan="9" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
   tbody.insertBefore(tr, tbody.firstChild);
   autoResizeIframe(document.getElementById('newIframe'));
 }
@@ -182,14 +183,14 @@ function loadConcepts() {
     })
     .catch(function(err){
       document.getElementById('conceptBody').innerHTML =
-        '<tr><td colspan="8" style="color:#a12a1a;padding:24px;">Error loading concepts: ' + err.message + '</td></tr>';
+        '<tr><td colspan="9" style="color:#a12a1a;padding:24px;">Error loading concepts: ' + err.message + '</td></tr>';
     });
 }
 
 function renderGrid(concepts) {
   var tbody = document.getElementById('conceptBody');
   if (!concepts.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
     return;
   }
   tbody.innerHTML = concepts.map(function(c) {
@@ -234,7 +235,7 @@ function toggleEdit(id) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = id;
-  tr.innerHTML = '<td colspan="8" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tr.innerHTML = '<td colspan="9" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
   conceptRow.insertAdjacentElement('afterend', tr);
   autoResizeIframe(document.getElementById('editIframe-' + id));
 }
@@ -256,7 +257,7 @@ function toggleSamples(conceptId) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = 'samples-' + conceptId;
-  tr.innerHTML = '<td colspan="8"><div class="samples-wrap"><div class="samples-title">Samples for concept #' + conceptId + '</div><div id="samplesInner-' + conceptId + '"><em style="color:#aaa;font-size:12px;">Loading…</em></div></div></td>';
+  tr.innerHTML = '<td colspan="9"><div class="samples-wrap"><div class="samples-title">Samples for concept #' + conceptId + '</div><div id="samplesInner-' + conceptId + '"><em style="color:#aaa;font-size:12px;">Loading…</em></div></div></td>';
   conceptRow.insertAdjacentElement('afterend', tr);
 
   loadSamples(conceptId);
@@ -303,15 +304,15 @@ function renderSamples(conceptId, samples) {
       '<td>' + tog(s.id,'active',s.active,conceptId) + '</td>' +
       '<td>' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + '</td>' +
       '<td>' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
+      '<td><button class="btn small danger" title="Permanently delete this sample" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
       '<td>' + (s.clip_count > 0
         ? '<a class="btn small secondary" href="/admin/social-clips/' + s.clip_id + '" title="Open the social media clip editor for this sample">Edit clip</a>'
         : '<button class="btn small" title="Generate a social media clip (video) from this sample" onclick="createClip(' + s.id + ',' + conceptId + ')">Generate clip</button>') + '</td>' +
-      '<td><button class="btn small danger" title="Permanently delete this sample" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
     '</tr>';
   }).join('');
 
   var tableHtml = samples.length
-    ? '<table class="samples-grid"><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample entirely">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th title="Social media clip linked to this sample">Clip</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+    ? '<table class="samples-grid"><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample entirely">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th></th><th title="Social media clip linked to this sample">Clip</th></tr></thead><tbody>' + rows + '</tbody></table>'
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
