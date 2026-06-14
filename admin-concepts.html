@@ -83,14 +83,14 @@
   <table id="conceptTable">
     <thead>
       <tr>
-        <th style="width:40px;">#</th>
-        <th style="width:120px;">Occasion</th>
-        <th style="width:100px;">Subject</th>
-        <th style="width:120px;">Action</th>
-        <th style="width:100px;">Mood</th>
-        <th style="width:80px;">Status</th>
-        <th style="width:140px;">Concept</th>
-        <th style="width:90px;">Samples</th>
+        <th style="width:40px;" title="Concept ID — used for grid ordering">#</th>
+        <th style="width:120px;" title="The event or occasion (e.g. Birthday, Anniversary, Valentine's Day)">Occasion</th>
+        <th style="width:100px;" title="Who the loveogram is for (e.g. Mom, Partner, Best Friend)">Subject</th>
+        <th style="width:120px;" title="The emotional action or theme (e.g. Celebrate, Thank, Cheer Up)">Action</th>
+        <th style="width:100px;" title="Emotional tone of the concept (e.g. Warm, Playful, Romantic)">Mood</th>
+        <th style="width:80px;" title="Visible = shown to customers. Hidden = draft or inactive.">Status</th>
+        <th style="width:140px;" title="Edit or permanently delete this concept">Concept</th>
+        <th style="width:90px;" title="Before/After sample pairs — drag media from the gallery to add">Samples</th>
       </tr>
     </thead>
     <tbody id="conceptBody">
@@ -194,8 +194,8 @@ function renderGrid(concepts) {
     var chip = function(v){ return v ? '<span class="badge dim-chip">' + escHtml(v) + '</span>' : '<span style="color:#ccc;">—</span>'; };
     var mood = c.mood ? '<span class="badge mood">' + escHtml(c.mood) + '</span>' : '<span style="color:#ccc;">—</span>';
     var status = c.active
-      ? '<span class="badge active">Visible</span>'
-      : '<span class="badge inactive">Hidden</span>';
+      ? '<span class="badge active" title="This concept is published and visible to customers">Visible</span>'
+      : '<span class="badge inactive" title="This concept is hidden — not shown to customers">Hidden</span>';
     return '<tr class="concept-row" data-id="' + c.id + '">' +
       '<td><span class="id-chip">' + c.id + '</span></td>' +
       '<td>' + chip(c.occasion) + '</td>' +
@@ -204,11 +204,11 @@ function renderGrid(concepts) {
       '<td>' + mood + '</td>' +
       '<td>' + status + '</td>' +
       '<td style="white-space:nowrap;">' +
-        '<button class="btn small" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
+        '<button class="btn small" title="Edit this concept\'s fields" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
         '<button class="btn small danger" title="Permanently delete this concept and all its samples" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + '\')">Delete</button>' +
       '</td>' +
       '<td>' +
-        '<button class="btn small secondary" onclick="toggleSamples(' + c.id + ')">Samples</button>' +
+        '<button class="btn small secondary" title="View and manage Before/After samples for this concept" onclick="toggleSamples(' + c.id + ')">Samples</button>' +
       '</td>' +
     '</tr>';  }).join('');
 }
@@ -287,7 +287,9 @@ function renderSamples(conceptId, samples) {
     function tog(sId, field, val, cId) {
       var on = val ? 'badge active' : 'badge inactive';
       var label = val ? 'On' : 'Off';
-      return '<span class="' + on + '" style="cursor:pointer" onclick="toggleSampleFlag(' + sId + ',\'' + field + '\',' + cId + ')">' + label + '</span>';
+      var tips = {active:'Click to enable/disable this sample',rolling:'Click to include/exclude from homepage rolling demo',gallery:'Click to include/exclude from the public gallery'};
+      var tip = tips[field] || '';
+      return '<span class="' + on + '" title="' + tip + '" style="cursor:pointer" onclick="toggleSampleFlag(' + sId + ',\'' + field + '\',' + cId + ')">' + label + '</span>';
     }
     return '<tr>' +
       '<td style="color:#aaa;font-size:11px;">#' + s.triplet_number + '</td>' +
@@ -302,20 +304,20 @@ function renderSamples(conceptId, samples) {
   }).join('');
 
   var tableHtml = samples.length
-    ? '<table class="samples-grid"><thead><tr><th>#</th><th>Before</th><th>After</th><th>Type</th><th>Active</th><th>Rolling</th><th>Gallery</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+    ? '<table class="samples-grid"><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample entirely">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
     '<div class="add-sample-form" style="gap:12px;">' +
       '<div>' +
         '<div class="drop-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:4px;">Before</div>' +
-        '<div class="sample-drop-zone" id="beforeDrop-' + conceptId + '"><span class="drop-hint">Drop from gallery</span></div>' +
+        '<div class="sample-drop-zone" id="beforeDrop-' + conceptId + '" title="Drag the original customer photo here from the gallery window"><span class="drop-hint">Drop from gallery</span></div>' +
       '</div>' +
       '<div>' +
         '<div class="drop-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:4px;">After</div>' +
-        '<div class="sample-drop-zone" id="afterDrop-' + conceptId + '"><span class="drop-hint">Drop from gallery</span></div>' +
+        '<div class="sample-drop-zone" id="afterDrop-' + conceptId + '" title="Drag the generated loveogram image or video here from the gallery window"><span class="drop-hint">Drop from gallery</span></div>' +
       '</div>' +
-      '<div style="display:flex;align-items:flex-end;"><button class="btn small" onclick="addSample(' + conceptId + ')">+ Add sample</button></div>' +
+      '<div style="display:flex;align-items:flex-end;"><button class="btn small" title="Add a new sample using the media dropped above" onclick="addSample(' + conceptId + ')">+ Add sample</button></div>' +
     '</div>';
 
   setupSampleDropZone(document.getElementById('beforeDrop-' + conceptId), conceptId, 'before');
