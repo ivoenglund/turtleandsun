@@ -27,6 +27,8 @@
     .muted{color:#888;font-size:12px;margin-top:4px;}
     .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
     footer.ts-footer{text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;}
+  body.in-iframe footer.ts-footer,.in-iframe .sun{display:none!important;}
+  body.in-iframe .wrap{padding-bottom:20px;}
 
     /* ID badge */
     .id-badge{display:inline-block;background:#1C2A14;color:#FFF9E6;border-radius:6px;padding:4px 14px;font-weight:700;font-size:16px;letter-spacing:0.03em;margin-left:10px;}
@@ -60,8 +62,9 @@
 
 <script src="/currency.js?v=20260526a"></script>
 <script src="/nav.js?v=20260611b"></script>
-<script>NavBar.init({ requireAuth: true });</script>
-<div class="sun"></div>
+<script>if (window.self === window.top) NavBar.init({ requireAuth: true });</script>
+<style>iframe body .sun, iframe .ts-footer { display:none; }</style>
+<div class="sun" style="display:none;"></div>
 
 <div class="wrap">
 
@@ -72,7 +75,6 @@
       <h1 id="pageTitle" style="margin:0;">New concept</h1>
       <span id="idBadge" class="id-badge" style="display:none;"></span>
     </div>
-    <a href="/admin/concepts">← Back to concepts</a>
   </div>
 
   <form id="conceptForm" method="POST" action="/admin/concepts/save" enctype="multipart/form-data">
@@ -228,8 +230,20 @@ document.addEventListener('DOMContentLoaded', function () {
   setupTooltips();
   setupFormSubmit();
 
+  // Detect iframe and apply class
+  if (window.self !== window.top) document.body.classList.add('in-iframe');
+
   var params = new URLSearchParams(window.location.search);
-  editId = params.get('id') ? parseInt(params.get('id'), 10) : null;
+  var pathMatch = window.location.pathname.match(/\/admin\/concepts\/edit\/(\d+)/);
+  editId = params.get('id')
+    ? parseInt(params.get('id'), 10)
+    : (pathMatch ? parseInt(pathMatch[1], 10) : null);
+
+  if (editId) {
+    document.getElementById('pageTitle').textContent = 'Edit concept';
+    document.getElementById('idBadge').textContent = '#' + editId;
+    document.getElementById('idBadge').style.display = 'inline-block';
+  }
 
   loadMeta()
     .then(function () {
