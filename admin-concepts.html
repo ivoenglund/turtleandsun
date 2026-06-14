@@ -28,6 +28,7 @@
   .badge.active{background:#d4edbe;color:#2c5016;}
   .badge.inactive{background:#f0ede6;color:#888;}
   .badge.mood{background:#FFF3C4;color:#7a5c00;}
+  .badge.dim-chip{background:#eef3ea;color:#2c5016;}
   .id-chip{font-size:11px;color:#aaa;font-weight:700;}
   .dim{font-weight:700;font-size:13px;color:#1C0A00;}
   .desc{color:#888;font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;}
@@ -54,15 +55,17 @@
   <table id="conceptTable">
     <thead>
       <tr>
-        <th style="width:44px;">#</th>
-        <th>Concept</th>
+        <th style="width:40px;">#</th>
+        <th style="width:120px;">Occasion</th>
+        <th style="width:100px;">Subject</th>
+        <th style="width:120px;">Action</th>
         <th style="width:100px;">Mood</th>
         <th style="width:80px;">Status</th>
         <th style="width:130px;"></th>
       </tr>
     </thead>
     <tbody id="conceptBody">
-      <tr><td colspan="5" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
+      <tr><td colspan="7" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -113,7 +116,7 @@ function toggleNew() {
   // Insert a special row at the top
   var tr = document.createElement('tr');
   tr.id = 'newRow';
-  tr.innerHTML = '<td colspan="5" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
   tbody.insertBefore(tr, tbody.firstChild);
   autoResizeIframe(document.getElementById('newIframe'));
 }
@@ -135,27 +138,28 @@ function loadConcepts() {
 function renderGrid(concepts) {
   var tbody = document.getElementById('conceptBody');
   if (!concepts.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
     return;
   }
   tbody.innerHTML = concepts.map(function(c) {
     var dim = [c.subject, c.occasion, c.action].filter(Boolean).join(' · ');
-    var desc = c.description ? escHtml(c.description).slice(0, 120) : '';
+    var chip = function(v){ return v ? '<span class="badge dim-chip">' + escHtml(v) + '</span>' : '<span style="color:#ccc;">—</span>'; };
     var mood = c.mood ? '<span class="badge mood">' + escHtml(c.mood) + '</span>' : '<span style="color:#ccc;">—</span>';
     var status = c.active
       ? '<span class="badge active">Visible</span>'
       : '<span class="badge inactive">Hidden</span>';
     return '<tr class="concept-row" data-id="' + c.id + '">' +
       '<td><span class="id-chip">' + c.id + '</span></td>' +
-      '<td><div class="dim">' + escHtml(dim) + '</div>' + (desc ? '<div class="desc">' + desc + '</div>' : '') + '</td>' +
+      '<td>' + chip(c.occasion) + '</td>' +
+      '<td>' + chip(c.subject)  + '</td>' +
+      '<td>' + chip(c.action)   + '</td>' +
       '<td>' + mood + '</td>' +
       '<td>' + status + '</td>' +
       '<td style="white-space:nowrap;">' +
         '<button class="btn small" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
-        '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + '\')">Delete</button>' +
+        '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + \')">Delete</button>' +
       '</td>' +
-    '</tr>';
-  }).join('');
+    '</tr>';  }).join('');
 }
 
 // ── Edit (expand inline) ───────────────────────────────────────────────────
@@ -174,7 +178,7 @@ function toggleEdit(id) {
   var tr = document.createElement('tr');
   tr.className = 'expand-row';
   tr.dataset.forId = id;
-  tr.innerHTML = '<td colspan="5" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tr.innerHTML = '<td colspan="7" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
   conceptRow.insertAdjacentElement('afterend', tr);
   autoResizeIframe(document.getElementById('editIframe-' + id));
 }
