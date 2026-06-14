@@ -232,11 +232,27 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ── Data loading ───────────────────────────────────────────────────────────
+function fillDatalist(id, values) {
+  var dl = document.getElementById(id);
+  if (!dl || !values || !values.length) return;
+  var existing = Array.from(dl.options).map(function(o){ return o.value; });
+  values.forEach(function(v) {
+    if (!existing.includes(v)) {
+      var opt = document.createElement('option');
+      opt.value = v;
+      dl.appendChild(opt);
+    }
+  });
+}
+
 function loadMeta() {
   return fetch('/admin/api/concepts/form-meta')
     .then(function (r) { if (!r.ok) throw new Error('form-meta ' + r.status); return r.json(); })
     .then(function (meta) {
       MODELS = meta.models || {};
+      fillDatalist('dl-subject',  meta.subjects);
+      fillDatalist('dl-occasion', meta.occasions);
+      fillDatalist('dl-action',   meta.actions);
       populateModelSelect();
     });
 }

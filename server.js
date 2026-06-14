@@ -6768,13 +6768,23 @@ app.get('/admin/media/library', requireRole('admin'), async (req, res) => {
 // ---------------------------------------------------------------------------
 // Concept form meta — model registry for the new concept admin form
 // ---------------------------------------------------------------------------
-app.get('/admin/api/concepts/form-meta', requireRole('admin'), (req, res) => {
+app.get('/admin/api/concepts/form-meta', requireRole('admin'), async (req, res) => {
   try {
     const models = {};
     Object.entries(generation.MODELS).forEach(([id, m]) => {
       models[id] = { kind: m.kind, label: m.label, description: m.description || '', fields: m.fields || [] };
     });
-    res.json({ models });
+    const [subj, occ, act] = await Promise.all([
+      pool.query('SELECT DISTINCT subject  FROM concepts WHERE subject  IS NOT NULL ORDER BY subject'),
+      pool.query('SELECT DISTINCT occasion FROM concepts WHERE occasion IS NOT NULL ORDER BY occasion'),
+      pool.query('SELECT DISTINCT action   FROM concepts WHERE action   IS NOT NULL ORDER BY action'),
+    ]);
+    res.json({
+      models,
+      subjects:  subj.rows.map(r => r.subject),
+      occasions: occ.rows.map(r => r.occasion),
+      actions:   act.rows.map(r => r.action),
+    });
   } catch (err) {
     console.error('[form-meta] error:', err.message);
     res.status(500).json({ error: 'Failed' });
