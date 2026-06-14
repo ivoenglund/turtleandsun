@@ -125,6 +125,15 @@
             <option value="dancing"><option value="posing"><option value="gift-giving">
           </datalist>
         </div>
+        <div class="field">
+          <label>Mood <span class="tip" data-tip="The emotional tone of this concept — heartfelt, funny, playful, dramatic, nostalgic, inspirational, spooky. Used internally and included in social media captions when publishing clips.">?</span></label>
+          <input type="text" name="mood" id="fMood" list="dl-mood" placeholder="heartfelt">
+          <datalist id="dl-mood">
+            <option value="heartfelt"><option value="funny"><option value="playful">
+            <option value="dramatic"><option value="nostalgic"><option value="inspirational">
+            <option value="spooky"><option value="romantic"><option value="uplifting">
+          </datalist>
+        </div>
       </div>
       <div class="field" style="margin-bottom:0;">
         <label>Description <span class="tip" data-tip="Shown to the customer above the gallery on the landing page. Explain what this concept produces in plain, engaging language. Can be long — several sentences is fine.">?</span></label>
@@ -253,6 +262,7 @@ function loadMeta() {
       fillDatalist('dl-subject',  meta.subjects);
       fillDatalist('dl-occasion', meta.occasions);
       fillDatalist('dl-action',   meta.actions);
+      fillDatalist('dl-mood',     meta.moods);
       populateModelSelect();
     });
 }
@@ -275,6 +285,7 @@ function loadConcept(id) {
       setVal('fSubject',     c.subject   || 'pet');
       setVal('fOccasion',    c.occasion  || 'general');
       setVal('fAction',      c.action    || 'royal-portrait');
+      setVal('fMood',        c.mood      || '');
       setVal('fDescription', c.description || '');
 
       // Visible

@@ -944,6 +944,7 @@ async function initDb() {
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS subject  TEXT NOT NULL DEFAULT 'pet';
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS occasion TEXT NOT NULL DEFAULT 'general';
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS action   TEXT NOT NULL DEFAULT 'royal-portrait';
+    ALTER TABLE concepts ADD COLUMN IF NOT EXISTS mood     TEXT NOT NULL DEFAULT 'heartfelt';
     ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS subject TEXT;
   `);
   // One-time backfill from slug patterns (idempotent: only rows still on defaults)

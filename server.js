@@ -6469,6 +6469,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
     const dimSubject  = normDim(req.body.subject)  || 'pet';
     const dimOccasion = normDim(req.body.occasion) || 'general';
     const dimAction   = normDim(req.body.action)   || 'royal-portrait';
+    const dimMood     = normDim(req.body.mood)     || 'heartfelt';
     // filter_category is derived — single source of truth is the three dimensions
     const filterCategory = [dimSubject, dimOccasion, dimAction].join(', ');
     const imagePrompt = (req.body.image_prompt || '').trim();
@@ -6567,7 +6568,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
            user_input_variable = $18, user_input_max_length = $19,
            image_input_extras = $20, video_input_extras = $21, description = $22,
            price_tier = $23, unit_price_sek_minor = $24, pricing_rules = $25,
-           subject = $27, occasion = $28, action = $29,
+           subject = $27, occasion = $28, action = $29, mood = $30,
            updated_at = NOW()
          WHERE id = $26`,
         [effectiveSlug, effectiveName, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
@@ -6575,7 +6576,7 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
          imageInputExtras, videoInputExtras, description,
          priceTier, unitPriceSekMinor, pricingRules,
-         editId, dimSubject, dimOccasion, dimAction]
+         editId, dimSubject, dimOccasion, dimAction, dimMood]
       );
     } else {
       await pool.query(
@@ -6585,14 +6586,14 @@ app.post('/admin/concepts/save', requireRole('admin'), conceptUploadFields, asyn
             user_input_enabled, user_input_label, user_input_placeholder, user_input_variable, user_input_max_length,
             image_input_extras, video_input_extras, description,
             price_tier, unit_price_sek_minor, pricing_rules,
-            subject, occasion, action)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
+            subject, occasion, action, mood)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
         [effectiveSlug, effectiveName, filterCategory, inputType, beforeUrl, afterUrl, videoUrl,
          imagePrompt, videoPrompt, falImage, falVideo, socialCaption, active, sortOrder,
          userInputEnabled, userInputLabel, userInputPlaceholder, userInputVariable, userInputMaxLength,
          imageInputExtras, videoInputExtras, description,
          priceTier, unitPriceSekMinor, pricingRules,
-         dimSubject, dimOccasion, dimAction]
+         dimSubject, dimOccasion, dimAction, dimMood]
       );
     }
     res.redirect('/admin/concepts?saved=1' + (warn ? '&warn=' + encodeURIComponent(warn) : ''));
@@ -6774,16 +6775,18 @@ app.get('/admin/api/concepts/form-meta', requireRole('admin'), async (req, res) 
     Object.entries(generation.MODELS).forEach(([id, m]) => {
       models[id] = { kind: m.kind, label: m.label, description: m.description || '', fields: m.fields || [] };
     });
-    const [subj, occ, act] = await Promise.all([
+    const [subj, occ, act, moo] = await Promise.all([
       pool.query('SELECT DISTINCT subject  FROM concepts WHERE subject  IS NOT NULL ORDER BY subject'),
       pool.query('SELECT DISTINCT occasion FROM concepts WHERE occasion IS NOT NULL ORDER BY occasion'),
       pool.query('SELECT DISTINCT action   FROM concepts WHERE action   IS NOT NULL ORDER BY action'),
+      pool.query('SELECT DISTINCT mood     FROM concepts WHERE mood     IS NOT NULL ORDER BY mood'),
     ]);
     res.json({
       models,
       subjects:  subj.rows.map(r => r.subject),
       occasions: occ.rows.map(r => r.occasion),
       actions:   act.rows.map(r => r.action),
+      moods:     moo.rows.map(r => r.mood),
     });
   } catch (err) {
     console.error('[form-meta] error:', err.message);
