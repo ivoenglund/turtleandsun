@@ -6629,7 +6629,9 @@ app.get('/admin/api/concepts/:id/samples', requireRole('admin'), async (req, res
               t.in_rolling_demo, t.in_gallery, t.caption,
               bm.url AS before_url, bm.id AS before_media_id,
               im.url AS image_url,  im.id AS image_media_id,
-              vm.url AS video_url,  vm.id AS video_media_id
+              vm.url AS video_url,  vm.id AS video_media_id,
+              (SELECT COUNT(*)::int FROM social_clips sc WHERE sc.triplet_id = t.id) AS clip_count,
+              (SELECT sc2.id FROM social_clips sc2 WHERE sc2.triplet_id = t.id ORDER BY sc2.created_at DESC LIMIT 1) AS clip_id
        FROM concept_triplets t
        LEFT JOIN concept_media bm ON bm.id = t.before_media_id
        LEFT JOIN concept_media im ON im.id = t.image_media_id

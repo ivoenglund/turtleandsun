@@ -299,12 +299,15 @@ function renderSamples(conceptId, samples) {
       '<td>' + tog(s.id,'active',s.active,conceptId) + '</td>' +
       '<td>' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + '</td>' +
       '<td>' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
+      '<td>' + (s.clip_count > 0
+        ? '<a class="btn small secondary" href="/admin/social-clips/' + s.clip_id + '" title="Open clip editor for this sample">Edit clip</a>'
+        : '<button class="btn small" title="Create a social media clip from this sample" onclick="createClip(' + s.id + ',' + conceptId + ')">Create clip</button>') + '</td>' +
       '<td><button class="btn small danger" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
     '</tr>';
   }).join('');
 
   var tableHtml = samples.length
-    ? '<table class="samples-grid"><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample entirely">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+    ? '<table class="samples-grid"><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample entirely">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th title="Social media clip linked to this sample">Clip</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
@@ -409,6 +412,25 @@ function toggleSampleFlag(sampleId, field, conceptId) {
       loadSamples(conceptId);
     })
     .catch(function(err){ alert('Toggle failed: ' + err.message); });
+}
+
+function createClip(sampleId, conceptId) {
+  fetch('/admin/api/social-clips/queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ triplet_ids: [sampleId], clip_style: 1 })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) { alert('Error creating clip: ' + j.error); return; }
+      var clipId = j.created && j.created[0];
+      if (clipId) {
+        window.location.href = '/admin/social-clips/' + clipId;
+      } else {
+        alert('Clip created — open Produce to find it.');
+      }
+    })
+    .catch(function(err){ alert('Error: ' + err.message); });
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────────────
