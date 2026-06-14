@@ -143,6 +143,7 @@ function collapseAll() {
   openExpandId = null;
   openSamplesId = null;
   document.getElementById('newRow') && closeNew();
+  history.replaceState(null, '', location.pathname);
 }
 
 // ── New concept ────────────────────────────────────────────────────────────
@@ -176,6 +177,8 @@ function loadConcepts() {
     .then(function(concepts){
       if (!Array.isArray(concepts)) throw new Error('Unexpected response: ' + JSON.stringify(concepts));
       renderGrid(concepts);
+      var hm = location.hash.match(/^#s-(\d+)$/);
+      if (hm) { setTimeout(function(){ toggleSamples(parseInt(hm[1], 10)); }, 80); }
     })
     .catch(function(err){
       document.getElementById('conceptBody').innerHTML =
@@ -245,6 +248,7 @@ function toggleSamples(conceptId) {
   if (!okToClose()) return;
   collapseAll();
   openSamplesId = conceptId;
+  history.replaceState(null, '', location.pathname + '#s-' + conceptId);
 
   var conceptRow = document.querySelector('tr.concept-row[data-id="' + conceptId + '"]');
   if (!conceptRow) return;
@@ -300,9 +304,9 @@ function renderSamples(conceptId, samples) {
       '<td>' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + '</td>' +
       '<td>' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
       '<td>' + (s.clip_count > 0
-        ? '<a class="btn small secondary" href="/admin/social-clips/' + s.clip_id + '" title="Open clip editor for this sample">Edit clip</a>'
-        : '<button class="btn small" title="Create a social media clip from this sample" onclick="createClip(' + s.id + ',' + conceptId + ')">Create clip</button>') + '</td>' +
-      '<td><button class="btn small danger" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
+        ? '<a class="btn small secondary" href="/admin/social-clips/' + s.clip_id + '" title="Open the social media clip editor for this sample">Edit clip</a>'
+        : '<button class="btn small" title="Generate a social media clip (video) from this sample" onclick="createClip(' + s.id + ',' + conceptId + ')">Generate clip</button>') + '</td>' +
+      '<td><button class="btn small danger" title="Permanently delete this sample" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
     '</tr>';
   }).join('');
 
