@@ -112,6 +112,8 @@
             dashLink('/admin/email', 'Email engine') +
           '</div>' +
         '</div>' +
+        '<div class="ts-nav-dd-sep"></div>' +
+        '<div id="ts-nav-devmode-wrap"></div>' +
       '</div>';
 
     var drawer =
@@ -134,6 +136,7 @@
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/gallery">Gallery</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/reviews">Reviews</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
+        '<div id="ts-nav-devmode-wrap-drawer" class="ts-nav-admin-only" style="padding:0 20px 4px;"></div>' +
         '<div class="ts-nav-drawer-sep ts-nav-admin-only"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
@@ -319,6 +322,17 @@
 
         if (status.isAdmin) {
           document.body.classList.add('ts-nav-admin');
+          var devOn = !!status.devMode;
+          var devBtnHtml =
+            '<form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">' +
+            '<input type="hidden" name="return_to" value="' + encodeURIComponent(window.location.pathname) + '">' +
+            '<button type="submit" style="width:100%;text-align:left;background:' + (devOn ? '#FFE800' : '#f5f5f0') + ';border:1px solid ' + (devOn ? '#c8b800' : '#e0ddd5') + ';border-radius:8px;padding:7px 10px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;font-weight:700;color:#1C0A00;">' +
+            '⚡ Dev mode: <span style="color:' + (devOn ? '#7a6200' : '#a12a1a') + ';">' + (devOn ? 'ON — Stripe bypassed' : 'OFF') + '</span>' +
+            '</button></form>';
+          var dw = document.getElementById('ts-nav-devmode-wrap');
+          if (dw) dw.innerHTML = devBtnHtml;
+          var dwd = document.getElementById('ts-nav-devmode-wrap-drawer');
+          if (dwd) dwd.innerHTML = devBtnHtml;
         }
       }
 
