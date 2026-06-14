@@ -129,9 +129,18 @@ function closeNew() {
 // ── Load concepts list ─────────────────────────────────────────────────────
 function loadConcepts() {
   fetch('/admin/api/concepts/list')
-    .then(function(r){ return r.json(); })
-    .then(function(concepts){ renderGrid(concepts); })
-    .catch(function(){ showFlash('Failed to load concepts.', 'err'); });
+    .then(function(r){
+      if (!r.ok) return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+      return r.json();
+    })
+    .then(function(concepts){
+      if (!Array.isArray(concepts)) throw new Error('Unexpected response: ' + JSON.stringify(concepts));
+      renderGrid(concepts);
+    })
+    .catch(function(err){
+      document.getElementById('conceptBody').innerHTML =
+        '<tr><td colspan="7" style="color:#a12a1a;padding:24px;">Error loading concepts: ' + err.message + '</td></tr>';
+    });
 }
 
 function renderGrid(concepts) {
