@@ -54,9 +54,16 @@
   #newRow td{padding:0;border-bottom:2px solid #3A6B20;}
   #newRow iframe{display:block;width:100%;border:none;background:#fafaf5;}
   footer.ts-footer{text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;}
+  /* Lightbox */
+  #lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;cursor:pointer;}
+  #lightbox.open{display:flex;}
+  #lightbox img{max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);}
+  #lightbox video{max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);}
 </style>
 </head>
 <body class="ts-nav-loggedin ts-nav-admin">
+
+<div id="lightbox" onclick="closeLightbox()"><img id="lbImg" src="" style="display:none"><video id="lbVid" src="" controls autoplay style="display:none"></video></div>
 <script src="/currency.js?v=20260526a"></script>
 <script src="/nav.js?v=20260611b"></script>
 <script>NavBar.init({ requireAuth: true });</script>
@@ -261,14 +268,14 @@ function renderSamples(conceptId, samples) {
 
   var rows = samples.map(function(s) {
     var beforeThumb = s.before_url
-      ? '<img class="thumb" src="' + escHtml(s.before_url) + '" loading="lazy">'
+      ? '<img class="thumb" src="' + escHtml(s.before_url) + '" loading="lazy" style="cursor:pointer" onclick="openLightbox(\'' + escHtml(s.before_url) + '\',\'image\')">'
       : '<div class="thumb-missing">—</div>';
     var afterUrl = s.image_url || s.video_url || '';
     var afterType = s.video_url ? 'video' : 'image';
     var afterThumb = afterUrl
       ? (afterType === 'video'
-          ? '<video class="thumb" src="' + escHtml(afterUrl) + '" muted playsinline></video>'
-          : '<img class="thumb" src="' + escHtml(afterUrl) + '" loading="lazy">')
+          ? '<video class="thumb" src="' + escHtml(afterUrl) + '" muted playsinline style="cursor:pointer" onclick="openLightbox(\'' + escHtml(afterUrl) + '\',\'video\')"></video>'
+          : '<img class="thumb" src="' + escHtml(afterUrl) + '" loading="lazy" style="cursor:pointer" onclick="openLightbox(\'' + escHtml(afterUrl) + '\',\'image\')">')
       : '<div class="thumb-missing">—</div>';
     var typeBadge = '<span class="sample-type-badge ' + afterType + '">' + afterType + '</span>';
     var activeStr = s.active ? '<span class="badge active">On</span>' : '<span class="badge inactive">Off</span>';
@@ -364,6 +371,28 @@ function autoResizeIframe(iframe) {
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function openLightbox(url, type) {
+  var lb = document.getElementById('lightbox');
+  var img = document.getElementById('lbImg');
+  var vid = document.getElementById('lbVid');
+  if (type === 'video') {
+    img.style.display = 'none'; img.src = '';
+    vid.src = url; vid.style.display = 'block';
+  } else {
+    vid.style.display = 'none'; vid.src = '';
+    img.src = url; img.style.display = 'block';
+  }
+  lb.classList.add('open');
+}
+function closeLightbox() {
+  var lb = document.getElementById('lightbox');
+  lb.classList.remove('open');
+  document.getElementById('lbVid').pause();
+  document.getElementById('lbVid').src = '';
+  document.getElementById('lbImg').src = '';
+}
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLightbox(); });
 
 loadConcepts();
 </script>
