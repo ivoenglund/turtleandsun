@@ -325,7 +325,7 @@
           var devOn = !!status.devMode;
           var devBtnHtml =
             '<form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">' +
-            '<input type="hidden" name="return_to" value="' + encodeURIComponent(window.location.pathname) + '">' +
+            '<input type="hidden" name="return_to" value="' + window.location.pathname + '">' +
             '<button type="submit" style="width:100%;text-align:left;background:' + (devOn ? '#FFE800' : '#f5f5f0') + ';border:1px solid ' + (devOn ? '#c8b800' : '#e0ddd5') + ';border-radius:8px;padding:7px 10px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;font-weight:700;color:#1C0A00;">' +
             '⚡ Dev mode: <span style="color:' + (devOn ? '#7a6200' : '#a12a1a') + ';">' + (devOn ? 'ON — Stripe bypassed' : 'OFF') + '</span>' +
             '</button></form>';
