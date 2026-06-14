@@ -302,7 +302,8 @@ function renderSamples(conceptId, samples) {
       '<td>' + afterThumb + '</td>' +
       '<td>' + typeBadge + '</td>' +
       '<td>' + tog(s.id,'active',s.active,conceptId) + '</td>' +
-      '<td style="white-space:nowrap">' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + ' ' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
+      '<td>' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + '</td>' +
+      '<td>' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
       '<td></td>' +
       '<td><button class="btn small danger" title="Permanently delete this sample" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
       '<td>' + (s.clip_count > 0
@@ -312,7 +313,7 @@ function renderSamples(conceptId, samples) {
   }).join('');
 
   var tableHtml = samples.length
-    ? '<table class="samples-grid"><colgroup><col><col><col><col><col><col><col style="width:15.73%"><col style="width:10.11%"><col style="width:11.24%"></colgroup><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample">Active</th><th title="Rolling demo · Gallery visibility">Rolling · Gallery</th><th></th><th title="Delete this sample">Delete</th><th title="Social media clip for this sample">Clip</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    ? '<table class="samples-grid"><colgroup><col><col><col><col><col><col><col><col style="width:15.73%"><col style="width:10.11%"><col style="width:11.24%"></colgroup><thead><tr><th title="Sample number within this concept">#</th><th title="The original photo the customer submits">Before</th><th title="The AI-generated loveogram result">After</th><th title="Whether the result is an image or video">Type</th><th title="Toggle to enable or disable this sample">Active</th><th title="Include in the rolling demo carousel on the homepage">Rolling</th><th title="Include in the public gallery page">Gallery</th><th></th><th title="Delete this sample — aligns with Samples column above">Samples</th><th title="Social media clip for this sample">Clip</th></tr></thead><tbody>' + rows + '</tbody></table>'
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
