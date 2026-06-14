@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Concepts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#1C0A00;margin:0;padding:0;min-height:100vh;display:flex;flex-direction:column;background:#FBF6EC;}
+  .wrap{max-width:1100px;margin:0 auto;padding:8px 24px 48px;width:100%;flex:1;}
+  h1{font-size:24px;margin:0;}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  .btn{display:inline-block;padding:9px 16px;background:#3A6B20;color:#FFF9E6;border:none;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;font-family:inherit;}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.danger{background:#a12a1a;color:#fff;}
+  .btn.secondary{background:#1C0A00;color:#fff;}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e2d8;border-radius:10px;overflow:hidden;}
+  th{background:#FFF3C4;text-transform:uppercase;font-size:11px;letter-spacing:0.04em;font-weight:700;padding:10px 12px;text-align:left;border-bottom:1px solid #e6e2d8;}
+  td{padding:9px 12px;border-bottom:1px solid #f0ede6;vertical-align:middle;font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+  tr.concept-row:hover td{background:#fffdf5;}
+  tr.expand-row td{padding:0;border-bottom:2px solid #3A6B20;}
+  .expand-row iframe{display:block;width:100%;border:none;background:#fafaf5;}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.03em;}
+  .badge.active{background:#d4edbe;color:#2c5016;}
+  .badge.inactive{background:#f0ede6;color:#888;}
+  .badge.mood{background:#FFF3C4;color:#7a5c00;}
+  .id-chip{font-size:11px;color:#aaa;font-weight:700;}
+  .dim{font-weight:700;font-size:13px;color:#1C0A00;}
+  .desc{color:#888;font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;}
+  .flash{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;}
+  .flash.ok{background:#e3f3d8;color:#2c5016;}
+  .flash.err{background:#f7d9d4;color:#7a2114;}
+  #newRow{display:none;}
+  #newRow td{padding:0;border-bottom:2px solid #3A6B20;}
+  #newRow iframe{display:block;width:100%;border:none;background:#fafaf5;}
+  footer.ts-footer{text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;}
+</style>
+</head>
+<body class="ts-nav-loggedin ts-nav-admin">
+<script src="/currency.js?v=20260526a"></script>
+<script src="/nav.js?v=20260611b"></script>
+<script>NavBar.init({ requireAuth: true });</script>
+
+<div class="wrap">
+  <div class="top">
+    <h1>Concepts</h1>
+    <button class="btn" onclick="toggleNew()">+ New concept</button>
+  </div>
+  <div id="flash"></div>
+  <table id="conceptTable">
+    <thead>
+      <tr>
+        <th style="width:44px;">#</th>
+        <th>Concept</th>
+        <th style="width:100px;">Mood</th>
+        <th style="width:80px;">Status</th>
+        <th style="width:130px;"></th>
+      </tr>
+    </thead>
+    <tbody id="conceptBody">
+      <tr><td colspan="5" style="text-align:center;color:#aaa;padding:32px;">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer class="ts-footer">
+  <p>Turtle and Sun — Admin</p>
+</footer>
+
+<script>
+var openExpandId = null;
+var newOpen = false;
+
+// ── Listen for save/delete messages from the iframe ────────────────────────
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+  if (e.data.type === 'concept-saved') {
+    showFlash('Concept saved.', 'ok');
+    collapseAll();
+    loadConcepts();
+  }
+  if (e.data.type === 'concept-deleted') {
+    showFlash('Concept deleted.', 'ok');
+    collapseAll();
+    loadConcepts();
+  }
+});
+
+function showFlash(msg, kind) {
+  var el = document.getElementById('flash');
+  el.innerHTML = '<div class="flash ' + kind + '">' + msg + '</div>';
+  setTimeout(function(){ el.innerHTML = ''; }, 4000);
+}
+
+function collapseAll() {
+  // Close any open expand rows
+  document.querySelectorAll('.expand-row').forEach(function(r){ r.remove(); });
+  openExpandId = null;
+  // Close new row
+  document.getElementById('newRow') && closeNew();
+}
+
+// ── New concept ────────────────────────────────────────────────────────────
+function toggleNew() {
+  if (newOpen) { closeNew(); return; }
+  collapseAll();
+  newOpen = true;
+  var tbody = document.getElementById('conceptBody');
+  // Insert a special row at the top
+  var tr = document.createElement('tr');
+  tr.id = 'newRow';
+  tr.innerHTML = '<td colspan="5" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/new" id="newIframe" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  tbody.insertBefore(tr, tbody.firstChild);
+  autoResizeIframe(document.getElementById('newIframe'));
+}
+
+function closeNew() {
+  var r = document.getElementById('newRow');
+  if (r) r.remove();
+  newOpen = false;
+}
+
+// ── Load concepts list ─────────────────────────────────────────────────────
+function loadConcepts() {
+  fetch('/admin/api/concepts/list')
+    .then(function(r){ return r.json(); })
+    .then(function(concepts){ renderGrid(concepts); })
+    .catch(function(){ showFlash('Failed to load concepts.', 'err'); });
+}
+
+function renderGrid(concepts) {
+  var tbody = document.getElementById('conceptBody');
+  if (!concepts.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:32px;">No concepts yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = concepts.map(function(c) {
+    var dim = [c.subject, c.occasion, c.action].filter(Boolean).join(' · ');
+    var desc = c.description ? escHtml(c.description).slice(0, 120) : '';
+    var mood = c.mood ? '<span class="badge mood">' + escHtml(c.mood) + '</span>' : '<span style="color:#ccc;">—</span>';
+    var status = c.active
+      ? '<span class="badge active">Visible</span>'
+      : '<span class="badge inactive">Hidden</span>';
+    return '<tr class="concept-row" data-id="' + c.id + '">' +
+      '<td><span class="id-chip">' + c.id + '</span></td>' +
+      '<td><div class="dim">' + escHtml(dim) + '</div>' + (desc ? '<div class="desc">' + desc + '</div>' : '') + '</td>' +
+      '<td>' + mood + '</td>' +
+      '<td>' + status + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button class="btn small" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
+        '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + '\')">Delete</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ── Edit (expand inline) ───────────────────────────────────────────────────
+function toggleEdit(id) {
+  // If this one is already open, close it
+  if (openExpandId === id) {
+    collapseAll();
+    return;
+  }
+  collapseAll();
+  openExpandId = id;
+
+  var conceptRow = document.querySelector('tr.concept-row[data-id="' + id + '"]');
+  if (!conceptRow) return;
+
+  var tr = document.createElement('tr');
+  tr.className = 'expand-row';
+  tr.dataset.forId = id;
+  tr.innerHTML = '<td colspan="5" style="padding:0;border-bottom:2px solid #3A6B20;"><iframe src="/admin/concepts/edit/' + id + '" id="editIframe-' + id + '" style="display:block;width:100%;border:none;background:#fafaf5;" scrolling="no"></iframe></td>';
+  conceptRow.insertAdjacentElement('afterend', tr);
+  autoResizeIframe(document.getElementById('editIframe-' + id));
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+function deleteConcept(id, name) {
+  if (!confirm('Delete concept "' + name + '"? This cannot be undone.')) return;
+  var fd = new FormData();
+  fetch('/admin/concepts/delete/' + id, { method: 'POST', body: fd })
+    .then(function(){ showFlash('Concept deleted.', 'ok'); loadConcepts(); })
+    .catch(function(){ showFlash('Delete failed.', 'err'); });
+}
+
+// ── Auto-resize iframe to fit its content ──────────────────────────────────
+function autoResizeIframe(iframe) {
+  function resize() {
+    try {
+      var h = iframe.contentDocument.body.scrollHeight;
+      iframe.style.height = (h + 32) + 'px';
+    } catch(e) {}
+  }
+  iframe.addEventListener('load', function() {
+    resize();
+    // Watch for content changes (dynamic fields)
+    try {
+      var mo = new MutationObserver(resize);
+      mo.observe(iframe.contentDocument.body, { childList:true, subtree:true, attributes:true });
+    } catch(e) {}
+    // Check if iframe navigated to saved/deleted URL
+    try {
+      var url = iframe.contentWindow.location.href;
+      if (url.indexOf('concept-saved') !== -1) {
+        showFlash('Concept saved.', 'ok');
+        collapseAll();
+        loadConcepts();
+      }
+    } catch(e) {}
+  });
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadConcepts();
+</script>
+</body>
+</html>
