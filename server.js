@@ -5563,7 +5563,11 @@ require('./admin_occasions').register(app, { requireRole, escapeHtml, conceptAdm
 reviews.register(app, { requireRole, escapeHtml, conceptAdminPage });
 emailEngine.register(app, { requireRole, escapeHtml, conceptAdminPage });
 
-app.get('/admin/concepts', requireRole('admin'), async (req, res) => {
+app.get('/admin/concepts', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-concepts.html'));
+});
+
+app.get('/admin/api/concepts/list', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT id, slug, name, filter_category, subject, occasion, action, mood,
