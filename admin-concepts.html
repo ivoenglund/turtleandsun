@@ -284,19 +284,25 @@ function renderSamples(conceptId, samples) {
           : '<img class="thumb" src="' + escHtml(afterUrl) + '" loading="lazy" style="cursor:pointer" onclick="openLightbox(\'' + escHtml(afterUrl) + '\',\'image\')">')
       : '<div class="thumb-missing">—</div>';
     var typeBadge = '<span class="sample-type-badge ' + afterType + '">' + afterType + '</span>';
-    var activeStr = s.active ? '<span class="badge active">On</span>' : '<span class="badge inactive">Off</span>';
+    function tog(sId, field, val, cId) {
+      var on = val ? 'badge active' : 'badge inactive';
+      var label = val ? 'On' : 'Off';
+      return '<span class="' + on + '" style="cursor:pointer" onclick="toggleSampleFlag(' + sId + ',\'' + field + '\',' + cId + ')">' + label + '</span>';
+    }
     return '<tr>' +
       '<td style="color:#aaa;font-size:11px;">#' + s.triplet_number + '</td>' +
       '<td>' + beforeThumb + '</td>' +
       '<td>' + afterThumb + '</td>' +
       '<td>' + typeBadge + '</td>' +
-      '<td>' + activeStr + '</td>' +
+      '<td>' + tog(s.id,'active',s.active,conceptId) + '</td>' +
+      '<td>' + tog(s.id,'rolling',s.in_rolling_demo,conceptId) + '</td>' +
+      '<td>' + tog(s.id,'gallery',s.in_gallery,conceptId) + '</td>' +
       '<td><button class="btn small danger" onclick="deleteSample(' + conceptId + ',' + s.id + ')">Delete</button></td>' +
     '</tr>';
   }).join('');
 
   var tableHtml = samples.length
-    ? '<table class="samples-grid"><thead><tr><th>#</th><th>Before</th><th>After</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+    ? '<table class="samples-grid"><thead><tr><th>#</th><th>Before</th><th>After</th><th>Type</th><th>Active</th><th>Rolling</th><th>Gallery</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
     : '<p style="font-size:12px;color:#aaa;margin:0 0 12px;">No samples yet.</p>';
 
   el.innerHTML = tableHtml +
@@ -387,6 +393,20 @@ function deleteSample(conceptId, sampleId) {
       loadSamples(conceptId);
     })
     .catch(function(err){ alert('Error: ' + err.message); });
+}
+
+function toggleSampleFlag(sampleId, field, conceptId) {
+  fetch('/admin/triplets/' + sampleId + '/toggle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'field=' + encodeURIComponent(field)
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) { alert('Toggle failed: ' + j.error); return; }
+      loadSamples(conceptId);
+    })
+    .catch(function(err){ alert('Toggle failed: ' + err.message); });
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────────────
