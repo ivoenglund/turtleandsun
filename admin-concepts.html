@@ -165,7 +165,7 @@ function renderGrid(concepts) {
       '<td>' + status + '</td>' +
       '<td style="white-space:nowrap;">' +
         '<button class="btn small" onclick="toggleEdit(' + c.id + ')">Edit</button> ' +
-        '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + \')">Delete</button>' +
+        '<button class="btn small danger" onclick="deleteConcept(' + c.id + ', \'' + escHtml(dim) + '\')">Delete</button>' +
       '</td>' +
     '</tr>';  }).join('');
 }
