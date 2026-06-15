@@ -331,6 +331,20 @@ html,body{overflow-x:hidden;}
   .ts-pay-trust{font-size:11px;gap:8px;}
 }
 /* ============ END HERO WIDGET ============ */
+
+/* ── Photo crop/zoom (Before frame, order mode only) ─────────── */
+#ts-crop-wrap{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none;}
+#ts-crop-wrap.is-dragging{cursor:grabbing;}
+#ts-crop-wrap img{position:absolute;top:50%;left:50%;width:auto;height:auto;min-width:100%;min-height:100%;max-width:none;object-fit:none;transform:translate(-50%,-50%);transform-origin:center;will-change:transform;pointer-events:none;user-select:none;}
+/* In demo mode: revert to normal cover behaviour */
+.ts-demo:not(.is-order) #ts-crop-wrap{cursor:default;overflow:hidden;}
+.ts-demo:not(.is-order) #ts-crop-wrap img{position:absolute;top:0;left:0;width:100%;height:100%;min-width:unset;min-height:unset;object-fit:cover;transform:none;}
+/* Zoom control buttons */
+.ts-zoom-ctrl{position:absolute;top:12px;right:12px;z-index:6;display:none;flex-direction:column;gap:5px;}
+.ts-demo.is-order .ts-zoom-ctrl{display:flex;}
+.ts-zoom-btn{width:30px;height:30px;border-radius:50%;background:rgba(28,10,0,0.72);color:#fff;border:none;font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;line-height:1;transition:background .12s,transform .1s;padding:0;}
+.ts-zoom-btn:hover{background:rgba(28,10,0,0.95);}
+.ts-zoom-btn:active{transform:scale(0.9);}
 </style>
 <script src="/currency.js?v=20260525a"></script>
 <script src="/nav.js?v=20260611b"></script>
@@ -409,7 +423,14 @@ html,body{overflow-x:hidden;}
           <button type="button" class="ts-delete" id="ts-delete" title="Remove photo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
-          <img id="ts-before" alt="Your photo" src="/assets/hero-1.png" />
+          <div id="ts-crop-wrap">
+            <img id="ts-before" alt="Your photo" src="/assets/hero-1.png" />
+          </div>
+          <div class="ts-zoom-ctrl" id="ts-zoom-ctrl">
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in" aria-label="Zoom in">+</button>
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-reset" title="Reset crop" aria-label="Reset crop">⦵</button>
+          </div>
           <div class="ts-drop">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V8m0 0l-3 3m3-3l3 3"/><path d="M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1"/></svg>
             <div class="ts-drop-title">Drop photo here</div>
@@ -1962,13 +1983,12 @@ NavBar.init({ requireAuth: false }).then(status => {
       }
     }
     else {
-      // In order mode, columns follow the concept's input_type:
-      //   image       → show only After Picture
-      //   video       → show only After Video
-      //   image_video → show both
+      // In order mode, show exactly one After column:
+      //   image / image_video → show only After Picture
+      //   video               → show only After Video
       var it = (concepts[i].input_type || 'image_video');
       if (stillCol) stillCol.style.display = (it === 'video') ? 'none' : '';
-      if (videoCol) videoCol.style.display = (it === 'image') ? 'none' : '';
+      if (videoCol) videoCol.style.display = (it !== 'video') ? 'none' : '';
       hideAllStills();
       stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
       stillOverlay.style.display = '';
@@ -2018,8 +2038,65 @@ NavBar.init({ requireAuth: false }).then(status => {
     if (typeof handleFile === 'function') handleFile(file);
   });
 
+
+  // ── Photo crop / zoom ─────────────────────────────────────────────────
+  var cropX = 0, cropY = 0, cropScale = 1;
+  var cropDrag = false, cropDx = 0, cropDy = 0, cropX0 = 0, cropY0 = 0;
+
+  function applyCrop(){
+    var img = document.getElementById('ts-before');
+    if (!img) return;
+    img.style.transform = 'translate(calc(-50% + '+cropX+'px), calc(-50% + '+cropY+'px)) scale('+cropScale+')';
+  }
+  function resetCrop(){ cropX=0; cropY=0; cropScale=1; applyCrop(); }
+
+  var cropWrap = document.getElementById('ts-crop-wrap');
+  if (cropWrap){
+    // pointer events (works on desktop + touch)
+    cropWrap.addEventListener('pointerdown', function(e){
+      if (mode!=='order') return;
+      cropDrag=true; cropDx=e.clientX; cropDy=e.clientY; cropX0=cropX; cropY0=cropY;
+      cropWrap.classList.add('is-dragging');
+      cropWrap.setPointerCapture(e.pointerId);
+    });
+    cropWrap.addEventListener('pointermove', function(e){
+      if (!cropDrag) return;
+      cropX = cropX0 + (e.clientX - cropDx);
+      cropY = cropY0 + (e.clientY - cropDy);
+      applyCrop();
+    });
+    ['pointerup','pointercancel'].forEach(function(ev){
+      cropWrap.addEventListener(ev, function(){
+        cropDrag=false; cropWrap.classList.remove('is-dragging');
+      });
+    });
+    // Pinch-to-zoom on touch
+    var pinchDist0 = null, pinchScale0 = 1;
+    cropWrap.addEventListener('touchstart', function(e){
+      if (e.touches.length===2){
+        pinchDist0 = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        pinchScale0 = cropScale;
+      }
+    },{passive:true});
+    cropWrap.addEventListener('touchmove', function(e){
+      if (e.touches.length===2 && pinchDist0){
+        var d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        cropScale = Math.max(0.5, Math.min(5, pinchScale0 * (d/pinchDist0)));
+        applyCrop(); e.preventDefault();
+      }
+    },{passive:false});
+  }
+  // Zoom buttons
+  var zoomIn = document.getElementById('ts-zoom-in');
+  var zoomOut = document.getElementById('ts-zoom-out');
+  var zoomReset = document.getElementById('ts-zoom-reset');
+  if (zoomIn) zoomIn.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.min(5, cropScale+0.2); applyCrop(); });
+  if (zoomOut) zoomOut.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.max(0.5, cropScale-0.2); applyCrop(); });
+  if (zoomReset) zoomReset.addEventListener('click', function(e){ e.stopPropagation(); resetCrop(); });
+
   function enterOrderMode(dataUrl){
     mode = 'order'; demoEl.classList.add('is-order'); demoEl.classList.remove('has-preview');
+    resetCrop();
     beforeEl.src = dataUrl;
     if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
     hideAllStills(); hideAllVideos();
@@ -2027,11 +2104,10 @@ NavBar.init({ requireAuth: false }).then(status => {
     previewsLeft = MAX_PREVIEWS; renderCounter();
     stillOverlay.style.display = '';
     var cur = concepts[current];
-    // Respect input_type for the After columns. image-only/video-only concepts
-    // collapse the other column instead of showing an empty placeholder.
+    // Always show exactly one After column (video-only concepts show video; everything else shows picture).
     var it = (cur && cur.input_type) || 'image_video';
     if (stillCol) stillCol.style.display = (it === 'video') ? 'none' : '';
-    if (videoCol) videoCol.style.display = (it === 'image') ? 'none' : '';
+    if (videoCol) videoCol.style.display = (it !== 'video') ? 'none' : '';
     // Premium / video-only concepts: no free preview. Make Buy live immediately.
     if (cur && cur.no_free_preview) {
       stillTitle.textContent = 'Pay to generate';
@@ -2045,6 +2121,7 @@ NavBar.init({ requireAuth: false }).then(status => {
   }
   function exitOrderMode(){
     mode = 'demo'; demoEl.classList.remove('is-order'); demoEl.classList.remove('has-preview');
+    resetCrop();
     beforeEl.src = DEMO_SRC;
     sourceCol.querySelector('.ts-frame').style.removeProperty('--ratio');
     stillEl.classList.remove('is-empty'); videoEl.classList.remove('is-empty');
