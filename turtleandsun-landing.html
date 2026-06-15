@@ -135,7 +135,7 @@ html,body{overflow-x:hidden;}
 .ts-hero-sub{font-family:'DM Sans',sans-serif;font-size:clamp(15px,1.6vw,19px);font-weight:400;color:rgba(28,10,0,0.78);line-height:1.45;max-width:780px;}
 .ts-hero-sub strong{font-weight:700;color:#1C0A00;}
 .ts-shell{display:flex;flex-direction:column;margin-bottom:24px;}
-.ts-headers{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:end;margin-bottom:14px;}
+.ts-headers{display:none;}
 .ts-dh-item{display:flex;align-items:center;gap:10px;padding:0 6px;}
 .ts-dh-span2{grid-column:span 2;}
 .ts-dh-num{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#1C2A14;color:#FFE800;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;}
@@ -285,8 +285,7 @@ html,body{overflow-x:hidden;}
 
 .ts-chips-col{display:none !important;}
 .ts-concept-filter{margin:2px 0 14px;}
-.ts-sub-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:0 0 16px;}
-.ts-sub-controls .ts-cap{margin:0;}
+
 @media(max-width:760px){
   .ts-headers{display:none;}
   .ts-mobile-step{display:flex;}
@@ -296,6 +295,8 @@ html,body{overflow-x:hidden;}
   .ts-source .ts-frame{max-width:none;margin:0;}
   .ts-chip{font-size:12px;padding:5px 13px;}
   .ts-ratio-btn{min-width:34px;padding:4px 6px;}
+  .ts-bb-hint{display:none;}
+  .ts-before-bar{gap:4px;}
   .ts-ratio-btn .ts-r-label{font-size:8px;}
   .ts-label{font-size:11px;padding:5px 10px;letter-spacing:0.1em;top:8px;right:8px;}
   .ts-counter{font-size:10px;padding:5px 9px;top:8px;left:8px;}
@@ -333,13 +334,15 @@ html,body{overflow-x:hidden;}
 .ts-demo.is-order .ts-crop-frame-hint{display:block;}
 
 /* ── Zoom panel in the aspect-ratio section ───────────────────── */
-.ts-zoom-panel{display:none;}
-.ts-demo.is-order .ts-zoom-panel{display:block;}
-.ts-zoom-row{display:flex;gap:6px;align-items:center;margin-top:8px;}
+
 .ts-zoom-btn{width:30px;height:30px;border-radius:50%;background:rgba(28,10,0,0.14);color:#1C0A00;border:1.5px solid rgba(28,10,0,0.18);font-size:18px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;line-height:1;transition:background .12s,transform .1s;padding:0;}
 .ts-zoom-btn:hover{background:rgba(28,10,0,0.22);}
 .ts-zoom-btn:active{transform:scale(0.9);}
 .ts-drag-hint-text{font-size:11px;color:rgba(28,10,0,0.5);margin-top:6px;font-family:'Plus Jakarta Sans',sans-serif;}
+.ts-before-bar{display:none;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
+.ts-demo.is-order .ts-before-bar{display:flex;}
+.ts-bb-left{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.ts-bb-hint{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;color:rgba(28,10,0,0.45);white-space:nowrap;}
 </style>
 <script src="/currency.js?v=20260525a"></script>
 <script src="/nav.js?v=20260611b"></script>
@@ -403,14 +406,28 @@ html,body{overflow-x:hidden;}
   <input type="file" id="ts-file" accept="image/jpeg,image/png,image/webp" style="display:none">
   <div class="ts-shell" id="ts-shell">
 
-    <div class="ts-headers">
-      <div class="ts-dh-item"><span class="ts-dh-text">Before</span></div>
-      <div class="ts-dh-item"><span class="ts-dh-text">After <span class="ts-accent">✦</span></span></div>
-    </div>
-
     <div class="ts-demo" id="ts-demo">
       <!-- 1. SOURCE -->
       <div class="ts-col ts-source" id="ts-source">
+        <!-- Controls bar: zoom + shapes, visible above frame in order mode -->
+        <div class="ts-before-bar" id="ts-before-bar">
+          <div class="ts-bb-left">
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in"  aria-label="Zoom in">+</button>
+            <span class="ts-bb-hint">Drag to position</span>
+          </div>
+          <div class="ts-ratio-row" id="ts-ratios">
+            <button type="button" class="ts-ratio-btn" data-ratio="16/9" data-orient="landscape" title="Landscape 16:9">
+              <span class="ts-r-shape" style="width:22px;height:13px;"></span><span class="ts-r-label">16:9</span>
+            </button>
+            <button type="button" class="ts-ratio-btn on" data-ratio="9/16" data-orient="portrait" title="Portrait 9:16">
+              <span class="ts-r-shape" style="width:13px;height:22px;"></span><span class="ts-r-label">9:16</span>
+            </button>
+            <button type="button" class="ts-ratio-btn" data-ratio="1/1" data-orient="square" title="Square 1:1">
+              <span class="ts-r-shape" style="width:18px;height:18px;"></span><span class="ts-r-label">1:1</span>
+            </button>
+          </div>
+        </div>
         <div class="ts-frame">
           <span class="ts-label">Before</span>
           <button type="button" class="ts-delete" id="ts-delete" title="Remove photo">
@@ -430,14 +447,6 @@ html,body{overflow-x:hidden;}
           <span class="ts-mode-pill" id="ts-mode-pill">Live<br>demo</span>
           <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg></button>
           <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg></button>
-        </div>
-        <!-- Zoom + crop panel — shown in order mode (user uploaded a photo) -->
-        <div class="ts-zoom-panel" id="ts-zoom-panel">
-          <div class="ts-zoom-row">
-            <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
-            <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in"  aria-label="Zoom in">+</button>
-          </div>
-          <div class="ts-drag-hint-text">Drag the photo to choose crop</div>
         </div>
       </div>
 
@@ -521,22 +530,6 @@ html,body{overflow-x:hidden;}
   <!-- Occasion pills + shape controls — below the two frames -->
   <div class="ts-concept-filter" id="ts-concept-filter">
     <div class="ts-chips" id="ts-chips"></div>
-  </div>
-  <div class="ts-sub-controls">
-    <div class="ts-ratios">
-      <span class="ts-cap">Shape</span>
-      <div class="ts-ratio-row" id="ts-ratios">
-        <button type="button" class="ts-ratio-btn" data-ratio="16/9" data-orient="landscape" title="Landscape 16:9">
-          <span class="ts-r-shape" style="width:22px;height:13px;"></span><span class="ts-r-label">16:9</span>
-        </button>
-        <button type="button" class="ts-ratio-btn on" data-ratio="9/16" data-orient="portrait" title="Portrait 9:16">
-          <span class="ts-r-shape" style="width:13px;height:22px;"></span><span class="ts-r-label">9:16</span>
-        </button>
-        <button type="button" class="ts-ratio-btn" data-ratio="1/1" data-orient="square" title="Square 1:1">
-          <span class="ts-r-shape" style="width:18px;height:18px;"></span><span class="ts-r-label">1:1</span>
-        </button>
-      </div>
-    </div>
   </div>
 
   <div class="gallery-bar" id="galleryKindBar" style="margin-bottom:8px;">
