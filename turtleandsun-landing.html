@@ -340,11 +340,10 @@ html,body{overflow-x:hidden;}
 /* ── Zoom panel in the aspect-ratio section ───────────────────── */
 .ts-zoom-panel{display:none;}
 .ts-demo.is-order .ts-zoom-panel{display:block;}
-.ts-zoom-row{display:flex;gap:5px;align-items:center;margin-top:4px;}
+.ts-zoom-row{display:flex;gap:6px;align-items:center;margin-top:8px;}
 .ts-zoom-btn{width:30px;height:30px;border-radius:50%;background:rgba(28,10,0,0.14);color:#1C0A00;border:1.5px solid rgba(28,10,0,0.18);font-size:18px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;line-height:1;transition:background .12s,transform .1s;padding:0;}
 .ts-zoom-btn:hover{background:rgba(28,10,0,0.22);}
 .ts-zoom-btn:active{transform:scale(0.9);}
-.ts-zoom-reset-btn{width:auto;border-radius:8px;padding:0 9px;font-size:11px;font-weight:700;}
 .ts-drag-hint-text{font-size:11px;color:rgba(28,10,0,0.5);margin-top:6px;font-family:'Plus Jakarta Sans',sans-serif;}
 </style>
 <script src="/currency.js?v=20260525a"></script>
@@ -424,8 +423,8 @@ html,body{overflow-x:hidden;}
           <button type="button" class="ts-delete" id="ts-delete" title="Remove photo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
-          <div id="ts-crop-wrap">
-            <img id="ts-before" alt="Your photo" src="/assets/hero-1.png" />
+          <div id="ts-crop-wrap" draggable="false">
+            <img id="ts-before" alt="Your photo" src="/assets/hero-1.png" draggable="false" />
           </div>
           <div class="ts-crop-frame-hint" id="ts-crop-frame-hint">↕ Drag to position</div>
           <div class="ts-drop">
@@ -438,6 +437,14 @@ html,body{overflow-x:hidden;}
           <span class="ts-mode-pill" id="ts-mode-pill">Live<br>demo</span>
           <button type="button" class="ts-demo-ctrl" id="ts-demo-pause" title="Pause / resume rolling demo" aria-label="Pause demo"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg></button>
           <button type="button" class="ts-demo-ctrl" id="ts-demo-sound" title="Turn rolling-demo sound on/off" aria-label="Toggle demo sound"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg></button>
+        </div>
+        <!-- Zoom + crop panel — shown in order mode (user uploaded a photo) -->
+        <div class="ts-zoom-panel" id="ts-zoom-panel">
+          <div class="ts-zoom-row">
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+            <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in"  aria-label="Zoom in">+</button>
+          </div>
+          <div class="ts-drag-hint-text">Drag the photo to choose crop</div>
         </div>
       </div>
 
@@ -459,16 +466,7 @@ html,body{overflow-x:hidden;}
                 <span class="ts-r-shape" style="width:18px;height:18px;"></span><span class="ts-r-label">1:1</span>
               </button>
             </div>
-            <!-- Zoom controls — visible only when user has uploaded a photo -->
-            <div class="ts-zoom-panel" id="ts-zoom-panel">
-              <span class="ts-cap" style="margin-top:10px;display:block;">Zoom &amp; crop</span>
-              <div class="ts-zoom-row">
-                <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
-                <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in"  aria-label="Zoom in">+</button>
-                <button type="button" class="ts-zoom-btn ts-zoom-reset-btn" id="ts-zoom-reset" title="Reset" aria-label="Reset crop">Reset</button>
-              </div>
-              <div class="ts-drag-hint-text">Drag the photo above to choose crop</div>
-            </div>
+
           </div>
         </div>
       </div>
@@ -2059,9 +2057,11 @@ NavBar.init({ requireAuth: false }).then(status => {
 
   var cropWrap = document.getElementById('ts-crop-wrap');
   if (cropWrap){
+    cropWrap.addEventListener('dragstart', function(e){ e.preventDefault(); });
     // pointer events (works on desktop + touch)
     cropWrap.addEventListener('pointerdown', function(e){
       if (mode!=='order') return;
+      e.preventDefault();
       cropDrag=true; cropDx=e.clientX; cropDy=e.clientY; cropX0=cropX; cropY0=cropY;
       cropWrap.classList.add('is-dragging');
       cropWrap.setPointerCapture(e.pointerId);
@@ -2099,7 +2099,6 @@ NavBar.init({ requireAuth: false }).then(status => {
   var zoomReset = document.getElementById('ts-zoom-reset');
   if (zoomIn) zoomIn.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.min(5, cropScale+0.1); applyCrop(); });
   if (zoomOut) zoomOut.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.max(0.15, cropScale-0.1); applyCrop(); });
-  if (zoomReset) zoomReset.addEventListener('click', function(e){ e.stopPropagation(); resetCrop(); });
 
   function enterOrderMode(dataUrl){
     mode = 'order'; demoEl.classList.add('is-order'); demoEl.classList.remove('has-preview');
