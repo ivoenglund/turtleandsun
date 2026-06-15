@@ -480,6 +480,39 @@ function renderClip(initial) {
 }
 
 // ── Style selector ────────────────────────────────────────
+function onScDrop(event) {
+  event.preventDefault();
+  const zone = document.getElementById('sc-drop-zone');
+  zone.style.borderColor = '#ccc';
+  zone.style.background = '';
+  // Try several data types — cross-window drops vary by browser
+  const url = (
+    event.dataTransfer.getData('text/plain') ||
+    event.dataTransfer.getData('text/uri-list') ||
+    event.dataTransfer.getData('URL') ||
+    ''
+  ).trim();
+  if (!url) { alert('Drop failed — could not read URL. Try again.'); return; }
+  setScUrl(url);
+}
+
+function setScUrl(url) {
+  document.getElementById('sc-url-input').value = url;
+  const fname = url.split('/').pop().split('?')[0];
+  document.getElementById('sc-url-text').textContent = fname + ' — ' + url;
+  document.getElementById('sc-url-display').style.display = 'flex';
+  document.getElementById('sc-drop-zone').style.display = 'none';
+  _dirty = true; scheduleAutoSave();
+}
+
+function clearScUrl() {
+  document.getElementById('sc-url-input').value = '';
+  document.getElementById('sc-url-text').textContent = '';
+  document.getElementById('sc-url-display').style.display = 'none';
+  document.getElementById('sc-drop-zone').style.display = '';
+  _dirty = true; scheduleAutoSave();
+}
+
 function setStyle(n, silent) {
   // Map old style 2 clips to style A (1) on load
   if (n === 2) n = 1;
