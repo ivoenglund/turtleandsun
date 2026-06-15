@@ -3038,7 +3038,7 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
              bm.url AS before_url, vm.url AS video_url,
              im.url AS image_url,
              COALESCE(bm.subject, im.subject, c.subject) AS inh_subject,
-             c.occasion AS inh_occasion, c.action AS inh_action
+             c.occasion AS inh_occasion, c.action AS inh_action, c.mood AS inh_mood
       FROM concept_triplets t
       JOIN concepts c ON c.id = t.concept_id
       LEFT JOIN concept_media bm ON bm.id = t.before_media_id AND bm.active = TRUE
@@ -3052,11 +3052,11 @@ app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res)
       // editable on the clip detail page (Stage 1 pipeline redesign).
       const { rows: [row] } = await pool.query(`
         INSERT INTO social_clips (triplet_id, concept_id, concept_name, before_url, after_video_url, after_image_url,
-                                  subject, occasion, action, clip_style)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                                  subject, occasion, action, mood, clip_style)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id
       `, [t.id, t.concept_id, t.concept_name, t.before_url, t.video_url, t.image_url,
-          t.inh_subject || null, t.inh_occasion || null, t.inh_action || null, styleVal]);
+          t.inh_subject || null, t.inh_occasion || null, t.inh_action || null, t.inh_mood || null, styleVal]);
       // Auto-assign click-attribution ref tag (c<id>) so tagged links work from day one
       await pool.query(`UPDATE social_clips SET ref_tag = 'c' || id WHERE id = $1 AND ref_tag IS NULL`, [row.id]);
       created.push(row.id);

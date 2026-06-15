@@ -186,64 +186,6 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
       </div>
 
 
-
-      <!-- Tags -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <h2 style="margin:0">Tags</h2>
-          <span id="style-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#1C2A14;color:#FFE800"></span>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div>
-            <div class="field-label">Subject</div>
-            <select id="tag-subject" class="field-input" onchange="debounceSave()">
-              <option value="">—</option>
-              <option value="dog">Dog</option>
-              <option value="cat">Cat</option>
-              <option value="human">Human</option>
-              <option value="family">Family</option>
-              <option value="other">Other</option>
-            </select>
-            <div class="inherit-hint" id="hint-subject" style="display:none">inherited from concept</div>
-          </div>
-          <div>
-            <div class="field-label">Occasion</div>
-            <select id="tag-occasion" class="field-input" onchange="debounceSave()">
-              <option value="">—</option>
-              <option value="general">General</option>
-              <option value="birthday">Birthday</option>
-              <option value="fathers-day">Father's Day</option>
-              <option value="mothers-day">Mother's Day</option>
-              <option value="christmas">Christmas</option>
-              <option value="other">Other</option>
-            </select>
-            <div class="inherit-hint" id="hint-occasion" style="display:none">inherited from concept</div>
-          </div>
-          <div>
-            <div class="field-label">Action</div>
-            <select id="tag-action" class="field-input" onchange="debounceSave()">
-              <option value="">—</option>
-              <option value="royal-portrait">Royal portrait</option>
-              <option value="talking">Talking</option>
-              <option value="singing">Singing</option>
-              <option value="other">Other</option>
-            </select>
-            <div class="inherit-hint" id="hint-action" style="display:none">inherited from concept</div>
-          </div>
-          <div>
-            <div class="field-label">Mood</div>
-            <select id="tag-mood" class="field-input" onchange="debounceSave()">
-              <option value="">—</option>
-              <option value="funny">Funny</option>
-              <option value="heartfelt">Heartfelt</option>
-              <option value="dramatic">Dramatic</option>
-              <option value="cute">Cute</option>
-              <option value="elegant">Elegant</option>
-            </select>
-          </div>
-        </div>
-
-      </div>
     </div>
 
     <!-- RIGHT: generated video only -->
@@ -256,73 +198,6 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         <a id="download-link" style="display:none" class="download-link" target="_blank">↓ Download MP4</a>
       </div>
 
-      <!-- Platform metadata -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <h2 style="margin:0">Platform content</h2>
-          <button class="btn btn-outline btn-sm" id="btn-gen-content" onclick="generateContent(this)" title="Regenerate platform texts manually" style="font-size:10px;padding:3px 8px">↻ Texts</button>
-        </div>
-        <div class="plat-tabs" id="plat-tabs">
-          <button class="ptab act" onclick="switchPlat('tiktok',this)">🎵 TikTok</button>
-          <button class="ptab" onclick="switchPlat('instagram',this)">📸 Instagram</button>
-          <button class="ptab" onclick="switchPlat('youtube',this)">▶ YouTube</button>
-          <button class="ptab" onclick="switchPlat('facebook',this)">📘 Facebook</button>
-        </div>
-        <div id="plat-tiktok" class="plat-pane">
-          <div class="field-label">Date posted</div>
-          <input id="tt-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Post URL</div>
-          <input id="tt-url" class="field-input" placeholder="https://tiktok.com/..." oninput="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Caption</div>
-          <textarea id="tt-caption" class="field-input" rows="3" placeholder="Hook + body…" oninput="debounceSave()"></textarea>
-          <div class="field-label" style="margin-top:6px">Hashtags</div>
-          <textarea id="tt-hashtags" class="field-input" rows="2" placeholder="#royalportrait #dogsoftiktok…" oninput="debounceSave()"></textarea>
-        </div>
-        <div id="plat-instagram" class="plat-pane" style="display:none">
-          <div class="field-label">Date posted</div>
-          <input id="ig-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Post URL</div>
-          <input id="ig-url" class="field-input" placeholder="https://instagram.com/p/…" oninput="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Caption</div>
-          <textarea id="ig-caption" class="field-input" rows="3" oninput="debounceSave()"></textarea>
-          <div class="field-label" style="margin-top:6px">Hashtags (max 30)</div>
-          <textarea id="ig-hashtags" class="field-input" rows="2" oninput="debounceSave()"></textarea>
-          <div class="field-label" style="margin-top:6px">Alt text</div>
-          <input id="ig-alt" class="field-input" placeholder="Describe the image for accessibility" oninput="debounceSave()">
-        </div>
-        <div id="plat-youtube" class="plat-pane" style="display:none">
-          <div class="field-label">Date posted</div>
-          <input id="yt-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Post URL</div>
-          <input id="yt-url" class="field-input" placeholder="https://youtube.com/shorts/…" oninput="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Video ID <span style="font-weight:400;color:#aaa">(for auto stats)</span></div>
-          <input id="yt-videoid" class="field-input" placeholder="e.g. dQw4w9WgXcQ" oninput="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Title</div>
-          <input id="yt-title" class="field-input" placeholder="Max 100 chars" oninput="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Description</div>
-          <textarea id="yt-desc" class="field-input" rows="4" oninput="debounceSave()"></textarea>
-          <div class="field-label" style="margin-top:6px">Keyword tags</div>
-          <input id="yt-kw" class="field-input" placeholder="pet portrait, royal portrait, dog…" oninput="debounceSave()">
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">
-            <div class="field-label">Schedule for (leave empty to publish immediately)</div>
-            <input id="yt-schedule-at" type="datetime-local" class="field-input" style="margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" id="btn-publish-yt" onclick="publishYouTube(this)">&#9654; Publish now</button>
-              <button class="btn btn-secondary btn-sm" id="btn-schedule-yt" onclick="scheduleYouTube(this)">&#128337; Schedule</button>
-              <span id="yt-publish-status" style="font-size:11px;color:#555"></span>
-            </div>
-          </div>
-          <div style="margin-top:5px"><a href="/admin/youtube/connect" style="font-size:11px;color:#185FA5">Not connected? Connect YouTube account &#8594;</a></div>
-        </div>
-        <div id="plat-facebook" class="plat-pane" style="display:none">
-          <div class="field-label">Date posted</div>
-          <input id="fb-date" type="date" class="field-input" oninput="debounceSave()" onchange="debounceSave()" onblur="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Post URL</div>
-          <input id="fb-url" class="field-input" placeholder="https://facebook.com/…" oninput="debounceSave()">
-          <div class="field-label" style="margin-top:6px">Caption</div>
-          <textarea id="fb-caption" class="field-input" rows="3" oninput="debounceSave()"></textarea>
-        </div>
-      </div>
       </div>
     </div>
 
@@ -502,7 +377,6 @@ async function loadClip() {
   }
 
   clip = fresh;
-  populateMeta(fresh);
   renderClip(true /* initial */);
 }
 
@@ -568,8 +442,6 @@ function renderClip(initial) {
   }
 
 
-
-  renderStats();
 
   const processing = clip.status === 'processing';
   const btn = document.getElementById('btn-generate');
@@ -880,29 +752,7 @@ function collectMeta() {
   const gv = id => { const el = document.getElementById(id); return el ? el.value.trim() || null : null; };
   const custom_raw = gv('tag-custom');
   return {
-    subject:      gv('tag-subject'),
-    occasion:     gv('tag-occasion'),
-    action:       gv('tag-action'),
-    mood:         gv('tag-mood'),
     custom_tags:  custom_raw ? custom_raw.split(',').map(s=>s.trim()).filter(Boolean) : [],
-    tiktok_posted_at:      gv('tt-date'),
-    tiktok_post_url:       gv('tt-url'),
-    tiktok_caption:        gv('tt-caption'),
-    tiktok_hashtags:       gv('tt-hashtags'),
-    instagram_posted_at:   gv('ig-date'),
-    instagram_post_url:    gv('ig-url'),
-    instagram_caption:     gv('ig-caption'),
-    instagram_hashtags:    gv('ig-hashtags'),
-    instagram_alt_text:    gv('ig-alt'),
-    yt_posted_at:          gv('yt-date'),
-    yt_post_url:           gv('yt-url'),
-    yt_video_id:           gv('yt-videoid'),
-    yt_title:              gv('yt-title'),
-    yt_description:        gv('yt-desc'),
-    yt_keyword_tags:       gv('yt-kw'),
-    fb_posted_at:          gv('fb-date'),
-    fb_post_url:           gv('fb-url'),
-    fb_caption:            gv('fb-caption'),
   };
 }
 
