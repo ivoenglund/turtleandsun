@@ -332,19 +332,20 @@ html,body{overflow-x:hidden;}
 }
 /* ============ END HERO WIDGET ============ */
 
-/* ── Photo crop/zoom (Before frame, order mode only) ─────────── */
-#ts-crop-wrap{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none;}
-#ts-crop-wrap.is-dragging{cursor:grabbing;}
-#ts-crop-wrap img{position:absolute;top:50%;left:50%;width:auto;height:auto;min-width:100%;min-height:100%;max-width:none;object-fit:none;transform:translate(-50%,-50%);transform-origin:center;will-change:transform;pointer-events:none;user-select:none;}
-/* In demo mode: revert to normal cover behaviour */
-.ts-demo:not(.is-order) #ts-crop-wrap{cursor:default;overflow:hidden;}
-.ts-demo:not(.is-order) #ts-crop-wrap img{position:absolute;top:0;left:0;width:100%;height:100%;min-width:unset;min-height:unset;object-fit:cover;transform:none;}
-/* Zoom control buttons */
-.ts-zoom-ctrl{position:absolute;top:12px;right:12px;z-index:6;display:none;flex-direction:column;gap:5px;}
-.ts-demo.is-order .ts-zoom-ctrl{display:flex;}
-.ts-zoom-btn{width:30px;height:30px;border-radius:50%;background:rgba(28,10,0,0.72);color:#fff;border:none;font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;line-height:1;transition:background .12s,transform .1s;padding:0;}
-.ts-zoom-btn:hover{background:rgba(28,10,0,0.95);}
+
+/* ── Crop hint inside Before frame ───────────────────────────── */
+.ts-crop-frame-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;display:none;white-space:nowrap;background:rgba(28,10,0,0.58);color:rgba(255,255,255,0.92);font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;letter-spacing:0.02em;}
+.ts-demo.is-order .ts-crop-frame-hint{display:block;}
+
+/* ── Zoom panel in the aspect-ratio section ───────────────────── */
+.ts-zoom-panel{display:none;}
+.ts-demo.is-order .ts-zoom-panel{display:block;}
+.ts-zoom-row{display:flex;gap:5px;align-items:center;margin-top:4px;}
+.ts-zoom-btn{width:30px;height:30px;border-radius:50%;background:rgba(28,10,0,0.14);color:#1C0A00;border:1.5px solid rgba(28,10,0,0.18);font-size:18px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;line-height:1;transition:background .12s,transform .1s;padding:0;}
+.ts-zoom-btn:hover{background:rgba(28,10,0,0.22);}
 .ts-zoom-btn:active{transform:scale(0.9);}
+.ts-zoom-reset-btn{width:auto;border-radius:8px;padding:0 9px;font-size:11px;font-weight:700;}
+.ts-drag-hint-text{font-size:11px;color:rgba(28,10,0,0.5);margin-top:6px;font-family:'Plus Jakarta Sans',sans-serif;}
 </style>
 <script src="/currency.js?v=20260525a"></script>
 <script src="/nav.js?v=20260611b"></script>
@@ -426,11 +427,7 @@ html,body{overflow-x:hidden;}
           <div id="ts-crop-wrap">
             <img id="ts-before" alt="Your photo" src="/assets/hero-1.png" />
           </div>
-          <div class="ts-zoom-ctrl" id="ts-zoom-ctrl">
-            <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in" aria-label="Zoom in">+</button>
-            <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
-            <button type="button" class="ts-zoom-btn" id="ts-zoom-reset" title="Reset crop" aria-label="Reset crop">⦵</button>
-          </div>
+          <div class="ts-crop-frame-hint" id="ts-crop-frame-hint">↕ Drag to position</div>
           <div class="ts-drop">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V8m0 0l-3 3m3-3l3 3"/><path d="M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1"/></svg>
             <div class="ts-drop-title">Drop photo here</div>
@@ -461,6 +458,16 @@ html,body{overflow-x:hidden;}
               <button type="button" class="ts-ratio-btn" data-ratio="1/1" data-orient="square" title="Square 1:1">
                 <span class="ts-r-shape" style="width:18px;height:18px;"></span><span class="ts-r-label">1:1</span>
               </button>
+            </div>
+            <!-- Zoom controls — visible only when user has uploaded a photo -->
+            <div class="ts-zoom-panel" id="ts-zoom-panel">
+              <span class="ts-cap" style="margin-top:10px;display:block;">Zoom &amp; crop</span>
+              <div class="ts-zoom-row">
+                <button type="button" class="ts-zoom-btn" id="ts-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+                <button type="button" class="ts-zoom-btn" id="ts-zoom-in"  title="Zoom in"  aria-label="Zoom in">+</button>
+                <button type="button" class="ts-zoom-btn ts-zoom-reset-btn" id="ts-zoom-reset" title="Reset" aria-label="Reset crop">Reset</button>
+              </div>
+              <div class="ts-drag-hint-text">Drag the photo above to choose crop</div>
             </div>
           </div>
         </div>
@@ -2081,7 +2088,7 @@ NavBar.init({ requireAuth: false }).then(status => {
     cropWrap.addEventListener('touchmove', function(e){
       if (e.touches.length===2 && pinchDist0){
         var d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
-        cropScale = Math.max(0.5, Math.min(5, pinchScale0 * (d/pinchDist0)));
+        cropScale = Math.max(0.15, Math.min(5, pinchScale0 * (d/pinchDist0)));
         applyCrop(); e.preventDefault();
       }
     },{passive:false});
@@ -2090,8 +2097,8 @@ NavBar.init({ requireAuth: false }).then(status => {
   var zoomIn = document.getElementById('ts-zoom-in');
   var zoomOut = document.getElementById('ts-zoom-out');
   var zoomReset = document.getElementById('ts-zoom-reset');
-  if (zoomIn) zoomIn.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.min(5, cropScale+0.2); applyCrop(); });
-  if (zoomOut) zoomOut.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.max(0.5, cropScale-0.2); applyCrop(); });
+  if (zoomIn) zoomIn.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.min(5, cropScale+0.1); applyCrop(); });
+  if (zoomOut) zoomOut.addEventListener('click', function(e){ e.stopPropagation(); cropScale=Math.max(0.15, cropScale-0.1); applyCrop(); });
   if (zoomReset) zoomReset.addEventListener('click', function(e){ e.stopPropagation(); resetCrop(); });
 
   function enterOrderMode(dataUrl){
@@ -2515,4 +2522,4 @@ NavBar.init({ requireAuth: false }).then(status => {
 </script>
 <script>try{window.tsDiscountCode=(new URLSearchParams(location.search).get('code')||'').trim();}catch(e){}</script>
 </body>
-</html>
+</html>                                                                            
