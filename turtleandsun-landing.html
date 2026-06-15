@@ -2061,7 +2061,7 @@ NavBar.init({ requireAuth: false }).then(status => {
     cropWrap.addEventListener('wheel', function(e){
       if (mode!=='order') return;
       e.preventDefault();
-      cropScale = Math.max(0.15, Math.min(5, cropScale - e.deltaY * 0.001));
+      cropScale = Math.max(0.15, Math.min(5, cropScale - e.deltaY * 0.0004));
       applyCrop();
     }, {passive:false});
     // pointer events (works on desktop + touch)
