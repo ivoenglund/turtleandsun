@@ -4396,8 +4396,24 @@ app.post('/admin/api/social-clips/:id/fetch-youtube-stats', requireRole('admin')
 
 // Delete a clip
 app.delete('/admin/api/social-clips/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const force = req.query.force === '1';
   try {
-    await pool.query(`DELETE FROM social_clips WHERE id = $1`, [parseInt(req.params.id)]);
+    const { rows } = await pool.query(
+      `SELECT tiktok_posted_at, instagram_posted_at, yt_posted_at, fb_posted_at FROM social_clips WHERE id = $1`, [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (!force) {
+      const r = rows[0];
+      const published = [
+        r.tiktok_posted_at    && 'TikTok',
+        r.instagram_posted_at && 'Instagram',
+        r.yt_posted_at        && 'YouTube',
+        r.fb_posted_at        && 'Facebook',
+      ].filter(Boolean);
+      if (published.length)
+        return res.status(409).json({ published });
+    }
+    await pool.query(`DELETE FROM social_clips WHERE id = $1`, [id]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
