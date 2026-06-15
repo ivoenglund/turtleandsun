@@ -1844,6 +1844,15 @@ NavBar.init({ requireAuth: false }).then(status => {
     demoEl.classList.add('is-order');
     if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
     beforeEl.src = saved.cloudinaryUrl;
+    (function(){
+      var _cw2 = cropWrap;
+      function _applyRC(){
+        var wW=_cw2?(_cw2.clientWidth||_cw2.offsetWidth):0, wH=_cw2?(_cw2.clientHeight||_cw2.offsetHeight):0;
+        var iW=beforeEl.naturalWidth, iH=beforeEl.naturalHeight;
+        if(wW>0&&wH>0&&iW>0&&iH>0){cropScale=Math.max(wW/iW,wH/iH);cropX=0;cropY=0;applyCrop();}
+      }
+      if(beforeEl.complete&&beforeEl.naturalWidth>0){_applyRC();}else{beforeEl.onload=_applyRC;}
+    })();
     hideAllStills(); hideAllVideos();
     stillEl.classList.add('is-empty');
     videoEl.classList.add('is-empty');
@@ -2040,6 +2049,7 @@ NavBar.init({ requireAuth: false }).then(status => {
   function applyCrop(){
     var img = document.getElementById('ts-before');
     if (!img) return;
+    if (mode !== 'order') { img.style.transform = ''; return; }
     img.style.transform = 'translate(calc(-50% + '+cropX+'px), calc(-50% + '+cropY+'px)) scale('+cropScale+')';
   }
   function resetCrop(){ cropX=0; cropY=0; cropScale=1; applyCrop(); }
@@ -2097,8 +2107,21 @@ NavBar.init({ requireAuth: false }).then(status => {
 
   function enterOrderMode(dataUrl){
     mode = 'order'; demoEl.classList.add('is-order'); demoEl.classList.remove('has-preview');
-    resetCrop();
+    cropX = 0; cropY = 0; cropScale = 1; applyCrop();
     beforeEl.src = dataUrl;
+    // Scale the photo to cover the frame (like object-fit:cover) then user can adjust
+    var _cw = cropWrap;
+    function _applyInitialCrop(){
+      var wW = _cw ? (_cw.clientWidth || _cw.offsetWidth) : 0;
+      var wH = _cw ? (_cw.clientHeight || _cw.offsetHeight) : 0;
+      var iW = beforeEl.naturalWidth, iH = beforeEl.naturalHeight;
+      if (wW > 0 && wH > 0 && iW > 0 && iH > 0) {
+        cropScale = Math.max(wW / iW, wH / iH);
+        cropX = 0; cropY = 0; applyCrop();
+      }
+    }
+    if (beforeEl.complete && beforeEl.naturalWidth > 0) { _applyInitialCrop(); }
+    else { beforeEl.onload = _applyInitialCrop; }
     if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
     hideAllStills(); hideAllVideos();
     stillEl.classList.add('is-empty'); videoEl.classList.add('is-empty');
