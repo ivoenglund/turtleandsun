@@ -4557,6 +4557,7 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
       // clip_style DB values: 1 = Style A (static end card), 3 = Style B (composite → rise & wipe)
       const clipStyle = parseInt(clip.clip_style) || 1;
+      console.log('[social-clip] id=%d clip_style=%s → clipStyle=%d intro_url=%s', id, clip.clip_style, clipStyle, clip.style_c_intro_url || 'none');
 
       if (clipStyle === 3) {
         // ── Style 3: Composite → Rise & Wipe ──────────────────────────────

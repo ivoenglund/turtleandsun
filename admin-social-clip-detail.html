@@ -494,6 +494,8 @@ function onScDrop(event) {
   ).trim();
   if (!url) { alert('Drop failed — could not read URL. Try again.'); return; }
   setScUrl(url);
+  // Dropping a video always activates Style C
+  setStyle(4);
 }
 
 function setScUrl(url) {
