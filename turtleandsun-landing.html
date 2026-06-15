@@ -2058,6 +2058,12 @@ NavBar.init({ requireAuth: false }).then(status => {
   var cropWrap = document.getElementById('ts-crop-wrap');
   if (cropWrap){
     cropWrap.addEventListener('dragstart', function(e){ e.preventDefault(); });
+    cropWrap.addEventListener('wheel', function(e){
+      if (mode!=='order') return;
+      e.preventDefault();
+      cropScale = Math.max(0.15, Math.min(5, cropScale - e.deltaY * 0.001));
+      applyCrop();
+    }, {passive:false});
     // pointer events (works on desktop + touch)
     cropWrap.addEventListener('pointerdown', function(e){
       if (mode!=='order') return;
