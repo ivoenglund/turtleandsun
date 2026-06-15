@@ -4651,15 +4651,17 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           const scaleFilter =
             '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v0];' +
             '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v1];' +
-            '[v0][v1]concat=n=2:v=1:a=0[vout]';
+            '[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a0];' +
+            '[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a1];' +
+            '[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]';
           execFile(ffmpegBin, [
             '-y', '-loglevel', 'error',
             '-i', videoFile,
             '-i', suppliedFile,
             '-filter_complex', scaleFilter,
-            '-map', '[vout]', '-map', '0:a?',
+            '-map', '[vout]', '-map', '[aout]',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac', '-b:a', '128k', '-shortest',
+            '-c:a', 'aac', '-b:a', '128k',
             '-movflags', '+faststart',
             outFile,
           ], { timeout: 180000 }, (err, stdout, stderr) => {
