@@ -170,6 +170,10 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
 
       <!-- Generate -->
       <div class="card">
+        <div class="field" style="margin-bottom:10px">
+          <label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Custom tags <span style="font-weight:400;color:#aaa">(optional · comma-separated)</span></label>
+          <input id="tag-custom" class="field-input" placeholder="e.g. fluffy-dog, transformation" oninput="debounceSave()">
+        </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="btn-generate" onclick="generate()">Generate ▶</button>
         </div>
@@ -201,10 +205,6 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
               <option value="other">Other</option>
             </select>
             <div class="inherit-hint" id="hint-subject" style="display:none">inherited from concept</div>
-          </div>
-          <div>
-            <div class="field-label">Name</div>
-            <input id="tag-name" class="field-input" placeholder="e.g. Bella" oninput="debounceSave()">
           </div>
           <div>
             <div class="field-label">Occasion</div>
@@ -241,11 +241,6 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
               <option value="elegant">Elegant</option>
             </select>
           </div>
-
-        </div>
-        <div style="margin-top:8px">
-          <div class="field-label">Custom tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></div>
-          <input id="tag-custom" class="field-input" placeholder="e.g. before-after, transformation" oninput="debounceSave()">
         </div>
 
       </div>
@@ -265,7 +260,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <h2 style="margin:0">Platform content</h2>
-          <button class="btn btn-secondary btn-sm" id="btn-gen-content" onclick="generateContent(this)">&#10024; Generate texts</button>
+          <button class="btn btn-outline btn-sm" id="btn-gen-content" onclick="generateContent(this)" title="Regenerate platform texts manually" style="font-size:10px;padding:3px 8px">↻ Texts</button>
         </div>
         <div class="plat-tabs" id="plat-tabs">
           <button class="ptab act" onclick="switchPlat('tiktok',this)">🎵 TikTok</button>
@@ -585,6 +580,7 @@ function renderClip(initial) {
 
   if (processing) {
     if (!polling) polling = setInterval(pollStatus, 6000);
+    autoGenerateTexts(); // texts don't need the video — generate immediately
   } else {
     if (polling) { clearInterval(polling); polling = null; }
   }
@@ -710,6 +706,24 @@ async function pollStatus() {
   }
 }
 
+async function autoGenerateTexts() {
+  try {
+    const r = await fetch('/admin/api/social-clips/' + clipId + '/generate-content', { method: 'POST' });
+    const d = await r.json();
+    if (!d.tiktok_caption) return;
+    const sv = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+    sv('tt-caption',  d.tiktok_caption);
+    sv('tt-hashtags', d.tiktok_hashtags);
+    sv('ig-caption',  d.instagram_caption);
+    sv('ig-hashtags', d.instagram_hashtags);
+    sv('ig-alt',      d.instagram_alt_text);
+    sv('yt-title',    d.yt_title);
+    sv('yt-desc',     d.yt_description);
+    sv('yt-kw',       d.yt_keyword_tags);
+    sv('fb-caption',  d.fb_caption);
+  } catch(e) { /* silent — texts can be regenerated manually */ }
+}
+
 
 
 // ── Stats ──────────────────────────────────────────────────
@@ -832,7 +846,6 @@ function populateMeta(clip) {
   // pg driver returns DATE columns as JS Date objects — normalise to YYYY-MM-DD for date inputs
   const fd = v => { if (!v) return ''; if (v instanceof Date) return v.toISOString().slice(0,10); return String(v).slice(0,10); };
   sv('tag-subject',  clip.subject);
-  sv('tag-name',     clip.subject_name);
   sv('tag-occasion', clip.occasion);
   sv('tag-action',   clip.action);
   sv('tag-mood',     clip.mood);
@@ -868,7 +881,6 @@ function collectMeta() {
   const custom_raw = gv('tag-custom');
   return {
     subject:      gv('tag-subject'),
-    subject_name: gv('tag-name'),
     occasion:     gv('tag-occasion'),
     action:       gv('tag-action'),
     mood:         gv('tag-mood'),

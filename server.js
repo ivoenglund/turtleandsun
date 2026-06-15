@@ -3233,53 +3233,83 @@ function actionPhrase(clip, concept) {
 
 function buildPlatformContent(clip) {
   const subject  = clip.subject || 'pet';
-  const name     = clip.subject_name;
   const concept  = clip.concept_name || clip.concept || 'Loveogram';
   const occasion = clip.occasion;
+  const mood     = clip.mood || '';
   const action   = actionPhrase(clip, concept);
-  const refTag   = clip.ref_tag || ('c' + clip.id);
-  const styleTag = clip.clip_style === 3 ? 'style-b' : 'style-a';
-  const subj     = name ? name : ('a ' + subject);
   const pronoun  = (subject === 'human' || subject === 'family') ? 'them' : ('your ' + subject);
+  const subjectLabel = subject.charAt(0).toUpperCase() + subject.slice(1);
 
+  // Mood sets tone + opening hook
+  const moodMap = {
+    'funny':     { emoji: '\u{1F602}', hook1: 'POV: your {subject} just went viral',   cta: 'Wait for it…'              },
+    'heartfelt': { emoji: '\u{1F97A}', hook1: 'This one is going to make you cry',      cta: 'Wait for the after…'       },
+    'dramatic':  { emoji: '\u{1F451}', hook1: 'Nothing prepared us for the after',       cta: 'The transformation is real.'    },
+    'cute':      { emoji: '\u{1F970}', hook1: 'The cutest thing you’ll see today',  cta: 'Wait for the after… \u{1F60D}' },
+    'elegant':   { emoji: '✨',    hook1: 'Timeless. Stunning. Unforgettable.',       cta: 'Wait for the after…'       },
+  };
+  const m        = moodMap[mood] || { emoji: '\u{1F60D}', hook1: subjectLabel + ' ' + action.past, cta: 'Wait for the after… \u{1F60D}' };
+  const moodEmoji = m.emoji;
+  const hook1     = m.hook1.replace('{subject}', subject);
+  const cta       = m.cta;
+  const mainLine  = subjectLabel + ' ' + action.past + ' ' + moodEmoji;
+
+  // Occasion call-to-action lines
   const occasionLine = {
-    'birthday':    '🎂 Perfect birthday gift!',
-    'fathers-day': "🎁 Perfect Father's Day gift!",
-    'mothers-day': '🌸 Perfect Mother\'s Day gift!',
-    'christmas':   '🎄 The perfect Christmas gift!',
+    'birthday':    '\u{1F382} The perfect birthday gift — they’ll never forget it.',
+    'fathers-day': '\u{1F381} Dad’s going to love this. Perfect Father’s Day gift.',
+    'mothers-day': '\u{1F338} The best Mother’s Day gift. She’ll cry happy tears.',
+    'christmas':   '\u{1F384} The perfect Christmas gift — order before it sells out.',
   }[occasion] || '';
 
+  // Subject hashtag pools
   const subjectTags = {
-    'dog':    '#dogsoftiktok #doglovers #doglover',
-    'cat':    '#catsoftiktok #catlovers #catlover',
-    'human':  '#portrait #personalgift',
-    'family': '#familylove #familyphoto',
-  }[subject] || '#petlovers';
+    'dog':    '#dogsoftiktok #dogmom #doglover #doglovers #dogsofinstagram',
+    'cat':    '#catsoftiktok #catmom #catlover #catlovers #catsofinstagram',
+    'human':  '#portrait #personalgift #uniquegift #customportrait',
+    'family': '#familylove #familyphoto #familygift #familyportrait',
+  }[subject] || '#petlovers #pets';
 
   const occasionTags = {
-    'birthday':    '#birthdaygift #birthdayideas #giftideas',
-    'fathers-day': '#fathersday #fathersdaygift #giftfordad',
-    'mothers-day': '#mothersday #mothersdaygift #giftformom',
-    'christmas':   '#christmasgift #christmasideas',
+    'birthday':    '#birthdaygift #birthdayideas #giftideas #uniquegiftideas',
+    'fathers-day': '#fathersday #fathersdaygift #giftfordad #fathersdayideas',
+    'mothers-day': '#mothersday #mothersdaygift #giftformom #mothersdayideas',
+    'christmas':   '#christmasgift #christmasideas #christmaspresent',
   }[occasion] || '';
+
+  const moodTags = {
+    'funny':     '#funnyanimals #funnypets #lol #funny',
+    'heartfelt': '#heartfelt #emotional #touching #tears',
+    'dramatic':  '#dramatic #royaltreatment #wow',
+    'cute':      '#cute #adorable #cutepets #aww',
+    'elegant':   '#elegant #artistic #beautiful #art',
+  }[mood] || '';
+
+  // Custom tags: stored as array, convert to hashtags
+  const customTags = (clip.custom_tags || [])
+    .map(t => t.trim()).filter(Boolean)
+    .map(t => t.startsWith('#') ? t : '#' + t.replace(/\s+/g, ''))
+    .join(' ');
 
   const conceptTag = '#' + concept.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // {name/subject} {action-phrase}
-  const hook = (name ? name : (subj.charAt(0).toUpperCase() + subj.slice(1))) + ' ' + action.past;
+  // TikTok
+  const ttCaption  = `${hook1}\n\n${mainLine}\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create yours: turtleandsun.com/tt${clip.id}`;
+  const ttHashtags = [conceptTag, subjectTags, '#beforeandafter #petportrait #loveogram #turtleandsun #fyp', occasionTags, moodTags, customTags].filter(Boolean).join(' ');
 
-  const ttCaption  = hook + '\n\nWait for the after… 😍' + (occasionLine ? '\n\n' + occasionLine : '') + `\n\nCreate yours: turtleandsun.com/tt${clip.id}`;
-  const ttHashtags = [conceptTag, subjectTags, '#beforeandafter #petportrait #loveogram #turtleandsun #fyp', occasionTags, '#' + styleTag].filter(Boolean).join(' ');
+  // Instagram
+  const igCaption  = `${hook1}\n\n${mainLine}\n\nTransformed into a stunning ${action.noun} by Turtle and Sun — the photo you could never take.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create yours at turtleandsun.com \u{1F422}  From 99 kr / ~$9`;
+  const igHashtags = ['#petportrait', conceptTag, subjectTags, '#beforeandafter #loveogram #turtleandsun #aiart #petgift', occasionTags, moodTags, customTags].filter(Boolean).join(' ');
+  const igAlt      = `${subjectLabel} ${action.gerund} — before and after showing the original photo and the AI-generated ${action.noun}`;
 
-  const igCaption  = hook + `\n\nTransformed into a timeless ${action.noun} by Turtle and Sun — the family photo you could never take.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create yours at turtleandsun.com/ig${clip.id} 🐢\nFrom 99 kr / ~$9`;
-  const igHashtags = ['#petportrait', conceptTag, subjectTags, '#beforeandafter #loveogram #turtleandsun #aiart #petgift', occasionTags, '#' + styleTag].filter(Boolean).join(' ');
-  const igAlt      = `${name || subject} ${action.gerund} — before and after showing the original photo and the AI-generated ${action.noun}`;
+  // YouTube
+  const occasionSuffix = occasion && occasion !== 'general' ? ' | ' + occasion.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+  const ytTitle    = `${subjectLabel} ${action.past} | Before & After${occasionSuffix}`;
+  const ytDesc     = `${hook1}\n\n${mainLine}\n\nThis is a Loveogram — an AI-generated portrait that transforms your ${subject === 'human' || subject === 'family' ? 'photo' : subject + ' photo'} into a stunning ${action.noun}.\n\nCreate yours at turtleandsun.com\nFrom 99 kr / ~$9 USD\n\n${occasionLine ? occasionLine + '\n\n' : ''}The photo you could never take.\n5% of every order goes to the Turtleandsun Connection Fund \u{1F422}\n\n#Shorts ${conceptTag} #loveogram #turtleandsun`;
+  const ytKw       = [subject + ' portrait', concept.toLowerCase(), (clip.action || 'royal-portrait').replace(/-/g, ' '), mood ? mood + ' ' + subject : '', 'pet transformation', 'before and after', 'AI pet art', subject + ' makeover', 'pet gift', 'loveogram', 'turtle and sun', subject + ' art', occasion && occasion !== 'general' ? occasion.replace(/-/g, ' ') + ' gift' : '', 'AI art'].filter(Boolean).join(', ');
 
-  const ytTitle    = name ? `${name} ${action.past} Wait for the after…` : `${subject.charAt(0).toUpperCase() + subject.slice(1)} ${action.past} | Before & After`;
-  const ytDesc     = `${hook}\n\nThis is a Loveogram — an AI-generated portrait that transforms your ${subject === 'human' || subject === 'family' ? 'photo' : subject + ' photo'} into a stunning ${action.noun}.\n\nCreate yours at turtleandsun.com/yt${clip.id}\nFrom 99 kr / ~$9 USD\n\n${occasionLine ? occasionLine + '\n\n' : ''}The family photo you could never take.\n5% of every order goes to the Turtleandsun Connection Fund 🐢\n\n#Shorts ${conceptTag} #loveogram #turtleandsun\n\n· ${refTag}`;
-  const ytKw       = [subject + ' portrait', concept.toLowerCase(), (clip.action || 'royal-portrait').replace(/-/g, ' '), 'pet transformation', 'before and after', 'AI pet art', subject + ' makeover', 'pet gift', 'loveogram', 'turtle and sun', subject + ' art', 'cute ' + subject, occasion && occasion !== 'general' ? occasion + ' gift' : '', 'AI art', styleTag].filter(Boolean).join(', ');
-
-  const fbCaption  = hook + ` We transformed ${pronoun} into a ${action.noun} using AI — and the result is stunning.\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create your own Loveogram at turtleandsun.com/fb${clip.id} — from 99 kr.`;
+  // Facebook
+  const fbCaption  = `${hook1}\n\n${mainLine}\n\nWe transformed ${pronoun} into a ${action.noun} — ${cta.toLowerCase().replace(/…$/, '')}\n\n${occasionLine ? occasionLine + '\n\n' : ''}Create your own Loveogram at turtleandsun.com — from 99 kr.`;
 
   return { tiktok_caption: ttCaption, tiktok_hashtags: ttHashtags, instagram_caption: igCaption, instagram_hashtags: igHashtags, instagram_alt_text: igAlt, yt_title: ytTitle, yt_description: ytDesc, yt_keyword_tags: ytKw, fb_caption: fbCaption };
 }
