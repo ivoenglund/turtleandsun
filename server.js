@@ -3119,7 +3119,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
   const id = parseInt(req.params.id);
   const {
     video_overlay_text, before_y_offset, after_y_offset, panel_url, end_card_duration_s, before_pct,
-    clip_style, show_before_s, rise_duration_s, rise_pause_s,
+    clip_style, show_before_s, rise_duration_s, rise_pause_s, style_c_intro_url,
     subject, subject_name, occasion, mood, action, custom_tags, ref_tag,
     tiktok_caption, tiktok_hashtags, tiktok_post_url, tiktok_posted_at,
     instagram_caption, instagram_hashtags, instagram_alt_text, instagram_post_url, instagram_posted_at,
@@ -3164,6 +3164,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         fb_post_url           = $34,
         fb_posted_at          = $35,
         action                = $36,
+        style_c_intro_url     = $37,
         updated_at            = now()
       WHERE id = $1
       RETURNING *
@@ -3203,6 +3204,7 @@ app.put('/admin/api/social-clips/:id(\\d+)/settings', requireRole('admin'), asyn
         fb_post_url ?? null,
         fb_posted_at ?? null,
         action ?? null,
+        style_c_intro_url ?? null,
     ]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
@@ -4419,6 +4421,9 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
   if (!clip.before_url || !clip.after_video_url)
     return res.status(400).json({ error: 'Missing before_url or after_video_url on this clip' });
 
+  if (parseInt(clip.clip_style) === 4 && !clip.style_c_intro_url)
+    return res.status(400).json({ error: 'Style C: drag a video from Asset Storage before generating' });
+
   // Mark processing immediately
   await pool.query(`UPDATE social_clips SET status='processing', error_msg=NULL, updated_at=now() WHERE id=$1`, [id]);
   res.json({ ok: true, message: 'Generation started — poll /admin/api/social-clips/' + id + ' for status' });
@@ -4552,8 +4557,6 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
       // clip_style DB values: 1 = Style A (static end card), 3 = Style B (composite → rise & wipe)
       const clipStyle = parseInt(clip.clip_style) || 1;
-      const isStyleC = clipStyle === 4;
-      const bodyFile = isStyleC ? pathM.join(tmpDir, 'body.mp4') : outFile;
 
       if (clipStyle === 3) {
         // ── Style 3: Composite → Rise & Wipe ──────────────────────────────
@@ -4636,6 +4639,30 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
           });
         });
 
+      } else if (clipStyle === 4) {
+        // ── Style C: after treatment + user-supplied MP4 ──────────────
+        if (!clip.style_c_intro_url)
+          throw new Error('Style C: style_c_intro_url is not set on this clip');
+        const suppliedFile = pathM.join(tmpDir, 'supplied.mp4');
+        const suppliedBuf  = await dlBuffer(clip.style_c_intro_url);
+        fs2.writeFileSync(suppliedFile, suppliedBuf);
+        await new Promise((resolve, reject) => {
+          execFile(ffmpegBin, [
+            '-y', '-loglevel', 'error',
+            '-i', videoFile,
+            '-i', suppliedFile,
+            '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[vout][aout]',
+            '-map', '[vout]', '-map', '[aout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '128k',
+            '-movflags', '+faststart',
+            outFile,
+          ], { timeout: 180000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error('FFmpeg Style C: ' + (stderr || err.message).slice(0, 1200)));
+            resolve();
+          });
+        });
+
       } else {
         // ── Variant 1: static end card concat (original) ──────────────────
 
@@ -4682,43 +4709,12 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-b:a', '128k', '-shortest',
             '-movflags', '+faststart',
-            bodyFile,
+            outFile,
           ], { timeout: 180000 }, (err, stdout, stderr) => {
             if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(0, 1200)));
             resolve();
           });
         });
-        if (isStyleC) {
-          // ── Style C: prepend intro clip to Style A body ─────────────────
-          const introEnvUrl = process.env.STYLE_C_INTRO_URL || null;
-          const introLocalPath = pathM.join(__dirname, 'public', 'tns_welcome.mp4');
-          const introFile = pathM.join(tmpDir, 'intro.mp4');
-          if (introEnvUrl) {
-            const introBuf = await dlBuffer(introEnvUrl);
-            fs2.writeFileSync(introFile, introBuf);
-          } else if (fs2.existsSync(introLocalPath)) {
-            fs2.copyFileSync(introLocalPath, introFile);
-          } else {
-            throw new Error('Style C: intro clip not found. Set STYLE_C_INTRO_URL in Railway env or place tns_welcome.mp4 in public/');
-          }
-          await new Promise((resolve, reject) => {
-            execFile(ffmpegBin, [
-              '-y', '-loglevel', 'error',
-              '-i', introFile,
-              '-i', bodyFile,
-              '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[vout][aout]',
-              '-map', '[vout]', '-map', '[aout]',
-              '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-              '-c:a', 'aac', '-b:a', '128k',
-              '-movflags', '+faststart',
-              outFile,
-            ], { timeout: 120000 }, (err, stdout, stderr) => {
-              if (err) return reject(new Error('FFmpeg Style C concat: ' + (stderr || err.message).slice(0, 1200)));
-              resolve();
-            });
-          });
-        } // end Style C concat
-
       } // end style branch
 
       // Upload clip + end card to R2 — filename starts with the clip ref

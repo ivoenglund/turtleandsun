@@ -89,6 +89,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
 .style-btn:hover{border-color:#1C2A14;color:#1C2A14}
 .style-btn.active{background:#1C2A14;color:#FFE800;border-color:#1C2A14}
 .inherit-hint{font-size:9px;color:#9a8c6a;margin-top:2px;font-style:italic}
+<style>#sc-drop-zone{user-select:none;transition:border-color .2s,background .2s;}</style>
 </style>
 </head>
 <body>
@@ -420,6 +421,7 @@ function renderClip(initial) {
     document.getElementById('rise_duration_s').value     = clip.rise_duration_s != null ? clip.rise_duration_s : 1.0;
     document.getElementById('rise_pause_s').value        = clip.rise_pause_s    != null ? clip.rise_pause_s    : 3.0;
     setStyle(parseInt(clip.clip_style) || 1, true /* silent */);
+    if (clip.style_c_intro_url) setScUrl(clip.style_c_intro_url);
 
     // Before photo
     const beforeImg = document.getElementById('cp-before-img');
@@ -546,6 +548,9 @@ async function generate() {
   const btn = document.getElementById('btn-generate');
   try {
     await saveNow(false);
+  const curStyle = parseInt(document.getElementById('clip_style').value);
+  if (curStyle === 4 && !(document.getElementById('sc-url-input')||{value:''}).value.trim())
+    return alert('Style C: drag a video from Asset Storage first.');
   } catch(e) { return; } // save failed — abort, button never got disabled
 
   btn.disabled = true;
@@ -764,6 +769,7 @@ function collectMeta() {
   const custom_raw = gv('tag-custom');
   return {
     custom_tags:  custom_raw ? custom_raw.split(',').map(s=>s.trim()).filter(Boolean) : [],
+    style_c_intro_url: (document.getElementById('sc-url-input')||{}).value || null,
   };
 }
 

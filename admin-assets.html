@@ -227,7 +227,7 @@ async function load(p = 1) {
     const deleteBtn = canDelete && dbId
       ? `<button class="btn-delete" onclick="deleteAsset('${r._type}',${dbId},this)" title="Delete from R2 and DB">Delete</button>`
       : '';
-    return `<div class="card${needsMig?' needs-migration':''}">
+    return `<div class="card${needsMig?' needs-migration':''}" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${r.url}');event.dataTransfer.effectAllowed='copy';" title="Drag to Style C clip field">
       <div class="thumb-wrap">
         ${thumbContent(r.url)}
         ${storageBadge(r.url)}

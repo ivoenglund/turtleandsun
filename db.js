@@ -925,6 +925,7 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS tiktok_video_id    TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_media_id  TEXT;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS facebook_video_id   TEXT;
+    ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS style_c_intro_url TEXT;
   `);
 
   // Click attribution (2026-06-10): ?ref=<clip ref_tag>&src=<yt|tt|ig|fb> on
