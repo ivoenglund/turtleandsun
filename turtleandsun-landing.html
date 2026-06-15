@@ -135,14 +135,16 @@ html,body{overflow-x:hidden;}
 .ts-hero-sub{font-family:'DM Sans',sans-serif;font-size:clamp(15px,1.6vw,19px);font-weight:400;color:rgba(28,10,0,0.78);line-height:1.45;max-width:780px;}
 .ts-hero-sub strong{font-weight:700;color:#1C0A00;}
 .ts-shell{display:flex;flex-direction:column;margin-bottom:24px;}
-.ts-headers{display:grid;grid-template-columns:1fr auto 1fr 1fr;gap:18px;align-items:end;margin-bottom:14px;}
+.ts-headers{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:end;margin-bottom:14px;}
 .ts-dh-item{display:flex;align-items:center;gap:10px;padding:0 6px;}
 .ts-dh-span2{grid-column:span 2;}
 .ts-dh-num{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#1C2A14;color:#FFE800;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;}
 .ts-dh-text{font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(18px,2.1vw,26px);font-weight:800;color:#1C0A00;line-height:1.15;}
 .ts-accent{color:#3A6B20;}
-.ts-demo{position:relative;display:grid;grid-template-columns:1fr auto 1fr 1fr;gap:18px;align-items:start;margin-bottom:18px;}
+.ts-demo{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"src after" "bundle bundle" "pay pay";gap:18px;align-items:start;margin-bottom:18px;}
 .ts-col{display:flex;flex-direction:column;gap:8px;position:relative;}
+.ts-source{grid-area:src;}
+.ts-still,.ts-video{grid-area:after;}
 .ts-cap{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:rgba(28,10,0,0.55);text-align:center;}
 .ts-frame{position:relative;border-radius:12px;overflow:hidden;background:#1A0C04;aspect-ratio:var(--ratio,9/16);box-shadow:0 16px 48px rgba(0,0,0,0.32),0 4px 12px rgba(0,0,0,0.18);transition:aspect-ratio 0.25s ease;}
 .ts-frame img,.ts-frame video{width:100%;height:100%;object-fit:cover;display:block;}
@@ -185,16 +187,16 @@ html,body{overflow-x:hidden;}
 
 /* Chips */
 .ts-chips-wrap{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-width:174px;height:100%;}
-.ts-chips{display:flex;flex-direction:column;gap:7px;padding:0 4px;flex:1;justify-content:center;}
-.ts-chip{display:flex;align-items:center;gap:9px;padding:10px 13px;border:1.5px solid rgba(28,10,0,0.16);border-radius:11px;background:rgba(255,255,255,0.55);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:rgba(28,10,0,0.78);cursor:pointer;text-align:left;transition:all 0.15s;width:100%;}
+.ts-chips{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;padding:4px 0;align-items:center;}
+.ts-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border:1.5px solid rgba(28,10,0,0.18);border-radius:999px;background:rgba(255,255,255,0.75);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:rgba(28,10,0,0.78);cursor:pointer;transition:all 0.15s;}
 .ts-chip:hover{border-color:rgba(28,10,0,0.4);color:#1C0A00;background:rgba(255,255,255,0.78);}
 .ts-chip.on{background:#1C2A14;border-color:#1C2A14;color:#fff;box-shadow:0 6px 18px rgba(28,42,20,0.28);}
 .ts-chip .ts-dot{width:7px;height:7px;border-radius:50%;background:rgba(28,10,0,0.25);flex-shrink:0;transition:background 0.15s;}
 .ts-chip.on .ts-dot{background:#FFE800;}
-.ts-chip .ts-chip-label{flex:1;line-height:1.2;}
+.ts-chip .ts-chip-label{line-height:1.2;}
 
 /* Ratio buttons */
-.ts-ratios{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 4px 2px;border-top:1px dashed rgba(28,10,0,0.16);flex-wrap:wrap;}
+.ts-ratios{display:flex;align-items:center;gap:8px;padding:4px 0 6px;flex-wrap:wrap;}
 .ts-ratios .ts-cap{margin:0;font-size:10px;letter-spacing:0.08em;}
 .ts-ratio-row{display:flex;gap:6px;}
 .ts-ratio-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 7px;border:1.5px solid rgba(28,10,0,0.16);border-radius:8px;background:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;min-width:38px;}
@@ -257,7 +259,7 @@ html,body{overflow-x:hidden;}
 .ts-demo.is-order.has-preview .ts-buy-prefix{max-width:60px;opacity:1;color:#fff;}
 
 /* Bundle */
-.ts-bundle{display:none;padding:14px 18px;background:#1C2A14;color:#fff;border-radius:14px;flex-direction:column;gap:8px;box-shadow:0 12px 32px rgba(28,42,20,0.32);grid-column:3 / span 2;margin-top:6px;}
+.ts-bundle{display:none;padding:14px 18px;background:#1C2A14;color:#fff;border-radius:14px;flex-direction:column;gap:8px;box-shadow:0 12px 32px rgba(28,42,20,0.32);grid-column:1 / -1;grid-area:bundle;margin-top:6px;}
 .ts-demo.is-order.has-preview .ts-bundle{display:flex;}
 .ts-bundle-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .ts-bundle-badge{background:#FFE800;color:#1C0A00;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;padding:5px 11px;border-radius:14px;letter-spacing:0.07em;text-transform:uppercase;flex-shrink:0;}
@@ -270,7 +272,7 @@ html,body{overflow-x:hidden;}
 .ts-bundle-btn:hover{background:#fff;transform:translateY(-1px);}
 
 /* Pay-trust */
-.ts-pay-trust{display:none;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:6px 0 12px;font-family:'DM Sans',sans-serif;font-size:12px;color:rgba(28,10,0,0.62);grid-column:3 / span 2;}
+.ts-pay-trust{display:none;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:6px 0 12px;font-family:'DM Sans',sans-serif;font-size:12px;color:rgba(28,10,0,0.62);grid-column:1 / -1;grid-area:pay;}
 .ts-demo.is-order.has-preview .ts-pay-trust{display:flex;}
 .ts-pay-trust .ts-pt-icons{display:inline-flex;gap:8px;align-items:center;}
 .ts-pay-trust .ts-pt-icon{padding:3px 9px;background:rgba(0,0,0,0.06);border-radius:5px;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:800;color:rgba(28,10,0,0.7);letter-spacing:0.04em;}
@@ -281,26 +283,19 @@ html,body{overflow-x:hidden;}
 .ts-mobile-step .ts-ms-text{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;}
 .ts-mobile-step .ts-ms-text .ts-accent{color:#3A6B20;}
 
+.ts-chips-col{display:none !important;}
+.ts-concept-filter{margin:2px 0 14px;}
+.ts-sub-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:0 0 16px;}
+.ts-sub-controls .ts-cap{margin:0;}
 @media(max-width:760px){
   .ts-headers{display:none;}
   .ts-mobile-step{display:flex;}
-  .ts-demo{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"src chip" "step3 step3" "still vid" "bundle bundle" "pay pay";gap:14px 12px;align-items:start;}
-  .ts-source{grid-area:src;}
-  .ts-chips-col{grid-area:chip;}
-  .ts-mobile-step-3{grid-area:step3;margin-top:2px;}
-  .ts-still{grid-area:still;}
-  .ts-video{grid-area:vid;}
-  .ts-bundle{grid-area:bundle;grid-column:auto;}
-  .ts-pay-trust{grid-area:pay;grid-column:auto;}
+  .ts-demo{grid-template-columns:1fr 1fr;grid-template-areas:"src after" "bundle bundle" "pay pay";gap:14px 12px;}
+  .ts-bundle{grid-column:auto;}
+  .ts-pay-trust{grid-column:auto;}
   .ts-source .ts-frame{max-width:none;margin:0;}
-  .ts-chips-wrap{min-width:0;height:auto;gap:6px;}
-  .ts-chips{gap:5px;}
-  .ts-chip{font-size:12px;padding:8px 11px;gap:7px;min-width:0;}
-  .ts-chip .ts-chip-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .ts-ratios{padding-top:7px;gap:6px;}
-  .ts-ratios .ts-cap{display:inline-block;font-size:9px;}
+  .ts-chip{font-size:12px;padding:5px 13px;}
   .ts-ratio-btn{min-width:34px;padding:4px 6px;}
-  .ts-ratio-btn .ts-r-shape{transform:scale(0.85);}
   .ts-ratio-btn .ts-r-label{font-size:8px;}
   .ts-label{font-size:11px;padding:5px 10px;letter-spacing:0.1em;top:8px;right:8px;}
   .ts-counter{font-size:10px;padding:5px 9px;top:8px;left:8px;}
@@ -409,15 +404,13 @@ html,body{overflow-x:hidden;}
   <div class="ts-shell" id="ts-shell">
 
     <div class="ts-headers">
-      <div class="ts-dh-item"><span class="ts-dh-num">1</span><span class="ts-dh-text">Upload a photo</span></div>
-      <div class="ts-dh-item"><span class="ts-dh-num">2</span><span class="ts-dh-text">Pick an occasion</span></div>
-      <div class="ts-dh-item ts-dh-span2"><span class="ts-dh-num">3</span><span class="ts-dh-text"><span class="ts-accent">Get something to keep</span></span></div>
+      <div class="ts-dh-item"><span class="ts-dh-text">Before</span></div>
+      <div class="ts-dh-item"><span class="ts-dh-text">After <span class="ts-accent">✦</span></span></div>
     </div>
 
     <div class="ts-demo" id="ts-demo">
       <!-- 1. SOURCE -->
       <div class="ts-col ts-source" id="ts-source">
-        <div class="ts-mobile-step"><span class="ts-ms-num">1</span><span class="ts-ms-text">Upload a photo</span></div>
         <div class="ts-frame">
           <span class="ts-label">Before</span>
           <button type="button" class="ts-delete" id="ts-delete" title="Remove photo">
@@ -448,30 +441,6 @@ html,body{overflow-x:hidden;}
         </div>
       </div>
 
-      <!-- 2. CHIPS + RATIO -->
-      <div class="ts-col ts-chips-col">
-        <div class="ts-mobile-step"><span class="ts-ms-num">2</span><span class="ts-ms-text">Pick an occasion</span></div>
-        <div class="ts-chips-wrap">
-          <div class="ts-chips" id="ts-chips"></div>
-          <div class="ts-ratios">
-            <span class="ts-cap">Shape</span>
-            <div class="ts-ratio-row" id="ts-ratios">
-              <button type="button" class="ts-ratio-btn" data-ratio="16/9" data-orient="landscape" title="Landscape 16:9">
-                <span class="ts-r-shape" style="width:22px;height:13px;"></span><span class="ts-r-label">16:9</span>
-              </button>
-              <button type="button" class="ts-ratio-btn on" data-ratio="9/16" data-orient="portrait" title="Portrait 9:16">
-                <span class="ts-r-shape" style="width:13px;height:22px;"></span><span class="ts-r-label">9:16</span>
-              </button>
-              <button type="button" class="ts-ratio-btn" data-ratio="1/1" data-orient="square" title="Square 1:1">
-                <span class="ts-r-shape" style="width:18px;height:18px;"></span><span class="ts-r-label">1:1</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      <div class="ts-mobile-step ts-mobile-step-3"><span class="ts-ms-num">3</span><span class="ts-ms-text"><span class="ts-accent">Get something to keep</span></span></div>
 
       <!-- 3. STILL -->
       <div class="ts-col ts-output ts-still">
@@ -549,9 +518,25 @@ html,body{overflow-x:hidden;}
   </div>
   <!-- ============ END HERO WIDGET ============ -->
 
-  <div id="styleDesc" style="display:flex;margin:20px 0 16px;padding:14px 20px;background:rgba(255,220,60,0.4);border-radius:12px;border:1.5px solid rgba(0,0,0,0.1);flex-direction:column;align-items:flex-start;gap:6px;">
-    <div id="styleDescTitle" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:700;color:#1C0A00;"></div>
-    <div id="styleDescText" style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(60,20,0,0.8);line-height:1.5;"></div>
+  <!-- Occasion pills + shape controls — below the two frames -->
+  <div class="ts-concept-filter" id="ts-concept-filter">
+    <div class="ts-chips" id="ts-chips"></div>
+  </div>
+  <div class="ts-sub-controls">
+    <div class="ts-ratios">
+      <span class="ts-cap">Shape</span>
+      <div class="ts-ratio-row" id="ts-ratios">
+        <button type="button" class="ts-ratio-btn" data-ratio="16/9" data-orient="landscape" title="Landscape 16:9">
+          <span class="ts-r-shape" style="width:22px;height:13px;"></span><span class="ts-r-label">16:9</span>
+        </button>
+        <button type="button" class="ts-ratio-btn on" data-ratio="9/16" data-orient="portrait" title="Portrait 9:16">
+          <span class="ts-r-shape" style="width:13px;height:22px;"></span><span class="ts-r-label">9:16</span>
+        </button>
+        <button type="button" class="ts-ratio-btn" data-ratio="1/1" data-orient="square" title="Square 1:1">
+          <span class="ts-r-shape" style="width:18px;height:18px;"></span><span class="ts-r-label">1:1</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="gallery-bar" id="galleryKindBar" style="margin-bottom:8px;">
@@ -569,6 +554,10 @@ html,body{overflow-x:hidden;}
   <div class="gallery-bar" id="galleryBarAction">
     <span class="glabel" style="font-size:14px;font-weight:700;white-space:nowrap;">What happens</span>
     <button class="fb on" data-dim="action" data-val="all">All</button>
+  </div>
+  <div id="styleDesc" style="display:flex;margin:12px 0 16px;padding:14px 20px;background:rgba(255,220,60,0.4);border-radius:12px;border:1.5px solid rgba(0,0,0,0.1);flex-direction:column;align-items:flex-start;gap:6px;">
+    <div id="styleDescTitle" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:700;color:#1C0A00;"></div>
+    <div id="styleDescText" style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:400;color:rgba(60,20,0,0.8);line-height:1.5;"></div>
   </div>
   <div class="g-section-label" id="g1-label" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:rgba(28,10,0,0.55);letter-spacing:0.04em;margin:6px 0 8px;">Videos</div>
   <div class="g-grid" id="g1"></div>
