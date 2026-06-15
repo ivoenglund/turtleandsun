@@ -4641,34 +4641,56 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         });
 
       } else if (clipStyle === 4) {
-        // ── Style C: after treatment + user-supplied MP4 ──────────────
+        // ── Style C: after treatment video + user-supplied MP4 ──────────
         if (!clip.style_c_intro_url)
           throw new Error('Style C: style_c_intro_url is not set on this clip');
         const suppliedFile = pathM.join(tmpDir, 'supplied.mp4');
-        const suppliedBuf  = await dlBuffer(clip.style_c_intro_url);
-        fs2.writeFileSync(suppliedFile, suppliedBuf);
+        fs2.writeFileSync(suppliedFile, await dlBuffer(clip.style_c_intro_url));
+
+        // Probe each clip for audio (ffmpeg -i exits with error but prints stream info to stderr)
+        const hasAudioSC = (fp) => new Promise(res => {
+          execFile(ffmpegBin, ['-i', fp], { timeout: 10000 }, (_e, _o, se) =>
+            res((se || '').includes('Audio:'))
+          );
+        });
+        const [v0Audio, v1Audio] = await Promise.all([hasAudioSC(videoFile), hasAudioSC(suppliedFile)]);
+        console.log('[social-clip] Style C audio: after=%s supplied=%s', v0Audio, v1Audio);
+
+        const scaleV0 = '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v0]';
+        const scaleV1 = '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v1]';
+        const aFmt0   = '[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a0]';
+        const aFmt1   = '[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a1]';
+        let scaleFilter, mapArgs;
+        if (v0Audio && v1Audio) {
+          scaleFilter = scaleV0+';'+scaleV1+';'+aFmt0+';'+aFmt1+';[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]';
+          mapArgs = ['-map', '[vout]', '-map', '[aout]'];
+        } else if (v0Audio) {
+          scaleFilter = scaleV0+';'+scaleV1+';[v0][v1]concat=n=2:v=1:a=0[vout]';
+          mapArgs = ['-map', '[vout]', '-map', '0:a'];
+        } else if (v1Audio) {
+          scaleFilter = scaleV0+';'+scaleV1+';[v0][v1]concat=n=2:v=1:a=0[vout]';
+          mapArgs = ['-map', '[vout]', '-map', '1:a'];
+        } else {
+          scaleFilter = scaleV0+';'+scaleV1+';[v0][v1]concat=n=2:v=1:a=0[vout]';
+          mapArgs = ['-map', '[vout]'];
+        }
+
         await new Promise((resolve, reject) => {
-          const scaleFilter =
-            '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v0];' +
-            '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v1];' +
-            '[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a0];' +
-            '[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a1];' +
-            '[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]';
           execFile(ffmpegBin, [
             '-y', '-loglevel', 'error',
-            '-i', videoFile,
-            '-i', suppliedFile,
+            '-i', videoFile, '-i', suppliedFile,
             '-filter_complex', scaleFilter,
-            '-map', '[vout]', '-map', '[aout]',
+            ...mapArgs,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-b:a', '128k',
             '-movflags', '+faststart',
             outFile,
-          ], { timeout: 180000 }, (err, stdout, stderr) => {
-            if (err) return reject(new Error('FFmpeg Style C: ' + (stderr || err.message).slice(0, 1200)));
+          ], { timeout: 180000 }, (err, _o, se) => {
+            if (err) return reject(new Error('FFmpeg Style C: ' + (se || err.message).slice(0, 1200)));
             resolve();
           });
         });
+
 
       } else {
         // ── Variant 1: static end card concat (original) ──────────────────
