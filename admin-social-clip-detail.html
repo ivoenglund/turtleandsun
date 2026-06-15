@@ -175,20 +175,13 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
         </div>
         <div class="gen-status" id="gen-status"></div>
         <div style="font-size:10px;color:#aaa;margin-top:4px" id="gen-hint"></div>
-      </div>
-
-      <!-- Publish -->
-      <div class="card">
-        <h2>Publish</h2>
-        <div class="channel-row"><span class="channel-icon">🎵</span><span class="channel-name">TikTok</span><label><input type="checkbox" id="ch-tiktok"> <span class="channel-status" id="st-tiktok">Not published</span></label></div>
-        <div class="channel-row"><span class="channel-icon">📸</span><span class="channel-name">Instagram</span><label><input type="checkbox" id="ch-instagram"> <span class="channel-status" id="st-instagram">Not published</span></label></div>
-        <div class="channel-row"><span class="channel-icon">▶️</span><span class="channel-name">YouTube Shorts</span><label><input type="checkbox" id="ch-youtube"> <span class="channel-status" id="st-youtube">Not published</span></label></div>
-        <div class="channel-row"><span class="channel-icon">📘</span><span class="channel-name">Facebook</span><label><input type="checkbox" id="ch-facebook"> <span class="channel-status" id="st-facebook">Not published</span></label></div>
-        <div style="margin-top:10px">
-          <button class="btn btn-primary btn-sm" onclick="publish()">Publish selected ▶</button>
-          <div style="font-size:10px;color:#aaa;margin-top:4px">Channel APIs not yet connected — marks intent only.</div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0">
+          <a class="btn btn-outline btn-sm" href="/admin/social-tracker" title="Open the Social Tracker to schedule and publish this clip">Send to Tracker →</a>
+          <div style="font-size:10px;color:#aaa;margin-top:4px">Plan when and where to post — per channel, in the tracker.</div>
         </div>
       </div>
+
+
 
       <!-- Tags -->
       <div class="card">
@@ -248,22 +241,13 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
               <option value="elegant">Elegant</option>
             </select>
           </div>
-          <div>
-            <div class="field-label">Template</div>
-            <select id="tag-template" class="field-input" onchange="setStyle(parseInt(this.value))">
-              <option value="1">Style A</option>
-              <option value="3">Style B</option>
-            </select>
-          </div>
+
         </div>
         <div style="margin-top:8px">
           <div class="field-label">Custom tags <span style="font-weight:400;color:#aaa">(comma-separated)</span></div>
           <input id="tag-custom" class="field-input" placeholder="e.g. before-after, transformation" oninput="debounceSave()">
         </div>
-        <div style="margin-top:8px">
-          <div class="field-label">Ref tag <span style="font-weight:400;color:#aaa">(for revenue attribution)</span></div>
-          <input id="tag-ref" class="field-input" placeholder="e.g. tns-rp-jun05" oninput="debounceSave()">
-        </div>
+
       </div>
     </div>
 
@@ -588,13 +572,7 @@ function renderClip(initial) {
     });
   }
 
-  // Publish
-  ['tiktok','instagram','youtube','facebook'].forEach(ch => {
-    const cb = document.getElementById('ch-' + ch);
-    const st = document.getElementById('st-' + ch);
-    if (cb) cb.checked = !!clip['published_' + ch];
-    if (st) { st.textContent = clip['published_' + ch] ? 'Published' : 'Not published'; st.className = 'channel-status' + (clip['published_' + ch] ? ' pub' : ''); }
-  });
+
 
   renderStats();
 
@@ -732,21 +710,7 @@ async function pollStatus() {
   }
 }
 
-// ── Publish ────────────────────────────────────────────────
-async function publish() {
-  const channels = [];
-  ['tiktok','instagram','youtube','facebook'].forEach(ch => {
-    if (document.getElementById('ch-' + ch).checked) channels.push(ch);
-  });
-  if (!channels.length) { showFlash('Select at least one channel', 'err'); return; }
-  if (!clip.output_url)  { showFlash('Generate the clip first', 'err'); return; }
-  const r = await fetch('/admin/api/social-clips/' + clipId + '/publish', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channels }),
-  });
-  const d = await r.json();
-  d.ok ? (showFlash('Marked: ' + channels.join(', '), 'ok'), loadClip()) : showFlash(d.error || 'Failed', 'err');
-}
+
 
 // ── Stats ──────────────────────────────────────────────────
 function renderStats() {
@@ -878,7 +842,6 @@ function populateMeta(clip) {
     if (hint) hint.style.display = (conceptVal && clip[dim] === conceptVal) ? '' : 'none';
   });
   sv('tag-custom',   (clip.custom_tags || []).join(', '));
-  sv('tag-ref',      clip.ref_tag);
   sv('tt-date',      fd(clip.tiktok_posted_at));
   sv('tt-url',       clip.tiktok_post_url);
   sv('tt-caption',   clip.tiktok_caption);
@@ -910,7 +873,6 @@ function collectMeta() {
     action:       gv('tag-action'),
     mood:         gv('tag-mood'),
     custom_tags:  custom_raw ? custom_raw.split(',').map(s=>s.trim()).filter(Boolean) : [],
-    ref_tag:      gv('tag-ref'),
     tiktok_posted_at:      gv('tt-date'),
     tiktok_post_url:       gv('tt-url'),
     tiktok_caption:        gv('tt-caption'),
