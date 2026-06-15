@@ -4648,14 +4648,18 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
         const suppliedBuf  = await dlBuffer(clip.style_c_intro_url);
         fs2.writeFileSync(suppliedFile, suppliedBuf);
         await new Promise((resolve, reject) => {
+          const scaleFilter =
+            '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v0];' +
+            '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1[v1];' +
+            '[v0][v1]concat=n=2:v=1:a=0[vout]';
           execFile(ffmpegBin, [
             '-y', '-loglevel', 'error',
             '-i', videoFile,
             '-i', suppliedFile,
-            '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[vout][aout]',
-            '-map', '[vout]', '-map', '[aout]',
+            '-filter_complex', scaleFilter,
+            '-map', '[vout]', '-map', '0:a?',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac', '-b:a', '128k',
+            '-c:a', 'aac', '-b:a', '128k', '-shortest',
             '-movflags', '+faststart',
             outFile,
           ], { timeout: 180000 }, (err, stdout, stderr) => {
