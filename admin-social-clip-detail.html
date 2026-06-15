@@ -140,6 +140,7 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
           <div class="style-btn-row" id="style-btn-row">
             <button class="style-btn" id="style-btn-1" onclick="setStyle(1)">A</button>
             <button class="style-btn" id="style-btn-3" onclick="setStyle(3)">B</button>
+            <button class="style-btn" id="style-btn-4" onclick="setStyle(4)" title="Intro clip (Welcome to Turtle and Sun) prepended to the before/after clip">C</button>
           </div>
         </div>
 
@@ -159,6 +160,12 @@ table.daily-tbl td.yt{color:#0F6E56;font-weight:700}
           </div>
         </div>
 
+        <!-- Style C: no duration setting — intro clip has its own length -->
+        <div id="sc-fields" style="display:none">
+          <div class="field">
+            <div style="font-size:11px;color:#888;padding:4px 0;">The standard intro clip (all animals say welcome) will be prepended. Duration is set by the intro clip — no extra settings needed.</div>
+          </div>
+        </div>
         <input type="hidden" id="video_overlay_text" value="">
         <input type="hidden" id="rise_pause_s" value="0">
         <input type="hidden" id="before_y_offset" value="0">
@@ -466,12 +473,16 @@ function setStyle(n, silent) {
   document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('style-btn-' + n);
   if (btn) btn.classList.add('active');
+  // Style C: hide duration fields — the intro clip sets its own length
+  document.getElementById('dur-fields').style.display = n === 4 ? 'none' : '';
   // Duration label differs between A and B
   document.getElementById('dur-label').textContent = n === 3 ? 'Show composite (seconds)' : 'End card duration (seconds)';
   // Rise duration: Style B only
   document.getElementById('vb-fields').style.display = n === 3 ? '' : 'none';
+  // Style C note
+  document.getElementById('sc-fields').style.display = n === 4 ? '' : 'none';
   const sb = document.getElementById('style-badge');
-  if (sb) sb.textContent = n === 3 ? 'Style B' : 'Style A';
+  if (sb) sb.textContent = n === 3 ? 'Style B' : (n === 4 ? 'Style C' : 'Style A');
   const ts = document.getElementById('tag-template');
   if (ts) ts.value = String(n);
   if (!silent) { _dirty = true; scheduleAutoSave(); }

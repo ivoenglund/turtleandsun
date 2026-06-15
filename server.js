@@ -3029,7 +3029,7 @@ app.get('/admin/api/social-clips', requireRole('admin'), async (req, res) => {
 // Queue one or more triplets — creates pending social_clip rows
 app.post('/admin/api/social-clips/queue', requireRole('admin'), async (req, res) => {
   const { triplet_ids, clip_style } = req.body; // array of triplet IDs + optional style (1=A, 3=B)
-  const styleVal = (clip_style === 3 || clip_style === 1) ? clip_style : 1;
+  const styleVal = (clip_style === 3 || clip_style === 1 || clip_style === 4) ? clip_style : 1;
   if (!Array.isArray(triplet_ids) || triplet_ids.length === 0)
     return res.status(400).json({ error: 'triplet_ids must be a non-empty array' });
   try {
@@ -4552,6 +4552,8 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
 
       // clip_style DB values: 1 = Style A (static end card), 3 = Style B (composite → rise & wipe)
       const clipStyle = parseInt(clip.clip_style) || 1;
+      const isStyleC = clipStyle === 4;
+      const bodyFile = isStyleC ? pathM.join(tmpDir, 'body.mp4') : outFile;
 
       if (clipStyle === 3) {
         // ── Style 3: Composite → Rise & Wipe ──────────────────────────────
@@ -4680,12 +4682,43 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate', requireRole('admin'), asy
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
             '-c:a', 'aac', '-b:a', '128k', '-shortest',
             '-movflags', '+faststart',
-            outFile,
+            bodyFile,
           ], { timeout: 180000 }, (err, stdout, stderr) => {
             if (err) return reject(new Error('FFmpeg: ' + (stderr || err.message).slice(0, 1200)));
             resolve();
           });
         });
+        if (isStyleC) {
+          // ── Style C: prepend intro clip to Style A body ─────────────────
+          const introEnvUrl = process.env.STYLE_C_INTRO_URL || null;
+          const introLocalPath = pathM.join(__dirname, 'public', 'tns_welcome.mp4');
+          const introFile = pathM.join(tmpDir, 'intro.mp4');
+          if (introEnvUrl) {
+            const introBuf = await dlBuffer(introEnvUrl);
+            fs2.writeFileSync(introFile, introBuf);
+          } else if (fs2.existsSync(introLocalPath)) {
+            fs2.copyFileSync(introLocalPath, introFile);
+          } else {
+            throw new Error('Style C: intro clip not found. Set STYLE_C_INTRO_URL in Railway env or place tns_welcome.mp4 in public/');
+          }
+          await new Promise((resolve, reject) => {
+            execFile(ffmpegBin, [
+              '-y', '-loglevel', 'error',
+              '-i', introFile,
+              '-i', bodyFile,
+              '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[vout][aout]',
+              '-map', '[vout]', '-map', '[aout]',
+              '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-pix_fmt', 'yuv420p',
+              '-c:a', 'aac', '-b:a', '128k',
+              '-movflags', '+faststart',
+              outFile,
+            ], { timeout: 120000 }, (err, stdout, stderr) => {
+              if (err) return reject(new Error('FFmpeg Style C concat: ' + (stderr || err.message).slice(0, 1200)));
+              resolve();
+            });
+          });
+        } // end Style C concat
+
       } // end style branch
 
       // Upload clip + end card to R2 — filename starts with the clip ref
