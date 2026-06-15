@@ -820,5 +820,24 @@ function collectMeta() {
     style_c_intro_url: (document.getElementById('sc-url-input')||{}).value || null,
   };
 }
+// ── Boot ───────────────────────────────────────────────
+applyProportions(40);
+initPanelDrop();
+initPanelDrag();
+NavBar.init({ requireAuth: true }).then(async () => {
+  await loadClip();
+});
 
-// ── Boot ───────────────────────────────────────�
+async function deleteThisClip() {
+  if (!confirm('Delete this clip?')) return;
+  const r = await fetch('/admin/api/social-clips/' + clipId, { method: 'DELETE' });
+  if (r.status === 409) {
+    const { published } = await r.json();
+    if (!confirm('This clip has already been posted to: ' + published.join(', ') + '.\n\nDelete anyway?')) return;
+    await fetch('/admin/api/social-clips/' + clipId + '?force=1', { method: 'DELETE' });
+  }
+  location.href = '/admin/social-clips';
+}
+</script>
+</body>
+</html>

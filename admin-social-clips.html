@@ -307,4 +307,15 @@ function showFlash(msg, type) {
   const el = document.getElementById('flash');
   el.textContent = msg;
   el.className = 'flash flash-' + type;
-  e
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+init();
+</script>
+</body>
+</html>
