@@ -836,7 +836,7 @@ async function deleteThisClip() {
     if (!confirm('This clip has already been posted to: ' + published.join(', ') + '.\n\nDelete anyway?')) return;
     await fetch('/admin/api/social-clips/' + clipId + '?force=1', { method: 'DELETE' });
   }
-  location.href = '/admin/social-clips';
+  location.href = '/admin/social-tracker';
 }
 </script>
 </body>
