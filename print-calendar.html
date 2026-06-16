@@ -797,6 +797,7 @@ function renderMonthPage(year, month) {
       else if (off >= daysInMonth) { day = off - daysInMonth + 1;     cur = false; }
       else                         { day = off + 1;                    cur = true; }
       const events = cur ? (byDay[day] || []) : [];
+      if(cur && month===0 && day===11) console.log('Jan11 events at assign:',JSON.stringify(events));
       if (cur && document.getElementById('holidayCb')?.checked) {
         const hKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
@@ -806,6 +807,7 @@ function renderMonthPage(year, month) {
         + `<div class="cal-day-num">${day}</div>`
         + (()=>{
           const tileEvents = events.filter(e=>e.type==='occasion'||e.type==='birthday');
+          if(month===0 && day===11) console.log('Jan11 tileEvents:',tileEvents.length, JSON.stringify(tileEvents));
           const otherEvents = events.filter(e=>e.type!=='occasion'&&e.type!=='birthday');
           const evHtml = otherEvents.map(e=>'<div class="cal-event '+e.type+'">'+(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label))+'</div>').join('');
           const tileHtml = tileEvents.map(function(e,i){
