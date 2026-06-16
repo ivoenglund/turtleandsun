@@ -445,7 +445,6 @@ function getOccasionsForMonth(year, month) {
   const add = (day, item) => { if (!byDay[day]) byDay[day] = []; byDay[day].push(item); };
 
   for (const c of _allContacts) {
-    }
     if (!isContactVisible(c.id, active, showOnlyLiving, showUnrelated)) continue;
 
     if (showBirthday && c.birthday) {
