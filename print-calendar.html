@@ -453,8 +453,8 @@ function getOccasionsForMonth(year, month) {
         const nameText = c.name || 'Unnamed';
         const bdayLabel = ageText ? `${nameText}, ${ageText}` : nameText;
         const cakeHtml = (age !== null && age >= 0)
-          ? `<span style="position:relative;display:inline-block;font-size:1.5em;line-height:1;vertical-align:middle;">🎂<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-45%);font-size:0.6em;font-weight:800;color:#000;line-height:1;">${age}</span></span>`
-          : `<span style="font-size:1.5em;line-height:1;vertical-align:middle;">🎂</span>`;
+          ? `<span style="position:relative;display:inline-block;font-size:2.1em;line-height:1;vertical-align:middle;">🎂<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-45%);font-size:0.3em;font-weight:800;color:#000;line-height:1;">${age}</span></span>`
+          : `<span style="font-size:2.1em;line-height:1;vertical-align:middle;">🎂</span>`;
         const eventHtml = `${cakeHtml}<span style="vertical-align:middle;margin-left:3px;">${esc(nameText)}</span>`;
         add(b.getDate(), { type: 'birthday', html: eventHtml, label: bdayLabel });
       }
