@@ -452,15 +452,10 @@ function getOccasionsForMonth(year, month) {
         const ageText = (age !== null && age >= 0) ? `${age} years` : '';
         const nameText = c.name || 'Unnamed';
         const bdayLabel = ageText ? `${nameText}, ${ageText}` : nameText;
-        const bdayIcon = birthdayIcon(bdayLabel);
-        let eventHtml;
-        if (c.photo_url && ageText) {
-          eventHtml = `<span class="ev-icon">${bdayIcon}</span><span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(ageText)}`;
-        } else if (c.photo_url) {
-          eventHtml = `<span class="ev-icon">${bdayIcon}</span><span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(nameText)}`;
-        } else {
-          eventHtml = `<span class="ev-icon">${bdayIcon}</span>${esc(bdayLabel)}`;
-        }
+        const cakeHtml = (age !== null && age >= 0)
+          ? `<span style="position:relative;display:inline-block;font-size:3em;line-height:1;vertical-align:middle;">🎂<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-45%);font-size:0.3em;font-weight:800;color:#fff;text-shadow:0 0 2px rgba(0,0,0,0.8);line-height:1;">${age}</span></span>`
+          : `<span style="font-size:3em;line-height:1;vertical-align:middle;">🎂</span>`;
+        const eventHtml = `${cakeHtml}<span style="vertical-align:middle;margin-left:3px;">${esc(nameText)}</span>`;
         add(b.getDate(), { type: 'birthday', html: eventHtml, label: bdayLabel });
       }
     }
@@ -534,26 +529,6 @@ function eventIcon(type, label) {
 }
 
 function birthdayIcon(label) {
-  // label format: "Name (42)" — extract age
-  const m = /(\d+)\s+years?/.exec(label || '');
-  const age = m ? parseInt(m[1], 10) : null;
-  if (age === null) return '🎂';
-  if (age === 0)    return '👶';   // newborn
-  if (age <= 4)     return '🍼';   // toddler
-  if (age <= 12)    return '🎈';   // child
-  if (age <= 17)    return '🎈';   // teen
-  if (age === 18)   return '🎉';   // coming of age
-  if (age === 21)   return '🥂';   // key age
-  if (age === 25)   return '🌟';   // quarter century
-  if (age === 30)   return '🎯';
-  if (age === 40)   return '💫';
-  if (age === 50)   return '🏅';
-  if (age === 60)   return '🌈';
-  if (age === 70)   return '💐';
-  if (age === 75)   return '👑';
-  if (age === 80)   return '👑';
-  if (age === 90)   return '👑';
-  if (age >= 100)   return '🏆';
   return '🎂';
 }
 
