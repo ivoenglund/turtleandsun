@@ -51,9 +51,9 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 /* ── Calendar page (screen = paper card) ─────────────────────────────────── */
 .cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:100%;max-width:560px;padding:24px 24px 16px;display:flex;flex-direction:column;}
 
-.cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:6px;margin-bottom:6px;margin-left:20px;}
+.cal-page-header{display:flex;align-items:baseline;justify-content:center;padding-bottom:6px;margin-bottom:6px;}
 .cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;color:#1C0A00;letter-spacing:-0.02em;}
-.cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;color:#000;}
+
 
 .cal-dow-row{display:flex;align-items:center;margin-bottom:5px;}
 .cal-dow-wk{width:24px;flex-shrink:0;}
@@ -63,7 +63,8 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .cal-week-nums{width:20px;flex-shrink:0;display:flex;flex-direction:column;}
 .cal-week-num{flex:1;display:flex;align-items:center;justify-content:flex-end;padding-right:3px;font-size:8px;font-weight:700;color:#000;border-right:1.5px solid rgba(28,10,0,0.15);}
 body.no-weeknums .cal-week-nums,body.no-weeknums .cal-dow-wk{display:none;}
-.cal-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(var(--rows,6),90px);border-top:1.5px solid rgba(28,10,0,0.15);border-left:1.5px solid rgba(28,10,0,0.15);}
+.cal-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(var(--rows,6),90px);border-top:1.5px solid rgba(28,10,0,0.15);}
+body.no-weeknums .cal-grid{border-left:1.5px solid rgba(28,10,0,0.15);}
 .cal-cell{padding:6px 7px;overflow:hidden;border-right:1.5px solid rgba(28,10,0,0.15);border-bottom:1.5px solid rgba(28,10,0,0.15);}
 
 .cal-cell.other-month{background:#faf8f5;}
@@ -105,9 +106,9 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   }
   .cal-page:last-child{page-break-after:auto;}
 
-  .cal-page-header{padding-bottom:2mm;margin-bottom:2mm;margin-left:5mm;}
+  .cal-page-header{padding-bottom:2mm;margin-bottom:2mm;}
   .cal-month-name{font-size:20pt;}
-  .cal-year-name{font-size:20pt;}
+
   .cal-dow-row{display:flex;align-items:center;margin-bottom:2mm;}
   .cal-dow-wk{width:5mm;flex-shrink:0;}
   .cal-dow-cell{flex:1;}
@@ -122,8 +123,8 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
     grid-template-columns:repeat(7,1fr);
     grid-template-rows:repeat(var(--rows,6),1fr);
     border-top:1px solid #000;
-    border-left:1px solid #000;
   }
+  body.no-weeknums .cal-grid{border-left:1px solid #000;}
   .cal-cell{padding:4px 5px;overflow:hidden;border-right:1px solid #000;border-bottom:1px solid #000;}
 
   .cal-day-num{font-size:9pt;margin-bottom:2px;}
@@ -515,8 +516,7 @@ function renderMonthPage(year, month) {
 
   return `<div class="cal-page">
   <div class="cal-page-header">
-    <span class="cal-month-name">${MONTHS_FULL[month]}</span>
-    <span class="cal-year-name">${year}</span>
+    <span class="cal-month-name">${MONTHS_FULL[month]} ${year}</span>
   </div>
   <div class="cal-dow-row">${dowHtml}</div>
   <div class="cal-body">
