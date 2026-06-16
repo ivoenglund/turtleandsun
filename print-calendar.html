@@ -125,7 +125,14 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   body.color-mode .cal-event.occasion{background:#fef3e2!important;color:#b85e10!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.milestone{background:#e8e0f0!important;color:#6b2d9a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
-  /* @page is set dynamically by applyOrientation() to handle portrait/landscape/A4/Letter */
+  /* @page is set dynamically by applyOrientation() */
+  /* Landscape: Chrome lays out at viewport width, not @page width.
+     Force body to landscape paper width so content fills the page. */
+  body.landscape { width: 297mm !important; }
+  body.landscape.paper-letter { width: 279.4mm !important; }
+  /* Explicit page heights for landscape (A4: 210mm - 20mm margins, Letter: 215.9mm - 20mm) */
+  body.landscape .cal-page { height: 190mm; }
+  body.landscape.paper-letter .cal-page { height: 195.9mm; }
 }
 </style>
 </head>
