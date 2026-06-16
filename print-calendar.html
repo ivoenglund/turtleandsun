@@ -534,8 +534,11 @@ function applyOrientation() {
   // Chrome lays out print at screen viewport width, not @page width.
   // For landscape we must explicitly set html+body width so content fills the page.
   const pw = landscape ? (isLetter ? '279.4mm' : '297mm') : 'auto';
-  s.textContent = `@page { size: ${sz} ${ori}; margin: ${m}; }
-@media print { html, body { width: ${pw} !important; } }`;
+  // Use explicit mm dimensions and min-width on html to force Chrome's print layout viewport.
+  const dimW = landscape ? (isLetter ? '279.4mm' : '297mm') : (isLetter ? '215.9mm' : '210mm');
+  const dimH = landscape ? (isLetter ? '215.9mm' : '210mm') : (isLetter ? '279.4mm' : '297mm');
+  s.textContent = `@page { size: ${dimW} ${dimH}; margin: ${m}; }
+@media print { html { min-width: ${dimW} !important; max-width: none !important; } }`;
 }
 
 function applyColor() {
