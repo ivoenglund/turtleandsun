@@ -51,19 +51,21 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 /* ── Calendar page (screen = paper card) ─────────────────────────────────── */
 .cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:100%;max-width:560px;padding:24px 24px 16px;display:flex;flex-direction:column;}
 
-.cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;}
+.cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:6px;margin-bottom:6px;}
 .cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
 .cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:500;color:#000;}
 
-.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:5px;}
-.cal-dow-cell{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);text-align:center;padding:3px 1px;}
+.cal-dow-row{display:grid;grid-template-columns:28px repeat(7,1fr);margin-bottom:5px;}
+.cal-dow-cell{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#000;text-align:center;padding:3px 1px;}
 
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(var(--rows,6),90px);border-left:1.5px solid rgba(28,10,0,0.1);border-top:1.5px solid rgba(28,10,0,0.1);}
+.cal-week-num{font-size:8px;font-weight:600;color:rgba(28,10,0,0.4);display:flex;align-items:flex-start;justify-content:center;padding-top:5px;background:#faf8f4;border-right:1.5px solid rgba(28,10,0,0.1);border-bottom:1.5px solid rgba(28,10,0,0.1);}
+.cal-dow-cell.wk-hdr{background:#faf8f4;font-size:8px;color:rgba(28,10,0,0.4);}
+.cal-grid{display:grid;grid-template-columns:28px repeat(7,1fr);grid-template-rows:repeat(var(--rows,6),90px);border-left:1.5px solid rgba(28,10,0,0.1);border-top:1.5px solid rgba(28,10,0,0.1);}
 .cal-cell{border-right:1.5px solid rgba(28,10,0,0.1);border-bottom:1.5px solid rgba(28,10,0,0.1);padding:6px 7px;overflow:hidden;}
 .cal-cell.other-month{background:#fdfcfa;}
 .cal-cell.other-month .cal-day-num{color:rgba(28,10,0,0.18);}
 .cal-cell.other-month .cal-events{display:none;}
-.cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:#000;text-align:right;margin-bottom:4px;}
+.cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:#000;text-align:right;margin-bottom:4px;}
 .cal-events{display:flex;flex-direction:column;gap:2px;}
 .cal-event{font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;line-height:1.3;padding:1.5px 4px;border-radius:3px;word-break:break-word;}
 
@@ -99,7 +101,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   }
   .cal-page:last-child{page-break-after:auto;}
 
-  .cal-page-header{padding-bottom:5mm;margin-bottom:3mm;}
+  .cal-page-header{padding-bottom:2mm;margin-bottom:2mm;}
   .cal-month-name{font-size:20pt;}
   .cal-year-name{font-size:12pt;}
   .cal-dow-row{margin-bottom:2mm;}
@@ -108,13 +110,14 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   .cal-grid{
     flex:1;
     display:grid!important;
-    grid-template-columns:repeat(7,1fr);
+    grid-template-columns:28px repeat(7,1fr);
     grid-template-rows:repeat(var(--rows,6),1fr);
     border-left:1px solid #000;
     border-top:1px solid #000;
   }
   .cal-cell{border-right:1px solid #000;border-bottom:1px solid #000;padding:4px 5px;overflow:hidden;}
-  .cal-day-num{font-size:8pt;margin-bottom:2px;}
+  .cal-week-num{font-size:6pt;padding-top:3px;}
+  .cal-day-num{font-size:9pt;margin-bottom:2px;}
   .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
   .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -164,6 +167,13 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
     <select id="paperSel" onchange="applyPaper()">
       <option value="a4">A4</option>
       <option value="letter">US Letter</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <div class="ctrl-lbl">Week starts</div>
+    <select id="weekStartSel" onchange="renderCalendar()">
+      <option value="1">Monday</option>
+      <option value="0">Sunday</option>
     </select>
   </div>
   <div class="ctrl-check">
@@ -444,29 +454,53 @@ function getOccasionsForMonth(year, month) {
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
+function isoWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const y = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - y) / 86400000 + 1) / 7);
+}
+
 function renderMonthPage(year, month) {
   const byDay = getOccasionsForMonth(year, month);
-  const firstDow       = new Date(year, month, 1).getDay();
-  const daysInMonth    = new Date(year, month + 1, 0).getDate();
+  const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value); // 0=Sun,1=Mon
+  const allLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const labels = [...allLabels.slice(startDay), ...allLabels.slice(0, startDay)];
+
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const firstDow        = (firstDayOfMonth - startDay + 7) % 7;
+  const daysInMonth     = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
-  const totalRows      = Math.ceil((firstDow + daysInMonth) / 7);
+  const totalRows       = Math.ceil((firstDow + daysInMonth) / 7);
 
   let cells = '';
-  for (let i = 0; i < totalRows * 7; i++) {
-    const off = i - firstDow;
-    let day, cur;
-    if (off < 0)                  { day = daysInPrevMonth + off + 1; cur = false; }
-    else if (off >= daysInMonth)  { day = off - daysInMonth + 1;     cur = false; }
-    else                          { day = off + 1;                    cur = true;  }
+  for (let row = 0; row < totalRows; row++) {
+    // Week number: use the first current-month day in this row, or first cell if all prev-month
+    const rowStart = row * 7 - firstDow;
+    const wkDayOff = rowStart < 0 ? 0 : rowStart; // first cell offset in month days
+    let wkDate;
+    if (rowStart < 0) wkDate = new Date(year, month, rowStart + 1);
+    else if (rowStart >= daysInMonth) wkDate = new Date(year, month + 1, rowStart - daysInMonth + 1);
+    else wkDate = new Date(year, month, rowStart + 1);
+    cells += `<div class="cal-week-num">${isoWeekNumber(wkDate)}</div>`;
 
-    const events = cur ? (byDay[day] || []) : [];
-    cells += `<div class="cal-cell${cur ? '' : ' other-month'}">
+    for (let col = 0; col < 7; col++) {
+      const off = row * 7 + col - firstDow;
+      let day, cur;
+      if (off < 0)                 { day = daysInPrevMonth + off + 1; cur = false; }
+      else if (off >= daysInMonth) { day = off - daysInMonth + 1;     cur = false; }
+      else                         { day = off + 1;                    cur = true;  }
+      const events = cur ? (byDay[day] || []) : [];
+      cells += `<div class="cal-cell${cur ? '' : ' other-month'}">
       <div class="cal-day-num">${day}</div>
       <div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : esc(e.label)}</div>`).join('')}</div>
     </div>`;
+    }
   }
 
-  const dowHtml = DOW_LABELS.map(d => `<div class="cal-dow-cell">${d}</div>`).join('');
+  const dowHtml = `<div class="cal-dow-cell wk-hdr">Wk</div>` +
+    labels.map(d => `<div class="cal-dow-cell">${d}</div>`).join('');
 
   return `<div class="cal-page">
   <div class="cal-page-header">
