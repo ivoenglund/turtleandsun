@@ -50,7 +50,6 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 
 /* ── Calendar page (screen = paper card) ─────────────────────────────────── */
 .cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:100%;max-width:560px;padding:24px 24px 16px;display:flex;flex-direction:column;}
-body.landscape .cal-page{max-width:800px;}
 
 .cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;border-bottom:2px solid #1C0A00;}
 .cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
@@ -125,11 +124,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   body.color-mode .cal-event.occasion{background:#fef3e2!important;color:#b85e10!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.milestone{background:#e8e0f0!important;color:#6b2d9a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
-  body.landscape { width: 297mm !important; }
-  body.landscape.paper-letter { width: 279.4mm !important; }
   /* Explicit page heights for landscape (A4: 210mm - 20mm margins, Letter: 215.9mm - 20mm) */
-  body.landscape .cal-page { height: 190mm; }
-  body.landscape.paper-letter .cal-page { height: 195.9mm; }
 }
 </style>
 </head>
@@ -174,10 +169,6 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   <div class="ctrl-check">
     <input type="checkbox" id="colorCb" checked onchange="applyColor()">
     <label for="colorCb">Colour</label>
-  </div>
-  <div class="ctrl-check">
-    <input type="checkbox" id="landscapeCb" onchange="applyOrientation()">
-    <label for="landscapeCb">Landscape <span id="landscapeHint" style="display:none;font-size:11px;color:#b85e10;font-weight:normal;">(also set in print dialog)</span></label>
   </div>
 </div>
 
@@ -515,23 +506,12 @@ function onViewChange() {
 function applyPaper() {
   const p = document.getElementById('paperSel').value;
   document.body.className = document.body.className.replace(/paper-\S+/g, '').trim() + ' paper-' + p;
-  applyOrientation();
-}
+  }
 
-function applyOrientation() {
-  const landscape = document.getElementById('landscapeCb').checked;
-  const paper = document.getElementById('paperSel').value;
-  document.body.classList.toggle('landscape', landscape);
-  document.body.classList.toggle('paper-letter', paper === 'letter');
-  const hint = document.getElementById('landscapeHint');
-  if (hint) hint.style.display = landscape ? 'inline' : 'none';
-}
 
 function applyColor() {
   document.body.classList.toggle('color-mode', document.getElementById('colorCb').checked);
 }
-
-applyOrientation();
 
 fetch('/api/auth/status').then(r => r.json()).then(s => {
   if (!s.loggedIn) { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
