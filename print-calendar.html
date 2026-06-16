@@ -547,6 +547,22 @@ function applyColor() {
 
 applyOrientation();
 
+// Fix Chrome landscape print: @page size rotates paper but NOT the layout viewport.
+// Setting min-width as inline style in beforeprint forces the actual render width.
+window.addEventListener('beforeprint', function() {
+  const landscape = document.getElementById('landscapeCb').checked;
+  if (landscape) {
+    const isLetter = document.getElementById('paperSel').value === 'letter';
+    const w = isLetter ? '279.4mm' : '297mm';
+    document.documentElement.style.setProperty('min-width', w, 'important');
+    document.body.style.setProperty('min-width', w, 'important');
+  }
+});
+window.addEventListener('afterprint', function() {
+  document.documentElement.style.removeProperty('min-width');
+  document.body.style.removeProperty('min-width');
+});
+
 fetch('/api/auth/status').then(r => r.json()).then(s => {
   if (!s.loggedIn) { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
   load();
