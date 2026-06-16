@@ -446,6 +446,13 @@ function getOccasionsForMonth(year, month) {
   const add = (day, item) => { if (!byDay[day]) byDay[day] = []; byDay[day].push(item); };
 
   for (const c of _allContacts) {
+    if (month===0 && c.birthday) {
+      const _b = new Date(c.birthday.split('T')[0]);
+      if (!isNaN(_b) && _b.getDate()===11 && _b.getMonth()===0) {
+        const _vis = isContactVisible(c.id, active, showOnlyLiving, showUnrelated);
+        console.log('Jan11 bday:', c.name, 'raw:', c.birthday, 'parsed date:', _b.getDate(), 'visible:', _vis, 'is_me:', c.is_me, 'groups:', JSON.stringify(_contactGroups[c.id]?[..._contactGroups[c.id]]:[]) );
+      }
+    }
     if (!isContactVisible(c.id, active, showOnlyLiving, showUnrelated)) continue;
 
     if (showBirthday && c.birthday) {
