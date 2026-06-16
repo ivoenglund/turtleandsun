@@ -437,6 +437,7 @@ function getOccasionsForMonth(year, month) {
   const showOnlyLiving = document.getElementById('fp-living').checked;
   const showUnrelated  = document.getElementById('fp-unrelated').checked;
   const showBirthday   = document.getElementById('typ-birthday').checked;
+  if(month===0) console.log('getOcc called: active='+(active?[...active].join(','):'ALL')+' living='+showOnlyLiving+' bday='+showBirthday);
   const showRem        = document.getElementById('typ-remembrance').checked;
   const showOcc        = document.getElementById('typ-occasion').checked;
   const showMilestone  = document.getElementById('typ-milestone').checked;
@@ -509,6 +510,7 @@ function getOccasionsForMonth(year, month) {
 
   const typeOrder = { birthday: 0, remembrance: 1, occasion: 2, milestone: 3 };
   Object.values(byDay).forEach(arr => arr.sort((a, b) => (typeOrder[a.type]||0) - (typeOrder[b.type]||0)));
+  if(month===0) console.log('getOcc result: day11='+JSON.stringify(byDay[11]));
   return byDay;
 }
 
