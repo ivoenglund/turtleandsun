@@ -577,7 +577,7 @@ input::-webkit-credentials-auto-fill-button{display:none!important;width:0!impor
     }
     el.innerHTML = '<div class="cp-list">' + occs.map(o => {
       const d = (o.start_date || '').split('T')[0];
-      const dateStr = d ? new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+      const dateStr = d ? new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
       return `<div class="cp-list-row">
         <span class="cp-list-primary">${_esc(o.name)}</span>
         <span class="cp-list-secondary">${dateStr}</span>

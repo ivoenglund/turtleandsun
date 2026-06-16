@@ -478,18 +478,18 @@ function getOccasionsForMonth(year, month) {
       if (showOcc && s.getMonth() === month) {
         const startYear = s.getFullYear();
         const yrs = startYear > 1000 ? year - startYear : null;
-        const cName = _contactMap[o.contact_id]?.name || '';
+        const cName = o.contact_name || _contactMap[o.contact_id]?.name || '';
         const base = cName ? `${cName}: ${o.name}` : o.name;
-        const label = (yrs !== null && yrs > 0) ? `${base} (${ordinal(yrs)})` : base;
+        const label = yrs !== null ? `${base} (${yrs}y)` : base;
         add(s.getDate(), { type: 'occasion', label });
       }
     } else if (o.frequency === 'milestone') {
       if (showMilestone && s.getMonth() === month) {
         const startYear = s.getFullYear();
         const yrs = startYear > 1000 ? year - startYear : null;
-        const cName = _contactMap[o.contact_id]?.name || '';
+        const cName = o.contact_name || _contactMap[o.contact_id]?.name || '';
         const base = cName ? `${cName}: ${o.name}` : o.name;
-        const label = (yrs !== null && yrs > 0) ? `${base} (${yrs}y)` : base;
+        const label = yrs !== null ? `${base} (${yrs}y)` : base;
         add(s.getDate(), { type: 'milestone', label });
       }
     } else {
