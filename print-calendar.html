@@ -52,12 +52,12 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:900px;aspect-ratio:1.414/1;padding:24px 28px 16px;display:flex;flex-direction:column;flex-shrink:0;}
 
 .cal-page-header{display:flex;align-items:baseline;justify-content:center;padding-bottom:6px;margin-bottom:6px;}
-.cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;color:#1C0A00;letter-spacing:-0.02em;}
+.cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:26px;font-weight:700;color:#1C0A00;letter-spacing:-0.02em;}
 
 
 .cal-dow-row{display:flex;align-items:center;margin-bottom:5px;}
 .cal-dow-wk{width:24px;flex-shrink:0;}
-.cal-dow-cell{flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#000;text-align:center;padding:3px 1px;}
+.cal-dow-cell{flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#000;text-align:center;padding:3px 1px;}
 
 .cal-body{display:flex;flex:1;}
 .cal-week-nums{width:20px;flex-shrink:0;display:flex;flex-direction:column;}
@@ -95,7 +95,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 /* ── Print ─────────────────────────────────────────────────────────────────── */
 
 /* Design 2 — Tiles */
-body.design-2 .cal-grid{gap:5px;border:none;background:transparent;}
+body.design-2 .cal-grid{gap:8px;border:none;background:transparent;}
 body.design-2 .cal-cell{border:1.5px solid rgba(28,10,0,0.15);border-radius:10px;}
 body.design-2 .cal-week-num{border-right:none;padding-right:4px;}
 body.design-2.no-weeknums .cal-grid{border-left:none;}
@@ -113,12 +113,12 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .cal-page:last-child{page-break-after:auto;}
 
   .cal-page-header{padding-bottom:2mm;margin-bottom:2mm;}
-  .cal-month-name{font-size:20pt;}
+  .cal-month-name{font-size:26pt;}
 
   .cal-dow-row{display:flex;align-items:center;margin-bottom:2mm;}
   .cal-dow-wk{width:5mm;flex-shrink:0;}
   .cal-dow-cell{flex:1;}
-  .cal-dow-cell{font-size:20pt;}
+  .cal-dow-cell{font-size:15pt;}
 
   .cal-body{display:flex;flex:1;}
   .cal-week-nums{width:5mm;flex-shrink:0;display:flex;flex-direction:column;}
@@ -132,7 +132,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   }
   body.no-weeknums .cal-grid{border-left:1px solid #000;}
   /* Design 2 print */
-  body.design-2 .cal-grid{gap:3px;border:none;background:transparent;}
+  body.design-2 .cal-grid{gap:5px;border:none;background:transparent;}
   body.design-2 .cal-cell{border:1px solid #000;border-radius:4px;}
   body.design-2 .cal-week-num{border-right:none;}
   body.design-2.no-weeknums .cal-grid{border-left:none;}
