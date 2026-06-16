@@ -125,8 +125,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   body.color-mode .cal-event.occasion{background:#fef3e2!important;color:#b85e10!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.milestone{background:#e8e0f0!important;color:#6b2d9a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
-  @page{size:A4 portrait;margin:12mm 10mm 12mm;}
-  body.paper-letter @page{size:Letter portrait;margin:12mm 10mm 12mm;}
+  /* @page is set dynamically by applyOrientation() to handle portrait/landscape/A4/Letter */
 }
 </style>
 </head>
