@@ -767,6 +767,7 @@ function holidayIcon(name) {
 
 function renderMonthPage(year, month) {
   const byDay = getOccasionsForMonth(year, month);
+  if(month===0) console.log("DEBUG byDay Jan",year,JSON.stringify(byDay));
   const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value); // 0=Sun,1=Mon
   const allLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const labels = [...allLabels.slice(startDay), ...allLabels.slice(0, startDay)];
