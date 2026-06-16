@@ -78,6 +78,8 @@ html,body{overflow-x:hidden;}
     banner.style.display = 'block';
   }
 
+  const _redirect = params.get('redirect') || '';
+
   document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const email = document.getElementById('email').value.trim();
@@ -91,7 +93,7 @@ html,body{overflow-x:hidden;}
       const res = await fetch('/auth/request-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, redirect: _redirect }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -114,7 +116,4 @@ html,body{overflow-x:hidden;}
 </script>
 <footer style="text-align:center;padding:32px 20px;font-size:13px;opacity:0.6;">
   <p>Questions? Write to <a href="mailto:hello@turtleandsun.com" style="color:inherit;">hello@turtleandsun.com</a></p>
-  <p>Turtle and Sun is a service by 3doc AB · Org.nr 556723-1864 · Fleminggatan 15, 112 26 Stockholm</p>
-</footer>
-</body>
-</html>
+  <p>Turtle and Sun is a service by 3doc AB · Org.nr 556723-

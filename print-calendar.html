@@ -522,9 +522,6 @@ function applyColor() {
 applyOrientation();
 
 fetch('/api/auth/status').then(r => r.json()).then(s => {
-  if (!s.loggedIn) { location.href = '/login'; return; }
+  if (!s.loggedIn) { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
   load();
-}).catch(() => { location.href = '/login'; });
-</script>
-</body>
-</html>
+}).ca

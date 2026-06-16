@@ -585,7 +585,7 @@ app.get('/login', (req, res) => {
 });
 
 app.post('/auth/request-link', async (req, res) => {
-  const { email } = req.body;
+  const { email, redirect: redir } = req.body;
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'Valid email required' });
   }
@@ -593,7 +593,8 @@ app.post('/auth/request-link', async (req, res) => {
   try {
     const token = await createMagicLink(normalised);
     const origin = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const link = `${origin}/auth/verify?token=${token}`;
+    const safeRedir = (redir && redir.startsWith('/') && !redir.startsWith('//')) ? redir : '';
+    const link = `${origin}/auth/verify?token=${token}` + (safeRedir ? `&redirect=${encodeURIComponent(safeRedir)}` : '');
     await resend.emails.send({
       from: 'Turtle and Sun <noreply@turtleandsun.com>',
       to: normalised,
@@ -662,8 +663,47 @@ async function ensureFamilyGroup(userId) {
   }
 }
 
-app.get('/auth/verify', async (req, res) => {
-  const { token } = req.query;
+app.get('/auth/verify', (req, res) => {
+  const { token, redirect: redir } = req.query;
+  if (!token) return res.redirect('/login?error=missing');
+  // Show a button page — do NOT consume the token here.
+  // Email security scanners (Gmail, Outlook Safe Links, etc.) pre-fetch GET
+  // links and would burn the one-time token before the user ever clicks it.
+  const redirAttr = redir ? ` value="${redir.replace(/"/g, '&quot;')}"` : '';
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log in — Turtle and Sun</title>
+<meta name="robots" content="noindex">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Arial',sans-serif;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{background:#fff;border-radius:16px;padding:40px 36px;max-width:420px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.1);text-align:center;}
+h1{font-size:22px;font-weight:800;color:#1C0A00;margin-bottom:12px;}
+p{font-size:14px;color:rgba(60,20,0,0.65);margin-bottom:28px;line-height:1.5;}
+.btn{display:inline-block;padding:14px 36px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.18s;}
+.btn:hover{background:#1C0A00;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Ready to log in?</h1>
+  <p>Click the button below to complete your login to Turtle and Sun.</p>
+  <form method="POST" action="/auth/verify">
+    <input type="hidden" name="token" value="${token.replace(/"/g, '&quot;')}">
+    <input type="hidden" name="redirect"${redirAttr}>
+    <button class="btn" type="submit">Log me in</button>
+  </form>
+</div>
+</body>
+</html>`);
+});
+
+app.post('/auth/verify', async (req, res) => {
+  const token = req.body.token;
+  const redir = req.body.redirect;
   if (!token) return res.redirect('/login?error=missing');
   try {
     const email = await verifyMagicLink(token);
@@ -677,7 +717,11 @@ app.get('/auth/verify', async (req, res) => {
       "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'",
       [userId]
     );
-    res.redirect(adminCheck.rows.length ? '/admin' : '/account');
+    // If a redirect was requested (e.g. /print/calendar), honour it;
+    // otherwise go to /admin or /account.
+    let dest = (redir && redir.startsWith('/') && !redir.startsWith('//')) ? redir
+              : (adminCheck.rows.length ? '/admin' : '/account');
+    res.redirect(dest);
   } catch (err) {
     console.error('Verify error:', err.message);
     res.redirect('/login?error=server');
@@ -1461,7 +1505,9 @@ app.get('/print/labels', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-labels.html'));
 });
 
-app.get('/print/calendar', requireAuth, (req, res) => {
+app.get('/print/calendar', async (req, res) => {
+  const user = await getSessionUser(req).catch(() => null);
+  if (!user) return res.redirect('/login?redirect=' + encodeURIComponent('/print/calendar' + (req.url.replace(/^\/print\/calendar/, '') || '')));
   res.sendFile(path.join(__dirname, 'print-calendar.html'));
 });
 
