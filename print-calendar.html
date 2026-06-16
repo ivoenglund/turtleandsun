@@ -51,9 +51,9 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 /* ── Calendar page (screen = paper card) ─────────────────────────────────── */
 .cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:100%;max-width:560px;padding:24px 24px 16px;display:flex;flex-direction:column;}
 
-.cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;border-bottom:2px solid #1C0A00;}
+.cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;}
 .cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
-.cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:500;color:rgba(28,10,0,0.35);}
+.cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:500;color:#000;}
 
 .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:5px;}
 .cal-dow-cell{font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(28,10,0,0.35);text-align:center;padding:3px 1px;}
@@ -63,7 +63,7 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .cal-cell.other-month{background:#fdfcfa;}
 .cal-cell.other-month .cal-day-num{color:rgba(28,10,0,0.18);}
 .cal-cell.other-month .cal-events{display:none;}
-.cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:rgba(28,10,0,0.4);margin-bottom:4px;}
+.cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;color:#000;text-align:right;margin-bottom:4px;}
 .cal-events{display:flex;flex-direction:column;gap:2px;}
 .cal-event{font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;line-height:1.3;padding:1.5px 4px;border-radius:3px;word-break:break-word;}
 
@@ -99,7 +99,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   }
   .cal-page:last-child{page-break-after:auto;}
 
-  .cal-page-header{padding-bottom:5mm;margin-bottom:3mm;border-bottom-width:1px;}
+  .cal-page-header{padding-bottom:5mm;margin-bottom:3mm;}
   .cal-month-name{font-size:20pt;}
   .cal-year-name{font-size:12pt;}
   .cal-dow-row{margin-bottom:2mm;}
