@@ -767,7 +767,21 @@ function holidayIcon(name) {
 
 function renderMonthPage(year, month) {
   const byDay = getOccasionsForMonth(year, month);
-  if(month===0) console.log("DEBUG byDay Jan",year,JSON.stringify(byDay));
+  // Pre-compute tile HTML from byDay snapshot BEFORE the render loop can mutate anything
+  const tileHtmlByDay = {};
+  Object.keys(byDay).forEach(function(d) {
+    const tileEvents = (byDay[d] || []).filter(function(e){ return e.type==='occasion'||e.type==='birthday'; });
+    if (!tileEvents.length) return;
+    tileHtmlByDay[d] = tileEvents.map(function(e, i) {
+      var lbl = e.label || '';
+      var h = (i + 1) * 31;
+      for (var j = 0; j < lbl.length; j++) h = (h * 37 + lbl.charCodeAt(j)) & 0xFFFF;
+      var angle = (h % 30) - 15;
+      var ml = ((h >> 8) % 10) - 3;
+      var st = 'display:block;transform:rotate('+angle+'deg);transform-origin:top left;margin-left:'+ml+'px;margin-bottom:3px;position:relative;z-index:'+(20-i)+';';
+      return '<div class="occasion-tile" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label))+'</div>';
+    }).join('');
+  });
   const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value); // 0=Sun,1=Mon
   const allLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const labels = [...allLabels.slice(startDay), ...allLabels.slice(0, startDay)];
@@ -797,7 +811,7 @@ function renderMonthPage(year, month) {
       else if (off >= daysInMonth) { day = off - daysInMonth + 1;     cur = false; }
       else                         { day = off + 1;                    cur = true; }
       const events = cur ? (byDay[day] || []) : [];
-      if(cur && month===0 && day===11) console.log('Jan11 events at assign:',JSON.stringify(events));
+
       if (cur && document.getElementById('holidayCb')?.checked) {
         const hKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
@@ -806,19 +820,10 @@ function renderMonthPage(year, month) {
       dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}${_hasTiles ? ' has-tiles' : ''}">`
         + `<div class="cal-day-num">${day}</div>`
         + (()=>{
-          const tileEvents = events.filter(e=>e.type==='occasion'||e.type==='birthday');
-          if(month===0 && day===11) console.log('Jan11 tileEvents:',tileEvents.length, JSON.stringify(tileEvents));
           const otherEvents = events.filter(e=>e.type!=='occasion'&&e.type!=='birthday');
           const evHtml = otherEvents.map(e=>'<div class="cal-event '+e.type+'">'+(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label))+'</div>').join('');
-          const tileHtml = tileEvents.map(function(e,i){
-            var lbl=e.label||'';var h=(i+1)*31;
-            for(var j=0;j<lbl.length;j++) h=(h*37+lbl.charCodeAt(j))&0xFFFF;
-            var angle=(h%30)-15; var ml=((h>>8)%10)-3;
-            var st='display:block;transform:rotate('+angle+'deg);transform-origin:top left;margin-left:'+ml+'px;margin-bottom:3px;position:relative;z-index:'+(20-i)+';';
-            return '<div class="occasion-tile" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label))+'</div>';
-          }).join('');
-          var dbg=tileEvents.length>1?'<span style="position:absolute;top:2px;right:2px;background:red;color:#fff;font-size:8px;padding:1px 3px;z-index:99;border-radius:3px;">'+tileEvents.length+'</span>':'';
-          return '<div class="cal-events">'+evHtml+'</div>'+(tileHtml?'<div class="tiles-overlay">'+dbg+tileHtml+'</div>':'');
+          const tileHtml = tileHtmlByDay[day] || '';
+          return '<div class="cal-events">'+evHtml+'</div>'+(tileHtml?'<div class="tiles-overlay">'+tileHtml+'</div>':'');
         })()
         + `</div>`;
     }
