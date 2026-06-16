@@ -72,6 +72,7 @@ body.no-weeknums .cal-grid{border-left:1.5px solid rgba(28,10,0,0.15);}
 .cal-cell.other-month .cal-events{display:none;}
 .cal-day-num{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;color:#000;text-align:right;margin-bottom:4px;}
 .cal-events{display:flex;flex-direction:column;gap:2px;}
+.ev-icon{font-size:1.5em;line-height:1;vertical-align:middle;margin-right:1px;}
 .cal-event{font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;line-height:1.3;padding:1.5px 4px;border-radius:3px;word-break:break-word;}
 
 /* Color mode */
@@ -80,7 +81,7 @@ body.color-mode .cal-event.remembrance{color:rgba(28,10,0,0.6);}
 body.color-mode .cal-event.occasion{color:#b85e10;}
 body.color-mode .cal-event.milestone{color:#6b2d9a;}
 /* B&W mode */
-body:not(.color-mode) .cal-event{color:#1C0A00;background:none;padding-left:0;}
+.cal-event{color:#1C0A00;background:none;padding-left:0;}
 body:not(.color-mode) .cal-event.birthday::before{content:'● ';font-size:7px;vertical-align:middle;}
 body:not(.color-mode) .cal-event.remembrance::before{content:'† ';}
 body:not(.color-mode) .cal-event.occasion::before{content:'◆ ';font-size:7px;vertical-align:middle;}
@@ -143,7 +144,8 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .cal-cell{padding:4px 5px;overflow:hidden;border-right:1px solid #000;border-bottom:1px solid #000;}
 
   .cal-day-num{font-size:9pt;margin-bottom:2px;}
-  .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
+  .ev-icon{font-size:1.5em;line-height:1;vertical-align:middle;margin-right:1px;}
+.cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
   .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
@@ -449,15 +451,17 @@ function getOccasionsForMonth(year, month) {
         if (age !== null && age < 0) continue; // not born yet in this calendar year
         const ageText = (age !== null && age >= 0) ? `${age} years` : '';
         const nameText = c.name || 'Unnamed';
+        const bdayLabel = ageText ? `${nameText}, ${ageText}` : nameText;
+        const bdayIcon = birthdayIcon(bdayLabel);
         let eventHtml;
         if (c.photo_url && ageText) {
-          eventHtml = `<span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(ageText)}`;
+          eventHtml = `<span class="ev-icon">${bdayIcon}</span><span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(ageText)}`;
         } else if (c.photo_url) {
-          eventHtml = `<span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(nameText)}`;
+          eventHtml = `<span class="ev-icon">${bdayIcon}</span><span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(nameText)}`;
         } else {
-          eventHtml = esc(ageText ? `${nameText}, ${ageText}` : nameText);
+          eventHtml = `<span class="ev-icon">${bdayIcon}</span>${esc(bdayLabel)}`;
         }
-        add(b.getDate(), { type: 'birthday', html: eventHtml, label: ageText ? `${nameText}, ${ageText}` : nameText });
+        add(b.getDate(), { type: 'birthday', html: eventHtml, label: bdayLabel });
       }
     }
 
@@ -521,24 +525,78 @@ function isoWeekNumber(date) {
 
 // ── Event & holiday emoji icons ───────────────────────────────────────────────
 function eventIcon(type, label) {
-  if (type === 'birthday')    return '🎂';
+  if (type === 'birthday')    return birthdayIcon(label);
   if (type === 'remembrance') return '🕊️';
-  if (type === 'milestone')   return '⭐';
+  if (type === 'milestone')   return milestoneIcon(label);
   if (type === 'holiday')     return holidayIcon(label);
   if (type === 'occasion')    return occasionIcon(label);
   return '•';
 }
 
+function birthdayIcon(label) {
+  // label format: "Name (42)" — extract age
+  const m = /(\d+)\s+years?/.exec(label || '');
+  const age = m ? parseInt(m[1], 10) : null;
+  if (age === null) return '🎂';
+  if (age === 0)    return '👶';   // newborn
+  if (age <= 4)     return '🍼';   // toddler
+  if (age <= 12)    return '🎈';   // child
+  if (age <= 17)    return '🎈';   // teen
+  if (age === 18)   return '🎉';   // coming of age
+  if (age === 21)   return '🥂';   // key age
+  if (age === 25)   return '🌟';   // quarter century
+  if (age === 30)   return '🎯';
+  if (age === 40)   return '💫';
+  if (age === 50)   return '🏅';
+  if (age === 60)   return '🌈';
+  if (age === 70)   return '💐';
+  if (age === 75)   return '👑';
+  if (age === 80)   return '👑';
+  if (age === 90)   return '👑';
+  if (age >= 100)   return '🏆';
+  return '🎂';
+}
+
+function milestoneIcon(label) {
+  const n = (label || '').toLowerCase();
+  if (/work|job|career|employ|years? at|anniversary at/.test(n)) return '💼';
+  if (/school|graduat|study|education/.test(n))                  return '🎓';
+  if (/run|marathon|race|km|miles?/.test(n))                     return '🏃';
+  if (/sober|clean|quit|smok/.test(n))                           return '💪';
+  if (/weight|health|fit/.test(n))                               return '💪';
+  return '⭐';
+}
+
 function occasionIcon(name) {
   const n = (name || '').toLowerCase();
-  if (/wedding|marriage|married|anniver/.test(n))   return '💍';
-  if (/birth|born/.test(n))                         return '🎂';
-  if (/graduat/.test(n))                            return '🎓';
-  if (/retire/.test(n))                             return '🏖️';
-  if (/promot|new job|started/.test(n))             return '💼';
-  if (/baby|birth of|born|newborn/.test(n))         return '👶';
-  if (/move|moving|new home|house/.test(n))         return '🏠';
-  if (/engag/.test(n))                              return '💍';
+  // Relationships
+  if (/engag/.test(n))                                          return '💍';
+  if (/wedding|marriage|married/.test(n))                       return '💍';
+  if (/anniversary/.test(n))                                    return '💝';
+  if (/first date|met |started dating|together/.test(n))        return '💑';
+  if (/divorce|separat/.test(n))                                return '💔';
+  // New life
+  if (/baby|newborn|birth of|welcom.*child|adoption|adopted/.test(n)) return '👶';
+  if (/born|birth/.test(n))                                     return '🎂';
+  // Coming of age / faith
+  if (/baptis|christening/.test(n))                             return '⛪';
+  if (/bar mitzvah|bat mitzvah/.test(n))                        return '✡️';
+  if (/confirmation|first communion/.test(n))                   return '✝️';
+  if (/graduation|graduat/.test(n))                             return '🎓';
+  // Work & career
+  if (/retire/.test(n))                                         return '🏖️';
+  if (/promot|new job|started work|new role|new position/.test(n)) return '💼';
+  if (/years? at |work anniversary|employment/.test(n))         return '💼';
+  // Home & life
+  if (/move|moving|new home|new house|bought.*house|new apartment/.test(n)) return '🏠';
+  if (/new car/.test(n))                                        return '🚗';
+  // Health
+  if (/surgery|operation|hospital/.test(n))                     return '🏥';
+  if (/sober|clean|quit smok|recovery/.test(n))                 return '💪';
+  if (/diagnosis|remission/.test(n))                            return '💪';
+  // Sport / achievement
+  if (/marathon|race|finish/.test(n))                           return '🏃';
+  if (/award|prize|won |medal|trophy/.test(n))                  return '🏆';
   return '🎉';
 }
 
@@ -764,7 +822,7 @@ function renderMonthPage(year, month) {
       }
       dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}">`
         + `<div class="cal-day-num">${day}</div>`
-        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : (eventIcon(e.type, e.label) + ' ' + esc(e.label))}</div>`).join('')}</div>`
+        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : ('<span class="ev-icon">' + eventIcon(e.type, e.label) + '</span>' + esc(e.label))}</div>`).join('')}</div>`
         + `</div>`;
     }
   }
