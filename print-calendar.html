@@ -92,7 +92,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 .cal-event.holiday{color:#1a5276;}
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
-.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{position:absolute;top:0;left:0;overflow:visible;z-index:3;pointer-events:none;}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;overflow:visible;margin-top:2px;}
 .occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:54px;min-width:20px;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:0;padding:3px 4px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:break-word;line-height:1.4;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
@@ -150,7 +150,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
 .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
   .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
   .occasion-tile{box-shadow:1px 2px 3px rgba(130,130,130,0.35);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;max-width:38px;font-size:6.5px;padding:2px 3px;}
-  .tiles-overlay{position:absolute;top:0;left:0;overflow:visible;z-index:3;}
+  .tiles-overlay{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;overflow:visible;margin-top:1px;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   body.color-mode .cal-event.birthday{color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -780,7 +780,7 @@ function renderMonthPage(year, month) {
       for (var j = 0; j < lbl.length; j++) h = (h * 37 + lbl.charCodeAt(j)) & 0xFFFF;
       var angle = (h % 30) - 15;
       var ml = ((h >> 8) % 10) - 3;
-      var st = 'display:block;transform:rotate('+angle+'deg);transform-origin:top left;margin-left:'+ml+'px;margin-bottom:3px;position:relative;z-index:'+(20-i)+';';
+      var st = 'transform:rotate('+angle+'deg);transform-origin:center center;';
       return '<div class="occasion-tile" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label))+'</div>';
     }).join('');
   });
