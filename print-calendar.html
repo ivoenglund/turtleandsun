@@ -474,7 +474,9 @@ function getOccasionsForMonth(year, month) {
 
   for (const o of _allOccasions) {
     if (!o.start_date) continue;
-    if (!isContactVisible(o.contact_id, active, showOnlyLiving, showUnrelated)) continue;
+    const _oc = _contactMap[o.contact_id];
+    if (!_oc) continue;
+    if (!_oc.is_me && !isContactVisible(o.contact_id, active, showOnlyLiving, showUnrelated)) continue;
     const s = new Date(o.start_date.split('T')[0]);
     if (isNaN(s)) continue;
 
