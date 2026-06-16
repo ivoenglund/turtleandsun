@@ -340,8 +340,8 @@ async function load() {
       document.getElementById('monthSel').value = _initMonth;
       document.getElementById('monthCtrl').style.display = '';
     } else {
-      document.getElementById('viewSel').value = 'year';
-      document.getElementById('monthCtrl').style.display = 'none';
+      document.getElementById('viewSel').value = 'month';
+      document.getElementById('monthCtrl').style.display = '';
     }
     console.log('[load] 8 hiding loading-msg');
     document.getElementById('loading-msg').style.display = 'none';
@@ -478,19 +478,25 @@ function getOccasionsForMonth(year, month) {
       if (showOcc && s.getMonth() === month) {
         const startYear = s.getFullYear();
         const yrs = startYear > 1000 ? year - startYear : null;
-        const label = (yrs !== null && yrs > 0) ? `${o.name} (${ordinal(yrs)})` : o.name;
+        const cName = _contactMap[o.contact_id]?.name || '';
+        const base = cName ? `${cName}: ${o.name}` : o.name;
+        const label = (yrs !== null && yrs > 0) ? `${base} (${ordinal(yrs)})` : base;
         add(s.getDate(), { type: 'occasion', label });
       }
     } else if (o.frequency === 'milestone') {
       if (showMilestone && s.getMonth() === month) {
         const startYear = s.getFullYear();
         const yrs = startYear > 1000 ? year - startYear : null;
-        const label = (yrs !== null && yrs > 0) ? `${o.name} (${yrs}y)` : o.name;
+        const cName = _contactMap[o.contact_id]?.name || '';
+        const base = cName ? `${cName}: ${o.name}` : o.name;
+        const label = (yrs !== null && yrs > 0) ? `${base} (${yrs}y)` : base;
         add(s.getDate(), { type: 'milestone', label });
       }
     } else {
       if (showOcc && s.getFullYear() === year && s.getMonth() === month) {
-        add(s.getDate(), { type: 'occasion', label: o.name });
+        const cName = _contactMap[o.contact_id]?.name || '';
+        const label = cName ? `${cName}: ${o.name}` : o.name;
+        add(s.getDate(), { type: 'occasion', label });
       }
     }
   }
