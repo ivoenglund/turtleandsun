@@ -92,8 +92,8 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 .cal-event.holiday{color:#1a5276;}
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
-.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;height:0;overflow:visible;}.cal-cell:has(.occasion-tile){z-index:2;}
-.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:54px;min-width:20px;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:0;padding:3px 4px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:break-word;line-height:1.4;position:absolute;transform-origin:top left;}.occasion-tile[data-ti='0']{top:-5px;left:-5px;z-index:14;transform:rotate(-15deg);}.occasion-tile[data-ti='1']{top:14px;left:12px;z-index:13;transform:rotate(10deg);}.occasion-tile[data-ti='2']{top:28px;left:-2px;z-index:12;transform:rotate(-12deg);}.occasion-tile[data-ti='3']{top:42px;left:16px;z-index:11;transform:rotate(6deg);}.occasion-tile[data-ti='4']{top:56px;left:4px;z-index:10;transform:rotate(-14deg);}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;height:auto;overflow:visible;}.cal-cell.has-tiles{z-index:2;}
+.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:54px;min-width:20px;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:0;padding:3px 4px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:break-word;line-height:1.4;transform-origin:top left;margin:2px 4px 16px 2px;position:relative;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -530,6 +530,13 @@ function eventIcon(type, label) {
   return '•';
 }
 
+function tileStyle(label, idx) {
+  let h = (idx + 1) * 31;
+  for (let i = 0; i < label.length; i++) h = (h * 37 + label.charCodeAt(i)) & 0xFFFF;
+  const angle = (h % 30) - 15;
+  const ml = ((h >> 4) % 14) - 4;
+  return 'transform:rotate(' + angle + 'deg);transform-origin:top left;margin-left:' + ml + 'px;';
+}
 function birthdayIcon(label) {
   return '🎂';
 }
@@ -797,9 +804,10 @@ function renderMonthPage(year, month) {
         const hKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
       }
-      dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}">`
+      const _hasTiles = events.some(e=>e.type==='occasion'||e.type==='birthday');
+      dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}${_hasTiles ? ' has-tiles' : ''}">`
         + `<div class="cal-day-num">${day}</div>`
-        + `<div class="cal-events">${(()=>{let _pi=0;return events.map(e=>{const isTile=e.type==='occasion'||e.type==='birthday';const ti=isTile?_pi++:-1;const inner=isTile?'<div class="occasion-tile" data-ti="'+ti+'">'+(e.html!==undefined?e.html:esc(e.label))+'</div>':(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label));return'<div class="cal-event '+e.type+'">'+inner+'</div>';}).join('');})() }</div>`
+        + `<div class="cal-events">${(()=>{let _pi=0;return events.map(e=>{const isTile=e.type==='occasion'||e.type==='birthday';const ti=isTile?_pi++:-1;const inner=isTile?'<div class="occasion-tile" style="'+tileStyle(e.label||'',ti)+'">'+(e.html!==undefined?e.html:esc(e.label))+'</div>':(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label));return'<div class="cal-event '+e.type+'">'+inner+'</div>';}).join('');})()}</div>`
         + `</div>`;
     }
   }
