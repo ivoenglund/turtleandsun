@@ -82,7 +82,7 @@ body.color-mode .cal-event.occasion{color:#b85e10;}
 body.color-mode .cal-event.milestone{color:#6b2d9a;}
 /* B&W mode */
 .cal-event{color:#1C0A00;background:none;padding-left:0;}
-body:not(.color-mode) .cal-event.birthday::before{content:'● ';font-size:7px;vertical-align:middle;}
+body:not(.color-mode) .cal-event.birthday::before{content:none;}
 body:not(.color-mode) .cal-event.remembrance::before{content:'† ';}
 body:not(.color-mode) .cal-event.occasion::before{content:none;}
 body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;vertical-align:middle;}
@@ -92,8 +92,8 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 .cal-event.holiday{color:#1a5276;}
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
-.cal-event.birthday{display:flex;align-items:center;gap:3px;}
-.occasion-tile{display:inline-block;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:3px;padding:3px 6px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00;box-shadow:2px 3px 6px rgba(0,0,0,0.22);max-width:85%;word-break:break-word;line-height:1.3;position:relative;z-index:20;transform:rotate(15deg);transform-origin:top left;margin:2px 0 12px 2px;}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;}
+.occasion-tile{display:inline-block;width:fit-content;max-width:90%;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:3px;padding:2px 5px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(0,0,0,0.22);word-break:break-word;line-height:1.3;position:relative;z-index:20;transform:rotate(-15deg);transform-origin:top left;margin:8px 0 6px 3px;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -799,7 +799,7 @@ function renderMonthPage(year, month) {
       }
       dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}">`
         + `<div class="cal-day-num">${day}</div>`
-        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.type === 'occasion' ? '<div class="occasion-tile">' + esc(e.label) + '</div>' : (e.html !== undefined ? e.html : ('<span class="ev-icon">' + eventIcon(e.type, e.label) + '</span>' + esc(e.label)))}</div>`).join('')}</div>`
+        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${(e.type === 'occasion' || e.type === 'birthday') ? '<div class="occasion-tile">' + (e.html !== undefined ? e.html : esc(e.label)) + '</div>' : (e.html !== undefined ? e.html : ('<span class="ev-icon">' + eventIcon(e.type, e.label) + '</span>' + esc(e.label)))}</div>`).join('')}</div>`
         + `</div>`;
     }
   }
