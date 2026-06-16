@@ -446,6 +446,7 @@ function getOccasionsForMonth(year, month) {
       if (!isNaN(b) && b.getMonth() === month) {
         const birthYear = b.getFullYear();
         const age = birthYear > 1000 ? year - birthYear : null;
+        if (age !== null && age < 0) continue; // not born yet in this calendar year
         const ageText = (age !== null && age >= 0) ? `${age} years` : '';
         const nameText = c.name || 'Unnamed';
         let eventHtml;
@@ -462,7 +463,7 @@ function getOccasionsForMonth(year, month) {
 
     if (showRem && c.died_on) {
       const d = new Date(c.died_on.split('T')[0]);
-      if (!isNaN(d) && d.getMonth() === month) {
+      if (!isNaN(d) && d.getMonth() === month && year >= d.getFullYear()) {
         add(d.getDate(), { type: 'remembrance', label: `† ${c.name || 'Unnamed'}` });
       }
     }
@@ -478,18 +479,20 @@ function getOccasionsForMonth(year, month) {
       if (showOcc && s.getMonth() === month) {
         const startYear = s.getFullYear();
         const yrs = startYear > 1000 ? year - startYear : null;
+        if (yrs !== null && yrs < 0) continue; // occasion hasn't started yet
         const cName = o.contact_name || _contactMap[o.contact_id]?.name || '';
         const base = cName ? `${cName}: ${o.name}` : o.name;
-        const label = yrs !== null ? `${base} (${yrs}y)` : base;
+        const label = (yrs !== null && yrs > 0) ? `${base} (${yrs}y)` : base;
         add(s.getDate(), { type: 'occasion', label });
       }
     } else if (o.frequency === 'milestone') {
       if (showMilestone && s.getMonth() === month) {
         const startYear = s.getFullYear();
         const yrs = startYear > 1000 ? year - startYear : null;
+        if (yrs !== null && yrs < 0) continue; // milestone hasn't happened yet
         const cName = o.contact_name || _contactMap[o.contact_id]?.name || '';
         const base = cName ? `${cName}: ${o.name}` : o.name;
-        const label = yrs !== null ? `${base} (${yrs}y)` : base;
+        const label = (yrs !== null && yrs > 0) ? `${base} (${yrs}y)` : base;
         add(s.getDate(), { type: 'milestone', label });
       }
     } else {
