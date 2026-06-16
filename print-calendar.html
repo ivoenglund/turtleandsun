@@ -177,7 +177,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   </div>
   <div class="ctrl-check">
     <input type="checkbox" id="landscapeCb" onchange="applyOrientation()">
-    <label for="landscapeCb">Landscape</label>
+    <label for="landscapeCb">Landscape <span id="landscapeHint" style="display:none;font-size:11px;color:#b85e10;font-weight:normal;">(also set in print dialog)</span></label>
   </div>
 </div>
 
@@ -523,8 +523,8 @@ function applyOrientation() {
   const paper = document.getElementById('paperSel').value;
   document.body.classList.toggle('landscape', landscape);
   document.body.classList.toggle('paper-letter', paper === 'letter');
-  // Named @page rules in static CSS handle paper size/orientation.
-  // No dynamic @page injection needed.
+  const hint = document.getElementById('landscapeHint');
+  if (hint) hint.style.display = landscape ? 'inline' : 'none';
 }
 
 function applyColor() {
