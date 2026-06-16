@@ -536,4 +536,7 @@ applyOrientation();
 fetch('/api/auth/status').then(r => r.json()).then(s => {
   if (!s.loggedIn) { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
   load();
-}).ca
+}).catch(() => { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); });
+</script>
+</body>
+</html>
