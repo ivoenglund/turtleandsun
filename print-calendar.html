@@ -527,10 +527,15 @@ function applyOrientation() {
   let s = document.getElementById('_pgo_style');
   if (!s) { s = document.createElement('style'); s.id = '_pgo_style'; document.head.appendChild(s); }
   const paper = document.getElementById('paperSel').value;
-  const sz = paper === 'letter' ? 'Letter' : 'A4';
+  const isLetter = paper === 'letter';
+  const sz = isLetter ? 'Letter' : 'A4';
   const ori = landscape ? 'landscape' : 'portrait';
   const m = landscape ? '10mm 12mm' : '12mm 10mm 12mm';
-  s.textContent = `@page { size: ${sz} ${ori}; margin: ${m}; }`;
+  // Chrome lays out print at screen viewport width, not @page width.
+  // For landscape we must explicitly set html+body width so content fills the page.
+  const pw = landscape ? (isLetter ? '279.4mm' : '297mm') : 'auto';
+  s.textContent = `@page { size: ${sz} ${ori}; margin: ${m}; }
+@media print { html, body { width: ${pw} !important; } }`;
 }
 
 function applyColor() {
