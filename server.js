@@ -796,33 +796,83 @@ app.put('/api/user/settings', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Holiday proxy (Nager.Date) ───────────────────────────────────────────────
-const _holidayCache = {};
+// ── Holiday cache (DB-backed, 30-day refresh) ────────────────────────────────
+const HOLIDAY_TTL_DAYS = 30;
+const _memHolidays = {}; // in-process cache to skip DB on repeated requests
+
 app.get('/api/holidays', async (req, res) => {
   const { year, country } = req.query;
   if (!year || !country) return res.status(400).json({ error: 'year and country required' });
   const key = `${year}-${country}`;
-  if (_holidayCache[key]) return res.json(_holidayCache[key]);
+  if (_memHolidays[key]) return res.json(_memHolidays[key]);
+
+  const { pool } = require('./db');
+  // Check DB cache
+  const cached = await pool.query(
+    `SELECT holidays, fetched_at FROM holiday_cache WHERE country_code=$1 AND year=$2`,
+    [country, parseInt(year)]
+  );
+  if (cached.rows.length) {
+    const ageMs = Date.now() - new Date(cached.rows[0].fetched_at).getTime();
+    if (ageMs < HOLIDAY_TTL_DAYS * 86400000) {
+      _memHolidays[key] = cached.rows[0].holidays;
+      return res.json(cached.rows[0].holidays);
+    }
+  }
+
+  // Fetch from Nager.Date and upsert into DB
   try {
     const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`);
-    if (!r.ok) return res.status(502).json({ error: 'Holiday API error' });
+    if (!r.ok) {
+      // Return stale DB data if available rather than failing
+      if (cached.rows.length) return res.json(cached.rows[0].holidays);
+      return res.status(502).json({ error: 'Holiday API error' });
+    }
     const data = await r.json();
-    _holidayCache[key] = data;
+    await pool.query(
+      `INSERT INTO holiday_cache (country_code, year, holidays, fetched_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (country_code, year) DO UPDATE SET holidays=$3, fetched_at=NOW()`,
+      [country, parseInt(year), JSON.stringify(data)]
+    );
+    _memHolidays[key] = data;
     res.json(data);
   } catch (e) {
+    if (cached.rows.length) return res.json(cached.rows[0].holidays);
     res.status(502).json({ error: 'Holiday API unreachable' });
   }
 });
 
 app.get('/api/holidays/countries', async (req, res) => {
-  if (_holidayCache['__countries']) return res.json(_holidayCache['__countries']);
+  if (_memHolidays['__countries']) return res.json(_memHolidays['__countries']);
+
+  const { pool } = require('./db');
+  const cached = await pool.query(`SELECT countries, fetched_at FROM holiday_countries_cache WHERE id=1`);
+  if (cached.rows.length) {
+    const ageMs = Date.now() - new Date(cached.rows[0].fetched_at).getTime();
+    if (ageMs < HOLIDAY_TTL_DAYS * 86400000) {
+      _memHolidays['__countries'] = cached.rows[0].countries;
+      return res.json(cached.rows[0].countries);
+    }
+  }
+
   try {
     const r = await fetch('https://date.nager.at/api/v3/AvailableCountries');
-    if (!r.ok) return res.status(502).json({ error: 'Holiday API error' });
+    if (!r.ok) {
+      if (cached.rows.length) return res.json(cached.rows[0].countries);
+      return res.status(502).json({ error: 'Holiday API error' });
+    }
     const data = await r.json();
-    _holidayCache['__countries'] = data;
+    await pool.query(
+      `INSERT INTO holiday_countries_cache (id, countries, fetched_at)
+       VALUES (1, $1, NOW())
+       ON CONFLICT (id) DO UPDATE SET countries=$1, fetched_at=NOW()`,
+      [JSON.stringify(data)]
+    );
+    _memHolidays['__countries'] = data;
     res.json(data);
   } catch (e) {
+    if (cached.rows.length) return res.json(cached.rows[0].countries);
     res.status(502).json({ error: 'Holiday API unreachable' });
   }
 });

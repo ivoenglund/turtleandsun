@@ -999,6 +999,18 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_funnel_events_ref ON funnel_events(ref) WHERE ref IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS holiday_cache (
+      country_code VARCHAR(10) NOT NULL,
+      year         INTEGER     NOT NULL,
+      holidays     JSONB       NOT NULL DEFAULT '[]',
+      fetched_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (country_code, year)
+    );
+    CREATE TABLE IF NOT EXISTS holiday_countries_cache (
+      id         INTEGER PRIMARY KEY DEFAULT 1,
+      countries  JSONB       NOT NULL DEFAULT '[]',
+      fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // Platform OAuth tokens (single-admin, keyed by platform name)
