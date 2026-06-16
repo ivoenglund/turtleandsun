@@ -92,8 +92,8 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 .cal-event.holiday{color:#1a5276;}
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
-.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;}.cal-event:nth-child(1):has(.occasion-tile){z-index:30;position:relative;}.cal-event:nth-child(2):has(.occasion-tile) .occasion-tile{margin-top:20px;}.cal-event:nth-child(3):has(.occasion-tile) .occasion-tile{margin-top:20px;}.cal-event:nth-child(4):has(.occasion-tile) .occasion-tile{margin-top:20px;}
-.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-width:40px;min-height:40px;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:0;padding:4px 5px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(0,0,0,0.22);word-break:break-word;line-height:1.4;position:relative;z-index:20;transform:rotate(-15deg);transform-origin:top left;margin:6px 0 14px 4px;}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;height:0;overflow:visible;}
+.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;aspect-ratio:1/1;min-width:44px;background:linear-gradient(160deg,#FFFEF5 0%,#FFFBE8 40%,#FFF0A0 75%,#FFE800 100%);border-radius:0;padding:4px 5px;font-size:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:break-word;line-height:1.4;position:absolute;transform-origin:top left;}.occasion-tile[data-ti='0']{top:-4px;left:-4px;z-index:12;transform:rotate(-15deg);}.occasion-tile[data-ti='1']{top:18px;left:16px;z-index:11;transform:rotate(-7deg);}.occasion-tile[data-ti='2']{top:38px;left:3px;z-index:10;transform:rotate(-20deg);}.occasion-tile[data-ti='3']{top:54px;left:20px;z-index:9;transform:rotate(-11deg);}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -148,7 +148,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .ev-icon{font-size:1.5em;line-height:1;vertical-align:middle;margin-right:1px;}
 .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
   .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
-  .occasion-tile{box-shadow:1px 1px 3px rgba(0,0,0,0.15);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .occasion-tile{box-shadow:1px 2px 4px rgba(130,130,130,0.4);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   body.color-mode .cal-event.birthday{color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -455,7 +455,7 @@ function getOccasionsForMonth(year, month) {
         const nameText = c.name || 'Unnamed';
         const bdayLabel = ageText ? `${nameText}, ${ageText}` : nameText;
         const cakeHtml = (age !== null && age >= 0)
-          ? `<span style="position:relative;display:inline-block;font-size:2.6em;line-height:1;">🎂<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-20%);font-size:0.45em;font-weight:800;color:#000;line-height:1;">${age}</span></span>`
+          ? `<span style="position:relative;display:inline-block;font-size:2.6em;line-height:1;">🎂<span style="position:absolute;top:50%;left:50%;transform:translate(-50%,10%);font-size:0.45em;font-weight:800;color:#000;line-height:1;">${age}</span></span>`
           : `<span style="font-size:2.6em;line-height:1;display:inline-block;">🎂</span>`;
         const eventHtml = `${cakeHtml}<span style="display:block;text-align:center;margin-top:2px;">${esc(nameText)}</span>`;
         add(b.getDate(), { type: 'birthday', html: eventHtml, label: bdayLabel });
@@ -799,7 +799,7 @@ function renderMonthPage(year, month) {
       }
       dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}">`
         + `<div class="cal-day-num">${day}</div>`
-        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${(e.type === 'occasion' || e.type === 'birthday') ? '<div class="occasion-tile">' + (e.html !== undefined ? e.html : esc(e.label)) + '</div>' : (e.html !== undefined ? e.html : ('<span class="ev-icon">' + eventIcon(e.type, e.label) + '</span>' + esc(e.label)))}</div>`).join('')}</div>`
+        + `<div class="cal-events">${(()=>{let _pi=0;return events.map(e=>{const isTile=e.type==='occasion'||e.type==='birthday';const ti=isTile?_pi++:-1;const inner=isTile?'<div class="occasion-tile" data-ti="'+ti+'">'+(e.html!==undefined?e.html:esc(e.label))+'</div>':(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label));return'<div class="cal-event '+e.type+'">'+inner+'</div>';}).join('');})() }</div>`
         + `</div>`;
     }
   }
