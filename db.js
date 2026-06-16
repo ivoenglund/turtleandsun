@@ -1102,4 +1102,7 @@ async function seedGallery() {
        style.category, style.prompt_text, style.fal_model]
     );
   }
-  console.log('Gallery st
+  console.log('Gallery styles seeded');
+}
+
+module.exports = { pool, initDb, seedGallery };
