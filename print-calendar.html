@@ -255,40 +255,52 @@ function esc(s) {
 }
 
 async function load() {
-  const [netRes, occRes] = await Promise.all([
-    fetch('/api/network'),
-    fetch('/api/occasions/upcoming'),
-  ]);
-  if (!netRes.ok) { window.location.href = '/login'; return; }
-  const netData = await netRes.json();
-  const occData = occRes.ok ? await occRes.json() : {};
+  try {
+    console.log('[load] 1 fetching');
+    const [netRes, occRes] = await Promise.all([
+      fetch('/api/network'),
+      fetch('/api/occasions/upcoming'),
+    ]);
+    console.log('[load] 2 net=' + netRes.status + ' occ=' + occRes.status);
+    if (!netRes.ok) { window.location.href = '/login'; return; }
+    console.log('[load] 3 parsing json');
+    const netData = await netRes.json();
+    console.log('[load] 4 contacts=' + (netData.contacts||[]).length);
+    const occData = occRes.ok ? await occRes.json() : {};
+    console.log('[load] 5 occasions=' + (occData.occasions||[]).length);
 
-  _allContacts = netData.contacts || [];
-  _rawGroups   = netData.groups || [];
-  _allOccasions = occData.occasions || [];
+    _allContacts = netData.contacts || [];
+    _rawGroups   = netData.groups || [];
+    _allOccasions = occData.occasions || [];
 
-  _allContacts.forEach(c => { _contactMap[c.id] = c; });
-  _rawGroups.forEach(g => { _groupById[g.id] = g; _groupByName[g.name] = g; });
-  (netData.group_memberships || []).forEach(m => {
-    if (!_contactGroups[m.contact_id]) _contactGroups[m.contact_id] = new Set();
-    _contactGroups[m.contact_id].add(m.group_name);
-  });
-
-  buildGroupFilters();
-  _loaded = true;
-
-  document.getElementById('yearInput').value = _initYear;
-  if (_initMonth !== null) {
-    document.getElementById('viewSel').value = 'month';
-    document.getElementById('monthSel').value = _initMonth;
-    document.getElementById('monthCtrl').style.display = '';
-  } else {
-    document.getElementById('viewSel').value = 'year';
-    document.getElementById('monthCtrl').style.display = 'none';
+    _allContacts.forEach(c => { _contactMap[c.id] = c; });
+    _rawGroups.forEach(g => { _groupById[g.id] = g; _groupByName[g.name] = g; });
+    (netData.group_memberships || []).forEach(m => {
+      if (!_contactGroups[m.contact_id]) _contactGroups[m.contact_id] = new Set();
+      _contactGroups[m.contact_id].add(m.group_name);
+    });
+    console.log('[load] 6 buildGroupFilters');
+    buildGroupFilters();
+    _loaded = true;
+    console.log('[load] 7 DOM updates');
+    document.getElementById('yearInput').value = _initYear;
+    if (_initMonth !== null) {
+      document.getElementById('viewSel').value = 'month';
+      document.getElementById('monthSel').value = _initMonth;
+      document.getElementById('monthCtrl').style.display = '';
+    } else {
+      document.getElementById('viewSel').value = 'year';
+      document.getElementById('monthCtrl').style.display = 'none';
+    }
+    console.log('[load] 8 hiding loading-msg');
+    document.getElementById('loading-msg').style.display = 'none';
+    console.log('[load] 9 renderCalendar');
+    renderCalendar();
+    console.log('[load] 10 done');
+  } catch(e) {
+    console.error('[load] CRASHED at: ' + e.message);
+    console.error('[load] stack: ' + e.stack);
   }
-
-  document.getElementById('loading-msg').style.display = 'none';
-  renderCalendar();
 }
 
 // ── Group filter ──────────────────────────────────────────────────────────────
