@@ -88,6 +88,9 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 
 .cal-page-footer{margin-top:10px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;color:rgba(28,10,0,0.5);letter-spacing:0.04em;}
 .bday-photo{display:inline-block;width:14px;height:14px;border-radius:50%;background-size:cover;background-position:center;flex-shrink:0;vertical-align:middle;}
+.cal-event.holiday{color:#1a5276;}
+body.color-mode .cal-event.holiday{color:#1a5276;}
+body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
 .cal-event.birthday{display:flex;align-items:center;gap:3px;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
@@ -147,6 +150,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   body.color-mode .cal-event.birthday{color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.remembrance{color:#555!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.occasion{color:#b85e10!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body.color-mode .cal-event.holiday{color:#1a5276!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.milestone{color:#6b2d9a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   /* Explicit page heights for landscape (A4: 210mm - 20mm margins, Letter: 215.9mm - 20mm) */
@@ -212,6 +216,16 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   <div class="ctrl-check">
     <input type="checkbox" id="colorCb" checked onchange="applyColor()">
     <label for="colorCb">Colour</label>
+  </div>
+  <div class="ctrl">
+    <div class="ctrl-lbl">Holidays</div>
+    <select id="countrySel" onchange="onCountryChange()">
+      <option value="">None</option>
+    </select>
+  </div>
+  <div class="ctrl-check">
+    <input type="checkbox" id="holidayCb" checked onchange="renderCalendar()">
+    <label for="holidayCb">Show holidays</label>
   </div>
 </div>
 
@@ -526,6 +540,10 @@ function renderMonthPage(year, month) {
       else if (off >= daysInMonth) { day = off - daysInMonth + 1;     cur = false; }
       else                         { day = off + 1;                    cur = true; }
       const events = cur ? (byDay[day] || []) : [];
+      if (cur && document.getElementById('holidayCb')?.checked) {
+        const hKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
+      }
       dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}">`
         + `<div class="cal-day-num">${day}</div>`
         + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : esc(e.label)}</div>`).join('')}</div>`
@@ -546,9 +564,16 @@ function renderMonthPage(year, month) {
 </div>`;
 }
 
+let _lastHolidayYear = null;
 function renderCalendar() {
   if (!_loaded) return;
   const year  = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
+  const code = document.getElementById('countrySel')?.value;
+  if (code && year !== _lastHolidayYear) {
+    _lastHolidayYear = year;
+    loadHolidays(year, code).then(() => renderCalendar());
+    return;
+  }
   const view  = document.getElementById('viewSel').value;
   const area  = document.getElementById('calArea');
 
@@ -576,6 +601,57 @@ function applyPaper() {
   }
 
 
+
+// ── Holidays ─────────────────────────────────────────────────────────────────
+let _holidays = {}; // keyed by "YYYY-MM-DD"
+
+async function loadCountries() {
+  try {
+    const data = await fetch('/api/holidays/countries').then(r => r.json());
+    const sel = document.getElementById('countrySel');
+    data.sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.countryCode;
+      o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  } catch(e) { console.warn('Could not load countries', e); }
+}
+
+async function loadHolidays(year, countryCode) {
+  _holidays = {};
+  if (!countryCode) return;
+  try {
+    const data = await fetch(`/api/holidays?year=${year}&country=${countryCode}`).then(r => r.json());
+    data.forEach(h => {
+      if (!_holidays[h.date]) _holidays[h.date] = [];
+      _holidays[h.date].push(h.localName || h.name);
+    });
+  } catch(e) { console.warn('Could not load holidays', e); }
+}
+
+async function onCountryChange() {
+  const code = document.getElementById('countrySel').value;
+  const year = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
+  // Save preference
+  fetch('/api/user/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ holiday_country: code || null }) });
+  await loadHolidays(year, code);
+  renderCalendar();
+}
+
+async function initHolidays() {
+  await loadCountries();
+  try {
+    const settings = await fetch('/api/user/settings').then(r => r.json());
+    const code = settings.holiday_country;
+    if (code) {
+      document.getElementById('countrySel').value = code;
+      const year = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
+      await loadHolidays(year, code);
+    }
+  } catch(e) {}
+}
+
 function applyDesign() {
   const v = document.getElementById('designSel').value;
   document.body.classList.toggle('design-2', v === '2');
@@ -587,8 +663,9 @@ function applyColor() {
   document.body.classList.toggle('color-mode', document.getElementById('colorCb').checked);
 }
 
-fetch('/api/auth/status').then(r => r.json()).then(s => {
+fetch('/api/auth/status').then(r => r.json()).then(async s => {
   if (!s.loggedIn) { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); return; }
+  await initHolidays();
   load();
 }).catch(() => { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); });
 </script>

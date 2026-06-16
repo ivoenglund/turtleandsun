@@ -774,6 +774,59 @@ function devRibbonHtml() {
   </div>`;
 }
 
+
+// ── User settings (holiday country) ─────────────────────────────────────────
+app.get('/api/user/settings', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Not logged in' });
+  const result = await require('./db').pool.query(
+    'SELECT holiday_country FROM users WHERE id=$1', [user.id]
+  );
+  res.json({ holiday_country: result.rows[0]?.holiday_country || null });
+});
+
+app.put('/api/user/settings', async (req, res) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Not logged in' });
+  const { holiday_country } = req.body || {};
+  await require('./db').pool.query(
+    'UPDATE users SET holiday_country=$1 WHERE id=$2',
+    [holiday_country || null, user.id]
+  );
+  res.json({ ok: true });
+});
+
+// ── Holiday proxy (Nager.Date) ───────────────────────────────────────────────
+const _holidayCache = {};
+app.get('/api/holidays', async (req, res) => {
+  const { year, country } = req.query;
+  if (!year || !country) return res.status(400).json({ error: 'year and country required' });
+  const key = `${year}-${country}`;
+  if (_holidayCache[key]) return res.json(_holidayCache[key]);
+  try {
+    const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`);
+    if (!r.ok) return res.status(502).json({ error: 'Holiday API error' });
+    const data = await r.json();
+    _holidayCache[key] = data;
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Holiday API unreachable' });
+  }
+});
+
+app.get('/api/holidays/countries', async (req, res) => {
+  if (_holidayCache['__countries']) return res.json(_holidayCache['__countries']);
+  try {
+    const r = await fetch('https://date.nager.at/api/v3/AvailableCountries');
+    if (!r.ok) return res.status(502).json({ error: 'Holiday API error' });
+    const data = await r.json();
+    _holidayCache['__countries'] = data;
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Holiday API unreachable' });
+  }
+});
+
 app.get('/api/auth/status', async (req, res) => {
   console.log('[auth] cookies:', req.cookies, 'session token present:', !!req.cookies?.ts_session);
   const user = await getSessionUser(req);

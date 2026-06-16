@@ -983,6 +983,7 @@ async function initDb() {
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS instagram_planned_at DATE;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS yt_planned_at        DATE;
     ALTER TABLE social_clips ADD COLUMN IF NOT EXISTS fb_planned_at        DATE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS holiday_country VARCHAR(10);
   `);
 
   // Funnel events (2026-06-11): preview/purchase stamped with the visitor's
