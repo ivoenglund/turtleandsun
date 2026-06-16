@@ -1608,7 +1608,7 @@ app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
 app.get('/api/network', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, name, email, birthday, city, died_on, is_pet, is_me, latitude, longitude FROM contacts WHERE user_id = $1`,
+      `SELECT id, name, email, birthday, city, died_on, is_pet, is_me, latitude, longitude, photo_url FROM contacts WHERE user_id = $1`,
       [req.user.id]
     );
     const relationships = await pool.query(

@@ -50,9 +50,10 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 
 /* ── Calendar page (screen = paper card) ─────────────────────────────────── */
 .cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:100%;max-width:560px;padding:24px 24px 16px;display:flex;flex-direction:column;}
+body.landscape .cal-page{max-width:800px;}
 
 .cal-page-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;border-bottom:2px solid #1C0A00;}
-.cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:28px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
+.cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
 .cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:500;color:rgba(28,10,0,0.35);}
 
 .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:5px;}
@@ -79,7 +80,9 @@ body:not(.color-mode) .cal-event.remembrance::before{content:'† ';}
 body:not(.color-mode) .cal-event.occasion::before{content:'◆ ';font-size:7px;vertical-align:middle;}
 body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;vertical-align:middle;}
 
-.cal-page-footer{margin-top:10px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;color:rgba(28,10,0,0.22);letter-spacing:0.06em;text-transform:uppercase;}
+.cal-page-footer{margin-top:10px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;color:rgba(28,10,0,0.5);letter-spacing:0.04em;}
+.bday-photo{display:inline-block;width:14px;height:14px;border-radius:50%;background-size:cover;background-position:center;flex-shrink:0;vertical-align:middle;}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -98,8 +101,8 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   .cal-page:last-child{page-break-after:auto;}
 
   .cal-page-header{padding-bottom:5mm;margin-bottom:3mm;border-bottom-width:1px;}
-  .cal-month-name{font-size:34pt;}
-  .cal-year-name{font-size:16pt;}
+  .cal-month-name{font-size:20pt;}
+  .cal-year-name{font-size:12pt;}
   .cal-dow-row{margin-bottom:2mm;}
   .cal-dow-cell{font-size:7pt;}
 
@@ -108,13 +111,14 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
     display:grid!important;
     grid-template-columns:repeat(7,1fr);
     grid-template-rows:repeat(var(--rows,6),1fr);
-    border-left:1px solid #ccc;
-    border-top:1px solid #ccc;
+    border-left:1px solid #000;
+    border-top:1px solid #000;
   }
-  .cal-cell{border-right:1px solid #ccc;border-bottom:1px solid #ccc;padding:4px 5px;overflow:hidden;}
+  .cal-cell{border-right:1px solid #000;border-bottom:1px solid #000;padding:4px 5px;overflow:hidden;}
   .cal-day-num{font-size:8pt;margin-bottom:2px;}
   .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
-  .cal-page-footer{font-size:7pt;color:rgba(0,0,0,0.3);margin-top:5px;}
+  .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
+  .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   body.color-mode .cal-event.birthday{background:#e8f0e0!important;color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body.color-mode .cal-event.remembrance{background:#f0ede6!important;color:#555!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -167,6 +171,10 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   <div class="ctrl-check">
     <input type="checkbox" id="colorCb" checked onchange="applyColor()">
     <label for="colorCb">Colour</label>
+  </div>
+  <div class="ctrl-check">
+    <input type="checkbox" id="landscapeCb" onchange="applyOrientation()">
+    <label for="landscapeCb">Landscape</label>
   </div>
 </div>
 
@@ -375,10 +383,17 @@ function getOccasionsForMonth(year, month) {
       if (!isNaN(b) && b.getMonth() === month) {
         const birthYear = b.getFullYear();
         const age = birthYear > 1000 ? year - birthYear : null;
-        const label = (age !== null && age >= 0)
-          ? `${c.name || 'Unnamed'}’s ${ordinal(age)} birthday`
-          : `${c.name || 'Unnamed'}’s birthday`;
-        add(b.getDate(), { type: 'birthday', label });
+        const ageText = (age !== null && age >= 0) ? `${age} years` : '';
+        const nameText = c.name || 'Unnamed';
+        let eventHtml;
+        if (c.photo_url && ageText) {
+          eventHtml = `<span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(ageText)}`;
+        } else if (c.photo_url) {
+          eventHtml = `<span class="bday-photo" style="background-image:url('${c.photo_url}')"></span>${esc(nameText)}`;
+        } else {
+          eventHtml = esc(ageText ? `${nameText}, ${ageText}` : nameText);
+        }
+        add(b.getDate(), { type: 'birthday', html: eventHtml, label: ageText ? `${nameText}, ${ageText}` : nameText });
       }
     }
 
@@ -441,7 +456,7 @@ function renderMonthPage(year, month) {
     const events = cur ? (byDay[day] || []) : [];
     cells += `<div class="cal-cell${cur ? '' : ' other-month'}">
       <div class="cal-day-num">${day}</div>
-      <div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${esc(e.label)}</div>`).join('')}</div>
+      <div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : esc(e.label)}</div>`).join('')}</div>
     </div>`;
   }
 
@@ -454,7 +469,7 @@ function renderMonthPage(year, month) {
   </div>
   <div class="cal-dow-row">${dowHtml}</div>
   <div class="cal-grid" style="--rows:${totalRows}">${cells}</div>
-  <div class="cal-page-footer">Turtle and Sun &middot; turtleandsun.com</div>
+  <div class="cal-page-footer">&#10022; turtleandsun.com</div>
 </div>`;
 }
 
@@ -485,11 +500,26 @@ function onViewChange() {
 function applyPaper() {
   const p = document.getElementById('paperSel').value;
   document.body.className = document.body.className.replace(/paper-\S+/g, '').trim() + ' paper-' + p;
+  applyOrientation();
+}
+
+function applyOrientation() {
+  const landscape = document.getElementById('landscapeCb').checked;
+  document.body.classList.toggle('landscape', landscape);
+  let s = document.getElementById('_pgo_style');
+  if (!s) { s = document.createElement('style'); s.id = '_pgo_style'; document.head.appendChild(s); }
+  const paper = document.getElementById('paperSel').value;
+  const sz = paper === 'letter' ? 'Letter' : 'A4';
+  const ori = landscape ? 'landscape' : 'portrait';
+  const m = landscape ? '10mm 12mm' : '12mm 10mm 12mm';
+  s.textContent = `@page { size: ${sz} ${ori}; margin: ${m}; }`;
 }
 
 function applyColor() {
   document.body.classList.toggle('color-mode', document.getElementById('colorCb').checked);
 }
+
+applyOrientation();
 
 fetch('/api/auth/status').then(r => r.json()).then(s => {
   if (!s.loggedIn) { location.href = '/login'; return; }
