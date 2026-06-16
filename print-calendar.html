@@ -56,10 +56,10 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .cal-year-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:500;color:#000;}
 
 .cal-dow-row{display:grid;grid-template-columns:28px repeat(7,1fr);margin-bottom:5px;}
-.cal-dow-cell{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#000;text-align:center;padding:3px 1px;}
+.cal-dow-cell{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#000;text-align:center;padding:3px 1px;}
 
-.cal-week-num{font-size:8px;font-weight:600;color:rgba(28,10,0,0.4);display:flex;align-items:flex-start;justify-content:center;padding-top:5px;background:#faf8f4;border-right:1.5px solid rgba(28,10,0,0.1);border-bottom:1.5px solid rgba(28,10,0,0.1);}
-.cal-dow-cell.wk-hdr{background:#faf8f4;font-size:8px;color:rgba(28,10,0,0.4);}
+.cal-week-num{font-size:8px;font-weight:600;color:rgba(28,10,0,0.4);display:flex;align-items:center;justify-content:center;padding:0 2px;}
+.cal-dow-cell.wk-hdr{font-size:8px;color:transparent;}
 .cal-grid{display:grid;grid-template-columns:28px repeat(7,1fr);grid-template-rows:repeat(var(--rows,6),90px);border-left:1.5px solid rgba(28,10,0,0.1);border-top:1.5px solid rgba(28,10,0,0.1);}
 .cal-cell{border-right:1.5px solid rgba(28,10,0,0.1);border-bottom:1.5px solid rgba(28,10,0,0.1);padding:6px 7px;overflow:hidden;}
 .cal-cell.other-month{background:#fdfcfa;}
@@ -105,7 +105,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
   .cal-month-name{font-size:20pt;}
   .cal-year-name{font-size:12pt;}
   .cal-dow-row{margin-bottom:2mm;}
-  .cal-dow-cell{font-size:7pt;}
+  .cal-dow-cell{font-size:8pt;}
 
   .cal-grid{
     flex:1;
@@ -509,7 +509,7 @@ function renderMonthPage(year, month) {
   </div>
   <div class="cal-dow-row">${dowHtml}</div>
   <div class="cal-grid" style="--rows:${totalRows}">${cells}</div>
-  <div class="cal-page-footer">&#10022; turtleandsun.com</div>
+  <div class="cal-page-footer">turtleandsun.com</div>
 </div>`;
 }
 
