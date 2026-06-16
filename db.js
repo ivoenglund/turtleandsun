@@ -268,6 +268,7 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS photo_url TEXT;
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_enabled BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_label VARCHAR(255);
     ALTER TABLE concepts ADD COLUMN IF NOT EXISTS user_input_placeholder VARCHAR(255);
@@ -1101,7 +1102,4 @@ async function seedGallery() {
        style.category, style.prompt_text, style.fal_model]
     );
   }
-  console.log('Gallery styles seeded');
-}
-
-module.exports = { pool, initDb, seedGallery };
+  console.log('Gallery st
