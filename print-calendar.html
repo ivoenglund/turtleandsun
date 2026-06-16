@@ -531,14 +531,13 @@ function applyOrientation() {
   const sz = isLetter ? 'Letter' : 'A4';
   const ori = landscape ? 'landscape' : 'portrait';
   const m = landscape ? '10mm 12mm' : '12mm 10mm 12mm';
-  // Chrome lays out print at screen viewport width, not @page width.
-  // For landscape we must explicitly set html+body width so content fills the page.
-  const pw = landscape ? (isLetter ? '279.4mm' : '297mm') : 'auto';
-  // Use explicit mm dimensions and min-width on html to force Chrome's print layout viewport.
   const dimW = landscape ? (isLetter ? '279.4mm' : '297mm') : (isLetter ? '215.9mm' : '210mm');
   const dimH = landscape ? (isLetter ? '215.9mm' : '210mm') : (isLetter ? '279.4mm' : '297mm');
-  s.textContent = `@page { size: ${dimW} ${dimH}; margin: ${m}; }
-@media print { html { min-width: ${dimW} !important; max-width: none !important; } }`;
+  s.textContent = `@page { size: ${dimW} ${dimH}; margin: ${m}; }`;
+  // Set min-width directly as inline style (always active, not just in @media print).
+  // This ensures Chrome's print renderer sees the correct layout width without CSS tricks.
+  document.documentElement.style.minWidth = landscape ? dimW : '';
+  document.body.style.minWidth = landscape ? dimW : '';
 }
 
 function applyColor() {
