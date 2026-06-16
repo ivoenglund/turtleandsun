@@ -518,6 +518,152 @@ function isoWeekNumber(date) {
   return Math.ceil(((d - y) / 86400000 + 1) / 7);
 }
 
+
+// ── Event & holiday emoji icons ───────────────────────────────────────────────
+function eventIcon(type, label) {
+  if (type === 'birthday')    return '🎂';
+  if (type === 'remembrance') return '🕊️';
+  if (type === 'milestone')   return '⭐';
+  if (type === 'holiday')     return holidayIcon(label);
+  if (type === 'occasion')    return occasionIcon(label);
+  return '•';
+}
+
+function occasionIcon(name) {
+  const n = (name || '').toLowerCase();
+  if (/wedding|marriage|married|anniver/.test(n))   return '💍';
+  if (/birth|born/.test(n))                         return '🎂';
+  if (/graduat/.test(n))                            return '🎓';
+  if (/retire/.test(n))                             return '🏖️';
+  if (/promot|new job|started/.test(n))             return '💼';
+  if (/baby|birth of|born|newborn/.test(n))         return '👶';
+  if (/move|moving|new home|house/.test(n))         return '🏠';
+  if (/engag/.test(n))                              return '💍';
+  return '🎉';
+}
+
+function holidayIcon(name) {
+  const n = (name || '').toLowerCase();
+
+  // ── New Year ──────────────────────────────────────────────────────────────
+  if (/new year/.test(n))                           return '🎆';
+  if (/lunar new year|chinese new year/.test(n))    return '🧧';
+  if (/nowruz|norouz|persian new year/.test(n))     return '🌸';
+  if (/losar|tibetan new year/.test(n))             return '🎊';
+  if (/thai new year|songkran/.test(n))             return '💦';
+  if (/japanese new year|shōgatsu|oshōgatsu/.test(n)) return '⛩️';
+  if (/islamic new year|hijri/.test(n))             return '🌙';
+
+  // ── Christmas & Advent ────────────────────────────────────────────────────
+  if (/christmas eve/.test(n))                      return '🎄';
+  if (/christmas/.test(n))                          return '🎄';
+  if (/advent/.test(n))                             return '✨';
+  if (/epiphany|three kings|wisemen|reyes/.test(n)) return '⭐';
+  if (/st.? lucia|santa lucia/.test(n))             return '🕯️';
+
+  // ── Easter & Holy Week ────────────────────────────────────────────────────
+  if (/easter|påsk|ostern|pascua|pâques|pascha/.test(n))  return '🐣';
+  if (/good friday|long friday/.test(n))            return '✝️';
+  if (/palm sunday/.test(n))                        return '🌿';
+  if (/holy thursday|maundy thursday|skärtorsdag/.test(n)) return '🫙';
+  if (/holy saturday|easter saturday/.test(n))      return '🕯️';
+  if (/ascension/.test(n))                          return '☁️';
+  if (/pentecost|whitsun|pingst|pfingst/.test(n))   return '🕊️';
+
+  // ── Other Christian ───────────────────────────────────────────────────────
+  if (/all saints|allhelgon|toussaint/.test(n))     return '🕯️';
+  if (/all souls|día de muertos|day of the dead/.test(n)) return '💀';
+  if (/ash wednesday/.test(n))                      return '🙏';
+  if (/immaculate conception/.test(n))              return '🌸';
+  if (/assumption/.test(n))                         return '🌸';
+  if (/corpus christi/.test(n))                     return '✝️';
+  if (/reformation/.test(n))                        return '📜';
+
+  // ── Halloween & autumn ────────────────────────────────────────────────────
+  if (/halloween/.test(n))                          return '🎃';
+  if (/bonfire|guy fawkes/.test(n))                 return '🎇';
+  if (/walpurgis|valborg|walpurgi/.test(n))         return '🔥';
+  if (/harvest/.test(n))                            return '🌾';
+  if (/thanksgiving/.test(n))                       return '🦃';
+
+  // ── Islamic ───────────────────────────────────────────────────────────────
+  if (/eid al-fitr|eid ul-fitr|eid al fitr/.test(n)) return '🌙';
+  if (/eid al-adha|eid ul-adha|eid al adha/.test(n)) return '🐑';
+  if (/ramadan/.test(n))                            return '🌙';
+  if (/mawlid|maulid|prophet.*birth/.test(n))       return '🌙';
+  if (/ashura/.test(n))                             return '🕯️';
+  if (/isra.*miraj/.test(n))                        return '🌙';
+
+  // ── Jewish ────────────────────────────────────────────────────────────────
+  if (/hanukkah|chanukah/.test(n))                  return '🕎';
+  if (/rosh hashanah|rosh ha-shanah/.test(n))       return '🍎';
+  if (/yom kippur/.test(n))                         return '🙏';
+  if (/passover|pesach/.test(n))                    return '🫓';
+  if (/purim/.test(n))                              return '🎭';
+  if (/shavuot|shavuoth/.test(n))                   return '📜';
+  if (/sukkot|succoth/.test(n))                     return '🌿';
+  if (/simchat torah/.test(n))                      return '📜';
+  if (/tu b.shvat|tu bishvat/.test(n))              return '🌳';
+  if (/tisha b.av/.test(n))                         return '🕯️';
+
+  // ── Hindu ─────────────────────────────────────────────────────────────────
+  if (/diwali|deepavali/.test(n))                   return '🪔';
+  if (/holi/.test(n))                               return '🎨';
+  if (/navaratri|navratri/.test(n))                 return '🌸';
+  if (/dussehra|dasara|vijayadashami/.test(n))      return '🌟';
+  if (/ganesh|ganesha/.test(n))                     return '🐘';
+  if (/pongal|makar sankranti/.test(n))             return '🌾';
+  if (/raksha bandhan/.test(n))                     return '🪢';
+  if (/janmashtami/.test(n))                        return '🪈';
+  if (/ram navami/.test(n))                         return '🏹';
+  if (/onam/.test(n))                               return '🌸';
+
+  // ── Buddhist ──────────────────────────────────────────────────────────────
+  if (/vesak|buddha.*day|buddha.*birthday/.test(n)) return '🙏';
+  if (/nirvana day/.test(n))                        return '☮️';
+  if (/loy krathong/.test(n))                       return '🪔';
+  if (/obon|o-bon/.test(n))                         return '🏮';
+  if (/tanabata/.test(n))                           return '⭐';
+
+  // ── Sikh ──────────────────────────────────────────────────────────────────
+  if (/baisakhi|vaisakhi/.test(n))                  return '🌾';
+  if (/guru nanak|gurpurab/.test(n))                return '🙏';
+
+  // ── Scandinavian / Nordic ─────────────────────────────────────────────────
+  if (/midsommar|midsummer|midsommardagen/.test(n)) return '☀️';
+  if (/nationaldagen|national day of sweden/.test(n)) return '🇸🇪';
+  if (/karl oskar|kräftskiva/.test(n))              return '🦞';
+
+  // ── Seasonal & cultural ───────────────────────────────────────────────────
+  if (/valentine/.test(n))                          return '❤️';
+  if (/st.? patrick/.test(n))                       return '🍀';
+  if (/april fool/.test(n))                         return '🤡';
+  if (/lantern festival/.test(n))                   return '🏮';
+  if (/dragon boat/.test(n))                        return '🐉';
+  if (/mid.autumn|moon festival|chuseok/.test(n))   return '🌕';
+  if (/qingming|ching ming/.test(n))                return '🌿';
+  if (/kwanzaa/.test(n))                            return '🕯️';
+  if (/diwali/.test(n))                             return '🪔';
+
+  // ── National / civic ──────────────────────────────────────────────────────
+  if (/independence day|national day|nationaldag/.test(n)) return '🎆';
+  if (/labour day|labor day|may day|workers/.test(n)) return '✊';
+  if (/mother.s day|mors dag/.test(n))              return '💐';
+  if (/father.s day|fars dag/.test(n))              return '👔';
+  if (/children.s day/.test(n))                     return '👧';
+  if (/veterans|remembrance day|armistice|poppy/.test(n)) return '🎗️';
+  if (/women.s day|international women/.test(n))    return '👩';
+  if (/earth day/.test(n))                          return '🌍';
+  if (/human rights/.test(n))                       return '✊';
+  if (/liberation day|freedom day/.test(n))         return '✌️';
+  if (/constitution day|grundlov/.test(n))          return '📜';
+  if (/anzac/.test(n))                              return '🎗️';
+  if (/bastille/.test(n))                           return '🇫🇷';
+
+  // default holiday
+  return '📅';
+}
+
 function renderMonthPage(year, month) {
   const byDay = getOccasionsForMonth(year, month);
   const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value); // 0=Sun,1=Mon
@@ -555,7 +701,7 @@ function renderMonthPage(year, month) {
       }
       dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}">`
         + `<div class="cal-day-num">${day}</div>`
-        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : esc(e.label)}</div>`).join('')}</div>`
+        + `<div class="cal-events">${events.map(e => `<div class="cal-event ${e.type}">${e.html !== undefined ? e.html : (eventIcon(e.type, e.label) + ' ' + esc(e.label))}</div>`).join('')}</div>`
         + `</div>`;
     }
   }
