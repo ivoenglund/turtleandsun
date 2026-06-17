@@ -7,16 +7,15 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
-body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:flex;flex-direction:column;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;color:#1C0A00;display:flex;flex-direction:column;overflow:visible;}
 
 /* ── Nav ──────────────────────────────────────────────────────────────────── */
-.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;}
-.nav-back{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:rgba(28,10,0,0.6);text-decoration:none;}
-.nav-back:hover{color:#1C0A00;}
-.nav-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#1C0A00;flex:1;}
+.app-shell{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+/* Blend site nav into page style */
+.ts-nav-bar{background:#FFF9E6!important;border-bottom:1px solid rgba(28,10,0,0.08)!important;}
 .btn-print-cal{padding:9px 22px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
-.btn-print-2x{background:#1a4a8a;margin-left:8px;}
+.btn-print-2x{background:#1a4a8a;}
 .btn-print-cal:hover{background:#1C0A00;}
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
@@ -47,10 +46,10 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .fp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 
 /* ── Calendar area ────────────────────────────────────────────────────────── */
-.cal-area{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:28px;align-items:center;}
+.cal-area{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:20px;align-items:center;}
 
 /* ── Calendar page (screen = paper card) ─────────────────────────────────── */
-.cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:900px;aspect-ratio:1.414/1;padding:24px 28px 16px;display:flex;flex-direction:column;flex-shrink:0;}
+.cal-page{background:#fff;box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;width:min(900px,100%);aspect-ratio:1.414/1;padding:24px 28px 16px;display:flex;flex-direction:column;flex-shrink:0;}
 
 .cal-page-header{display:flex;align-items:baseline;justify-content:center;padding-bottom:6px;margin-bottom:6px;}
 .cal-month-name{font-family:'Plus Jakarta Sans',sans-serif;font-size:26px;font-weight:700;color:#1C0A00;letter-spacing:-0.02em;}
@@ -108,7 +107,7 @@ body.design-2 .cal-week-num{border-right:none;padding-right:4px;}
 body.design-2.no-weeknums .cal-grid{border-left:none;}
 @media print {
   html,body{height:100%;overflow:visible;background:#fff;}
-  .nav-bar,.controls-bar,.filter-panel{display:none!important;}
+  .ts-nav-bar,.controls-bar,.filter-panel{display:none!important;}
   .main-area{display:block;height:auto;overflow:visible;}
   .cal-area{overflow:visible;padding:0;gap:0;align-items:stretch;display:block;}
 
@@ -170,16 +169,12 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   /* Explicit page heights for landscape (A4: 210mm - 20mm margins, Letter: 215.9mm - 20mm) */
 }
 </style>
+<script src="/nav.js?v=20260611b"></script>
 </head>
 <body class="color-mode paper-a4">
 
-<div class="nav-bar">
-  <a class="nav-back" href="/account/network?view=calendar">← Back to calendar</a>
-  <h1 class="nav-title">Print Calendar</h1>
-  <button class="btn-print-cal" onclick="window.print()">Print</button>
-  <button class="btn-print-cal btn-print-2x" onclick="printLarge()">Print 2×</button>
-</div>
 
+<div class="app-shell">
 <div class="controls-bar">
   <div class="ctrl">
     <div class="ctrl-lbl">Year</div>
@@ -233,14 +228,18 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
     <label for="weekNumCb">Week numbers</label>
   </div>
   <div class="ctrl">
-    <div class="ctrl-lbl">Holidays</div>
+    <div class="ctrl-lbl">Observances</div>
     <select id="countrySel" onchange="onCountryChange()">
       <option value="">None</option>
     </select>
   </div>
   <div class="ctrl-check">
     <input type="checkbox" id="holidayCb" checked onchange="renderCalendar()">
-    <label for="holidayCb">Show holidays</label>
+    <label for="holidayCb">Show</label>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;align-self:center;">
+    <button class="btn-print-cal" onclick="window.print()">Print</button>
+    <button class="btn-print-cal btn-print-2x" onclick="printLarge()">Print 2×</button>
   </div>
 </div>
 
@@ -292,6 +291,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
     <div id="loading-msg">Loading…</div>
   </div>
 </div>
+</div><!-- /app-shell -->
 
 <script>
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
