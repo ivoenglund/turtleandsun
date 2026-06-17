@@ -91,9 +91,9 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
 body:not(.color-mode) .ev-icon{filter:grayscale(1);}
-.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{display:flex;flex-wrap:wrap;gap:3px;overflow:visible;margin:0 -10px;align-items:flex-start;height:0;}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{display:block;overflow:visible;margin:0 -10px;height:0;}
 .tile-bday{background:#FFEE00!important;}.tile-occ{background:#FFBFA0!important;}.tile-mile{background:#FFEE00!important;}
-body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;}body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);}.occasion-tile{display:inline-block;text-align:center;vertical-align:top;max-width:47%;background:#FFE800;border-radius:0;padding:1px 4px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
+body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;}body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);}.occasion-tile{display:inline-block;text-align:center;vertical-align:top;max-width:47%;margin:1px 1px 0 0;background:#FFE800;border-radius:0;padding:1px 4px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -156,7 +156,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .ev-icon{filter:grayscale(1);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .cal-event{color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .tiles-overlay{display:flex;flex-wrap:wrap;gap:2px;overflow:visible;margin:0 -4px;align-items:flex-start;height:0;}
+  .tiles-overlay{display:block;overflow:visible;margin:0 -4px;height:0;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   body.color-mode .cal-event.birthday{color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
