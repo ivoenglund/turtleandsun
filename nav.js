@@ -3,7 +3,7 @@
 
   var CSS =
     '@media print{.ts-nav-bar{display:none!important;}}' +
-    '@media screen{body{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}}' +
+    '@media screen{body:not([data-no-bg]){background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}}' +
     '.ts-bg{position:fixed;inset:0;z-index:-2;pointer-events:none;}' +
     '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;border-radius:50%;pointer-events:none;z-index:-1;}' + '@media screen{.sun{background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);}}' +
     '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:100;}' +
@@ -218,7 +218,7 @@
     var frag = document.createDocumentFragment();
     while (tmp.firstChild) frag.appendChild(tmp.firstChild);
     document.body.insertBefore(frag, document.body.firstChild);
-    if (!document.querySelector('.sun')) {
+    if (!document.querySelector('.sun') && !document.body.hasAttribute('data-no-bg')) {
       var sun = document.createElement('div');
       sun.className = 'sun';
       document.body.insertBefore(sun, document.body.firstChild);
