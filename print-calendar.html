@@ -961,6 +961,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
   opts = opts || {};
   var showHeader = opts.showHeader !== false;
   var showFooter = opts.showFooter !== false;
+
   const byDay = getOccasionsForMonth(year, month);
   const tileHtmlByDay = {};
   Object.keys(byDay).forEach(function(d) {
@@ -979,8 +980,6 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
 
   const allLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const labels = [...allLabels.slice(startDay), ...allLabels.slice(0, startDay)];
-  const selectedLabels = colIndices.map(i => labels[i]);
-  const nCols = colIndices.length;
 
   const firstDayOfMonth = new Date(year, month, 1).getDay();
   const firstDow        = (firstDayOfMonth - startDay + 7) % 7;
@@ -988,8 +987,12 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
   const daysInPrevMonth = new Date(year, month, 0).getDate();
   const totalRows       = Math.ceil((firstDow + daysInMonth) / 7);
 
+  // DOW header — all 7 columns, hide those outside colIndices
   const dowHtml = '<div class="cal-dow-wk"></div>' +
-    selectedLabels.map(d => '<div class="cal-dow-cell">'+d+'</div>').join('');
+    labels.map(function(d, i) {
+      var vis = colIndices.indexOf(i) >= 0;
+      return '<div class="cal-dow-cell" style="'+(vis ? '' : 'visibility:hidden;')+'">'+d+'</div>';
+    }).join('');
 
   let weekNums = '';
   let dayCells = '';
@@ -999,7 +1002,13 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
                : (rs >= daysInMonth) ? new Date(year, month + 1, rs - daysInMonth + 1)
                : new Date(year, month, rs + 1);
     weekNums += '<div class="cal-week-num">'+isoWeekNumber(wkDate)+'</div>';
-    for (const col of colIndices) {
+    for (let col = 0; col < 7; col++) {
+      var vis = colIndices.indexOf(col) >= 0;
+      if (!vis) {
+        // Hidden cell — occupies space so grid stays 7-col, cells stay equal size
+        dayCells += '<div class="cal-cell" style="visibility:hidden;border-right:none;border-bottom:none;"></div>';
+        continue;
+      }
       const off = row * 7 + col - firstDow;
       let day, cur;
       if (off < 0)                 { day = daysInPrevMonth + off + 1; cur = false; }
@@ -1031,7 +1040,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
-    + '<div class="cal-grid" style="flex:none;width:calc('+nCols+' * (100% - 5mm) / 7);grid-template-columns:repeat('+nCols+',1fr);--rows:'+totalRows+'">'+dayCells+'</div>'
+    + '<div class="cal-grid" style="grid-template-columns:repeat(7,1fr);--rows:'+totalRows+'">'+dayCells+'</div>'
     + '</div>'
     + '<div class="cal-page-footer" style="'+(showFooter ? '' : 'visibility:hidden;')+'">turtleandsun.com</div>'
     + '</div>';
