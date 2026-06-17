@@ -957,7 +957,10 @@ fetch('/api/auth/status').then(r => r.json()).then(async s => {
   load();
 }).catch(() => { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); });
 
-function renderHalfMonthPage(year, month, startDay, colIndices) {
+function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
+  opts = opts || {};
+  var showHeader = opts.showHeader !== false;
+  var showFooter = opts.showFooter !== false;
   const byDay = getOccasionsForMonth(year, month);
   const tileHtmlByDay = {};
   Object.keys(byDay).forEach(function(d) {
@@ -1024,16 +1027,13 @@ function renderHalfMonthPage(year, month, startDay, colIndices) {
   }
 
   return '<div class="cal-page">'
-    + '<div class="cal-page-header">'
-    + '<span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span>'
-    + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11pt;font-weight:400;margin-left:10px;opacity:0.65;">'+selectedLabels.join(' \u00b7 ')+'</span>'
-    + '</div>'
+    + (showHeader ? '<div class="cal-page-header"><span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span></div>' : '')
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
     + '<div class="cal-grid" style="grid-template-columns:repeat('+nCols+',1fr);--rows:'+totalRows+'">'+dayCells+'</div>'
     + '</div>'
-    + '<div class="cal-page-footer">turtleandsun.com</div>'
+    + (showFooter ? '<div class="cal-page-footer">turtleandsun.com</div>' : '')
     + '</div>';
 }
 
@@ -1042,8 +1042,8 @@ function printLarge() {
   const month    = parseInt(document.getElementById('monthSel').value);
   const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value);
 
-  const page1Html = renderHalfMonthPage(year, month, startDay, [0,1,2,3]);
-  const page2Html = renderHalfMonthPage(year, month, startDay, [4,5,6]);
+  const page1Html = renderHalfMonthPage(year, month, startDay, [0,1,2,3], {showHeader:true,  showFooter:false});
+  const page2Html = renderHalfMonthPage(year, month, startDay, [4,5,6],   {showHeader:false, showFooter:true});
 
   // Collect all inline CSS rules from this page
   let css = '';
