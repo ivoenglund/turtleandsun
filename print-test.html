@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Print Test — Step 1</title>
+<style>
+/* ── STEP 1: White body, grid borders, week nums, header, footer ── */
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:#fff;font-family:'DM Sans',sans-serif;color:#1C0A00;}
+
+.page{
+  width:min(900px,100%);
+  aspect-ratio:1/1.414;
+  background:#fff;
+  border:2px solid #ccc;
+  margin:20px auto;
+  padding:16px 20px 10px;
+  display:flex;
+  flex-direction:column;
+}
+
+.page-header{
+  text-align:center;
+  font-size:22px;
+  font-weight:700;
+  margin-bottom:8px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+}
+
+.page-body{
+  flex:1;
+  display:flex;
+  min-height:0;
+}
+
+/* Week number column */
+.week-nums{
+  width:5mm;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+}
+.week-num{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding-right:1mm;
+  font-size:8px;
+  font-weight:700;
+  border-right:1.5px solid #000;
+}
+
+/* Grid */
+.grid-wrap{flex:1;display:flex;flex-direction:column;}
+
+.day-headers{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.03em;
+  text-align:center;
+  padding:2px 0 4px;
+}
+
+.cal-grid{
+  flex:1;
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  grid-template-rows:repeat(6,1fr);
+  border-top:1.5px solid #000;
+  border-left:1.5px solid #000;
+}
+
+.cal-cell{
+  border-right:1.5px solid #000;
+  border-bottom:1.5px solid #000;
+  padding:4px 5px;
+  font-size:10px;
+  font-weight:700;
+  font-family:'Plus Jakarta Sans',sans-serif;
+}
+
+.cal-cell.other-month{color:#aaa;}
+
+.page-footer{
+  text-align:center;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:0.04em;
+  margin-top:4px;
+}
+
+/* ── PRINT ── */
+@media print {
+  html,body{
+    height:100%;
+    background:#fff!important;
+    margin:0;padding:0;
+    display:flex;flex-direction:column;
+  }
+  .page{
+    flex:1;
+    width:100%;
+    aspect-ratio:unset;
+    border:none;
+    margin:0;
+    padding:8mm 8mm 6mm;
+    display:flex;
+    flex-direction:column;
+  }
+  .page-body{flex:1;display:flex;min-height:0;}
+  .week-nums{display:flex;}
+  .grid-wrap{flex:1;display:flex;flex-direction:column;}
+  .cal-grid{flex:1;}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="page-header">January 2026</div>
+
+  <div class="page-body">
+
+    <!-- Week numbers -->
+    <div class="week-nums">
+      <div class="week-num">1</div>
+      <div class="week-num">2</div>
+      <div class="week-num">3</div>
+      <div class="week-num">4</div>
+      <div class="week-num">5</div>
+      <div class="week-num">6</div>
+    </div>
+
+    <!-- Grid -->
+    <div class="grid-wrap">
+      <div class="day-headers">
+        <div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div><div>SUN</div>
+      </div>
+      <div class="cal-grid">
+        <!-- Row 1: Dec 29 – Jan 4 -->
+        <div class="cal-cell other-month">29</div>
+        <div class="cal-cell other-month">30</div>
+        <div class="cal-cell other-month">31</div>
+        <div class="cal-cell">1</div>
+        <div class="cal-cell">2</div>
+        <div class="cal-cell">3</div>
+        <div class="cal-cell">4</div>
+        <!-- Row 2 -->
+        <div class="cal-cell">5</div>
+        <div class="cal-cell">6</div>
+        <div class="cal-cell">7</div>
+        <div class="cal-cell">8</div>
+        <div class="cal-cell">9</div>
+        <div class="cal-cell">10</div>
+        <div class="cal-cell">11</div>
+        <!-- Row 3 -->
+        <div class="cal-cell">12</div>
+        <div class="cal-cell">13</div>
+        <div class="cal-cell">14</div>
+        <div class="cal-cell">15</div>
+        <div class="cal-cell">16</div>
+        <div class="cal-cell">17</div>
+        <div class="cal-cell">18</div>
+        <!-- Row 4 -->
+        <div class="cal-cell">19</div>
+        <div class="cal-cell">20</div>
+        <div class="cal-cell">21</div>
+        <div class="cal-cell">22</div>
+        <div class="cal-cell">23</div>
+        <div class="cal-cell">24</div>
+        <div class="cal-cell">25</div>
+        <!-- Row 5 -->
+        <div class="cal-cell">26</div>
+        <div class="cal-cell">27</div>
+        <div class="cal-cell">28</div>
+        <div class="cal-cell">29</div>
+        <div class="cal-cell">30</div>
+        <div class="cal-cell">31</div>
+        <div class="cal-cell other-month">1</div>
+        <!-- Row 6: empty -->
+        <div class="cal-cell other-month">2</div>
+        <div class="cal-cell other-month">3</div>
+        <div class="cal-cell other-month">4</div>
+        <div class="cal-cell other-month">5</div>
+        <div class="cal-cell other-month">6</div>
+        <div class="cal-cell other-month">7</div>
+        <div class="cal-cell other-month">8</div>
+      </div>
+    </div>
+
+  </div><!-- page-body -->
+
+  <div class="page-footer">turtleandsun.com</div>
+</div>
+
+</body>
+</html>
