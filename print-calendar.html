@@ -14,7 +14,7 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .app-shell{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 /* Nav bar: transparent so gradient shows through */
 .btn-print-cal{padding:9px 22px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
-.btn-print-2x{background:#1a4a8a;}.btn-print-pdf{background:#6b21a8;}
+.btn-print-2x{background:#1a4a8a;}
 .btn-print-cal:hover{background:#1C0A00;}
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
@@ -178,9 +178,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   /* Explicit page heights for landscape (A4: 210mm - 20mm margins, Letter: 215.9mm - 20mm) */
 }
 </style>
-<script src="/nav.js?v=20260617o"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="/nav.js?v=20260617p"></script>
 </head>
 <body class="color-mode paper-a4" data-no-bg>
 
@@ -251,7 +249,6 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   <div style="margin-left:auto;display:flex;gap:8px;align-self:center;">
     <button class="btn-print-cal" onclick="window.print()">Print</button>
     <button class="btn-print-cal btn-print-2x" onclick="printLarge()">Print 2×</button>
-    <button class="btn-print-cal btn-print-pdf" onclick="printPDF(this)">Print PDF</button>
   </div>
 </div>
 
@@ -1109,24 +1106,6 @@ function printLarge() {
   w.focus();
   setTimeout(function(){ w.print(); }, 800);
 }
-
-function printPDF(btn) {
-  btn.textContent = 'Generating...';
-  btn.disabled = true;
-  var pages = document.querySelectorAll('.cal-page');
-  var { jsPDF } = window.jspdf;
-  var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  var idx = 0;
-  function capturePage() {
-    if (idx >= pages.length) {
-      pdf.autoPrint();
-      var blob = pdf.output('blob');
-      var url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      btn.textContent = 'Print PDF';
-      btn.disabled = false;
-      return;
-    }
     var page = pages[idx];
     var prevShadow = page.style.boxShadow;
     var prevRadius = page.style.borderRadius;
