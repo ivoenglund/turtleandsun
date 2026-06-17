@@ -130,6 +130,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .cal-week-num{flex:1;display:flex;align-items:center;justify-content:flex-end;padding-right:1mm;font-size:6pt;font-weight:700;color:#000;border-right:1px solid #000;}
   .cal-grid{
     flex:1;
+    overflow:visible;
     display:grid!important;
     grid-template-columns:repeat(7,1fr);
     grid-template-rows:repeat(var(--rows,6),1fr);
@@ -142,7 +143,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   body.design-2 .cal-week-num{border-right:none;}
   body.design-2.no-weeknums .cal-grid{border-left:none;}
 
-  .cal-cell{padding:4px 5px;overflow:visible;border-right:1px solid #000;border-bottom:1px solid #000;position:relative;}
+  .cal-cell{padding:4px 5px;overflow:visible;border-right:1px solid #000;border-bottom:1px solid #000;position:relative;}.cal-cell.has-tiles{z-index:20;position:relative;}
 
   .cal-day-num{font-size:9pt;position:absolute;top:3px;right:4px;z-index:1;}
   .cal-events{padding-right:18px;}
@@ -156,7 +157,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .ev-icon{filter:grayscale(1);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .cal-event{color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .tiles-overlay{display:block;overflow:visible;margin:0 -4px;height:0;}
+  .tiles-overlay{position:absolute;top:22px;left:-4px;right:-4px;overflow:visible;z-index:30;height:auto;display:block;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   body.color-mode .cal-event.birthday{color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
