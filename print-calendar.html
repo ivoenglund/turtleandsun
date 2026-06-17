@@ -228,7 +228,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
     <label for="weekNumCb">Week numbers</label>
   </div>
   <div class="ctrl">
-    <div class="ctrl-lbl">Observances</div>
+    <div class="ctrl-lbl">"Holidays"</div>
     <select id="countrySel" onchange="onCountryChange()">
       <option value="">None</option>
     </select>
@@ -294,6 +294,8 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
 </div><!-- /app-shell -->
 
 <script>
+NavBar.init({ requireAuth: true });
+
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
