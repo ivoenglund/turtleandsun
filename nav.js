@@ -2,10 +2,10 @@
   'use strict';
 
   var CSS =
-    '@media print{.ts-bg,.sun,.ts-nav-bar{display:none!important;}}' +
+    '@media print{.ts-nav-bar{display:none!important;}}' +
     'body{background:#fff;}' +
-    '.ts-bg{position:fixed;inset:0;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);z-index:-2;pointer-events:none;}' +
-    '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:-1;}' +
+    '.ts-bg{position:fixed;inset:0;z-index:-2;pointer-events:none;}' + '@media screen{.ts-bg{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}}' +
+    '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;border-radius:50%;pointer-events:none;z-index:-1;}' + '@media screen{.sun{background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);}}' +
     '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:100;}' +
     '.ts-nav-wrap{padding:0;}' +
     '.ts-nav{display:flex;align-items:center;padding:16px 32px 18px 0;}' +
@@ -335,16 +335,4 @@
             '<form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">' +
             '<input type="hidden" name="return_to" value="' + window.location.pathname + '">' +
             '<button type="submit" style="width:100%;text-align:left;background:' + (devOn ? '#FFE800' : '#f5f5f0') + ';border:1px solid ' + (devOn ? '#c8b800' : '#e0ddd5') + ';border-radius:8px;padding:7px 10px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;font-weight:700;color:#1C0A00;">' +
-            '⚡ Dev mode: <span style="color:' + (devOn ? '#7a6200' : '#a12a1a') + ';">' + (devOn ? 'ON — Stripe bypassed' : 'OFF') + '</span>' +
-            '</button></form>';
-          var dw = document.getElementById('ts-nav-devmode-wrap');
-          if (dw) dw.innerHTML = devBtnHtml;
-          var dwd = document.getElementById('ts-nav-devmode-wrap-drawer');
-          if (dwd) dwd.innerHTML = devBtnHtml;
-        }
-      }
-
-      return status;
-    }
-  };
-})();
+            '⚡ Dev mode: <span style="color:' + (devOn ? '#7a6200' : '#a12a1a') + ';">' + (devOn ? 'ON — Stripe bypas
