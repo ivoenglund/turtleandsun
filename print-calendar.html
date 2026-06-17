@@ -175,7 +175,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   /* Explicit page heights for landscape (A4: 210mm - 20mm margins, Letter: 215.9mm - 20mm) */
 }
 </style>
-<script src="/nav.js?v=20260617h"></script>
+<script src="/nav.js?v=20260617i"></script>
 </head>
 <body class="color-mode paper-a4">
 
@@ -301,7 +301,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
 
 <script>
 NavBar.init({ requireAuth: true });
-(function(){var e=document.querySelector('.ts-bg');if(e)e.remove();e=document.querySelector('.sun');if(e)e.remove();})();
+(function(){var e=document.querySelector('.ts-bg');if(e)e.remove();e=document.querySelector('.sun');if(e)e.remove();document.documentElement.style.setProperty('background','#fff','important');document.body.style.setProperty('background','#fff','important');})();
 
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
