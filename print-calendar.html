@@ -24,8 +24,8 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .ctrl{display:flex;flex-direction:column;gap:4px;}
 .ctrl-lbl{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.4);}
 .ctrl input[type=number],.ctrl select{padding:7px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;color:#1C0A00;background:#fff;outline:none;}
-.ctrl input[type=number]{width:88px;}
-.ctrl select{width:160px;}
+.ctrl input[type=number]{width:68px;}
+.ctrl select{width:auto;}
 .ctrl input[type=number]:focus,.ctrl select:focus{border-color:#3A6B20;}
 .ctrl-check{display:flex;align-items:center;gap:7px;padding-bottom:8px;}
 .ctrl-check label{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;}
@@ -185,13 +185,6 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
     <div class="ctrl-lbl">Year</div>
     <input type="number" id="yearInput" value="2026" min="1900" max="2100" oninput="renderCalendar()">
   </div>
-  <div class="ctrl">
-    <div class="ctrl-lbl">View</div>
-    <select id="viewSel" onchange="onViewChange()">
-      <option value="month">Single month</option>
-      <option value="year">Whole year — 12 pages</option>
-    </select>
-  </div>
   <div class="ctrl" id="monthCtrl">
     <div class="ctrl-lbl">Month</div>
     <select id="monthSel" onchange="renderCalendar()">
@@ -201,6 +194,13 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
       <option value="6">July</option><option value="7">August</option>
       <option value="8">September</option><option value="9">October</option>
       <option value="10">November</option><option value="11">December</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <div class="ctrl-lbl">View</div>
+    <select id="viewSel" onchange="onViewChange()">
+      <option value="month">Month</option>
+      <option value="year">Full year</option>
     </select>
   </div>
   <div class="ctrl">
@@ -220,17 +220,17 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   <div class="ctrl">
     <div class="ctrl-lbl">Design</div>
     <select id="designSel" onchange="applyDesign()">
-      <option value="1">1 — Grid</option>
-      <option value="2">2 — Tiles</option>
+      <option value="1">Grid</option>
+      <option value="2">Tiles</option>
     </select>
-  </div>
-  <div class="ctrl-check">
-    <input type="checkbox" id="weekNumCb" checked onchange="applyWeekNums()">
-    <label for="weekNumCb">Week numbers</label>
   </div>
   <div class="ctrl-check">
     <input type="checkbox" id="colorCb" checked onchange="applyColor()">
     <label for="colorCb">Colour</label>
+  </div>
+  <div class="ctrl-check">
+    <input type="checkbox" id="weekNumCb" checked onchange="applyWeekNums()">
+    <label for="weekNumCb">Week numbers</label>
   </div>
   <div class="ctrl">
     <div class="ctrl-lbl">Holidays</div>
