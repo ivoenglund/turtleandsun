@@ -182,7 +182,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .cal-dow-row{width:184mm;}
 }
 </style>
-<script src="/nav.js?v=20260618b"></script>
+<script src="/nav.js?v=20260618c"></script>
 </head>
 <body class="color-mode paper-a4" data-no-bg>
 
@@ -1169,6 +1169,7 @@ function printNormal() {
     + '@media print{'
     + '@page{size:A4 '+orient+';margin:10mm 12mm 10mm 10mm;}'
     + 'body{margin:0!important;}'
+    + (orient==='landscape' ? '.cal-grid{flex:1!important;width:auto!important;min-width:0;}.cal-dow-row{width:auto!important;}' : '')
     + '}'
     + '</style></head>'
     + '<body class="'+bodyClass+'">'
