@@ -93,7 +93,7 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
 .cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;overflow:visible;margin:0 -10px;align-items:start;}
-.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:68px;min-width:44px;background:#FFE800;border-radius:0;padding:2px 5px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
+.tile-bday{background:#FFD700!important;}.tile-occ{background:#FFBFA0!important;}.tile-mile{background:#FFD700!important;}.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:68px;min-width:44px;background:#FFE800;border-radius:0;padding:2px 5px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -780,7 +780,8 @@ function renderMonthPage(year, month) {
       var angle = (h % 30) - 15;
       var ml = ((h >> 8) % 10) - 3;
       var st = 'transform:rotate('+angle+'deg);transform-origin:center center;';
-      return '<div class="occasion-tile" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/[;:]\s*/g,'<br>'))+'</div>';
+      var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ':e.type==='milestone'?' tile-mile':'');
+      return '<div class="'+tc+'" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/\.\s*$/,'').replace(/[;:,]\s*/g,'<br>'))+'</div>';
     }).join('');
   });
   const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value); // 0=Sun,1=Mon
