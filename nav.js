@@ -2,9 +2,10 @@
   'use strict';
 
   var CSS =
-    '@media print{body{background:#fff!important;}div.sun{display:none!important;}.sun{display:none!important;}}' +
-    'body{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}' +
-    '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}' +
+    '@media print{.ts-bg,.sun,.ts-nav-bar{display:none!important;}}' +
+    'body{background:#fff;}' +
+    '.ts-bg{position:fixed;inset:0;background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);z-index:-2;pointer-events:none;}' +
+    '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:-1;}' +
     '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:100;}' +
     '.ts-nav-wrap{padding:0;}' +
     '.ts-nav{display:flex;align-items:center;padding:16px 32px 18px 0;}' +
@@ -195,20 +196,6 @@
     document.head.appendChild(style);
   }
 
-  function setupPrintCleanup() {
-    function beforePrint() {
-      document.body.style.setProperty('background', '#fff', 'important');
-      var sun = document.querySelector('.sun');
-      if (sun) sun.style.setProperty('display', 'none', 'important');
-    }
-    function afterPrint() {
-      document.body.style.removeProperty('background');
-      var sun = document.querySelector('.sun');
-      if (sun) sun.style.removeProperty('display');
-    }
-    window.addEventListener('beforeprint', beforePrint);
-    window.addEventListener('afterprint', afterPrint);
-  }
 
   function injectHTML() {
     if (document.getElementById('ts-nav-bar')) return;
@@ -217,6 +204,11 @@
     var frag = document.createDocumentFragment();
     while (tmp.firstChild) frag.appendChild(tmp.firstChild);
     document.body.insertBefore(frag, document.body.firstChild);
+    if (!document.querySelector('.ts-bg')) {
+      var bg = document.createElement('div');
+      bg.className = 'ts-bg';
+      document.body.insertBefore(bg, document.body.firstChild);
+    }
     if (!document.querySelector('.sun')) {
       var sun = document.createElement('div');
       sun.className = 'sun';
@@ -309,7 +301,6 @@
       var requireAuth = opts && opts.requireAuth;
       injectCSS();
       injectHTML();
-      setupPrintCleanup();
       highlightActivePage();
       setupEvents();
       setupCurrency();
