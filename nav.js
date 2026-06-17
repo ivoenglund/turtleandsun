@@ -195,6 +195,21 @@
     document.head.appendChild(style);
   }
 
+  function setupPrintCleanup() {
+    function beforePrint() {
+      document.body.style.setProperty('background', '#fff', 'important');
+      var sun = document.querySelector('.sun');
+      if (sun) sun.style.setProperty('display', 'none', 'important');
+    }
+    function afterPrint() {
+      document.body.style.removeProperty('background');
+      var sun = document.querySelector('.sun');
+      if (sun) sun.style.removeProperty('display');
+    }
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+  }
+
   function injectHTML() {
     if (document.getElementById('ts-nav-bar')) return;
     var tmp = document.createElement('div');
@@ -294,6 +309,7 @@
       var requireAuth = opts && opts.requireAuth;
       injectCSS();
       injectHTML();
+      setupPrintCleanup();
       highlightActivePage();
       setupEvents();
       setupCurrency();
