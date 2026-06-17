@@ -16,6 +16,7 @@ body{font-family:'DM Sans',sans-serif;background:#f4f1eb;color:#1C0A00;display:f
 .nav-back:hover{color:#1C0A00;}
 .nav-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:800;color:#1C0A00;flex:1;}
 .btn-print-cal{padding:9px 22px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-print-2x{background:#1a4a8a;margin-left:8px;}
 .btn-print-cal:hover{background:#1C0A00;}
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
@@ -171,6 +172,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   <a class="nav-back" href="/account/network?view=calendar">← Back to calendar</a>
   <h1 class="nav-title">Print Calendar</h1>
   <button class="btn-print-cal" onclick="window.print()">Print</button>
+  <button class="btn-print-cal btn-print-2x" onclick="printLarge()">Print 2×</button>
 </div>
 
 <div class="controls-bar">
@@ -954,6 +956,135 @@ fetch('/api/auth/status').then(r => r.json()).then(async s => {
   await initHolidays();
   load();
 }).catch(() => { location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search); });
+
+function renderHalfMonthPage(year, month, startDay, colIndices) {
+  const byDay = getOccasionsForMonth(year, month);
+  const tileHtmlByDay = {};
+  Object.keys(byDay).forEach(function(d) {
+    const tileEvents = (byDay[d] || []).filter(function(e){ return e.type==='occasion'||e.type==='birthday'; });
+    if (!tileEvents.length) return;
+    tileHtmlByDay[d] = tileEvents.map(function(e, i) {
+      var lbl = e.label || '';
+      var h = (i + 1) * 31;
+      for (var j = 0; j < lbl.length; j++) h = (h * 37 + lbl.charCodeAt(j)) & 0xFFFF;
+      var angle = (h % 30) - 15;
+      var st = 'transform:rotate('+angle+'deg);transform-origin:center center;';
+      var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ':e.type==='milestone'?' tile-mile':'');
+      return '<div class="'+tc+'" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/\.\s*$/,'').replace(/[;:]\s*/g,'<br>').replace(/[,.]\s*/g,' ').replace(/ {2,}/g,' ').trim())+'</div>';
+    }).join('');
+  });
+
+  const allLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const labels = [...allLabels.slice(startDay), ...allLabels.slice(0, startDay)];
+  const selectedLabels = colIndices.map(i => labels[i]);
+  const nCols = colIndices.length;
+
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const firstDow        = (firstDayOfMonth - startDay + 7) % 7;
+  const daysInMonth     = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const totalRows       = Math.ceil((firstDow + daysInMonth) / 7);
+
+  const dowHtml = '<div class="cal-dow-wk"></div>' +
+    selectedLabels.map(d => '<div class="cal-dow-cell">'+d+'</div>').join('');
+
+  let weekNums = '';
+  let dayCells = '';
+  for (let row = 0; row < totalRows; row++) {
+    const rs = row * 7 - firstDow;
+    let wkDate = (rs < 0) ? new Date(year, month, rs + 1)
+               : (rs >= daysInMonth) ? new Date(year, month + 1, rs - daysInMonth + 1)
+               : new Date(year, month, rs + 1);
+    weekNums += '<div class="cal-week-num">'+isoWeekNumber(wkDate)+'</div>';
+    for (const col of colIndices) {
+      const off = row * 7 + col - firstDow;
+      let day, cur;
+      if (off < 0)                 { day = daysInPrevMonth + off + 1; cur = false; }
+      else if (off >= daysInMonth) { day = off - daysInMonth + 1;     cur = false; }
+      else                         { day = off + 1;                   cur = true; }
+      const events = cur ? (byDay[day] || []) : [];
+      if (cur) {
+        const holidayCb = document.getElementById('holidayCb');
+        if (holidayCb && holidayCb.checked) {
+          const hKey = year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+          (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
+        }
+      }
+      const _hasTiles = events.some(e=>e.type==='occasion'||e.type==='birthday');
+      dayCells += '<div class="cal-cell'+(cur ? '' : ' other-month')+(_hasTiles ? ' has-tiles' : '')+'">'
+        + '<div class="cal-day-num">'+day+'</div>'
+        + (function(){
+          const otherEvents = events.filter(e=>e.type!=='occasion'&&e.type!=='birthday');
+          const evHtml = otherEvents.map(e=>'<div class="cal-event '+e.type+'">'+(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label))+'</div>').join('');
+          const tileHtml = cur ? (tileHtmlByDay[day] || '') : '';
+          return '<div class="cal-events">'+evHtml+'</div>'+(tileHtml?'<div class="tiles-overlay">'+tileHtml+'</div>':'');
+        })()
+        + '</div>';
+    }
+  }
+
+  return '<div class="cal-page">'
+    + '<div class="cal-page-header">'
+    + '<span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span>'
+    + '<span style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11pt;font-weight:400;margin-left:10px;opacity:0.65;">'+selectedLabels.join(' \u00b7 ')+'</span>'
+    + '</div>'
+    + '<div class="cal-dow-row">'+dowHtml+'</div>'
+    + '<div class="cal-body">'
+    + '<div class="cal-week-nums">'+weekNums+'</div>'
+    + '<div class="cal-grid" style="grid-template-columns:repeat('+nCols+',1fr);--rows:'+totalRows+'">'+dayCells+'</div>'
+    + '</div>'
+    + '<div class="cal-page-footer">turtleandsun.com</div>'
+    + '</div>';
+}
+
+function printLarge() {
+  const year     = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
+  const month    = parseInt(document.getElementById('monthSel').value);
+  const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value);
+
+  const page1Html = renderHalfMonthPage(year, month, startDay, [0,1,2,3]);
+  const page2Html = renderHalfMonthPage(year, month, startDay, [4,5,6]);
+
+  // Collect all inline CSS rules from this page
+  let css = '';
+  for (const sheet of document.styleSheets) {
+    try {
+      for (const rule of sheet.cssRules) { css += rule.cssText + '\n'; }
+    } catch(e) {}
+  }
+
+  const w = window.open('','_blank','width=900,height=1200');
+  if (!w) { alert('Please allow pop-ups for this site to use Print 2\u00d7'); return; }
+  const bodyClass = document.body.className;
+  const monthName = MONTHS_FULL[month];
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<title>Print 2\u00d7 \u2014 '+monthName+' '+year+'</title>'
+    + '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    + '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">'
+    + '<style>\n'+css+'\n'
+    + 'html,body{margin:0;padding:0;background:#fff;}'
+    + '.cal-page{page-break-after:always;box-sizing:border-box;}'
+    + '.cal-page:last-child{page-break-after:avoid;}'
+    + '.cal-month-name{font-size:18pt!important;}'
+    + '.cal-dow-cell{font-size:11pt!important;}'
+    + '.cal-day-num{font-size:10pt!important;}'
+    + '.cal-event{font-size:8pt!important;padding:2px 4px!important;}'
+    + '.occasion-tile{font-size:8pt!important;max-width:90px!important;min-width:50px!important;padding:4px 6px!important;}'
+    + '.cal-week-num{font-size:7pt!important;}'
+    + '@media print{'
+    + '@page{size:A4 portrait;margin:8mm;}'
+    + 'body{margin:0!important;}'
+    + '.cal-page{page-break-after:always!important;}'
+    + '}'
+    + '</style></head>'
+    + '<body class="'+bodyClass+'">'
+    + page1Html
+    + page2Html
+    + '</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 800);
+}
 </script>
 </body>
 </html>
