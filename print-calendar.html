@@ -91,9 +91,9 @@ body:not(.color-mode) .cal-event.milestone::before{content:'★ ';font-size:7px;
 body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
 body:not(.color-mode) .ev-icon{filter:grayscale(1);}
-.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;overflow:visible;margin:0 -10px;align-items:start;height:0;}
+.cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:2;}.tiles-overlay{display:flex;flex-wrap:wrap;gap:3px;overflow:visible;margin:0 -10px;align-items:flex-start;height:0;}
 .tile-bday{background:#FFEE00!important;}.tile-occ{background:#FFBFA0!important;}.tile-mile{background:#FFEE00!important;}
-body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;}body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);}.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:68px;min-width:44px;background:#FFE800;border-radius:0;padding:2px 5px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
+body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;}body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);}.occasion-tile{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:80px;width:fit-content;background:#FFE800;border-radius:0;padding:2px 5px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
 
@@ -149,14 +149,14 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .ev-icon{font-size:1.5em;line-height:1;vertical-align:middle;margin-right:1px;}
 .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
   .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
-  .occasion-tile{box-shadow:1px 2px 3px rgba(130,130,130,0.35);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;max-width:52px;min-width:32px;font-size:6.5pt;padding:3px 4px;background:#FFE800!important;}
+  .occasion-tile{box-shadow:1px 2px 3px rgba(130,130,130,0.35);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;max-width:60px;width:fit-content;font-size:6.5pt;padding:3px 4px;background:#FFE800!important;}
   .tile-bday{background:#FFEE00!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .tile-occ{background:#FFBFA0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .ev-icon{filter:grayscale(1);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body:not(.color-mode) .cal-event{color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .tiles-overlay{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;overflow:visible;margin:0 -4px;align-items:start;height:0;}
+  .tiles-overlay{display:flex;flex-wrap:wrap;gap:2px;overflow:visible;margin:0 -4px;align-items:flex-start;height:0;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
   body.color-mode .cal-event.birthday{color:#2d5a16!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -1078,7 +1078,7 @@ function printLarge() {
     + '.cal-dow-cell{font-size:11pt!important;}'
     + '.cal-day-num{font-size:10pt!important;}'
     + '.cal-event{font-size:8pt!important;padding:2px 4px!important;}'
-    + '.occasion-tile{font-size:8pt!important;max-width:90px!important;min-width:50px!important;padding:4px 6px!important;}'
+    + '.occasion-tile{font-size:8pt!important;max-width:90px!important;width:fit-content!important;padding:4px 6px!important;}'
     + '.cal-week-num{font-size:7pt!important;}'
     + 
     + '@media print{'
