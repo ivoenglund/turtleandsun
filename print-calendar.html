@@ -985,6 +985,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
 
   const allLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const labels = [...allLabels.slice(startDay), ...allLabels.slice(0, startDay)];
+  const nCols = colIndices.length;
 
   const firstDayOfMonth = new Date(year, month, 1).getDay();
   const firstDow        = (firstDayOfMonth - startDay + 7) % 7;
@@ -992,12 +993,9 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
   const daysInPrevMonth = new Date(year, month, 0).getDate();
   const totalRows       = Math.ceil((firstDow + daysInMonth) / 7);
 
-  // DOW header: always 7 flex cells; hide those not in colIndices so columns align
+  // DOW header: only the visible columns, each pinned to 27mm to match the grid
   const dowHtml = '<div class="cal-dow-wk"></div>' +
-    labels.map(function(d, i) {
-      var vis = colIndices.indexOf(i) >= 0;
-      return '<div class="cal-dow-cell" style="'+(vis ? '' : 'visibility:hidden;')+'">'+d+'</div>';
-    }).join('');
+    colIndices.map(i => '<div class="cal-dow-cell" style="width:27mm;flex:none;text-align:center;">'+labels[i]+'</div>').join('');
 
   let weekNums = '';
   let dayCells = '';
@@ -1007,8 +1005,6 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
                : (rs >= daysInMonth) ? new Date(year, month + 1, rs - daysInMonth + 1)
                : new Date(year, month, rs + 1);
     weekNums += '<div class="cal-week-num">'+isoWeekNumber(wkDate)+'</div>';
-
-    // Only render visible columns, but pin each to its absolute grid-column position
     for (const col of colIndices) {
       const off = row * 7 + col - firstDow;
       let day, cur;
@@ -1024,9 +1020,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
         }
       }
       const _hasTiles = events.some(e=>e.type==='occasion'||e.type==='birthday');
-      // grid-column and grid-row are 1-based; col is 0-based within the 7-col week
-      const placement = 'grid-column:'+(col+1)+';grid-row:'+(row+1)+';';
-      dayCells += '<div class="cal-cell'+(cur ? '' : ' other-month')+(_hasTiles ? ' has-tiles' : '')+'" style="'+placement+'">'
+      dayCells += '<div class="cal-cell'+(cur ? '' : ' other-month')+(_hasTiles ? ' has-tiles' : '')+'">'
         + '<div class="cal-day-num">'+day+'</div>'
         + (function(){
           const otherEvents = events.filter(e=>e.type!=='occasion'&&e.type!=='birthday');
@@ -1038,12 +1032,14 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
     }
   }
 
+  // Grid: fixed 27mm per column (A4 210mm − 16mm margins − 5mm weeknums = 189mm / 7 = 27mm)
+  // Use inline !important so the collected stylesheet rules cannot override it
   return '<div class="cal-page">'
     + '<div class="cal-page-header" style="'+(showHeader ? '' : 'visibility:hidden;')+'"><span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span></div>'
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
-    + '<div class="cal-grid" style="--rows:'+totalRows+'">'+dayCells+'</div>'
+    + '<div class="cal-grid" style="grid-template-columns:repeat('+nCols+',27mm)!important;flex:none!important;--rows:'+totalRows+'">'+dayCells+'</div>'
     + '</div>'
     + '<div class="cal-page-footer" style="'+(showFooter ? '' : 'visibility:hidden;')+'">turtleandsun.com</div>'
     + '</div>';
@@ -1083,8 +1079,7 @@ function printLarge() {
     + '.cal-event{font-size:8pt!important;padding:2px 4px!important;}'
     + '.occasion-tile{font-size:8pt!important;max-width:90px!important;min-width:50px!important;padding:4px 6px!important;}'
     + '.cal-week-num{font-size:7pt!important;}'
-    + '/* Fix grid to 27mm per column so cells are identical on both pages */'
-    + '.cal-grid{grid-template-columns:repeat(7,27mm)!important;flex:none!important;}'
+    + 
     + '@media print{'
     + '@page{size:A4 portrait;margin:8mm;}'
     + 'body{margin:0!important;}'
