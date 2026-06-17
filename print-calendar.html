@@ -990,7 +990,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
   const daysInPrevMonth = new Date(year, month, 0).getDate();
   const totalRows       = Math.ceil((firstDow + daysInMonth) / 7);
 
-  // DOW header — all 7 columns, hide those outside colIndices
+  // DOW header: always 7 flex cells; hide those not in colIndices so columns align
   const dowHtml = '<div class="cal-dow-wk"></div>' +
     labels.map(function(d, i) {
       var vis = colIndices.indexOf(i) >= 0;
@@ -1005,13 +1005,9 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
                : (rs >= daysInMonth) ? new Date(year, month + 1, rs - daysInMonth + 1)
                : new Date(year, month, rs + 1);
     weekNums += '<div class="cal-week-num">'+isoWeekNumber(wkDate)+'</div>';
-    for (let col = 0; col < 7; col++) {
-      var vis = colIndices.indexOf(col) >= 0;
-      if (!vis) {
-        // Hidden cell — occupies space so grid stays 7-col, cells stay equal size
-        dayCells += '<div class="cal-cell" style="visibility:hidden;border-right:none;border-bottom:none;"></div>';
-        continue;
-      }
+
+    // Only render visible columns, but pin each to its absolute grid-column position
+    for (const col of colIndices) {
       const off = row * 7 + col - firstDow;
       let day, cur;
       if (off < 0)                 { day = daysInPrevMonth + off + 1; cur = false; }
@@ -1026,7 +1022,9 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
         }
       }
       const _hasTiles = events.some(e=>e.type==='occasion'||e.type==='birthday');
-      dayCells += '<div class="cal-cell'+(cur ? '' : ' other-month')+(_hasTiles ? ' has-tiles' : '')+'">'
+      // grid-column and grid-row are 1-based; col is 0-based within the 7-col week
+      const placement = 'grid-column:'+(col+1)+';grid-row:'+(row+1)+';';
+      dayCells += '<div class="cal-cell'+(cur ? '' : ' other-month')+(_hasTiles ? ' has-tiles' : '')+'" style="'+placement+'">'
         + '<div class="cal-day-num">'+day+'</div>'
         + (function(){
           const otherEvents = events.filter(e=>e.type!=='occasion'&&e.type!=='birthday');
