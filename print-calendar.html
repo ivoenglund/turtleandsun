@@ -1027,7 +1027,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
   }
 
   return '<div class="cal-page">'
-    + (showHeader ? '<div class="cal-page-header"><span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span></div>' : '')
+    + '<div class="cal-page-header" style="'+(showHeader ? '' : 'visibility:hidden;')+'"><span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span></div>'
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
