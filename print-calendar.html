@@ -1106,23 +1106,6 @@ function printLarge() {
   w.focus();
   setTimeout(function(){ w.print(); }, 800);
 }
-    var page = pages[idx];
-    var prevShadow = page.style.boxShadow;
-    var prevRadius = page.style.borderRadius;
-    page.style.boxShadow = 'none';
-    page.style.borderRadius = '0';
-    html2canvas(page, { scale: 3, useCORS: true, backgroundColor: '#ffffff', logging: false }).then(function(canvas) {
-      page.style.boxShadow = prevShadow;
-      page.style.borderRadius = prevRadius;
-      var img = canvas.toDataURL('image/jpeg', 0.97);
-      if (idx > 0) pdf.addPage();
-      pdf.addImage(img, 'JPEG', 0, 0, 297, 210);
-      idx++;
-      capturePage();
-    });
-  }
-  capturePage();
-}
 </script>
 </body>
 </html>
