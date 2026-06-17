@@ -149,7 +149,9 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   .ev-icon{font-size:1.5em;line-height:1;vertical-align:middle;margin-right:1px;}
 .cal-event{font-size:6.5pt;padding:1px 3px;border-radius:2px;line-height:1.25;}
   .cal-page-footer{font-size:8pt;color:#1C0A00;margin-top:5px;font-weight:700;letter-spacing:0.04em;}
-  .occasion-tile{box-shadow:1px 2px 3px rgba(130,130,130,0.35);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;max-width:52px;min-width:32px;font-size:6.5pt;padding:3px 4px;}
+  .occasion-tile{box-shadow:1px 2px 3px rgba(130,130,130,0.35);border:0.5pt solid #d4b800;-webkit-print-color-adjust:exact;print-color-adjust:exact;max-width:52px;min-width:32px;font-size:6.5pt;padding:3px 4px;background:#FFE800!important;}
+  .tile-bday{background:#FFEE00!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .tile-occ{background:#FFBFA0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .tiles-overlay{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;overflow:visible;margin:0 -4px;align-items:start;height:0;}
   .bday-photo{width:12px;height:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
@@ -781,7 +783,7 @@ function renderMonthPage(year, month) {
       var ml = ((h >> 8) % 10) - 3;
       var st = 'transform:rotate('+angle+'deg);transform-origin:center center;';
       var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ':e.type==='milestone'?' tile-mile':'');
-      return '<div class="'+tc+'" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/\.\s*$/,'').replace(/[;:,]\s*/g,'<br>'))+'</div>';
+      return '<div class="'+tc+'" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/\.\s*$/,'').replace(/[;:]\s*/g,'<br>').replace(/[,.]\s*/g,' ').replace(/ {2,}/g,' ').trim())+'</div>';
     }).join('');
   });
   const startDay = parseInt((document.getElementById('weekStartSel') || {value:'1'}).value); // 0=Sun,1=Mon
