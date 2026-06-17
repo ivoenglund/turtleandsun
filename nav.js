@@ -2,6 +2,7 @@
   'use strict';
 
   var CSS =
+    '@media print{body{background:#fff!important;}div.sun{display:none!important;}.sun{display:none!important;}}' +
     'body{background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);}' +
     '.sun{position:fixed;top:-238px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:radial-gradient(circle,#fff 0%,rgba(255,255,245,0.92) 5%,rgba(255,255,200,0.65) 16%,rgba(255,240,80,0.28) 30%,transparent 52%);border-radius:50%;pointer-events:none;z-index:0;}' +
     '.ts-nav-bar{background:transparent;border-bottom:none;flex-shrink:0;position:relative;z-index:100;}' +
