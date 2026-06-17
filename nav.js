@@ -196,6 +196,20 @@
     document.head.appendChild(style);
   }
 
+  function setupPrintCleanup() {
+    function beforePrint() {
+      document.body.style.setProperty('background', '#fff', 'important');
+      var sun = document.querySelector('.sun');
+      if (sun) sun.style.setProperty('display', 'none', 'important');
+    }
+    function afterPrint() {
+      document.body.style.removeProperty('background');
+      var sun = document.querySelector('.sun');
+      if (sun) sun.style.removeProperty('display');
+    }
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint', afterPrint);
+  }
 
   function injectHTML() {
     if (document.getElementById('ts-nav-bar')) return;
@@ -204,11 +218,6 @@
     var frag = document.createDocumentFragment();
     while (tmp.firstChild) frag.appendChild(tmp.firstChild);
     document.body.insertBefore(frag, document.body.firstChild);
-    if (!document.querySelector('.ts-bg')) {
-      var bg = document.createElement('div');
-      bg.className = 'ts-bg';
-      document.body.insertBefore(bg, document.body.firstChild);
-    }
     if (!document.querySelector('.sun')) {
       var sun = document.createElement('div');
       sun.className = 'sun';
@@ -301,6 +310,7 @@
       var requireAuth = opts && opts.requireAuth;
       injectCSS();
       injectHTML();
+      setupPrintCleanup();
       highlightActivePage();
       setupEvents();
       setupCurrency();
@@ -335,4 +345,16 @@
             '<form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">' +
             '<input type="hidden" name="return_to" value="' + window.location.pathname + '">' +
             '<button type="submit" style="width:100%;text-align:left;background:' + (devOn ? '#FFE800' : '#f5f5f0') + ';border:1px solid ' + (devOn ? '#c8b800' : '#e0ddd5') + ';border-radius:8px;padding:7px 10px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;font-weight:700;color:#1C0A00;">' +
-            '⚡ Dev mode: <span style="color:' + (devOn ? '#7a6200' : '#a12a1a') + ';">' + (devOn ? 'ON — Stripe bypas
+            '⚡ Dev mode: <span style="color:' + (devOn ? '#7a6200' : '#a12a1a') + ';">' + (devOn ? 'ON — Stripe bypassed' : 'OFF') + '</span>' +
+            '</button></form>';
+          var dw = document.getElementById('ts-nav-devmode-wrap');
+          if (dw) dw.innerHTML = devBtnHtml;
+          var dwd = document.getElementById('ts-nav-devmode-wrap-drawer');
+          if (dwd) dwd.innerHTML = devBtnHtml;
+        }
+      }
+
+      return status;
+    }
+  };
+})();
