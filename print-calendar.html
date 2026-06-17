@@ -1031,7 +1031,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
-    + '<div class="cal-grid" style="grid-template-columns:repeat('+nCols+',calc(100% / 7));--rows:'+totalRows+'">'+dayCells+'</div>'
+    + '<div class="cal-grid" style="flex:none;width:calc('+nCols+' * (100% - 5mm) / 7);grid-template-columns:repeat('+nCols+',1fr);--rows:'+totalRows+'">'+dayCells+'</div>'
     + '</div>'
     + '<div class="cal-page-footer" style="'+(showFooter ? '' : 'visibility:hidden;')+'">turtleandsun.com</div>'
     + '</div>';
