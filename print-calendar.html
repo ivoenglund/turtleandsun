@@ -993,9 +993,9 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
   const daysInPrevMonth = new Date(year, month, 0).getDate();
   const totalRows       = Math.ceil((firstDow + daysInMonth) / 7);
 
-  // DOW header: only the visible columns, each pinned to 27mm to match the grid
+  // DOW header: only the visible columns, each pinned to 47.25mm (189mm / 4 cols = larger cells)
   const dowHtml = '<div class="cal-dow-wk"></div>' +
-    colIndices.map(i => '<div class="cal-dow-cell" style="width:27mm;flex:none;text-align:center;">'+labels[i]+'</div>').join('');
+    colIndices.map(i => '<div class="cal-dow-cell" style="width:47.25mm;flex:none;text-align:center;">'+labels[i]+'</div>').join('');
 
   let weekNums = '';
   let dayCells = '';
@@ -1032,14 +1032,14 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
     }
   }
 
-  // Grid: fixed 27mm per column (A4 210mm − 16mm margins − 5mm weeknums = 189mm / 7 = 27mm)
+  // Grid: 47.25mm per column (189mm / 4 = larger cells; page 2 has 3 cols + blank space)
   // Use inline !important so the collected stylesheet rules cannot override it
   return '<div class="cal-page">'
     + '<div class="cal-page-header" style="'+(showHeader ? '' : 'visibility:hidden;')+'"><span class="cal-month-name">'+MONTHS_FULL[month]+' '+year+'</span></div>'
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
-    + '<div class="cal-grid" style="grid-template-columns:repeat('+nCols+',27mm)!important;flex:none!important;--rows:'+totalRows+'">'+dayCells+'</div>'
+    + '<div class="cal-grid" style="grid-template-columns:repeat('+nCols+',47.25mm)!important;flex:none!important;--rows:'+totalRows+'">'+dayCells+'</div>'
     + '</div>'
     + '<div class="cal-page-footer" style="'+(showFooter ? '' : 'visibility:hidden;')+'">turtleandsun.com</div>'
     + '</div>';
