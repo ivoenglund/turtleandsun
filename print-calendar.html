@@ -1041,7 +1041,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
     + '<div class="cal-dow-row">'+dowHtml+'</div>'
     + '<div class="cal-body">'
     + '<div class="cal-week-nums">'+weekNums+'</div>'
-    + '<div class="cal-grid" style="grid-template-columns:repeat(7,1fr);--rows:'+totalRows+'">'+dayCells+'</div>'
+    + '<div class="cal-grid" style="--rows:'+totalRows+'">'+dayCells+'</div>'
     + '</div>'
     + '<div class="cal-page-footer" style="'+(showFooter ? '' : 'visibility:hidden;')+'">turtleandsun.com</div>'
     + '</div>';
@@ -1081,6 +1081,8 @@ function printLarge() {
     + '.cal-event{font-size:8pt!important;padding:2px 4px!important;}'
     + '.occasion-tile{font-size:8pt!important;max-width:90px!important;min-width:50px!important;padding:4px 6px!important;}'
     + '.cal-week-num{font-size:7pt!important;}'
+    + '/* Fix grid to 27mm per column so cells are identical on both pages */'
+    + '.cal-grid{grid-template-columns:repeat(7,27mm)!important;flex:none!important;}'
     + '@media print{'
     + '@page{size:A4 portrait;margin:8mm;}'
     + 'body{margin:0!important;}'
