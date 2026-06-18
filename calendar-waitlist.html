@@ -28,12 +28,13 @@ html,body{
   display:flex;
   flex-direction:column;
   align-items:center;
-  padding:48px 20px 64px;
+  justify-content:center;
+  padding:40px 20px;
 }
 
 /* ── Logo ── */
 .logo-wrap{
-  margin-bottom:56px;
+  margin-bottom:48px;
 }
 .logo-wrap img{
   height:38px;
@@ -44,8 +45,8 @@ html,body{
 /* ── Card ── */
 .card{
   background:#1C0A00;
-  border-radius:24px;
-  padding:48px 40px 44px;
+  border-radius:28px;
+  padding:64px 48px 60px;
   max-width:560px;
   width:100%;
   text-align:center;
@@ -58,7 +59,7 @@ html,body{
   letter-spacing:0.1em;
   text-transform:uppercase;
   color:#FFE800;
-  margin-bottom:16px;
+  margin-bottom:24px;
 }
 
 .headline{
@@ -67,7 +68,7 @@ html,body{
   font-weight:800;
   line-height:1.1;
   color:#fff;
-  margin-bottom:16px;
+  margin-bottom:48px;
 }
 
 .sub{
@@ -84,11 +85,11 @@ html,body{
 .wl-form{
   display:flex;
   flex-direction:column;
-  gap:12px;
+  gap:14px;
 }
 .wl-input{
   width:100%;
-  padding:16px 20px;
+  padding:18px 22px;
   border-radius:999px;
   border:none;
   font-family:'DM Sans',sans-serif;
@@ -101,7 +102,7 @@ html,body{
 .wl-input::placeholder{color:rgba(28,10,0,0.4);}
 .wl-btn{
   width:100%;
-  padding:16px 20px;
+  padding:18px 20px;
   border-radius:999px;
   background:#FFE800;
   color:#1C0A00;
@@ -167,7 +168,8 @@ html,body{
 
 /* ── Mobile ── */
 @media(max-width:480px){
-  .card{padding:36px 24px 32px;}
+  .card{padding:48px 28px 44px;}
+  .page{justify-content:flex-start;padding-top:48px;}
 }
 </style>
 </head>
