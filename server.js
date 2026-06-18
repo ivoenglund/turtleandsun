@@ -571,7 +571,12 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname)));
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'turtleandsun-landing.html')));
+app.get('/', async (req, res) => {
+  const file = cachedHomepageMode === 'loveogram'
+    ? 'turtleandsun-landing.html'
+    : 'calendar-waitlist.html';
+  res.sendFile(path.join(__dirname, file));
+});
 app.get('/faq', (req, res) => res.sendFile(path.join(__dirname, 'faq.html')));
 app.get('/pricing', (req, res) => res.sendFile(path.join(__dirname, 'pricing.html')));
 app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'privacy.html')));
@@ -733,8 +738,11 @@ app.post('/auth/verify', async (req, res) => {
 // Cached so synchronous template helpers (conceptAdminPage) can read it without
 // awaiting the DB on every render. Loaded at startup + refreshed after toggle.
 let cachedDevMode = false;
+let cachedHomepageMode = 'calendar'; // 'calendar' | 'loveogram'
 async function loadDevMode() {
   try {
+    const hmR = await pool.query(`SELECT value FROM system_settings WHERE key = 'homepage_mode'`);
+    if (hmR.rows[0]) cachedHomepageMode = hmR.rows[0].value;
     const r = await pool.query(`SELECT value FROM system_settings WHERE key = 'dev_mode'`);
     cachedDevMode = r.rows.length > 0 && r.rows[0].value === 'true';
   } catch (e) {
@@ -754,6 +762,19 @@ async function setDevMode(on) {
   );
   cachedDevMode = !!on;
 }
+
+app.post('/admin/homepage/toggle', requireRole('admin'), async (req, res) => {
+  const return_to = req.body?.return_to || '/admin';
+  cachedHomepageMode = cachedHomepageMode === 'calendar' ? 'loveogram' : 'calendar';
+  try {
+    await pool.query(
+      `INSERT INTO system_settings (key, value, updated_at) VALUES ('homepage_mode', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [cachedHomepageMode]
+    );
+  } catch(e) { console.error('[homepage toggle]', e); }
+  res.redirect(return_to);
+});
 
 app.post('/admin/dev-mode/toggle', requireRole('admin'), async (req, res) => {
   const next = !cachedDevMode;
@@ -1136,6 +1157,13 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     <h2 class="admin-section">\u{1F527} Developing <span class="admin-section-sub">— work in progress + dev tools, never visible to customers</span></h2>
     <div class="admin-grid">
       ${card('Email engine', 'Lifecycle email: templates, sequences, enrollments. Work in progress.', '/admin/email')}
+      <form method="POST" action="/admin/homepage/toggle" style="margin:0;">
+        <input type="hidden" name="return_to" value="/admin">
+        <button type="submit" class="admin-card" style="background:#fff;border:2px solid #FFE800;text-align:left;cursor:pointer;width:100%;font-family:inherit;">
+          <div class="admin-card-title">Homepage: <strong style="color:#1C0A00;">${cachedHomepageMode === 'calendar' ? '📅 Calendar waitlist' : '🖼️ Loveogram'}</strong></div>
+          <div class="admin-card-desc">Currently showing the ${cachedHomepageMode === 'calendar' ? 'calendar waitlist page' : 'Loveogram landing page'} at /. Click to switch.</div>
+        </button>
+      </form>
       <form method="POST" action="/admin/dev-mode/toggle" style="margin:0;">
         <input type="hidden" name="return_to" value="/admin">
         <button type="submit" class="admin-card" style="background:${cachedDevMode ? '#FFE800' : '#fff'};border:1px solid ${cachedDevMode ? '#1C0A00' : '#eee'};text-align:left;cursor:pointer;width:100%;font-family:inherit;">
