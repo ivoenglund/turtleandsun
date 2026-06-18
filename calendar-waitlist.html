@@ -181,14 +181,11 @@ html,body{
   <div class="card">
     <div class="coming-soon">Coming soon</div>
     <h1 class="headline">Your family calendar.<br>Finally worth printing.</h1>
-    <p class="sub">
-      Join the waitlist — get <strong>25% off</strong> when we launch.
-    </p>
 
     <div id="wl-form-wrap">
       <form class="wl-form" id="wlForm" novalidate>
         <input class="wl-input" id="wlEmail" type="email" placeholder="Your email address" autocomplete="email" required>
-        <button class="wl-btn" id="wlBtn" type="submit">Notify me when it's ready</button>
+        <button class="wl-btn" id="wlBtn" type="submit">Join the waitlist — get 25% off</button>
       </form>
     </div>
 
@@ -214,7 +211,7 @@ html,body{
     var email = document.getElementById('wlEmail').value.trim();
     if (!email) return;
     btn.disabled = true;
-    btn.textContent = 'Saving your spot…';
+    btn.textContent = 'Saving…';
     try {
       var res = await fetch('/api/waitlist', {
         method: 'POST',
@@ -233,7 +230,7 @@ html,body{
       } else {
         alert(data.error || 'Something went wrong — please try again.');
         btn.disabled = false;
-        btn.textContent = 'Notify me when it\'s ready';
+        btn.textContent = 'Join the waitlist — get 25% off';
       }
     } catch(err) {
       alert('Network error — please try again.');
