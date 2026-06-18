@@ -1027,6 +1027,25 @@ async function initDb() {
     );
   `);
 
+
+  // Waitlist — email capture for upcoming calendar print service (2026-06-19)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id            SERIAL PRIMARY KEY,
+      email         VARCHAR(255) NOT NULL,
+      src           TEXT,
+      ref           TEXT,
+      referrer      TEXT,
+      user_agent    TEXT,
+      country       VARCHAR(10),
+      city          TEXT,
+      ip            TEXT,
+      discount_code VARCHAR(20),
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(email)
+    );
+  `);
+
   console.log('Database tables ready');
 }
 

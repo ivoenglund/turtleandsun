@@ -1109,6 +1109,7 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     ${section('\u{1F4C5} Daily — what to check this morning',
       card('Daily digest', 'Live revenue, visitors, humans, delivery health.', '/admin/digest') +
       card('Failed deliveries', 'Orders that failed generation or email.', '/admin/failed-deliveries') +
+      card('Waitlist', 'Email signups for calendar print launch.', '/admin/waitlist') +
       card('Visits & visitors map', 'Traffic log, geo map, and IP labels.', '/admin/visits') +
       card('Generation review', 'Quality-check every AI output — flag bad ones, trigger regeneration.', '/admin/generations') +
       card('Asset storage', 'See every file — R2, Cloudinary, fal.ai. Migrate anything not on R2.', '/admin/assets')
@@ -1159,6 +1160,107 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     )}`;
   res.send(conceptAdminPage('Admin dashboard', body));
 });
+
+// ---------------------------------------------------------------------------
+// Waitlist — capture emails before calendar print service launches (2026-06-19)
+// ---------------------------------------------------------------------------
+app.post('/api/waitlist', async (req, res) => {
+  const { email, src, ref } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Valid email required' });
+  }
+  try {
+    const ip = visitorIp(req) || 'unknown';
+    const geo = await geoLookup(ip).catch(() => ({}));
+    // Generate discount code: PRINT25-XXXXXX
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const discount_code = 'PRINT25-' + rand;
+
+    const result = await pool.query(
+      `INSERT INTO waitlist (email, src, ref, referrer, user_agent, country, city, ip, discount_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (email) DO UPDATE SET src=EXCLUDED.src, ref=EXCLUDED.ref
+       RETURNING discount_code, (xmax=0) AS is_new`,
+      [email, src || req.query.src || null, ref || req.query.ref || null,
+       req.headers.referer || null, req.headers['user-agent'] || null,
+       geo.country || null, geo.city || null, ip, discount_code]
+    );
+    const row = result.rows[0];
+    const code = row.discount_code;
+    const isNew = row.is_new;
+
+    if (isNew) {
+      // Send confirmation email via Resend
+      await resend.emails.send({
+        from: 'Turtle and Sun <hello@turtleandsun.com>',
+        to: email,
+        subject: 'You\'re on the list — 25% off when we launch 🗓️',
+        html: `
+          <div style="font-family:'DM Sans',Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#FFF5A0;border-radius:16px;">
+            <h1 style="font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:28px;font-weight:800;color:#1C0A00;margin:0 0 12px;">You're on the list! 🎉</h1>
+            <p style="font-size:16px;color:#1C0A00;line-height:1.5;margin:0 0 20px;">
+              We're putting the finishing touches on our <strong>calendar print service</strong> — 
+              beautifully designed family calendars you can print at home or order delivered.
+            </p>
+            <p style="font-size:16px;color:#1C0A00;line-height:1.5;margin:0 0 24px;">
+              As one of our early supporters, you get <strong>25% off</strong> your first order. 
+              Save this email — your discount code is below.
+            </p>
+            <div style="background:#1C0A00;color:#FFE800;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:22px;font-weight:800;letter-spacing:0.1em;padding:16px 24px;border-radius:10px;text-align:center;margin:0 0 24px;">
+              ${code}
+            </div>
+            <p style="font-size:14px;color:rgba(28,10,0,0.6);margin:0;">
+              We'll email you as soon as the service goes live. 
+              Questions? Reply to this email anytime.
+            </p>
+            <p style="font-size:14px;color:rgba(28,10,0,0.6);margin:24px 0 0;">
+              — The Turtle and Sun team
+            </p>
+          </div>
+        `,
+      }).catch(err => console.error('[waitlist] Resend error:', err));
+    }
+
+    res.json({ ok: true, code, is_new: isNew });
+  } catch (err) {
+    console.error('[waitlist] error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/admin/waitlist', requireRole('admin'), async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, email, discount_code, country, city, src, ref, created_at
+     FROM waitlist ORDER BY created_at DESC LIMIT 500`
+  );
+  const rows_html = rows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.email)}</td>
+      <td><code>${escapeHtml(r.discount_code || '')}</code></td>
+      <td>${escapeHtml(r.country || '')}</td>
+      <td>${escapeHtml(r.city || '')}</td>
+      <td>${escapeHtml(r.src || '')}</td>
+      <td>${escapeHtml(r.ref || '')}</td>
+      <td style="white-space:nowrap;font-size:12px;">${new Date(r.created_at).toISOString().slice(0,16).replace('T',' ')}</td>
+    </tr>`).join('');
+  const body = `
+    <h1>Waitlist (${rows.length})</h1>
+    <style>
+      table{border-collapse:collapse;width:100%;font-size:13px;}
+      th,td{padding:8px 12px;border:1px solid #eee;text-align:left;}
+      th{background:#f5f5f5;font-weight:600;}
+      tr:hover td{background:#fffde7;}
+    </style>
+    <table>
+      <thead><tr>
+        <th>Email</th><th>Discount code</th><th>Country</th><th>City</th>
+        <th>src</th><th>ref</th><th>Signed up</th>
+      </tr></thead>
+      <tbody>${rows_html || '<tr><td colspan="7" style="color:#999;text-align:center;">No signups yet</td></tr>'}</tbody>
+    </table>`;
+  res.send(conceptAdminPage('Waitlist', body));
+});
+
 
 // ---------------------------------------------------------------------------
 // /admin/digest — live, on-demand view of the same data shown in the
