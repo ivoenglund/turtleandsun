@@ -577,6 +577,7 @@ app.get('/pricing', (req, res) => res.sendFile(path.join(__dirname, 'pricing.htm
 app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'privacy.html')));
 app.get('/terms', (req, res) => res.sendFile(path.join(__dirname, 'terms.html')));
 app.get('/refund', (req, res) => res.sendFile(path.join(__dirname, 'refund.html')));
+app.get('/calendar', (req, res) => res.sendFile(path.join(__dirname, 'calendar-waitlist.html')));
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 

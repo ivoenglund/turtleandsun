@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Family Calendar — Turtle and Sun</title>
+<meta name="description" content="A beautifully designed family calendar. Coming soon. Join the waitlist and get 25% off.">
+<meta property="og:title" content="Family Calendar — Turtle and Sun">
+<meta property="og:description" content="Join the waitlist and get 25% off when we launch.">
+<meta property="og:image" content="https://turtleandsun.com/assets/og-card.png">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{
+  min-height:100vh;
+  font-family:'DM Sans',sans-serif;
+  font-weight:300;
+  color:#1C0A00;
+  background:linear-gradient(175deg,#FFF5A0 0%,#FFE800 20%,#FFD000 40%,#FFC000 60%,#FFAA00 80%,#FF9500 100%);
+}
+
+/* ── Layout ── */
+.page{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:48px 20px 64px;
+}
+
+/* ── Logo ── */
+.logo-wrap{
+  margin-bottom:56px;
+}
+.logo-wrap img{
+  height:38px;
+  width:auto;
+  display:block;
+}
+
+/* ── Card ── */
+.card{
+  background:#1C0A00;
+  border-radius:24px;
+  padding:48px 40px 44px;
+  max-width:560px;
+  width:100%;
+  text-align:center;
+}
+
+.coming-soon{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:#FFE800;
+  margin-bottom:16px;
+}
+
+.headline{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:clamp(28px,5vw,42px);
+  font-weight:800;
+  line-height:1.1;
+  color:#fff;
+  margin-bottom:16px;
+}
+
+.sub{
+  font-family:'DM Sans',sans-serif;
+  font-size:clamp(15px,2vw,17px);
+  font-weight:400;
+  color:rgba(255,255,255,0.7);
+  line-height:1.55;
+  margin-bottom:32px;
+}
+.sub strong{color:#FFE800;font-weight:600;}
+
+/* ── Form ── */
+.wl-form{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.wl-input{
+  width:100%;
+  padding:16px 20px;
+  border-radius:999px;
+  border:none;
+  font-family:'DM Sans',sans-serif;
+  font-size:16px;
+  font-weight:400;
+  color:#1C0A00;
+  outline:none;
+  background:#fff;
+}
+.wl-input::placeholder{color:rgba(28,10,0,0.4);}
+.wl-btn{
+  width:100%;
+  padding:16px 20px;
+  border-radius:999px;
+  background:#FFE800;
+  color:#1C0A00;
+  border:none;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+  transition:transform .12s ease, box-shadow .12s ease, opacity .15s;
+}
+.wl-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,0.25);}
+.wl-btn:active{transform:translateY(0);}
+.wl-btn:disabled{opacity:0.55;cursor:default;transform:none;box-shadow:none;}
+
+.wl-note{
+  font-size:13px;
+  color:rgba(255,255,255,0.4);
+  margin-top:4px;
+}
+
+/* ── Success state ── */
+.wl-success{
+  display:none;
+  text-align:center;
+}
+.wl-success-icon{
+  font-size:48px;
+  margin-bottom:16px;
+}
+.wl-success-title{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:24px;
+  font-weight:800;
+  color:#FFE800;
+  margin-bottom:10px;
+}
+.wl-success-body{
+  font-size:15px;
+  color:rgba(255,255,255,0.72);
+  line-height:1.5;
+}
+.wl-success-code{
+  display:inline-block;
+  background:#FFE800;
+  color:#1C0A00;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:20px;
+  font-weight:800;
+  letter-spacing:0.08em;
+  padding:12px 24px;
+  border-radius:10px;
+  margin:20px 0 12px;
+}
+
+/* ── Footer hint ── */
+.back-link{
+  margin-top:40px;
+  font-size:13px;
+  color:rgba(28,10,0,0.5);
+  text-decoration:none;
+}
+.back-link:hover{color:#1C0A00;}
+
+/* ── Mobile ── */
+@media(max-width:480px){
+  .card{padding:36px 24px 32px;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="logo-wrap">
+    <a href="/"><img src="/logo.svg" alt="Turtle and Sun"></a>
+  </div>
+
+  <div class="card">
+    <div class="coming-soon">Coming soon</div>
+    <h1 class="headline">Your family calendar.<br>Finally worth printing.</h1>
+    <p class="sub">
+      Beautifully designed calendars with your photos —
+      ready to print at home or order delivered straight to your door.<br><br>
+      Join the waitlist and get <strong>25% off</strong> your first order.
+    </p>
+
+    <div id="wl-form-wrap">
+      <form class="wl-form" id="wlForm" novalidate>
+        <input class="wl-input" id="wlEmail" type="email" placeholder="Your email address" autocomplete="email" required>
+        <button class="wl-btn" id="wlBtn" type="submit">Notify me when it's ready</button>
+      </form>
+      <p class="wl-note" style="margin-top:12px;">No spam. One email when we launch.</p>
+    </div>
+
+    <div class="wl-success" id="wlSuccess">
+      <div class="wl-success-icon">🎉</div>
+      <div class="wl-success-title">You're on the list!</div>
+      <p class="wl-success-body">Check your email — your discount code is waiting:</p>
+      <div class="wl-success-code" id="wlCode"></div>
+      <p class="wl-success-body">Save it. We'll email you the moment we launch.</p>
+    </div>
+  </div>
+
+  <a class="back-link" href="/">← Back to Turtle and Sun</a>
+
+</div>
+<script>
+(function() {
+  var form = document.getElementById('wlForm');
+  var btn  = document.getElementById('wlBtn');
+  var qs   = new URLSearchParams(window.location.search);
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var email = document.getElementById('wlEmail').value.trim();
+    if (!email) return;
+    btn.disabled = true;
+    btn.textContent = 'Saving your spot…';
+    try {
+      var res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          src: qs.get('src') || 'calendar-page',
+          ref: qs.get('ref') || null
+        })
+      });
+      var data = await res.json();
+      if (res.ok) {
+        document.getElementById('wl-form-wrap').style.display = 'none';
+        document.getElementById('wlCode').textContent = data.code;
+        document.getElementById('wlSuccess').style.display = 'block';
+      } else {
+        alert(data.error || 'Something went wrong — please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Notify me when it\'s ready';
+      }
+    } catch(err) {
+      alert('Network error — please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Notify me when it\'s ready';
+    }
+  });
+})();
+</script>
+</body>
+</html>
