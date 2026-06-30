@@ -283,6 +283,30 @@ async function initDb() {
     ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS source_url TEXT;
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS engaged BOOLEAN NOT NULL DEFAULT FALSE;
 
+    -- 2026-06-30: Turtle Studio groups — dated, status-aware memberships.
+    -- A membership now carries a from/to date range (so the same model handles
+    -- ongoing groups, ended memberships, and historical/dated groups like school
+    -- classes & alumni), a lifecycle status, and a self_managed flag for members
+    -- who maintain their own row via a fill-in link. All additive; existing rows
+    -- default to status='active', self_managed=false, NULL dates (= today's behaviour).
+    ALTER TABLE contact_group_memberships ADD COLUMN IF NOT EXISTS from_date    DATE;
+    ALTER TABLE contact_group_memberships ADD COLUMN IF NOT EXISTS to_date      DATE;
+    ALTER TABLE contact_group_memberships ADD COLUMN IF NOT EXISTS status       TEXT NOT NULL DEFAULT 'active';
+    ALTER TABLE contact_group_memberships ADD COLUMN IF NOT EXISTS self_managed BOOLEAN NOT NULL DEFAULT FALSE;
+
+    -- Self-service fill-in links: one shareable token per group. Members open the
+    -- link to add or update their own contact details and membership (no login).
+    CREATE TABLE IF NOT EXISTS group_share_links (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id),
+      group_id    INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+      token       VARCHAR(64) NOT NULL UNIQUE,
+      active      BOOLEAN DEFAULT TRUE,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      expires_at  TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS group_share_links_group_idx ON group_share_links(group_id);
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle

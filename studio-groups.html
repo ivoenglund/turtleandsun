@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Turtle Studio — Grupper &amp; kontakter</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{--cream:#FBF6EC;--green:#243A17;--green2:#2E4A1E;--leaf:#7FB36F;--leaf2:#4E944F;
+        --yellow:#FFE800;--ink:#1C2A14;--bg:#F1EEE1;--line:#E2DCC9;--mut:#6b7560;}
+  *{box-sizing:border-box;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;}
+  body{margin:0;background:var(--bg);color:var(--ink);}
+  .btn{border:none;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;}
+  .btn.pub{background:var(--yellow);color:#3a3000;}
+  .btn.sm{padding:5px 10px;font-size:13px;}
+  .btn.gray{background:#e7e2d2;color:#3a3000;}
+  .wrap{display:flex;min-height:calc(100vh - 4px);}
+  .side{width:258px;background:#fff;border-right:1px solid var(--line);padding:12px 8px;font-size:14.5px;}
+  .lbl{font-size:11px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:10px 10px 6px;}
+  .row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
+  .row:hover{background:#F4F1E6;}
+  .row.active{background:#EAF3E2;color:var(--green2);font-weight:700;}
+  .row .ct{margin-left:auto;font-size:12px;color:var(--mut);}
+  .sub{padding-left:26px;}
+  .arr{width:14px;display:inline-block;color:var(--mut);font-size:11px;}
+  .addg{color:var(--leaf2);font-weight:700;padding:8px 10px;cursor:pointer;font-size:14px;}
+  .main{flex:1;padding:18px 24px;}
+  .crumb{font-size:13px;color:var(--mut);margin-bottom:2px;}
+  h1{font-size:21px;margin:0 0 12px;}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px;}
+  .tab{padding:9px 14px;font-size:14px;cursor:pointer;color:#4a553f;border-bottom:3px solid transparent;}
+  .tab.active{color:var(--green2);font-weight:700;border-bottom-color:var(--yellow);}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px 20px;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
+  .tag{display:inline-block;background:#EAF3E2;color:var(--green2);border-radius:20px;padding:2px 9px;font-size:11.5px;margin:1px 2px;}
+  .tag.alt{background:#eef3fb;color:#26527f;}
+  .self{font-size:12px;color:var(--leaf2);font-weight:700;}
+  .muted{color:var(--mut);}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;}.ok{background:var(--leaf2);}.no{background:#d9b24a;}
+  .help{font-size:12.5px;color:var(--mut);margin-top:10px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .seg span{padding:6px 12px;font-size:13px;cursor:pointer;}
+  .seg span.on{background:var(--green2);color:#fff;font-weight:700;}
+  .toggleRow{display:flex;align-items:center;gap:9px;font-size:14px;padding:6px 0;}
+  .hide{display:none;}
+  .selbox{background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:11px 12px;font-size:13.5px;color:var(--green2);margin-bottom:14px;word-break:break-all;}
+  input[type=date],input[type=text],select{font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;}
+  #map{height:420px;border-radius:12px;border:1px solid var(--line);}
+  .empty{padding:30px;text-align:center;color:var(--mut);}
+  .stbadge{font-size:11.5px;border-radius:20px;padding:2px 9px;}
+  .st-active{background:#EAF3E2;color:var(--green2);}
+  .st-invited{background:#fdf4dd;color:#7a5b00;}
+  .st-ended{background:#fbeee9;color:#9a4a3a;}
+  .topbar{background:var(--green);color:#EAF1DE;height:48px;display:flex;align-items:center;gap:14px;padding:0 18px;font-weight:800;}
+  .topbar b{color:var(--yellow);}.topbar .sp{flex:1;}.topbar a{color:#EAF1DE;font-size:13px;text-decoration:none;opacity:.85;}
+</style></head>
+<body>
+<div class="topbar">🐢 Turtle <b>Studio</b><span class="sp"></span><a href="/account/network">Network</a><a href="/account">Konto</a></div>
+<div class="wrap">
+  <div class="side">
+    <div class="lbl">Pool</div>
+    <div class="row" id="poolRow"><span>🗂️</span> Mina kontakter <span class="ct" id="poolCount">–</span></div>
+    <div class="lbl">Grupper (träd)</div>
+    <div id="tree"></div>
+    <div class="addg" id="addGroupBtn">＋ Ny grupp / undergrupp</div>
+  </div>
+
+  <div class="main">
+    <div class="crumb" id="crumb">Grupper</div>
+    <h1 id="title">Välj en grupp</h1>
+    <div class="tabs">
+      <div class="tab active" data-t="med">Medlemmar</div>
+      <div class="tab" data-t="kar">Karta</div>
+      <div class="tab" data-t="bok">Årsbok</div>
+      <div class="tab" data-t="exp">Export</div>
+    </div>
+
+    <!-- MEDLEMMAR -->
+    <div id="med">
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="btn pub" id="shareBtn">🔗 Skicka ifyllnadslänk</button>
+        <button class="btn gray" id="addMemberBtn">＋ Lägg till ur poolen</button>
+      </div>
+      <div class="selbox hide" id="shareBox"></div>
+      <div class="panel" id="memPanel"><div class="empty">Välj en grupp i listan till vänster.</div></div>
+    </div>
+
+    <!-- KARTA -->
+    <div id="kar" class="hide">
+      <div class="panel">
+        <div id="map"></div>
+        <div class="help" id="mapHelp"></div>
+      </div>
+    </div>
+
+    <!-- ÅRSBOK -->
+    <div id="bok" class="hide">
+      <div class="panel" style="max-width:520px;">
+        <h3 style="margin-top:0">Årsbok</h3>
+        <div class="selbox" id="bokSrc">Källa: –</div>
+        <div class="toggleRow"><label><input type="checkbox" id="bokPhotos" checked> Med foton</label></div>
+        <div class="help">Underlaget (medlemmar, foton, födelsedagar) hämtas live från gruppen. AI-layout och tryckbeställning kopplas på i nästa steg — datat är redo.</div>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div id="exp" class="hide">
+      <div class="panel" style="max-width:520px;">
+        <h3 style="margin-top:0">Export &amp; dela</h3>
+        <div class="help" style="margin-top:0">Exporterar de medlemmar som visas i den valda gruppen — med riktiga uppgifter.</div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn gray" id="expCsv">⬇︎ Excel / deltagarlista (CSV)</button>
+          <button class="btn gray" id="expVcf">⬇︎ vCard (telefon)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let groups = [];            // tree from /api/groups
+let memberships = [];       // flat list from /api/group-memberships (for counts)
+let contactsPool = [];      // /api/contacts
+let selected = null;        // selected group {id,name}
+let current = null;         // last /api/groups/:id/members payload
+let mapObj = null;
+
+async function api(path, opts){
+  const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
+  if(r.status===401){ location.href='/login'; return null; }
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(data.error||('HTTP '+r.status));
+  return data;
+}
+
+// Count direct + descendant memberships per group id
+function countFor(node){
+  const direct = memberships.filter(m=>m.group_id===node.id).length;
+  const kids = (node.subgroups||[]).reduce((s,c)=>s+countFor(c),0);
+  return direct + kids;
+}
+
+function renderTree(){
+  const host = $('#tree'); host.innerHTML='';
+  function row(node, depth){
+    const div=document.createElement('div');
+    div.className='row'+(selected&&selected.id===node.id?' active':'')+(depth?' sub':'');
+    const arrow = (node.subgroups&&node.subgroups.length)?'▾':'';
+    div.innerHTML = `<span class="arr">${arrow}</span><span>${depth?'•':'📁'}</span> ${esc(node.name)} <span class="ct">${countFor(node)}</span>`;
+    div.onclick = ()=>selectGroup(node);
+    host.appendChild(div);
+    (node.subgroups||[]).forEach(c=>row(c,depth+1));
+  }
+  groups.forEach(g=>row(g,0));
+}
+
+async function loadAll(){
+  $('#poolCount').textContent='…';
+  const [g, ms, cs] = await Promise.all([
+    api('/api/groups'), api('/api/group-memberships'), api('/api/contacts')
+  ]);
+  groups=g||[]; memberships=ms||[]; contactsPool=cs||[];
+  $('#poolCount').textContent = contactsPool.length;
+  renderTree();
+}
+
+async function selectGroup(node){
+  selected = node;
+  renderTree();
+  $('#crumb').textContent = 'Grupper › '+node.name;
+  const total = countFor(node);
+  const subN = (node.subgroups||[]).length;
+  $('#title').innerHTML = `${esc(node.name)} <span style="font-size:13px;color:var(--mut);font-weight:400;">· ${total} medlemmar${subN?` · ${subN} undergrupper`:''}</span>`;
+  $('#shareBox').classList.add('hide');
+  $('#bokSrc').textContent = 'Källa: '+node.name;
+  current = await api('/api/groups/'+node.id+'/members');
+  renderMembers();
+  renderMap();
+}
+
+function fmtRange(m){
+  const f = m.from_date ? String(m.from_date).slice(0,10) : '';
+  const t = m.to_date ? String(m.to_date).slice(0,10) : '';
+  if(!f && !t) return '<span class="muted">—</span>';
+  if(f && !t) return esc(f.slice(0,4))+'– <span style="color:var(--leaf2)">pågående</span>';
+  return esc(f.slice(0,4))+'–<b>'+esc(t.slice(0,4))+'</b> <span style="color:#9a4a3a">avslutad</span>';
+}
+function statusBadge(s){
+  const map={active:['st-active','aktiv'],invited:['st-invited','inbjuden'],ended:['st-ended','avslutad']};
+  const [c,l]=map[s]||map.active; return `<span class="stbadge ${c}">${l}</span>`;
+}
+
+function renderMembers(){
+  if(!current){ return; }
+  const rows = current.members;
+  if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">Inga medlemmar än. Använd “Lägg till ur poolen” eller skicka en ifyllnadslänk.</div>'; return; }
+  let html = `<table><tr><th>Namn</th><th>Undergrupp</th><th>Från–t.o.m.</th><th>Även i</th><th>Status</th><th>Foto</th><th></th></tr>`;
+  rows.forEach(m=>{
+    const alsoIn = (m.also_in||[]).map(g=>`<span class="tag alt">${esc(g.name)}</span>`).join('')||'<span class="muted">—</span>';
+    html += `<tr data-cid="${m.contact_id}" data-gid="${m.subgroup_id||current.group.id}">
+      <td>${esc(m.name)||'<span class="muted">(namnlös)</span>'}${m.self_managed?' <span class="self">✓ sköter själv</span>':''}</td>
+      <td>${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>
+      <td class="rng">${fmtRange(m)}</td>
+      <td>${alsoIn}</td>
+      <td>${statusBadge(m.status)}</td>
+      <td><span class="dot ${m.photo_url?'ok':'no'}"></span></td>
+      <td><button class="btn sm gray editBtn">Ändra</button></td>
+    </tr>`;
+  });
+  html+='</table><div class="help">Varje medlemskap har ett <b>från–t.o.m.-datum</b> och en status — samma modell klarar pågående, avslutade och historiska/daterade grupper (skolklasser, alumner). Personen finns en gång i poolen och kan ligga i flera grupper.</div>';
+  $('#memPanel').innerHTML=html;
+  $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
+}
+
+function openEdit(e){
+  const tr = e.target.closest('tr');
+  const cid = +tr.dataset.cid, gid = +tr.dataset.gid;
+  const m = current.members.find(x=>x.contact_id===cid && ((x.subgroup_id||current.group.id)===gid));
+  const f = m.from_date?String(m.from_date).slice(0,10):'';
+  const t = m.to_date?String(m.to_date).slice(0,10):'';
+  const cell = tr.querySelector('.rng');
+  cell.innerHTML = `<input type="date" class="ef" value="${f}"> – <input type="date" class="et" value="${t}">
+    <select class="es"><option value="active"${m.status==='active'?' selected':''}>aktiv</option>
+    <option value="invited"${m.status==='invited'?' selected':''}>inbjuden</option>
+    <option value="ended"${m.status==='ended'?' selected':''}>avslutad</option></select>
+    <button class="btn sm pub saveB">Spara</button> <button class="btn sm gray rmB">Ta bort</button>`;
+  cell.querySelector('.saveB').onclick=async()=>{
+    await api('/api/memberships',{method:'PUT',body:JSON.stringify({
+      contact_id:cid, group_id:gid,
+      from_date:cell.querySelector('.ef').value||null,
+      to_date:cell.querySelector('.et').value||null,
+      status:cell.querySelector('.es').value,
+      self_managed:m.self_managed
+    })});
+    current = await api('/api/groups/'+selected.id+'/members'); renderMembers();
+  };
+  cell.querySelector('.rmB').onclick=async()=>{
+    if(!confirm('Ta bort '+(m.name||'medlem')+' ur den här gruppen? (Personen finns kvar i poolen.)')) return;
+    await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
+    await loadAll(); current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
+  };
+}
+
+// ── Share link ──
+$('#shareBtn').onclick=async()=>{
+  if(!selected){ alert('Välj en grupp först.'); return; }
+  const r = await api('/api/groups/'+selected.id+'/share-link',{method:'POST'});
+  const box=$('#shareBox'); box.classList.remove('hide');
+  box.innerHTML = `Ifyllnadslänk för <b>${esc(selected.name)}</b>: <a href="${esc(r.url)}" target="_blank">${esc(r.url)}</a>
+    <button class="btn sm gray" id="copyShare" style="margin-left:8px;">Kopiera</button>`;
+  $('#copyShare').onclick=()=>{ navigator.clipboard.writeText(r.url); $('#copyShare').textContent='Kopierad ✓'; };
+};
+
+// ── Add from pool ──
+$('#addMemberBtn').onclick=async()=>{
+  if(!selected){ alert('Välj en grupp först.'); return; }
+  const inGroup = new Set((current?current.members:[]).map(m=>m.contact_id));
+  const avail = contactsPool.filter(c=>!inGroup.has(c.id));
+  if(!avail.length){ alert('Alla kontakter i poolen är redan med, eller poolen är tom.'); return; }
+  const name = prompt('Lägg till vem? Skriv (del av) namn:\n'+avail.slice(0,40).map(c=>'• '+c.name).join('\n'));
+  if(!name) return;
+  const match = avail.find(c=>(c.name||'').toLowerCase().includes(name.toLowerCase()));
+  if(!match){ alert('Hittade ingen matchande kontakt.'); return; }
+  await api('/api/memberships',{method:'PUT',body:JSON.stringify({
+    contact_id:match.id, group_id:selected.id, from_date:new Date().toISOString().slice(0,10), status:'active'
+  })});
+  await loadAll(); current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
+};
+
+// ── New group ──
+$('#addGroupBtn').onclick=async()=>{
+  const name = prompt('Namn på ny grupp:'); if(!name) return;
+  let parent=null;
+  if(selected && confirm('Skapa som undergrupp till "'+selected.name+'"? (Avbryt = ny toppgrupp)')) parent=selected.id;
+  await api('/api/groups',{method:'POST',body:JSON.stringify({name, parent_group_id:parent})});
+  await loadAll();
+};
+
+// ── Map ──
+function renderMap(){
+  if(!current) return;
+  const pts = current.members.filter(m=>m.latitude!=null && m.longitude!=null);
+  if(!mapObj){ mapObj = L.map('map').setView([62,15],4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapObj);
+  }
+  if(mapObj._layerGroup) mapObj.removeLayer(mapObj._layerGroup);
+  const lg = L.layerGroup().addTo(mapObj); mapObj._layerGroup=lg;
+  pts.forEach(m=>L.marker([m.latitude,m.longitude]).addTo(lg).bindPopup(esc(m.name||'')+(m.city?'<br>'+esc(m.city):'')));
+  if(pts.length){ lg.eachLayer(()=>{}); mapObj.fitBounds(pts.map(m=>[m.latitude,m.longitude]),{padding:[40,40],maxZoom:11}); }
+  $('#mapHelp').textContent = pts.length
+    ? `${pts.length} av ${current.members.length} medlemmar har koordinater. Bra för utskick, samåkning och “vilka bor nära”.`
+    : 'Inga medlemmar har koordinater än — lägg till adress/ort på kontakterna så geokodas de automatiskt.';
+  setTimeout(()=>mapObj.invalidateSize(),100);
+}
+
+// ── Export ──
+function dl(name, text, type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click();
+}
+$('#expCsv').onclick=()=>{
+  if(!current||!current.members.length){ alert('Inga medlemmar att exportera.'); return; }
+  const head=['Namn','E-post','Telefon','Ort','Land','Födelsedag','Undergrupp','Från','Till','Status'];
+  const rows=current.members.map(m=>[m.name,m.email,m.phone,m.city,m.country,m.birthday,m.subgroup_name,
+    m.from_date?String(m.from_date).slice(0,10):'',m.to_date?String(m.to_date).slice(0,10):'',m.status]
+    .map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','));
+  dl((selected.name||'grupp')+'.csv','﻿'+[head.join(','),...rows].join('\r\n'),'text/csv');
+};
+$('#expVcf').onclick=()=>{
+  if(!current||!current.members.length){ alert('Inga medlemmar att exportera.'); return; }
+  const vcf=current.members.map(m=>['BEGIN:VCARD','VERSION:3.0','FN:'+(m.name||''),
+    m.email?'EMAIL:'+m.email:'',m.phone?'TEL:'+m.phone:'',
+    (m.city||m.country)?'ADR;TYPE=home:;;;'+(m.city||'')+';;;'+(m.country||''):'','END:VCARD']
+    .filter(Boolean).join('\r\n')).join('\r\n');
+  dl((selected.name||'grupp')+'.vcf',vcf,'text/vcard');
+};
+
+// ── Tabs ──
+const ids=['med','kar','bok','exp'];
+document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); tb.classList.add('active');
+  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==tb.dataset.t));
+  if(tb.dataset.t==='kar') setTimeout(renderMap,80);
+});
+
+loadAll().catch(e=>{ $('#memPanel').innerHTML='<div class="empty">Kunde inte ladda: '+esc(e.message)+'</div>'; });
+</script>
+</body></html>

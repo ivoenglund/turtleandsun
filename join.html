@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fyll i dina uppgifter — Turtle Studio</title>
+<style>
+  :root{--green:#243A17;--green2:#2E4A1E;--leaf2:#4E944F;--yellow:#FFE800;--line:#E2DCC9;--mut:#6b7560;--bg:#F1EEE1;}
+  *{box-sizing:border-box;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;}
+  body{margin:0;background:var(--bg);color:#1C2A14;display:flex;justify-content:center;padding:30px 16px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;max-width:460px;width:100%;padding:26px 24px;}
+  .brand{font-weight:800;font-size:18px;color:var(--green);margin-bottom:4px;}.brand b{color:#caa800;}
+  h1{font-size:20px;margin:6px 0 4px;}
+  .sub{color:var(--mut);font-size:14px;margin-bottom:18px;}
+  label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;}
+  input{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;font-size:15px;}
+  .big{width:100%;background:linear-gradient(90deg,#2E4A1E,#4E944F);color:#fff;border:none;border-radius:11px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;margin-top:18px;}
+  .big:disabled{opacity:.6;cursor:default;}
+  .msg{margin-top:16px;font-size:14px;}
+  .ok{color:var(--leaf2);font-weight:700;}.err{color:#b23b2a;}
+  .done{text-align:center;padding:14px 0;}
+  .done .big{display:inline-block;width:auto;}
+</style></head>
+<body>
+<div class="card" id="card">
+  <div class="brand">🐢 Turtle <b>Studio</b></div>
+  <div id="loading" class="sub">Laddar…</div>
+  <div id="form" style="display:none">
+    <h1 id="title"></h1>
+    <div class="sub">Fyll i dina uppgifter så läggs du till i gruppen. Du sköter din egen rad.</div>
+    <label>Namn *</label><input id="name" autocomplete="name">
+    <label>E-post</label><input id="email" type="email" autocomplete="email">
+    <label>Telefon</label><input id="phone" type="tel" autocomplete="tel">
+    <label>Ort</label><input id="city" autocomplete="address-level2">
+    <label>Land</label><input id="country" autocomplete="country-name">
+    <label>Födelsedag (ÅÅÅÅ-MM-DD)</label><input id="birthday" placeholder="1991-04-23">
+    <button class="big" id="submit">Skicka in</button>
+    <div class="msg" id="msg"></div>
+  </div>
+  <div id="thanks" class="done" style="display:none">
+    <h1>Tack!</h1>
+    <p class="sub">Dina uppgifter är registrerade. Du kan stänga den här sidan.</p>
+  </div>
+</div>
+<script>
+const token = location.pathname.split('/').pop();
+const $=s=>document.querySelector(s);
+async function init(){
+  try{
+    const r = await fetch('/api/join/'+token);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error||'Länken är inte giltig.');
+    $('#loading').style.display='none'; $('#form').style.display='block';
+    $('#title').textContent = d.group_name;
+  }catch(e){ $('#loading').className='msg err'; $('#loading').textContent=e.message; }
+}
+$('#submit').onclick=async()=>{
+  const name=$('#name').value.trim();
+  if(!name){ $('#msg').className='msg err'; $('#msg').textContent='Namn krävs.'; return; }
+  $('#submit').disabled=true;
+  try{
+    const r=await fetch('/api/join/'+token,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,email:$('#email').value.trim(),phone:$('#phone').value.trim(),
+        city:$('#city').value.trim(),country:$('#country').value.trim(),birthday:$('#birthday').value.trim()})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Något gick fel.');
+    $('#form').style.display='none'; $('#thanks').style.display='block';
+  }catch(e){ $('#msg').className='msg err'; $('#msg').textContent=e.message; $('#submit').disabled=false; }
+};
+init();
+</script>
+</body></html>

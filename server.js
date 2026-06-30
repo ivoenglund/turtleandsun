@@ -1693,6 +1693,15 @@ app.get('/account/network', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'network.html'));
 });
 
+app.get('/account/studio', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'studio-groups.html'));
+});
+
+// Public self-service fill-in page (no auth — gated by the share token instead)
+app.get('/join/:token', (req, res) => {
+  res.sendFile(path.join(__dirname, 'join.html'));
+});
+
 app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
@@ -1838,6 +1847,227 @@ app.post('/api/contacts/:id/groups', requireAuth, async (req, res) => {
         [req.user.id, req.params.id, gid]
       );
     }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Turtle Studio: group members, dated memberships & self-service links ───────
+
+// All members of a group (including its direct subgroups), with membership
+// dates, status, self_managed flag, photo, location, and the other groups each
+// member also belongs to ("även i"). Read-only; nothing here mutates data.
+app.get('/api/groups/:id/members', requireAuth, async (req, res) => {
+  try {
+    const groupId = parseInt(req.params.id, 10);
+    const owner = req.user.id;
+
+    const grp = await pool.query(
+      `SELECT id, name, parent_group_id FROM groups WHERE id = $1 AND user_id = $2`,
+      [groupId, owner]
+    );
+    if (!grp.rows.length) return res.status(404).json({ error: 'Group not found' });
+
+    const subgroups = await pool.query(
+      `SELECT id, name FROM groups WHERE parent_group_id = $1 AND user_id = $2 ORDER BY name`,
+      [groupId, owner]
+    );
+    const treeIds = [groupId, ...subgroups.rows.map(s => s.id)];
+
+    const members = await pool.query(
+      `SELECT m.id AS membership_id, m.contact_id, m.group_id,
+              m.from_date, m.to_date, m.status, m.self_managed,
+              g.name AS group_name, g.parent_group_id,
+              c.name, c.email, c.phone, c.photo_url, c.birthday,
+              c.city, c.country, c.latitude, c.longitude
+       FROM contact_group_memberships m
+       JOIN contacts c ON c.id = m.contact_id
+       JOIN groups g   ON g.id = m.group_id
+       WHERE m.user_id = $1 AND m.group_id = ANY($2)
+       ORDER BY c.name NULLS LAST`,
+      [owner, treeIds]
+    );
+
+    const contactIds = [...new Set(members.rows.map(r => r.contact_id))];
+    let alsoIn = {};
+    if (contactIds.length) {
+      const other = await pool.query(
+        `SELECT m.contact_id, g.id, g.name
+         FROM contact_group_memberships m
+         JOIN groups g ON g.id = m.group_id
+         WHERE m.user_id = $1 AND m.contact_id = ANY($2) AND NOT (m.group_id = ANY($3))`,
+        [owner, contactIds, treeIds]
+      );
+      for (const r of other.rows) {
+        (alsoIn[r.contact_id] = alsoIn[r.contact_id] || []).push({ id: r.id, name: r.name });
+      }
+    }
+
+    const out = members.rows.map(r => ({
+      membership_id: r.membership_id,
+      contact_id: r.contact_id,
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      photo_url: r.photo_url,
+      birthday: r.birthday,
+      city: r.city,
+      country: r.country,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      // subgroup = the membership's group when it is a child of the selected group;
+      // null means the contact is a direct member of the selected (parent) group.
+      subgroup_id: r.parent_group_id === groupId ? r.group_id : null,
+      subgroup_name: r.parent_group_id === groupId ? r.group_name : null,
+      from_date: r.from_date,
+      to_date: r.to_date,
+      status: r.status,
+      self_managed: r.self_managed,
+      also_in: alsoIn[r.contact_id] || [],
+    }));
+
+    res.json({ group: grp.rows[0], subgroups: subgroups.rows, members: out });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create or update a single dated membership (does not disturb other rows).
+app.put('/api/memberships', requireAuth, async (req, res) => {
+  const { contact_id, group_id, from_date, to_date, status, self_managed } = req.body;
+  if (!contact_id || !group_id) return res.status(400).json({ error: 'contact_id and group_id required' });
+  const allowed = ['invited', 'active', 'ended'];
+  const st = allowed.includes(status) ? status : 'active';
+  try {
+    // Ownership checks — both the contact and the group must belong to the user.
+    const own = await pool.query(
+      `SELECT (SELECT 1 FROM contacts WHERE id = $1 AND user_id = $3) AS c,
+              (SELECT 1 FROM groups   WHERE id = $2 AND user_id = $3) AS g`,
+      [contact_id, group_id, req.user.id]
+    );
+    if (!own.rows[0].c || !own.rows[0].g) return res.status(404).json({ error: 'Contact or group not found' });
+
+    const result = await pool.query(
+      `INSERT INTO contact_group_memberships
+         (user_id, contact_id, group_id, from_date, to_date, status, self_managed)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (user_id, contact_id, group_id)
+       DO UPDATE SET from_date = EXCLUDED.from_date, to_date = EXCLUDED.to_date,
+                     status = EXCLUDED.status, self_managed = EXCLUDED.self_managed
+       RETURNING id`,
+      [req.user.id, contact_id, group_id, from_date || null, to_date || null, st, !!self_managed]
+    );
+    res.json({ id: result.rows[0].id, ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Remove one membership (contact stays in the pool and in other groups).
+app.delete('/api/memberships', requireAuth, async (req, res) => {
+  const contact_id = req.query.contact_id;
+  const group_id = req.query.group_id;
+  if (!contact_id || !group_id) return res.status(400).json({ error: 'contact_id and group_id required' });
+  try {
+    await pool.query(
+      `DELETE FROM contact_group_memberships WHERE user_id = $1 AND contact_id = $2 AND group_id = $3`,
+      [req.user.id, contact_id, group_id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Self-service fill-in links ─────────────────────────────────────────────────
+
+// Get the active share link for a group (if any).
+app.get('/api/groups/:id/share-link', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT token, active, created_at, expires_at FROM group_share_links
+       WHERE group_id = $1 AND user_id = $2 AND active = TRUE
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, req.user.id]
+    );
+    if (!result.rows.length) return res.json({ token: null });
+    const row = result.rows[0];
+    res.json({ ...row, url: `${req.protocol}://${req.get('host')}/join/${row.token}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create (or reuse) a share link for a group.
+app.post('/api/groups/:id/share-link', requireAuth, async (req, res) => {
+  try {
+    const grp = await pool.query(`SELECT id FROM groups WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    if (!grp.rows.length) return res.status(404).json({ error: 'Group not found' });
+
+    const existing = await pool.query(
+      `SELECT token FROM group_share_links WHERE group_id = $1 AND user_id = $2 AND active = TRUE ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, req.user.id]
+    );
+    let token = existing.rows[0]?.token;
+    if (!token) {
+      token = require('crypto').randomBytes(24).toString('hex');
+      await pool.query(
+        `INSERT INTO group_share_links (user_id, group_id, token) VALUES ($1, $2, $3)`,
+        [req.user.id, req.params.id, token]
+      );
+    }
+    res.json({ token, url: `${req.protocol}://${req.get('host')}/join/${token}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Deactivate a group's share link.
+app.delete('/api/groups/:id/share-link', requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE group_share_links SET active = FALSE WHERE group_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Public self-service endpoints (no auth — the token IS the credential) ──────
+
+async function resolveShareToken(token) {
+  const result = await pool.query(
+    `SELECT s.group_id, s.user_id, g.name AS group_name
+     FROM group_share_links s
+     JOIN groups g ON g.id = s.group_id
+     WHERE s.token = $1 AND s.active = TRUE
+       AND (s.expires_at IS NULL OR s.expires_at > NOW())`,
+    [token]
+  );
+  return result.rows[0] || null;
+}
+
+// What the member sees when they open the link: just the group name.
+app.get('/api/join/:token', async (req, res) => {
+  try {
+    const link = await resolveShareToken(req.params.token);
+    if (!link) return res.status(404).json({ error: 'This link is no longer active.' });
+    res.json({ group_name: link.group_name });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Member submits their own details → creates a contact in the owner's pool and a
+// self_managed membership in the group. Limited to safe, member-owned fields.
+app.post('/api/join/:token', async (req, res) => {
+  try {
+    const link = await resolveShareToken(req.params.token);
+    if (!link) return res.status(404).json({ error: 'This link is no longer active.' });
+
+    const { name, email, phone, city, country, birthday } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+
+    const contact = await pool.query(
+      `INSERT INTO contacts (user_id, name, email, phone, city, country, birthday, is_placeholder)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE) RETURNING id`,
+      [link.user_id, name.trim(), email || null, phone || null, city || null, country || null, birthday || null]
+    );
+    await pool.query(
+      `INSERT INTO contact_group_memberships
+         (user_id, contact_id, group_id, from_date, status, self_managed)
+       VALUES ($1, $2, $3, CURRENT_DATE, 'active', TRUE)
+       ON CONFLICT (user_id, contact_id, group_id)
+       DO UPDATE SET self_managed = TRUE, status = 'active'`,
+      [link.user_id, contact.rows[0].id, link.group_id]
+    );
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
