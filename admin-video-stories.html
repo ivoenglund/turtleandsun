@@ -159,8 +159,9 @@ table.lib tr.inactive{opacity:.5;}
       <input id="ctaKey" placeholder="offer_key (e.g. rebate-email)" style="width:160px;" title="Short internal ID for the offer (no spaces). Used in tracking to answer 'which offer converts best?'. Example: rebate-email, buy-calendar.">
       <input id="ctaLabel" placeholder="Label (e.g. 25% off for your email)" style="width:220px;" title="Human-readable name of the offer — shown in dropdowns and on story cards.">
       <input id="ctaText" placeholder="CTA text shown in card (optional)" style="width:220px;" title="The actual call-to-action wording the viewer sees on the end-card, e.g. 'Get 25% off — link in bio'.">
-      <input id="ctaVideo" placeholder="Video URL (once generated)" style="width:220px;" title="URL of the finished 3-5s end-card clip. Generate it ONCE at top quality (Kling Pro), paste the URL here, and it gets reused on every video — that's why part 2 costs nothing per video. Leave empty until you have it.">
-      <input id="ctaDur" placeholder="secs" type="number" step="0.5" value="4" style="width:70px;" title="Length of the end-card clip in seconds (3-5s recommended).">
+      <input id="ctaVideo" placeholder="Video URL (optional)" style="width:200px;" title="URL of a finished 3-5s end-card CLIP. Generate it once at top quality (Kling Pro), paste here, reused on every video. Leave empty if you use an image instead.">
+      <input id="ctaImage" placeholder="Image URL (optional)" style="width:200px;" title="URL of a still PICTURE to use as the end-card — the cheap option. Assembly shows it for the duration set in 'secs' and burns the CTA text on top. Fill in EITHER this or Video URL; if both are set, the video wins.">
+      <input id="ctaDur" placeholder="secs" type="number" step="0.5" value="4" style="width:70px;" title="How long the end-card is shown, in seconds (3-5s recommended). For video end-cards the clip's own length is used.">
       <button class="btn primary" onclick="addCta()" title="Save this offer card. Active cards rotate into new stories and are available for video assembly.">Add</button>
     </div>
     <table class="lib" id="ctaTable"></table>
@@ -454,16 +455,17 @@ async function delEl(id){
 async function loadCtas(){
   const j = await api('/admin/api/cta-cards');
   document.getElementById('ctaTable').innerHTML =
-    '<tr><th>Offer key</th><th>Label</th><th>CTA text</th><th>Video</th><th>Secs</th><th>Used</th><th>Active</th><th></th></tr>' +
+    '<tr><th>Offer key</th><th>Label</th><th>CTA text</th><th>Video</th><th>Image</th><th>Secs</th><th>Used</th><th>Active</th><th></th></tr>' +
     (j.cards.length ? j.cards.map(c=>`
       <tr class="${c.active?'':'inactive'}">
         <td><b>${esc(c.offer_key)}</b></td><td>${esc(c.label)}</td>
         <td>${esc(c.cta_text||'—')}</td>
-        <td>${c.video_url?'<a href="'+esc(c.video_url)+'" target="_blank">video</a>':'—'}</td>
+        <td>${c.video_url?'<a href="'+esc(c.video_url)+'" target="_blank" title="The end-card video clip this card uses.">video</a>':'—'}</td>
+        <td>${c.image_url?'<a href="'+esc(c.image_url)+'" target="_blank" title="The end-card picture this card uses (looped for its duration during assembly).">image</a>':'—'}</td>
         <td>${c.duration_s}</td><td>${c.times_used}</td>
         <td><button class="btn small" onclick="toggleCta(${c.id},${!c.active})" title="on = this offer rotates into new stories. Click to ${c.active?'pause it':'activate it'}.">${c.active?'on':'off'}</button></td>
         <td><button class="btn small danger" onclick="delCta(${c.id})" title="Delete this offer card permanently. Stories that used it keep working (they only lose the label).">✗</button></td>
-      </tr>`).join('') : '<tr><td colspan="8" style="color:#aaa;">No CTA cards yet — first one: the rebate-for-email offer.</td></tr>');
+      </tr>`).join('') : '<tr><td colspan="9" style="color:#aaa;">No CTA cards yet — first one: the rebate-for-email offer.</td></tr>');
 }
 async function addCta(){
   const offer_key = document.getElementById('ctaKey').value.trim();
@@ -474,9 +476,10 @@ async function addCta(){
       offer_key, label,
       cta_text: document.getElementById('ctaText').value.trim()||null,
       video_url: document.getElementById('ctaVideo').value.trim()||null,
+      image_url: document.getElementById('ctaImage').value.trim()||null,
       duration_s: parseFloat(document.getElementById('ctaDur').value)||4,
     })});
-  ['ctaKey','ctaLabel','ctaText','ctaVideo'].forEach(id=>document.getElementById(id).value='');
+  ['ctaKey','ctaLabel','ctaText','ctaVideo','ctaImage'].forEach(id=>document.getElementById(id).value='');
   loadCtas();
 }
 async function toggleCta(id, active){

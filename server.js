@@ -9733,13 +9733,21 @@ async function runStoryAssemblyJob(story, ctaCard) {
       ? textFilter(ctaCard.cta_text, pathM.join(tmpDir, 'cta.txt'), { size: 60, y: 'h-h/3' })
       : '';
     const cardDur = Math.min(Math.max(parseFloat(ctaCard.duration_s) || 4, 2), 8);
-    if (ctaCard.video_url) {
+    // Forgiving input: a picture URL pasted in the video field is treated as a picture.
+    const looksLikeImage = (u) => /\.(jpe?g|png|webp|gif)(\?|#|$)/i.test(String(u || ''));
+    let cardVideoUrl = ctaCard.video_url || null;
+    let cardImageUrl = ctaCard.image_url || null;
+    if (cardVideoUrl && looksLikeImage(cardVideoUrl)) {
+      cardImageUrl = cardImageUrl || cardVideoUrl;
+      cardVideoUrl = null;
+    }
+    if (cardVideoUrl) {
       const p2raw = pathM.join(tmpDir, 'part2_raw.mp4');
-      await dlFile(ctaCard.video_url, p2raw);
+      await dlFile(cardVideoUrl, p2raw);
       await normalizeVideo(p2raw, part2, ctaVf);
     } else {
       const img = pathM.join(tmpDir, 'endcard_img');
-      await dlFile(ctaCard.image_url, img);
+      await dlFile(cardImageUrl, img);
       await ff(['-y', '-loop', '1', '-t', String(cardDur), '-i', img,
         '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100', '-shortest',
         '-vf', SCALE + ctaVf, '-map', '0:v:0', '-map', '1:a:0', ...VCODEC, ...ACODEC, part2]);
