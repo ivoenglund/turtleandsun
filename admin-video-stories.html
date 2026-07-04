@@ -31,6 +31,13 @@ body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13p
 .vcol{background:#faf8f2;border:1px solid #eee5d0;border-radius:8px;padding:10px;}
 .colhead{font-size:11px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
 .colhint{font-size:11px;color:#aaa;line-height:1.5;}
+.elpick{position:relative;display:inline-block;}
+.elpick summary{padding:7px 12px;border-radius:8px;border:1px solid #ccc;font-size:13px;cursor:pointer;background:#fff;list-style:none;user-select:none;}
+.elpick summary::-webkit-details-marker{display:none;}
+.elpick[open] summary{border-color:#1C2A14;}
+.elpick-list{position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:10px 12px;min-width:240px;box-shadow:0 6px 20px rgba(0,0,0,0.12);max-height:280px;overflow:auto;}
+.elpick-list label{display:flex;gap:8px;align-items:center;font-size:12px;padding:4px 0;cursor:pointer;white-space:nowrap;}
+.elpick-list .elkind{font-size:10px;color:#999;}
 .card{background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:14px 16px;}
 .card.accepted{border-left:5px solid #4caf50;}
 .card.rejected{border-left:5px solid #e53935;opacity:.75;}
@@ -123,6 +130,10 @@ table.lib tr.inactive{opacity:.5;}
       <option value="flow">Flow / manual paste (1 scene)</option>
       <option value="gemini">Gemini app / manual paste (1 scene)</option>
     </select>
+    <details class="elpick" id="elPick" title="Which elements (cast & props) the stories should use. Default 'auto' = the calendar (kind: product) + 2 random active elements. Tick specific ones to use EXACTLY those instead — e.g. only Jack and the kitchen.">
+      <summary id="elPickSummary">Elements: auto</summary>
+      <div class="elpick-list" id="elPickList"><div style="color:#aaa;font-size:11px;padding:4px;">Loading…</div></div>
+    </details>
     <select id="gCount" title="How many stories to write in one click. Each story costs ~$0.001 in LLM fees. More stories = more to review."><option>1</option><option>2</option><option>3</option><option>5</option></select>
     <button class="btn primary" id="genBtn" onclick="generate()" title="Write new STORIES (text only: hook + scene prompts) into the review queue. Does NOT create any video and costs ~$0.001 per story. Videos are made later, from accepted stories, with the 🎬 button on each card.">⚡ Generate stories</button>
     <span style="border-left:1px solid #ddd;height:24px;"></span>
@@ -149,12 +160,18 @@ table.lib tr.inactive{opacity:.5;}
 <!-- ── SITUATIONS TAB ────────────────────────────────────────────────────── -->
 <div id="tab-situations" style="display:none;">
   <div class="lib-wrap">
-    <div class="form-row">
-      <textarea id="sitText" placeholder="New situation… e.g. The dog notices today is marked on the fridge calendar" title="One story idea in plain language. The LLM builds a full story around it. Short and concrete works best."></textarea>
-      <input id="sitOccasion" placeholder="occasion (optional, e.g. birthday)" style="width:200px;" title="Optional label (birthday, christmas, mothers-day…) so you can later see which occasions perform best.">
-      <button class="btn primary" onclick="addSituation()" title="Save this situation to the list. It immediately becomes available to the story generator.">Add</button>
+    <p style="font-size:12px;color:#777;margin-bottom:10px;">
+      The idea library the story generator draws from. Everything is editable in the grid — change text or occasion, press <b>Save</b> on the row.
+      💡 lets the LLM write new ideas in bulk; delete the ones you don't like, edit the rest.
+    </p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <button class="btn primary" onclick="newSit()" title="Add an empty row for writing a situation yourself. Fill in the text, press Save.">＋ New situation</button>
+      <select id="sitGenCount" title="How many new ideas the LLM should write in one go.">
+        <option>5</option><option selected>10</option><option>20</option>
+      </select>
+      <button class="btn primary" id="sitGenBtn" onclick="genIdeas()" title="The LLM writes this many NEW situations (it sees the existing list and avoids repeats) and adds them to the grid, active immediately. ~$0.001-0.01. Then curate: delete the weak ones, edit the good ones.">💡 Generate ideas</button>
     </div>
-    <table class="lib" id="sitTable"></table>
+    <div id="sitGrid"></div>
   </div>
 </div>
 
@@ -564,6 +581,7 @@ async function generate(){
       cta_card_id: document.getElementById('gCta').value || null,
       generator: document.getElementById('gGenerator').value,
       count: parseInt(document.getElementById('gCount').value, 10),
+      element_ids: pickedElementIds(),
     };
     const j = await api('/admin/api/stories/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     if(j.failures && j.failures.length) alert('Some generations failed:\n'+j.failures.join('\n'));
@@ -576,8 +594,8 @@ async function generate(){
 // ── Pickers (situation + CTA dropdowns in toolbar) ─────────────────────────
 async function loadPickers(){
   try{
-    const [s, c] = await Promise.all([
-      api('/admin/api/story-situations'), api('/admin/api/cta-cards'),
+    const [s, c, e] = await Promise.all([
+      api('/admin/api/story-situations'), api('/admin/api/cta-cards'), api('/admin/api/story-elements'),
     ]);
     const sSel = document.getElementById('gSituation');
     s.situations.filter(x=>x.active).forEach(x=>{
@@ -590,36 +608,108 @@ async function loadPickers(){
       const o = document.createElement('option'); o.value = x.id; o.textContent = x.label;
       cSel.appendChild(o);
     });
+    const list = document.getElementById('elPickList');
+    const els = e.elements.filter(x=>x.active);
+    list.innerHTML = els.length ? els.map(x=>`
+      <label title="${esc(x.description||'')}">
+        <input type="checkbox" class="elpick-cb" value="${x.id}" onchange="updateElPickSummary()">
+        ${esc(x.name)} <span class="elkind">(${esc(x.kind)})</span>
+      </label>`).join('')
+      : '<div style="color:#aaa;font-size:11px;padding:4px;">No active elements yet — add them in the Elements tab.</div>';
   }catch(e){ /* pickers stay empty */ }
 }
 
-// ── Situations lib ──────────────────────────────────────────────────────────
+function updateElPickSummary(){
+  const n = document.querySelectorAll('.elpick-cb:checked').length;
+  document.getElementById('elPickSummary').textContent = n ? ('Elements: ' + n + ' chosen') : 'Elements: auto';
+}
+function pickedElementIds(){
+  return [...document.querySelectorAll('.elpick-cb:checked')].map(cb => parseInt(cb.value, 10));
+}
+
+// ── Situations: editable grid + LLM idea generation ─────────────────────────
+let sitRows = [];
+let sitSeq = 0;
+
 async function loadSituations(){
   const j = await api('/admin/api/story-situations');
-  document.getElementById('sitTable').innerHTML =
-    '<tr><th>Situation</th><th>Occasion</th><th>Used</th><th>Active</th><th></th></tr>' +
-    j.situations.map(s=>`
-      <tr class="${s.active?'':'inactive'}">
-        <td>${esc(s.text)}</td><td>${esc(s.occasion||'—')}</td><td>${s.times_used}</td>
-        <td><button class="btn small" onclick="toggleSit(${s.id},${!s.active})" title="on = the generator may pick this situation. Click to switch it ${s.active?'OFF (kept in the list, no longer used)':'ON (used again)'}.">${s.active?'on':'off'}</button></td>
-        <td><button class="btn small danger" onclick="delSit(${s.id})" title="Delete this situation permanently. Existing stories keep their copy of the text.">✗</button></td>
-      </tr>`).join('');
+  sitRows = j.situations.map(s => ({ ...s, _key: 'db' + s.id }));
+  renderSitGrid();
 }
-async function addSituation(){
-  const text = document.getElementById('sitText').value.trim();
-  if(!text) return;
-  await api('/admin/api/story-situations', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({text, occasion: document.getElementById('sitOccasion').value.trim()||null})});
-  document.getElementById('sitText').value=''; document.getElementById('sitOccasion').value='';
+
+function sitByKey(key){ return sitRows.find(s => s._key === key); }
+
+function newSit(){
+  sitRows.unshift({ id: null, _key: 'new' + (++sitSeq), text: '', occasion: '', active: true, times_used: 0 });
+  renderSitGrid();
+}
+
+function renderSitGrid(){
+  const grid = document.getElementById('sitGrid');
+  if (!sitRows.length){ grid.innerHTML = '<div class="empty">No situations. Press ＋ or 💡.</div>'; return; }
+  grid.innerHTML = sitRows.map(s => `
+  <div class="cta-row ${s.active?'':'inactive'}" data-key="${s._key}">
+    <div class="cta-fields" style="grid-template-columns:3fr 1fr;">
+      <div><label title="The one-sentence story idea the generator builds a full story around. Concrete and filmable works best.">Situation</label>
+        <textarea style="min-height:44px;" oninput="sitEdit('${s._key}','text',this.value)" title="Click and edit directly. Press Save on this row when done. Stories already generated from the old wording keep their copy.">${esc(s.text||'')}</textarea></div>
+      <div><label title="Occasion label (birthday, christmas, mothers-day…) — lets the Insights view show which occasions perform.">Occasion</label>
+        <input value="${esc(s.occasion||'')}" oninput="sitEdit('${s._key}','occasion',this.value)" placeholder="general" title="Optional. Examples: birthday, christmas, mothers-day, general.">
+        <div style="font-size:10px;color:#999;margin-top:4px;" title="How many stories have been generated from this situation.">used ${s.times_used||0}×</div></div>
+    </div>
+    <div class="cta-actions">
+      <button class="btn primary" onclick="saveSit('${s._key}', this)" title="Save this row's text and occasion. Always clickable.">💾 Save</button>
+      <button class="btn small" onclick="toggleSitRow('${s._key}')" title="on = the generator may pick this situation. off = kept in the list but never used.">${s.active?'on':'off'}</button>
+      <button class="btn small danger" onclick="delSitRow('${s._key}')" title="Delete this situation permanently. Existing stories keep their copy of the text.">✗ Delete</button>
+    </div>
+  </div>`).join('');
+}
+
+function sitEdit(key, field, value){
+  const s = sitByKey(key); if (s) s[field] = value;
+  const row = document.querySelector(`.cta-row[data-key="${key}"]`);
+  if (row) row.classList.add('dirty');
+}
+
+async function saveSit(key, btn){
+  const s = sitByKey(key); if (!s) return;
+  if (!String(s.text||'').trim()) return alert('The situation text is empty.');
+  if (btn){ btn.disabled = true; btn.textContent = '…'; }
+  const body = { text: s.text.trim(), occasion: (s.occasion||'').trim() || null, active: !!s.active };
+  try{
+    if (s.id) await api('/admin/api/story-situations/'+s.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    else await api('/admin/api/story-situations', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    await loadSituations();
+  }catch(e){ alert('Save failed: '+e.message); if (btn){ btn.disabled = false; btn.textContent = '💾 Save'; } }
+}
+
+async function toggleSitRow(key){
+  const s = sitByKey(key); if (!s) return;
+  s.active = !s.active;
+  if (s.id){
+    try{ await api('/admin/api/story-situations/'+s.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active: s.active})}); }
+    catch(e){ alert(e.message); s.active = !s.active; }
+  }
+  renderSitGrid();
+}
+
+async function delSitRow(key){
+  const s = sitByKey(key); if (!s) return;
+  if (!s.id){ sitRows = sitRows.filter(x => x._key !== key); renderSitGrid(); return; }
+  if (!confirm('Delete this situation permanently?')) return;
+  try{ await api('/admin/api/story-situations/'+s.id, {method:'DELETE'}); }catch(e){ alert(e.message); }
   loadSituations();
 }
-async function toggleSit(id, active){
-  await api('/admin/api/story-situations/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
-  loadSituations();
-}
-async function delSit(id){
-  if(!confirm('Delete situation?')) return;
-  await api('/admin/api/story-situations/'+id, {method:'DELETE'}); loadSituations();
+
+async function genIdeas(){
+  const btn = document.getElementById('sitGenBtn');
+  const count = parseInt(document.getElementById('sitGenCount').value, 10) || 10;
+  btn.disabled = true; btn.textContent = '💡 Writing…';
+  try{
+    const j = await api('/admin/api/story-situations/generate-ideas', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});
+    await loadSituations();
+  }catch(e){ alert('Idea generation failed: '+e.message); }
+  btn.disabled = false; btn.textContent = '💡 Generate ideas';
 }
 
 // ── Elements lib ────────────────────────────────────────────────────────────

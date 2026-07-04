@@ -345,6 +345,57 @@ async function generatePostingKit({ story, situationText, ctaCard, links, model 
   throw new Error(`Posting kit generation failed after 2 attempts: ${lastErr.message}`);
 }
 
+// ---------------------------------------------------------------------------
+// Situation idea generator — bulk-writes NEW story situations for the library.
+// The admin reviews, edits or deletes them in the Situations grid.
+// ---------------------------------------------------------------------------
+async function generateSituationIdeas({ existing = [], count = 10, model }) {
+  const useModel = model || DEFAULT_MODEL;
+  const n = Math.min(Math.max(parseInt(count, 10) || 10, 1), 20);
+  const prompt = [
+    'You invent story SITUATIONS for Turtle & Sun short videos. The product:',
+    "a personalised FRIDGE BIRTHDAY CALENDAR (A2 paper wall calendar with the family's",
+    'own birthdays and occasions, pets included). Videos are 8-15s, funny AND useful,',
+    'built around pets, family occasions and the calendar on the fridge.',
+    '',
+    'A situation is ONE sentence: a concrete, filmable everyday moment where the',
+    'calendar plays a role. Pets as protagonists work best. No camera directions.',
+    '',
+    'ALREADY IN THE LIBRARY (do NOT repeat or closely paraphrase these):',
+    ...existing.slice(0, 60).map(t => '- ' + t),
+    '',
+    `Write ${n} NEW, distinct situations. Vary occasion and angle (birthdays,`,
+    'christmas, mothers/fathers day, name days, anniversaries, general everyday).',
+    '',
+    'Respond with ONLY a JSON object, no markdown fences:',
+    '{ "ideas": [ { "text": "one-sentence situation", "occasion": "birthday|christmas|mothers-day|fathers-day|new-year|anniversary|general" } ] }',
+  ].join('\n');
+
+  let lastErr = null;
+  let totalCost = 0;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const result = await fal.subscribe(ROUTER_ENDPOINT, {
+        input: { model: useModel, prompt, temperature: 1.0, max_tokens: 2000 },
+      });
+      const data = result?.data || {};
+      if (data.error) throw new Error(`LLM error: ${data.error}`);
+      totalCost += Number(data?.usage?.cost || 0);
+      const parsed = extractJson(data.output);
+      const ideas = (Array.isArray(parsed.ideas) ? parsed.ideas : [])
+        .filter(i => i && typeof i.text === 'string' && i.text.trim().length >= 20)
+        .slice(0, n)
+        .map(i => ({ text: i.text.trim(), occasion: (i.occasion || 'general').trim() }));
+      if (!ideas.length) throw new Error('No usable ideas in LLM output');
+      return { ideas, model: useModel, costUsd: totalCost };
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 2) break;
+    }
+  }
+  throw new Error(`Idea generation failed after 2 attempts: ${lastErr.message}`);
+}
+
 module.exports = {
   DEFAULT_MODEL,
   ROUTER_ENDPOINT,
@@ -353,6 +404,7 @@ module.exports = {
   KIT_FIELDS,
   buildPostingKitPrompt,
   generatePostingKit,
+  generateSituationIdeas,
   buildSystemPrompt,
   buildUserPrompt,
   extractJson,

@@ -9437,7 +9437,7 @@ app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
 });
 
 // Shared generation core: picks situation/CTA/elements, calls the LLM.
-async function generateStoryRecord({ situationId, ctaCardId, generator }) {
+async function generateStoryRecord({ situationId, ctaCardId, generator, elementIds }) {
   // 1. Situation: requested or random active.
   let situation = null;
   if (situationId) {
@@ -9462,13 +9462,22 @@ async function generateStoryRecord({ situationId, ctaCardId, generator }) {
     ctaCard = rows[0] || null;
   }
 
-  // 3. Elements: every active product element (the calendar must look the same
+  // 3. Elements. Explicit selection from the queue toolbar wins; otherwise
+  //    auto: every active product element (the calendar must look the same
   //    everywhere = recognition) + up to 2 random other active elements.
-  const { rows: productEls } = await pool.query(
-    `SELECT * FROM story_elements WHERE active = TRUE AND kind = 'product' ORDER BY sort_order`);
-  const { rows: otherEls } = await pool.query(
-    `SELECT * FROM story_elements WHERE active = TRUE AND kind <> 'product' ORDER BY random() LIMIT 2`);
-  const elements = [...productEls, ...otherEls];
+  let elements;
+  if (Array.isArray(elementIds) && elementIds.length) {
+    const { rows } = await pool.query(
+      `SELECT * FROM story_elements WHERE id = ANY($1::int[]) ORDER BY sort_order, id`,
+      [elementIds.map(Number).filter(Number.isFinite)]);
+    elements = rows;
+  } else {
+    const { rows: productEls } = await pool.query(
+      `SELECT * FROM story_elements WHERE active = TRUE AND kind = 'product' ORDER BY sort_order`);
+    const { rows: otherEls } = await pool.query(
+      `SELECT * FROM story_elements WHERE active = TRUE AND kind <> 'product' ORDER BY random() LIMIT 2`);
+    elements = [...productEls, ...otherEls];
+  }
 
   // 4. LLM call.
   const model = await getStoryLlmModel();
@@ -9521,7 +9530,7 @@ async function generateStoryRecord({ situationId, ctaCardId, generator }) {
 // Generate 1-5 new stories into the queue.
 app.post('/admin/api/stories/generate', requireRole('admin'), async (req, res) => {
   try {
-    const { situation_id, cta_card_id, generator } = req.body || {};
+    const { situation_id, cta_card_id, generator, element_ids } = req.body || {};
     const count = Math.min(Math.max(parseInt(req.body?.count, 10) || 1, 1), 5);
     const created = [];
     const failures = [];
@@ -9531,6 +9540,7 @@ app.post('/admin/api/stories/generate', requireRole('admin'), async (req, res) =
           situationId: situation_id || null,
           ctaCardId: cta_card_id || null,
           generator,
+          elementIds: Array.isArray(element_ids) ? element_ids : null,
         }));
       } catch (err) { failures.push(err.message); }
     }
@@ -10151,6 +10161,26 @@ app.get('/admin/api/stories/insights', requireRole('admin'), async (req, res) =>
 
 // ── Library CRUD: situations / elements / CTA cards ─────────────────────────
 
+// Bulk idea generation: LLM writes N new situations into the library
+// (active immediately — the admin edits/deletes in the grid).
+app.post('/admin/api/story-situations/generate-ideas', requireRole('admin'), async (req, res) => {
+  try {
+    const count = Math.min(Math.max(parseInt(req.body?.count, 10) || 10, 1), 20);
+    const { rows: existing } = await pool.query(
+      `SELECT text FROM story_situations ORDER BY id DESC LIMIT 60`);
+    const model = await getStoryLlmModel();
+    const { ideas, costUsd } = await storyEngine.generateSituationIdeas({
+      existing: existing.map(r => r.text), count, model,
+    });
+    for (const idea of ideas) {
+      await pool.query(
+        `INSERT INTO story_situations (text, occasion) VALUES ($1, $2)`,
+        [idea.text, idea.occasion || 'general']);
+    }
+    res.json({ ok: true, created: ideas.length, cost_usd: costUsd });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/admin/api/story-situations', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -10172,15 +10202,19 @@ app.post('/admin/api/story-situations', requireRole('admin'), async (req, res) =
 
 app.put('/admin/api/story-situations/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
-    const { text, occasion, active } = req.body || {};
-    const { rows } = await pool.query(`
-      UPDATE story_situations SET
-        text = COALESCE($2, text),
-        occasion = COALESCE($3, occasion),
-        active = COALESCE($4, active)
-      WHERE id = $1 RETURNING *`,
-      [req.params.id, text ?? null, occasion ?? null,
-       typeof active === 'boolean' ? active : null]);
+    // Presence-based update: only keys in the body change; null clears.
+    const body = req.body || {};
+    const sets = [];
+    const vals = [req.params.id];
+    for (const f of ['text', 'occasion', 'active']) {
+      if (Object.prototype.hasOwnProperty.call(body, f)) {
+        vals.push(body[f]);
+        sets.push(`${f} = $${vals.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    const { rows } = await pool.query(
+      `UPDATE story_situations SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, situation: rows[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }
