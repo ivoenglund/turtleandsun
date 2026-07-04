@@ -15,6 +15,19 @@ const { fal } = require('@fal-ai/client');
 const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 const ROUTER_ENDPOINT = 'openrouter/router';
 
+// fal's validation errors (422) carry the exact complaint in body.detail —
+// surface it instead of a bare "Unprocessable Entity".
+function falErrorMessage(err) {
+  const d = err?.body?.detail ?? err?.body ?? null;
+  if (d) {
+    try {
+      const s = typeof d === 'string' ? d : JSON.stringify(d);
+      if (s && s !== '{}') return s.slice(0, 600);
+    } catch { /* fall through */ }
+  }
+  return err?.message || String(err);
+}
+
 const STORY_TYPES = [
   'before_after',   // real pet photo -> transformed reveal (Kling start+end frame)
   'pet_pov',        // the pet narrates / reacts
@@ -262,8 +275,16 @@ const FRAME_T2I_MODEL = 'fal-ai/kling-image/o3/text-to-image';
 // preserved); without -> t2i (e.g. a neutral establishing shot for the
 // frame library). Both native 9:16, $0.028.
 async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames, role = 'opening' }) {
-  const refs = (referenceImageUrls || []).slice(0, 10);
-  const names = elementNames || [];
+  // Only clean absolute http(s) URLs — one malformed entry fails the whole call.
+  const cleaned = [];
+  const names = [];
+  (referenceImageUrls || []).forEach((u, i) => {
+    if (typeof u === 'string' && /^https?:\/\/\S+$/.test(u.trim())) {
+      cleaned.push(u.trim());
+      names.push((elementNames || [])[i]);
+    }
+  });
+  const refs = cleaned.slice(0, 10);
   const roleWord = role === 'closing' ? 'CLOSING FRAME (the final image)' : 'OPENING FRAME (the very first image)';
   const lines = [
     `Create the cinematic ${roleWord} of a vertical 9:16 short video.`,
@@ -285,10 +306,16 @@ async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames
     output_format: 'png',
   };
   if (refs.length) input.image_urls = refs;
-  const result = await fal.subscribe(refs.length ? START_FRAME_IMAGE_MODEL : FRAME_T2I_MODEL, {
-    input,
-    storageSettings: { expiresIn: 'never' },
-  });
+  let result;
+  try {
+    result = await fal.subscribe(refs.length ? START_FRAME_IMAGE_MODEL : FRAME_T2I_MODEL, {
+      input,
+      storageSettings: { expiresIn: 'never' },
+    });
+  } catch (err) {
+    throw new Error('fal rejected the frame request: ' + falErrorMessage(err) +
+      (refs.length ? ` (with ${refs.length} reference images)` : ' (text-to-image, no references)'));
+  }
   const url = result?.data?.images?.[0]?.url;
   if (!url) throw new Error('frame composition returned no image');
   return { url, costUsd: 0.028, prompt };
@@ -313,9 +340,13 @@ async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = t
     if (input.multi_prompt) {
       const { multi_prompt, ...rest } = input;
       const joined = multi_prompt.map((p, i) => `Shot ${i + 1} (${p.duration}s): ${p.prompt}`).join('\n');
-      result = await run({ ...rest, prompt: joined });
+      try {
+        result = await run({ ...rest, prompt: joined });
+      } catch (err2) {
+        throw new Error('fal rejected the video request: ' + falErrorMessage(err2));
+      }
     } else {
-      throw err;
+      throw new Error('fal rejected the video request: ' + falErrorMessage(err));
     }
   }
 

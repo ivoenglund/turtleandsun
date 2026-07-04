@@ -9633,7 +9633,14 @@ app.post('/admin/api/stories/:id(\\d+)/generate-frame', requireRole('admin'), as
         ? scenes[0]?.video_prompt
         : scenes[scenes.length - 1]?.video_prompt) || s.hook_text || '';
     }
-    const refs = gatherElementRefs(s.elements_snapshot);
+    // Use the elements' CURRENT photos — the story's snapshot may predate them.
+    let frameEls = s.elements_snapshot;
+    if (Array.isArray(s.element_ids) && s.element_ids.length) {
+      const { rows: freshEls } = await pool.query(
+        `SELECT * FROM story_elements WHERE id = ANY($1::int[])`, [s.element_ids]);
+      if (freshEls.length) frameEls = freshEls;
+    }
+    const refs = gatherElementRefs(frameEls);
     const out = await storyEngine.composeStartFrame({
       scenePrompt: framePrompt,
       referenceImageUrls: refs.map(r => r.url),
@@ -10025,6 +10032,14 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
   const scenes = Array.isArray(story.scenes) ? story.scenes : [];
   let genLog = { id: null };
   try {
+    // Refresh element data — photos are often added after the story was made.
+    if (Array.isArray(story.element_ids) && story.element_ids.length) {
+      try {
+        const { rows: freshEls } = await pool.query(
+          `SELECT * FROM story_elements WHERE id = ANY($1::int[])`, [story.element_ids]);
+        if (freshEls.length) story = { ...story, elements_snapshot: freshEls };
+      } catch { /* snapshot stays */ }
+    }
     // Start frame: element photo anchors frame 1 = visual consistency across
     // videos. 'off' skips it; any preparation failure falls back to pure t2v.
     let startImageUrl = null;
