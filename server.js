@@ -1211,7 +1211,9 @@ app.post('/api/waitlist', async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (email) DO UPDATE SET src=EXCLUDED.src, ref=EXCLUDED.ref
        RETURNING discount_code, (xmax=0) AS is_new`,
-      [email, src || req.query.src || null, ref || req.query.ref || null,
+      [email,
+       src || req.query.src || req.cookies?.ts_src || null,
+       ref || req.query.ref || req.cookies?.ts_ref || null,
        req.headers.referer || null, req.headers['user-agent'] || null,
        geo.country || null, geo.city || null, ip, discount_code]
     );

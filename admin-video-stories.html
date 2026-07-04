@@ -337,7 +337,7 @@ function trackerBlock(s){
   const views = Number(s.total_views||0), clicks = Number(s.link_clicks||0), emails = Number(s.emails||0);
   const ctr = views > 0 ? (100*clicks/views).toFixed(2)+'%' : '—';
   const pub = ['tiktok','instagram','youtube','facebook'].filter(p=>s['published_'+p]).map(p=>p[0].toUpperCase()+p.slice(1,2)).join(' ');
-  const base = 'https://turtleandsun.com/?ref=' + encodeURIComponent(s.ref_tag||'');
+  const base = 'https://turtleandsun.com/calendar?ref=' + encodeURIComponent(s.ref_tag||'');
   const linkBtn = (src, label) => `<button class="copybtn" onclick='copyText(${JSON.stringify(base + '&src=' + src)}, this)' title="Copy the tracked link for ${label}. Put THIS link in the video description / bio when posting there — clicks on it are counted for this story.">${label} link</button>`;
   return `<div style="margin-top:8px;background:#faf8f2;border:1px solid #eee5d0;border-radius:8px;padding:8px 10px;">
     <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;" title="Live numbers from the tracker for this video. Views come from the platform stats (refreshed daily / on demand in the Tracker page). Clicks = visits on this video's ?ref= link. Emails = waitlist signups that arrived through it.">
