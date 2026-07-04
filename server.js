@@ -9854,6 +9854,24 @@ async function prepareStoryStartFrame(story) {
   }
 }
 
+// Kling v3 elements payload: every story element that has reference photos
+// becomes a {frontal_image_url, reference_image_urls} entry (max 4 elements,
+// 3 photos each), plus the @ElementN tag line the prompts must carry.
+function buildStoryElementsPayload(els) {
+  const isImg = (u) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(u || ''));
+  const withRefs = (Array.isArray(els) ? els : [])
+    .filter(e => (e.reference_image_urls || []).some(isImg))
+    .slice(0, 4);
+  const payload = withRefs.map(e => {
+    const imgs = e.reference_image_urls.filter(isImg);
+    const entry = { frontal_image_url: imgs[0] };
+    if (imgs.length > 1) entry.reference_image_urls = imgs.slice(1, 4);
+    return entry;
+  });
+  const tags = withRefs.map((e, i) => `@Element${i + 1} (${e.name})`).join(', ');
+  return { payload, tags };
+}
+
 async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
   const scenes = Array.isArray(story.scenes) ? story.scenes : [];
   let genLog = { id: null };
@@ -9871,6 +9889,21 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
         console.warn('[video-story] start-frame prep failed, using text-to-video:', err.message);
       }
     }
+    // Elements mode: subjects placed INTO the scene for the whole video.
+    // Prompts get the @ElementN mapping appended so Kling knows who is who.
+    let useScenes = scenes;
+    let elementsPayload = null;
+    if (startFrame === 'elements' && startImageUrl) {
+      const built = buildStoryElementsPayload(story.elements_snapshot);
+      if (built.payload.length) {
+        elementsPayload = built.payload;
+        useScenes = scenes.map(s => ({
+          ...s,
+          video_prompt: s.video_prompt +
+            ` — featuring ${built.tags}, exactly as they look in the reference images.`,
+        }));
+      }
+    }
     const tierDef = storyEngine.VIDEO_MODELS[tier] || storyEngine.VIDEO_MODELS.standard;
     const modelId = startImageUrl ? tierDef.i2v.id : tierDef.id;
     genLog = await generation.logGenerationStart({
@@ -9878,10 +9911,13 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
       inputPayload: {
         story_id: story.id, tier, generate_audio: generateAudio,
         start_image_url: startImageUrl, start_frame_method: startMethod,
+        elements_count: elementsPayload ? elementsPayload.length : 0,
       },
       sourceType: 'video_story',
     });
-    const out = await storyEngine.generateStoryVideo({ scenes, tier, generateAudio, startImageUrl });
+    const out = await storyEngine.generateStoryVideo({
+      scenes: useScenes, tier, generateAudio, startImageUrl, elements: elementsPayload,
+    });
     out.estCostUsd = (out.estCostUsd || 0) + startCostUsd;
     // fal output URLs can expire — copy to R2 immediately (same pattern as orders).
     let finalUrl = out.url;
@@ -10162,7 +10198,9 @@ app.post('/admin/api/stories/:id(\\d+)/generate-video', requireRole('admin'), as
         video_started_at = NOW(), updated_at = NOW()
       WHERE id = $1`, [story.id]);
     res.json({ ok: true, status: 'generating' });
-    runStoryVideoJob(story, { tier, generateAudio, startFrame: req.body?.start_frame === 'off' ? 'off' : 'auto' })
+    const startFrame = ['off', 'auto', 'elements'].includes(req.body?.start_frame)
+      ? req.body.start_frame : 'elements';
+    runStoryVideoJob(story, { tier, generateAudio, startFrame })
       .catch(err => console.error('[video-story] job crashed:', err.message));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

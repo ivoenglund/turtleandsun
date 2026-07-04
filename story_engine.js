@@ -203,7 +203,7 @@ function clampDuration(totalS) {
   return Math.min(Math.max(Math.round(totalS || 5), 3), 15);
 }
 
-function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null } = {}) {
+function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null, elements = null } = {}) {
   const list = (Array.isArray(scenes) ? scenes : []).filter(s => s && s.video_prompt);
   if (!list.length) throw new Error('Story has no scenes with video prompts');
   const totalS = clampDuration(list.reduce((a, s) => a + (Number(s.duration_s) || 5), 0));
@@ -219,6 +219,11 @@ function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null } 
   // one of the two is ever present.
   if (startImageUrl) base.start_image_url = startImageUrl;
   else base.aspect_ratio = '9:16';
+  // Kling v3 elements: characters/objects placed INTO the scene throughout,
+  // referenced in prompts as @Element1… (i2v only — needs a start image).
+  if (Array.isArray(elements) && elements.length && startImageUrl) {
+    base.elements = elements;
+  }
   if (list.length === 1) {
     return { input: { ...base, prompt: list[0].video_prompt }, totalS };
   }
@@ -277,10 +282,10 @@ async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames
   return { url, costUsd: 0.028 };
 }
 
-async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true, startImageUrl = null }) {
+async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true, startImageUrl = null, elements = null }) {
   const model = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
   const modelId = startImageUrl ? model.i2v.id : model.id;
-  const { input, totalS } = buildVideoInput(scenes, { generateAudio, startImageUrl });
+  const { input, totalS } = buildVideoInput(scenes, { generateAudio, startImageUrl, elements });
 
   const run = async (payload) => fal.subscribe(modelId, {
     input: payload,
