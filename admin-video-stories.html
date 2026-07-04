@@ -381,8 +381,20 @@ function kitBlock(s){
 
 async function removeFromTracker(storyId, clipId){
   if(!confirm('Remove this video from the Tracker?\n\nDeletes the tracker row, its stats history and posting texts. The story and its videos stay. You can re-send it afterwards — same ref link, old clicks re-attach.\n\n(Remember to also delete the posted video on the platform itself — that part is manual.)')) return;
-  try{ await api('/admin/api/social-clips/'+clipId, {method:'DELETE'}); }
-  catch(e){ alert('Could not remove: '+e.message); }
+  try{
+    const r = await fetch('/admin/api/social-clips/'+clipId, {method:'DELETE'});
+    if (r.status === 409){
+      const j = await r.json().catch(()=>({}));
+      const where = (j.published||[]).join(', ') || 'a platform';
+      if (confirm('The tracker still has this clip marked as POSTED on: '+where+'.\n\nOnly continue if you have already deleted the video there (I cannot delete it on the platform for you).\n\nDelete the tracker row anyway?')){
+        const r2 = await fetch('/admin/api/social-clips/'+clipId+'?force=1', {method:'DELETE'});
+        if (!r2.ok){ const j2 = await r2.json().catch(()=>({})); alert('Could not remove: '+(j2.error||r2.status)); }
+      }
+    } else if (!r.ok){
+      const j = await r.json().catch(()=>({}));
+      alert('Could not remove: '+(j.error||r.status));
+    }
+  }catch(e){ alert('Could not remove: '+e.message); }
   loadQueue();
 }
 
