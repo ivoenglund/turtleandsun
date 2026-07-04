@@ -94,6 +94,7 @@ table.lib tr.inactive{opacity:.5;}
   <button class="tab" data-tab="situations" onclick="showTab('situations')" title="The growing list of story ideas ('the dog notices today is his birthday…'). The generator picks one per story. Add your own — more variety here = more variety in videos.">Situations</button>
   <button class="tab" data-tab="elements" onclick="showTab('elements')" title="Your recurring cast & props: pets, the kitchen, and the calendar itself. Their descriptions are written into every video prompt so they look the SAME across all videos (recognition). Kind 'product' = included in every story.">Elements</button>
   <button class="tab" data-tab="ctas" onclick="showTab('ctas')" title="Reusable part-2 end-cards: one per offer (e.g. '25% off for your email'), generated once at top quality, then glued onto every video. Rotating cards = A/B-testing offers.">CTA end-cards</button>
+  <button class="tab" data-tab="insights" onclick="showTab('insights')" title="The feedback loop: views, link clicks and email signups grouped by story type, CTA offer and generator. Answers 'which KIND of video sells?' — and tells you what to generate more of. Only counts videos that were sent to the Tracker.">Insights</button>
 </div>
 
 <!-- ── QUEUE TAB ─────────────────────────────────────────────────────────── -->
@@ -178,6 +179,17 @@ table.lib tr.inactive{opacity:.5;}
   </div>
 </div>
 
+<!-- ── INSIGHTS TAB ──────────────────────────────────────────────────────── -->
+<div id="tab-insights" style="display:none;">
+  <div class="lib-wrap">
+    <p style="font-size:12px;color:#777;margin-bottom:10px;" title="Benchmarks from the test protocol: link-CTR from shorts is typically 0.5-1%; a landing page should convert 10-30% of clicks to emails. Views without clicks = pet channel, not a business.">
+      Which KIND of video sells? Grouped results for every video that went through the Tracker.
+      Benchmarks: CTR 0.5–1% is normal for shorts · views without clicks = entertainment, not a funnel.
+    </p>
+    <div id="insightsWrap"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
 <script>
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtDate(s){return s?new Date(s).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'}):'—';}
@@ -197,12 +209,46 @@ function copyText(t, btn){
 // ── Tabs ────────────────────────────────────────────────────────────────────
 function showTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  ['queue','situations','elements','ctas'].forEach(n=>{
+  ['queue','situations','elements','ctas','insights'].forEach(n=>{
     document.getElementById('tab-'+n).style.display = n===name ? '' : 'none';
   });
   if(name==='situations') loadSituations();
   if(name==='elements') loadElements();
   if(name==='ctas') loadCtas();
+  if(name==='insights') loadInsights();
+}
+
+// ── Insights (feedback loop) ────────────────────────────────────────────────
+async function loadInsights(){
+  const el = document.getElementById('insightsWrap');
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  try{
+    const j = await api('/admin/api/stories/insights');
+    const section = (title, rows, keyLabel, tip) => {
+      if (!rows || !rows.length) return '';
+      return `<h3 style="font-size:13px;margin:16px 0 6px;" title="${esc(tip)}">${esc(title)}</h3>
+      <table class="lib">
+        <tr>
+          <th title="${esc(tip)}">${esc(keyLabel)}</th>
+          <th title="How many videos of this kind were sent to the tracker.">Videos</th>
+          <th title="Total platform views across TikTok / Instagram / YouTube / Facebook.">Views</th>
+          <th title="Clicks on the tracked ?ref= links belonging to these videos.">Clicks</th>
+          <th title="Clicks divided by views. 0.5-1% is the normal range for shorts; consistently below with decent views = weak CTA or wrong audience.">CTR</th>
+          <th title="Email signups (waitlist) that arrived through these videos' links. This is the number the whole test is about.">Emails</th>
+        </tr>
+        ${rows.map(r => {
+          const v = Number(r.views||0), c = Number(r.clicks||0);
+          const ctr = v > 0 ? (100*c/v).toFixed(2)+'%' : '—';
+          return `<tr><td><b>${esc(r.key)}</b></td><td>${r.videos}</td><td>${v}</td><td>${c}</td><td>${ctr}</td><td><b>${r.emails}</b></td></tr>`;
+        }).join('')}
+      </table>`;
+    };
+    const html =
+      section('By story type', j.story_type, 'Story type', 'The narrative formula. Generate more of whatever wins here.') +
+      section('By CTA offer', j.cta, 'Offer', 'Which offer end-card converts views into clicks and emails best.') +
+      section('By generator', j.generator, 'Generator', 'Kling vs Flow vs Gemini — whether the expensive path earns its cost.');
+    el.innerHTML = html || '<div class="empty">No data yet. Assemble a video, press 📊 Send to Tracker on it, post it with its tracked link — numbers appear here.</div>';
+  }catch(e){ el.innerHTML = '<div class="empty">Error: '+esc(e.message)+'</div>'; }
 }
 
 // ── Queue ───────────────────────────────────────────────────────────────────
@@ -276,9 +322,39 @@ function finalBlockStatus(s){
       <div style="font-size:11px;font-weight:700;color:#1b5e20;margin-bottom:4px;" title="This is the complete video: hook text + story + CTA end-card. This is the file you publish.">✅ FINAL — ready to post (${esc(s.final_duration_s||'?')}s)</div>
       <video src="${esc(s.final_url)}" controls preload="metadata" style="max-width:220px;border-radius:8px;display:block;" title="The finished, publishable video with hook text and end-card. Right-click → Save video as… to download for posting."></video>
       <a href="${esc(s.final_url)}" target="_blank" style="font-size:11px;" title="Open the final file in a new tab (from there: right-click → save).">open / download</a>
+      ${trackerBlock(s)}
     </div>`;
   }
   return '';
+}
+
+function trackerBlock(s){
+  if (!s.social_clip_id) {
+    return `<div style="margin-top:8px;">
+      <button class="btn small primary" onclick="sendToTracker(${s.id}, this)" title="Register this video in your Social Tracker (same system as your other clips). Creates the tracking record with a unique ?ref= link so views, link clicks and email signups all land on THIS story. Free, instant, do it once per video — before posting.">📊 Send to Tracker</button>
+    </div>`;
+  }
+  const views = Number(s.total_views||0), clicks = Number(s.link_clicks||0), emails = Number(s.emails||0);
+  const ctr = views > 0 ? (100*clicks/views).toFixed(2)+'%' : '—';
+  const pub = ['tiktok','instagram','youtube','facebook'].filter(p=>s['published_'+p]).map(p=>p[0].toUpperCase()+p.slice(1,2)).join(' ');
+  const base = 'https://turtleandsun.com/?ref=' + encodeURIComponent(s.ref_tag||'');
+  const linkBtn = (src, label) => `<button class="copybtn" onclick='copyText(${JSON.stringify(base + '&src=' + src)}, this)' title="Copy the tracked link for ${label}. Put THIS link in the video description / bio when posting there — clicks on it are counted for this story.">${label} link</button>`;
+  return `<div style="margin-top:8px;background:#faf8f2;border:1px solid #eee5d0;border-radius:8px;padding:8px 10px;">
+    <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;" title="Live numbers from the tracker for this video. Views come from the platform stats (refreshed daily / on demand in the Tracker page). Clicks = visits on this video's ?ref= link. Emails = waitlist signups that arrived through it.">
+      📊 In tracker as <a href="/admin/social-tracker" title="Open the Social Tracker — publish buttons, per-platform stats and the calendar live there.">${esc(s.ref_tag||'')}</a>
+      · ${views} views · ${clicks} clicks (${ctr}) · ${emails} emails ${pub?'· posted: '+pub:''}
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;" title="Tracked links, one per platform. The src parameter tells the tracker WHERE the click came from.">
+      ${linkBtn('yt','YouTube')} ${linkBtn('tt','TikTok')} ${linkBtn('ig','Instagram')} ${linkBtn('fb','Facebook')}
+    </div>
+  </div>`;
+}
+
+async function sendToTracker(id, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{ await api(`/admin/api/stories/${id}/create-clip`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); }
+  catch(e){ alert('Could not create tracker record: '+e.message); }
+  loadQueue();
 }
 
 async function assemble(id, btn){

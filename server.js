@@ -9409,9 +9409,18 @@ app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
     params.push(limit, offset);
     const { rows } = await pool.query(`
       SELECT vs.*, cc.label AS cta_label, cc.offer_key AS cta_offer_key,
+             sc.ref_tag,
+             sc.published_tiktok, sc.published_instagram, sc.published_youtube, sc.published_facebook,
+             COALESCE(sc.tiktok_views,0)+COALESCE(sc.instagram_views,0)
+               +COALESCE(sc.youtube_views,0)+COALESCE(sc.facebook_views,0) AS total_views,
+             CASE WHEN sc.ref_tag IS NOT NULL
+               THEN (SELECT COUNT(*)::int FROM visits v WHERE v.ref = sc.ref_tag) ELSE 0 END AS link_clicks,
+             CASE WHEN sc.ref_tag IS NOT NULL
+               THEN (SELECT COUNT(*)::int FROM waitlist w WHERE w.ref = sc.ref_tag) ELSE 0 END AS emails,
              COUNT(*) OVER() AS total_count
       FROM video_stories vs
       LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
+      LEFT JOIN social_clips sc ON sc.id = vs.social_clip_id
       ${where}
       ORDER BY vs.created_at DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
@@ -9860,6 +9869,98 @@ app.post('/admin/api/stories/:id(\\d+)/generate-video', requireRole('admin'), as
     res.json({ ok: true, status: 'generating' });
     runStoryVideoJob(story, { tier, generateAudio })
       .catch(err => console.error('[video-story] job crashed:', err.message));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Tracker integration (spec component 9) ──────────────────────────────────
+// A finished story becomes a social_clips row -> the existing Produce/Tracker
+// pages, publish buttons, stats crons and ?ref= click attribution all apply.
+// ref_tag 'vs<id>' ties platform stats, link clicks and email signups to the
+// story's internal tags. One system, no side spreadsheets.
+
+app.post('/admin/api/stories/:id(\\d+)/create-clip', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT vs.*, ss.occasion AS situation_occasion, cc.offer_key AS cta_offer_key
+      FROM video_stories vs
+      LEFT JOIN story_situations ss ON ss.id = vs.situation_id
+      LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
+      WHERE vs.id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const s = rows[0];
+    if (s.social_clip_id) {
+      return res.json({ ok: true, social_clip_id: s.social_clip_id, existing: true });
+    }
+    if (s.final_status !== 'done' || !s.final_url) {
+      return res.status(400).json({ error: 'Assemble the final video first — the tracker records the publishable video.' });
+    }
+    const elements = Array.isArray(s.elements_snapshot) ? s.elements_snapshot : [];
+    const tags = [
+      s.story_type ? 'type:' + s.story_type : null,
+      s.cta_offer_key ? 'cta:' + s.cta_offer_key : null,
+      'gen:' + s.generator,
+      ...elements.map(e => 'el:' + e.name),
+    ].filter(Boolean);
+    const petEl = elements.find(e => e.kind === 'pet');
+    const { rows: clipRows } = await pool.query(`
+      INSERT INTO social_clips (
+        concept_name, output_url, status, ref_tag,
+        subject, subject_name, occasion, mood, action, style,
+        custom_tags, video_overlay_text, notes, end_card_enabled
+      ) VALUES ($1, $2, 'done', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, FALSE)
+      RETURNING id, ref_tag`,
+      [
+        'Story #' + s.id + ' — ' + String(s.hook_text || '').slice(0, 60),
+        s.final_url,
+        'vs' + s.id,
+        'pet',
+        petEl ? petEl.name : null,
+        s.situation_occasion || 'general',
+        s.mood || null,
+        s.story_type || 'story',
+        'video-engine',
+        tags,
+        s.hook_text || null,
+        'Video Engine story #' + s.id + ' (hook + end-card already burned in)',
+      ]);
+    await pool.query(`UPDATE video_stories SET social_clip_id = $2, updated_at = NOW() WHERE id = $1`,
+      [s.id, clipRows[0].id]);
+    res.json({ ok: true, social_clip_id: clipRows[0].id, ref_tag: clipRows[0].ref_tag });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Feedback loop (spec component 10): which KIND of video sells?
+// Aggregates views / link clicks / email signups per story type, CTA offer,
+// and generator — only over stories that made it into the tracker.
+app.get('/admin/api/stories/insights', requireRole('admin'), async (req, res) => {
+  try {
+    const groupings = {
+      story_type: `COALESCE(vs.story_type, '(none)')`,
+      cta: `COALESCE(cc.label, '(no CTA)')`,
+      generator: `vs.generator`,
+    };
+    const out = {};
+    for (const [name, expr] of Object.entries(groupings)) {
+      const { rows } = await pool.query(`
+        SELECT g.key, COUNT(*)::int AS videos,
+               COALESCE(SUM(g.views), 0)::bigint AS views,
+               COALESCE(SUM(g.clicks), 0)::int AS clicks,
+               COALESCE(SUM(g.emails), 0)::int AS emails
+        FROM (
+          SELECT ${expr} AS key,
+                 COALESCE(sc.tiktok_views,0)+COALESCE(sc.instagram_views,0)
+                   +COALESCE(sc.youtube_views,0)+COALESCE(sc.facebook_views,0) AS views,
+                 (SELECT COUNT(*) FROM visits v WHERE v.ref = sc.ref_tag) AS clicks,
+                 (SELECT COUNT(*) FROM waitlist w WHERE w.ref = sc.ref_tag) AS emails
+          FROM video_stories vs
+          JOIN social_clips sc ON sc.id = vs.social_clip_id
+          LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
+        ) g
+        GROUP BY g.key
+        ORDER BY views DESC`);
+      out[name] = rows;
+    }
+    res.json(out);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
