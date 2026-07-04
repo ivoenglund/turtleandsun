@@ -9790,17 +9790,67 @@ app.post('/admin/api/stories/:id(\\d+)/delete-final', requireRole('admin'), asyn
 // Kling takes minutes, so we answer immediately and run the job in the
 // background; the row's video_status drives the queue UI (polled client-side).
 
-async function runStoryVideoJob(story, { tier, generateAudio }) {
-  const modelId = (storyEngine.VIDEO_MODELS[tier] || storyEngine.VIDEO_MODELS.standard).id;
+// Start-frame preparation (spec open item: "test Standard first with
+// start-frame images"). Picks the best element reference photo (pet first,
+// then product), cover-crops it to 1080x1920 (i2v inherits the image's aspect
+// ratio) and stores the crop in R2. Returns null when no usable photo exists.
+async function prepareStoryStartFrame(story) {
+  const els = Array.isArray(story.elements_snapshot) ? story.elements_snapshot : [];
+  const isImg = (u) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(u || ''));
+  let refUrl = null;
+  for (const kind of ['pet', 'product', 'person', 'location', 'prop']) {
+    const el = els.find(e => e.kind === kind
+      && Array.isArray(e.reference_image_urls) && e.reference_image_urls.some(isImg));
+    if (el) { refUrl = el.reference_image_urls.find(isImg); break; }
+  }
+  if (!refUrl) return null;
+
+  const buf = await new Promise((resolve, reject) => {
+    const get = (url, hops) => {
+      if (hops > 4) return reject(new Error('too many redirects'));
+      const lib = url.startsWith('https') ? require('https') : require('http');
+      lib.get(url, r => {
+        if (r.statusCode >= 300 && r.headers.location) return get(r.headers.location, hops + 1);
+        const chunks = [];
+        r.on('data', c => chunks.push(c));
+        r.on('end', () => resolve(Buffer.concat(chunks)));
+      }).on('error', reject);
+    };
+    get(refUrl, 0);
+  });
+
+  const sharp = require('sharp');
+  const cropped = await sharp(buf).resize(1080, 1920, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+  const { uploadBuffer } = require('./storage');
+  const r2 = await uploadBuffer({
+    buffer: cropped, contentType: 'image/jpeg',
+    kind: 'video-story-startframe', baseName: 'story' + story.id + '_start',
+  });
+  return r2.url;
+}
+
+async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
   const scenes = Array.isArray(story.scenes) ? story.scenes : [];
   let genLog = { id: null };
   try {
+    // Start frame: element photo anchors frame 1 = visual consistency across
+    // videos. 'off' skips it; any preparation failure falls back to pure t2v.
+    let startImageUrl = null;
+    if (startFrame !== 'off') {
+      try {
+        startImageUrl = await prepareStoryStartFrame(story);
+      } catch (err) {
+        console.warn('[video-story] start-frame prep failed, using text-to-video:', err.message);
+      }
+    }
+    const tierDef = storyEngine.VIDEO_MODELS[tier] || storyEngine.VIDEO_MODELS.standard;
+    const modelId = startImageUrl ? tierDef.i2v.id : tierDef.id;
     genLog = await generation.logGenerationStart({
       modelId,
-      inputPayload: { story_id: story.id, tier, generate_audio: generateAudio },
+      inputPayload: { story_id: story.id, tier, generate_audio: generateAudio, start_image_url: startImageUrl },
       sourceType: 'video_story',
     });
-    const out = await storyEngine.generateStoryVideo({ scenes, tier, generateAudio });
+    const out = await storyEngine.generateStoryVideo({ scenes, tier, generateAudio, startImageUrl });
     // fal output URLs can expire — copy to R2 immediately (same pattern as orders).
     let finalUrl = out.url;
     try {
@@ -10080,7 +10130,7 @@ app.post('/admin/api/stories/:id(\\d+)/generate-video', requireRole('admin'), as
         video_started_at = NOW(), updated_at = NOW()
       WHERE id = $1`, [story.id]);
     res.json({ ok: true, status: 'generating' });
-    runStoryVideoJob(story, { tier, generateAudio })
+    runStoryVideoJob(story, { tier, generateAudio, startFrame: req.body?.start_frame === 'off' ? 'off' : 'auto' })
       .catch(err => console.error('[video-story] job crashed:', err.message));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

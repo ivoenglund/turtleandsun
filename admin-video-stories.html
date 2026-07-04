@@ -214,6 +214,10 @@ table.lib th{font-size:13px;}
       <option value="on">Audio: on</option>
       <option value="off">Audio: off (cheaper)</option>
     </select>
+    <select id="vStart" title="Start frame = the video's first image comes from an element's reference photo (pet first, then product), auto-cropped to vertical. This is what keeps Jack looking like the REAL Jack across videos. 'auto' uses a photo when one exists on the story's elements (Elements tab), otherwise plain text-to-video. Bonus: with a start frame, Pro tier costs $0.17/s instead of $0.34/s.">
+      <option value="auto">Start frame: auto</option>
+      <option value="off">Start frame: off</option>
+    </select>
     <select id="fStatus" onchange="loadQueue()" title="Filter the queue below by review status. 'Pending review' = waiting for your accept/reject decision.">
       <option value="" selected>All</option>
       <option value="pending_review">Pending review</option>
@@ -678,7 +682,8 @@ async function makeVideo(id, btn){
   if(btn){ btn.disabled = true; btn.textContent = '⏳…'; }
   try{
     await api(`/admin/api/stories/${id}/generate-video`, {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ tier, generate_audio: audio })});
+      body: JSON.stringify({ tier, generate_audio: audio,
+        start_frame: document.getElementById('vStart').value })});
   }catch(e){ alert('Could not start video: '+e.message); }
   loadQueue();
 }

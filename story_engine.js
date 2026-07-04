@@ -183,11 +183,19 @@ const VIDEO_MODELS = {
     id: 'fal-ai/kling-video/v3/standard/text-to-video',
     label: 'Kling v3 Standard',
     usdPerSec: { audioOn: 0.126, audioOff: 0.084 },
+    i2v: {
+      id: 'fal-ai/kling-video/v3/standard/image-to-video',
+      usdPerSec: { audioOn: 0.126, audioOff: 0.084 },
+    },
   },
   pro: {
     id: 'fal-ai/kling-video/v3/pro/text-to-video',
     label: 'Kling v3 Pro',
     usdPerSec: { audioOn: 0.336, audioOff: 0.224 },
+    i2v: {
+      id: 'fal-ai/kling-video/v3/pro/image-to-video',
+      usdPerSec: { audioOn: 0.168, audioOff: 0.112 },
+    },
   },
 };
 
@@ -195,18 +203,22 @@ function clampDuration(totalS) {
   return Math.min(Math.max(Math.round(totalS || 5), 3), 15);
 }
 
-function buildVideoInput(scenes, { generateAudio = true } = {}) {
+function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null } = {}) {
   const list = (Array.isArray(scenes) ? scenes : []).filter(s => s && s.video_prompt);
   if (!list.length) throw new Error('Story has no scenes with video prompts');
   const totalS = clampDuration(list.reduce((a, s) => a + (Number(s.duration_s) || 5), 0));
   const base = {
     duration: String(totalS),
-    aspect_ratio: '9:16',
     generate_audio: !!generateAudio,
     negative_prompt: 'blur, distort, low quality, text, watermark, subtitles',
     cfg_scale: 0.5,
     shot_type: 'customize',
   };
+  // i2v inherits aspect ratio from the start image (pre-cropped to 9:16);
+  // t2v needs it stated explicitly. The API rejects unknown fields, so only
+  // one of the two is ever present.
+  if (startImageUrl) base.start_image_url = startImageUrl;
+  else base.aspect_ratio = '9:16';
   if (list.length === 1) {
     return { input: { ...base, prompt: list[0].video_prompt }, totalS };
   }
@@ -222,16 +234,18 @@ function buildVideoInput(scenes, { generateAudio = true } = {}) {
   };
 }
 
-function estimateVideoCost(tier, totalS, generateAudio) {
+function estimateVideoCost(tier, totalS, generateAudio, useI2v) {
   const m = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
-  return totalS * (generateAudio ? m.usdPerSec.audioOn : m.usdPerSec.audioOff);
+  const rates = useI2v ? m.i2v.usdPerSec : m.usdPerSec;
+  return totalS * (generateAudio ? rates.audioOn : rates.audioOff);
 }
 
-async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true }) {
+async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true, startImageUrl = null }) {
   const model = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
-  const { input, totalS } = buildVideoInput(scenes, { generateAudio });
+  const modelId = startImageUrl ? model.i2v.id : model.id;
+  const { input, totalS } = buildVideoInput(scenes, { generateAudio, startImageUrl });
 
-  const run = async (payload) => fal.subscribe(model.id, {
+  const run = async (payload) => fal.subscribe(modelId, {
     input: payload,
     storageSettings: { expiresIn: 'never' },
   });
@@ -257,9 +271,9 @@ async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = t
     url,
     input,
     raw: result.data,
-    modelId: model.id,
+    modelId,
     totalS,
-    estCostUsd: estimateVideoCost(tier, totalS, generateAudio),
+    estCostUsd: estimateVideoCost(tier, totalS, generateAudio, !!startImageUrl),
   };
 }
 
