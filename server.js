@@ -9955,6 +9955,29 @@ app.delete('/admin/api/story-elements/:id(\\d+)', requireRole('admin'), async (r
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Drag-and-drop upload for CTA end-card media (image or video) -> R2.
+// Returns the permanent URL + detected media type so the grid can slot it
+// into image_url or video_url automatically.
+app.post('/admin/api/cta-cards/upload', requireRole('admin'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    const mt = req.file.mimetype || '';
+    const isVideo = mt.startsWith('video/');
+    const isImage = mt.startsWith('image/');
+    if (!isVideo && !isImage) {
+      return res.status(400).json({ error: `Only image or video files are accepted (got ${mt || 'unknown type'})` });
+    }
+    if (req.file.size > 300 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large (max 300 MB)' });
+    }
+    const { uploadBuffer } = require('./storage');
+    const baseName = 'ctacard_' + String(req.file.originalname || 'media')
+      .replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 60);
+    const r2 = await uploadBuffer({ buffer: req.file.buffer, contentType: mt, kind: 'cta-card', baseName });
+    res.json({ ok: true, url: r2.url, media_type: isVideo ? 'video' : 'image' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/admin/api/cta-cards', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -9978,21 +10001,21 @@ app.post('/admin/api/cta-cards', requireRole('admin'), async (req, res) => {
 
 app.put('/admin/api/cta-cards/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
-    const { offer_key, label, cta_text, video_url, image_url, duration_s, notes, active } = req.body || {};
-    const { rows } = await pool.query(`
-      UPDATE cta_cards SET
-        offer_key = COALESCE($2, offer_key),
-        label = COALESCE($3, label),
-        cta_text = COALESCE($4, cta_text),
-        video_url = COALESCE($5, video_url),
-        image_url = COALESCE($6, image_url),
-        duration_s = COALESCE($7, duration_s),
-        notes = COALESCE($8, notes),
-        active = COALESCE($9, active)
-      WHERE id = $1 RETURNING *`,
-      [req.params.id, offer_key ?? null, label ?? null, cta_text ?? null,
-       video_url ?? null, image_url ?? null, duration_s ?? null, notes ?? null,
-       typeof active === 'boolean' ? active : null]);
+    // Updates exactly the fields present in the body — sending null CLEARS a
+    // field (needed when the grid swaps an image end-card for a video one).
+    const body = req.body || {};
+    const allowed = ['offer_key', 'label', 'cta_text', 'video_url', 'image_url', 'duration_s', 'notes', 'active'];
+    const sets = [];
+    const vals = [req.params.id];
+    for (const f of allowed) {
+      if (Object.prototype.hasOwnProperty.call(body, f)) {
+        vals.push(body[f]);
+        sets.push(`${f} = $${vals.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    const { rows } = await pool.query(
+      `UPDATE cta_cards SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, card: rows[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }

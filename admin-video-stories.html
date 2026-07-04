@@ -64,6 +64,23 @@ table.lib tr.inactive{opacity:.5;}
 .videobox.generating{background:#fff3cd;color:#856404;}
 .videobox.error{background:#fff5f5;border:1px solid #ffccbc;}
 .videobox.done{background:#f0f7ea;border:1px solid #c8e6c9;}
+/* CTA editable grid */
+.cta-row{display:flex;gap:12px;background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:12px;margin-bottom:12px;align-items:flex-start;flex-wrap:wrap;}
+.cta-row.inactive{opacity:.55;}
+.cta-row.dirty{border-color:#FFE800;}
+.cta-media{width:130px;flex-shrink:0;}
+.cta-drop{width:130px;height:190px;border:2px dashed #c9c1a8;border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:#999;cursor:pointer;position:relative;overflow:hidden;background:#faf8f2;}
+.cta-drop.dragover{border-color:#3A6B20;background:#f0f7ea;color:#3A6B20;}
+.cta-drop video,.cta-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.cta-drop .drop-hint{position:relative;z-index:2;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 6px;margin:4px;}
+.cta-drop.hasmedia .drop-hint{opacity:0;transition:opacity .15s;}
+.cta-drop.hasmedia:hover .drop-hint{opacity:1;}
+.cta-fields{flex:1;min-width:260px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cta-fields label{font-size:10px;font-weight:700;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px;}
+.cta-fields input,.cta-fields textarea{width:100%;padding:6px 8px;border-radius:7px;border:1px solid #ccc;font-size:12px;font-family:inherit;}
+.cta-fields .full{grid-column:1 / -1;}
+.cta-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+.uploading{font-size:11px;color:#856404;background:#fff3cd;border-radius:6px;padding:3px 6px;position:relative;z-index:2;}
 </style>
 </head>
 <body class="ts-nav-loggedin ts-nav-admin">
@@ -153,18 +170,11 @@ table.lib tr.inactive{opacity:.5;}
 <div id="tab-ctas" style="display:none;">
   <div class="lib-wrap">
     <p style="font-size:12px;color:#777;margin-bottom:10px;">
-      Reusable part-2 end-cards — one per offer, generated once at top quality, rotated across videos.
+      Reusable part-2 end-cards — one per offer, made once, rotated across videos.
+      Edit directly in the grid, then press <b>Save</b> on the row. Drag &amp; drop a video or picture onto the media box — it uploads to your central storage automatically.
     </p>
-    <div class="form-row">
-      <input id="ctaKey" placeholder="offer_key (e.g. rebate-email)" style="width:160px;" title="Short internal ID for the offer (no spaces). Used in tracking to answer 'which offer converts best?'. Example: rebate-email, buy-calendar.">
-      <input id="ctaLabel" placeholder="Label (e.g. 25% off for your email)" style="width:220px;" title="Human-readable name of the offer — shown in dropdowns and on story cards.">
-      <input id="ctaText" placeholder="CTA text shown in card (optional)" style="width:220px;" title="The actual call-to-action wording the viewer sees on the end-card, e.g. 'Get 25% off — link in bio'.">
-      <input id="ctaVideo" placeholder="Video URL (optional)" style="width:200px;" title="URL of a finished 3-5s end-card CLIP. Generate it once at top quality (Kling Pro), paste here, reused on every video. Leave empty if you use an image instead.">
-      <input id="ctaImage" placeholder="Image URL (optional)" style="width:200px;" title="URL of a still PICTURE to use as the end-card — the cheap option. Assembly shows it for the duration set in 'secs' and burns the CTA text on top. Fill in EITHER this or Video URL; if both are set, the video wins.">
-      <input id="ctaDur" placeholder="secs" type="number" step="0.5" value="4" style="width:70px;" title="How long the end-card is shown, in seconds (3-5s recommended). For video end-cards the clip's own length is used.">
-      <button class="btn primary" onclick="addCta()" title="Save this offer card. Active cards rotate into new stories and are available for video assembly.">Add</button>
-    </div>
-    <table class="lib" id="ctaTable"></table>
+    <button class="btn primary" onclick="newCta()" style="margin-bottom:12px;" title="Add an empty row to the grid. Fill it in (offer key + label required), drop a video or picture on the media box, then press Save.">＋ New end-card</button>
+    <div id="ctaGrid"></div>
   </div>
 </div>
 
@@ -451,44 +461,147 @@ async function delEl(id){
   await api('/admin/api/story-elements/'+id, {method:'DELETE'}); loadElements();
 }
 
-// ── CTA cards lib ───────────────────────────────────────────────────────────
+// ── CTA cards: editable grid with drag-and-drop media upload ────────────────
+let ctaCards = [];      // local working copies; unsaved new rows have id === null
+let ctaSeq = 0;         // client-side key for rows without a DB id yet
+
 async function loadCtas(){
   const j = await api('/admin/api/cta-cards');
-  document.getElementById('ctaTable').innerHTML =
-    '<tr><th>Offer key</th><th>Label</th><th>CTA text</th><th>Video</th><th>Image</th><th>Secs</th><th>Used</th><th>Active</th><th></th></tr>' +
-    (j.cards.length ? j.cards.map(c=>`
-      <tr class="${c.active?'':'inactive'}">
-        <td><b>${esc(c.offer_key)}</b></td><td>${esc(c.label)}</td>
-        <td>${esc(c.cta_text||'—')}</td>
-        <td>${c.video_url?'<a href="'+esc(c.video_url)+'" target="_blank" title="The end-card video clip this card uses.">video</a>':'—'}</td>
-        <td>${c.image_url?'<a href="'+esc(c.image_url)+'" target="_blank" title="The end-card picture this card uses (looped for its duration during assembly).">image</a>':'—'}</td>
-        <td>${c.duration_s}</td><td>${c.times_used}</td>
-        <td><button class="btn small" onclick="toggleCta(${c.id},${!c.active})" title="on = this offer rotates into new stories. Click to ${c.active?'pause it':'activate it'}.">${c.active?'on':'off'}</button></td>
-        <td><button class="btn small danger" onclick="delCta(${c.id})" title="Delete this offer card permanently. Stories that used it keep working (they only lose the label).">✗</button></td>
-      </tr>`).join('') : '<tr><td colspan="9" style="color:#aaa;">No CTA cards yet — first one: the rebate-for-email offer.</td></tr>');
+  ctaCards = j.cards.map(c => ({ ...c, _key: 'db' + c.id, _dirty: false }));
+  renderCtaGrid();
 }
-async function addCta(){
-  const offer_key = document.getElementById('ctaKey').value.trim();
-  const label = document.getElementById('ctaLabel').value.trim();
-  if(!offer_key || !label) return alert('offer_key and label required');
-  await api('/admin/api/cta-cards', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      offer_key, label,
-      cta_text: document.getElementById('ctaText').value.trim()||null,
-      video_url: document.getElementById('ctaVideo').value.trim()||null,
-      image_url: document.getElementById('ctaImage').value.trim()||null,
-      duration_s: parseFloat(document.getElementById('ctaDur').value)||4,
-    })});
-  ['ctaKey','ctaLabel','ctaText','ctaVideo','ctaImage'].forEach(id=>document.getElementById(id).value='');
+
+function newCta(){
+  ctaCards.unshift({ id: null, _key: 'new' + (++ctaSeq), _dirty: true,
+    offer_key: '', label: '', cta_text: '', video_url: null, image_url: null,
+    duration_s: 4, active: true, times_used: 0 });
+  renderCtaGrid();
+}
+
+function ctaByKey(key){ return ctaCards.find(c => c._key === key); }
+
+function mediaPreview(c){
+  if (c._uploading) return `<span class="uploading">⏳ Uploading…</span>`;
+  if (c.video_url) return `<video src="${esc(c.video_url)}" muted loop onmouseover="this.play()" onmouseout="this.pause()" title="The end-card video this offer uses (hover to preview). Drop a new file to replace it."></video><span class="drop-hint">Drop to replace</span>`;
+  if (c.image_url) return `<img src="${esc(c.image_url)}" title="The end-card picture this offer uses. Drop a new file to replace it."><span class="drop-hint">Drop to replace</span>`;
+  return `<span class="drop-hint">Drag &amp; drop<br>video or picture<br><small>(or click to choose)</small></span>`;
+}
+
+function renderCtaGrid(){
+  const grid = document.getElementById('ctaGrid');
+  if (!ctaCards.length){
+    grid.innerHTML = '<div class="empty">No end-cards yet. Click ＋ New end-card — the first one should be your rebate-for-email offer.</div>';
+    return;
+  }
+  grid.innerHTML = ctaCards.map(c => `
+  <div class="cta-row ${c.active?'':'inactive'} ${c._dirty?'dirty':''}" data-key="${c._key}">
+    <div class="cta-media">
+      <div class="cta-drop ${ (c.video_url||c.image_url) ? 'hasmedia' : '' }"
+        title="The end-card visual. Drag & drop a video or picture file from your computer here — it is uploaded to central storage (R2) immediately and the row updates itself. Click to pick a file instead. Video and picture both work; a picture is shown for the number of seconds set below."
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="ctaDrop(event,'${c._key}')"
+        onclick="document.getElementById('file_${c._key}').click()">
+        ${mediaPreview(c)}
+      </div>
+      <input type="file" id="file_${c._key}" accept="image/*,video/*" style="display:none" onchange="ctaFilePicked(event,'${c._key}')">
+    </div>
+    <div class="cta-fields">
+      <div><label title="Short internal ID for the offer (no spaces) — used in tracking to answer 'which offer converts best?'.">Offer key</label>
+        <input value="${esc(c.offer_key||'')}" oninput="ctaEdit('${c._key}','offer_key',this.value)" placeholder="rebate-email" title="Short internal ID, e.g. rebate-email or buy-calendar. Required."></div>
+      <div><label title="Human-readable name — shown in dropdowns and on story cards.">Label</label>
+        <input value="${esc(c.label||'')}" oninput="ctaEdit('${c._key}','label',this.value)" placeholder="25% off for your email" title="The offer's display name. Required."></div>
+      <div class="full"><label title="The wording burned onto the end-card during assembly. Change it any time — no regeneration needed.">CTA text (burned onto the card)</label>
+        <input value="${esc(c.cta_text||'')}" oninput="ctaEdit('${c._key}','cta_text',this.value)" placeholder="Get 25% off — link in bio" title="What the viewer reads on the end-card. Leave empty for no burned text."></div>
+      <div><label title="How long a PICTURE end-card is shown (2-8 s). Video end-cards use their own length.">Seconds</label>
+        <input type="number" step="0.5" min="2" max="8" value="${esc(c.duration_s||4)}" oninput="ctaEdit('${c._key}','duration_s',this.value)" title="Display time for picture end-cards, in seconds."></div>
+      <div><label title="How many stories have used this offer so far.">Used</label>
+        <div style="padding:6px 2px;font-size:12px;">${c.times_used||0}×</div></div>
+    </div>
+    <div class="cta-actions">
+      <button class="btn primary" onclick="saveCta('${c._key}', this)" ${c._dirty?'':'disabled'} title="Save this row's changes to the database. Lights up yellow-edged when there are unsaved edits.">💾 Save</button>
+      <button class="btn small" onclick="ctaToggle('${c._key}')" title="on = this offer rotates into new stories and can be assembled. off = paused (kept, not used).">${c.active?'on':'off'}</button>
+      <button class="btn small danger" onclick="delCta('${c._key}')" title="Delete this offer card permanently. Stories that used it keep working; they only lose the label.">✗ Delete</button>
+    </div>
+  </div>`).join('');
+}
+
+function ctaEdit(key, field, value){
+  const c = ctaByKey(key); if (!c) return;
+  c[field] = field === 'duration_s' ? (parseFloat(value)||4) : value;
+  if (!c._dirty){ c._dirty = true;
+    const row = document.querySelector(`.cta-row[data-key="${key}"]`);
+    if (row){ row.classList.add('dirty'); const b = row.querySelector('.cta-actions .btn.primary'); if (b) b.disabled = false; }
+  }
+}
+
+async function saveCta(key, btn){
+  const c = ctaByKey(key); if (!c) return;
+  if (!String(c.offer_key||'').trim() || !String(c.label||'').trim())
+    return alert('Offer key and Label are required.');
+  if (btn){ btn.disabled = true; btn.textContent = '…'; }
+  const body = { offer_key: c.offer_key.trim(), label: c.label.trim(),
+    cta_text: (c.cta_text||'').trim() || null,
+    video_url: c.video_url || null, image_url: c.image_url || null,
+    duration_s: c.duration_s || 4, active: !!c.active };
+  try{
+    if (c.id) await api('/admin/api/cta-cards/'+c.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    else await api('/admin/api/cta-cards', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    await loadCtas();
+  }catch(e){ alert('Save failed: '+e.message); if (btn){ btn.disabled = false; btn.textContent = '💾 Save'; } }
+}
+
+async function ctaToggle(key){
+  const c = ctaByKey(key); if (!c) return;
+  c.active = !c.active;
+  if (c.id){
+    try{ await api('/admin/api/cta-cards/'+c.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active: c.active})}); }
+    catch(e){ alert(e.message); c.active = !c.active; }
+  } else { c._dirty = true; }
+  renderCtaGrid();
+}
+
+async function delCta(key){
+  const c = ctaByKey(key); if (!c) return;
+  if (!c.id){ ctaCards = ctaCards.filter(x => x._key !== key); renderCtaGrid(); return; }
+  if (!confirm('Delete end-card "'+(c.label||c.offer_key)+'" permanently?')) return;
+  try{ await api('/admin/api/cta-cards/'+c.id, {method:'DELETE'}); }catch(e){ alert(e.message); }
   loadCtas();
 }
-async function toggleCta(id, active){
-  await api('/admin/api/cta-cards/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
-  loadCtas();
+
+function ctaDrop(ev, key){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('dragover');
+  const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) uploadCtaFile(key, file);
 }
-async function delCta(id){
-  if(!confirm('Delete CTA card?')) return;
-  await api('/admin/api/cta-cards/'+id, {method:'DELETE'}); loadCtas();
+function ctaFilePicked(ev, key){
+  const file = ev.target.files && ev.target.files[0];
+  if (file) uploadCtaFile(key, file);
+  ev.target.value = '';
+}
+
+async function uploadCtaFile(key, file){
+  const c = ctaByKey(key); if (!c) return;
+  if (!/^(image|video)\//.test(file.type)) return alert('Only picture or video files, please (got: '+(file.type||'unknown')+').');
+  if (file.size > 300*1024*1024) return alert('File too large (max 300 MB).');
+  c._uploading = true; renderCtaGrid();
+  try{
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch('/admin/api/cta-cards/upload', { method:'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    if (j.media_type === 'video'){ c.video_url = j.url; c.image_url = null; }
+    else { c.image_url = j.url; c.video_url = null; }
+    // Media changes save immediately for existing rows — no extra click needed.
+    if (c.id){
+      await api('/admin/api/cta-cards/'+c.id, {method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ video_url: c.video_url, image_url: c.image_url })});
+    } else { c._dirty = true; }
+  }catch(e){ alert('Upload failed: '+e.message); }
+  c._uploading = false;
+  renderCtaGrid();
 }
 
 loadPickers();
