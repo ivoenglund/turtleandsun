@@ -1165,6 +1165,19 @@ async function initDb() {
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_error        TEXT;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_duration_s   INTEGER;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_completed_at TIMESTAMPTZ;
+
+    -- 2026-07-04 (part 4): posting texts live ON the story (auto-written at
+    -- assembly, editable in the queue) and are copied to the tracker record
+    -- when the story is sent there.
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS yt_title           TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS yt_description     TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS yt_keyword_tags    TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS tiktok_caption     TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS tiktok_hashtags    TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS instagram_caption  TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS instagram_hashtags TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS instagram_alt_text TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS fb_caption         TEXT;
   `);
 
   // Allow the generations audit log to record video-engine runs.

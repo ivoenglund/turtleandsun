@@ -60,6 +60,15 @@ table.lib tr.inactive{opacity:.5;}
 .form-row textarea{min-width:280px;min-height:44px;}
 .copybtn{background:none;border:1px solid #ccc;border-radius:6px;font-size:10px;padding:2px 8px;cursor:pointer;color:#555;}
 .copybtn:hover{background:#f0f7ea;}
+.hookedit{font-size:16px;font-weight:800;border:1px solid transparent;border-radius:7px;padding:4px 6px;width:100%;font-family:inherit;background:transparent;}
+.hookedit:hover,.hookedit:focus{border-color:#ccc;background:#fff;outline:none;}
+.scene-edit{width:100%;min-height:64px;font-size:12px;line-height:1.5;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-family:inherit;background:transparent;resize:vertical;}
+.scene-edit:hover,.scene-edit:focus{border-color:#ccc;background:#fff;outline:none;}
+.scene-dur{width:52px;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:6px;}
+.kit-edit{width:100%;min-height:40px;font-size:11px;line-height:1.45;border:1px solid #e3dcc8;border-radius:7px;padding:5px 7px;font-family:inherit;background:#fff;resize:vertical;}
+.card .save-edits{display:none;}
+.card.editdirty .save-edits{display:inline-block;}
+.card.editdirty{border-color:#FFE800;}
 .videobox{font-size:12px;padding:8px 10px;border-radius:8px;}
 .videobox.generating{background:#fff3cd;color:#856404;}
 .videobox.error{background:#fff5f5;border:1px solid #ffccbc;}
@@ -322,6 +331,10 @@ function finalBlockStatus(s){
       <div style="font-size:11px;font-weight:700;color:#1b5e20;margin-bottom:4px;" title="This is the complete video: hook text + story + CTA end-card. This is the file you publish.">✅ FINAL — ready to post (${esc(s.final_duration_s||'?')}s)</div>
       <video src="${esc(s.final_url)}" controls preload="metadata" style="max-width:220px;border-radius:8px;display:block;" title="The finished, publishable video with hook text and end-card. Right-click → Save video as… to download for posting."></video>
       <a href="${esc(s.final_url)}" target="_blank" style="font-size:11px;" title="Open the final file in a new tab (from there: right-click → save).">open / download</a>
+      <div style="margin-top:6px;">
+        <button class="btn small ${s.yt_title?'':'primary'}" onclick="makeKit(${s.id}, this)" title="${s.yt_title?'Throw away the current posting texts and have the LLM write fresh ones (~$0.001). Your manual edits to the texts are LOST — edit in place instead if you just want tweaks.':'Have the LLM write the posting texts for this video (~$0.001). Normally happens automatically when assembly finishes — this button is the manual fallback.'}">${s.yt_title?'📝 Rewrite texts (discards edits)':'📝 Generate posting texts'}</button>
+      </div>
+      ${kitBlock(s)}
       ${trackerBlock(s)}
     </div>`;
   }
@@ -347,34 +360,35 @@ function trackerBlock(s){
     <div style="display:flex;gap:4px;flex-wrap:wrap;" title="Tracked links, one per platform. The src parameter tells the tracker WHERE the click came from.">
       ${linkBtn('yt','YouTube')} ${linkBtn('tt','TikTok')} ${linkBtn('ig','Instagram')} ${linkBtn('fb','Facebook')}
     </div>
-    <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
-      <button class="btn small ${s.yt_title?'':'primary'}" onclick="makeKit(${s.id}, this)" title="Have the LLM write proper posting texts for THIS story: YouTube title/description/keywords, TikTok caption+hashtags, Instagram caption+hashtags+alt text, Facebook caption — tracked links baked in. Saved onto the tracker record, so the upload dialogs prefill them. ~$0.001. Regenerating overwrites the previous texts.">${s.yt_title?'📝 Regenerate texts':'📝 Generate posting texts'}</button>
+    <div style="margin-top:6px;">
       <button class="btn small danger" onclick="removeFromTracker(${s.id}, ${s.social_clip_id})" title="Delete this video's tracker row (and its collected stats history + posting texts). The story itself is NOT touched — it goes back to showing 📊 Send to Tracker so you can start over cleanly. Use after deleting a wrongly-posted video on YouTube/TikTok. Re-sending recreates the same ${esc(s.ref_tag||'vs'+s.id)} link, so any old link clicks re-attach automatically.">🗑 Remove from Tracker</button>
     </div>
-    ${kitBlock(s)}
   </div>`;
 }
 
 function kitBlock(s){
   if (!s.yt_title) return '';
-  const item = (label, text, tip) => text ? `
+  const item = (label, field, tip) => {
+    const text = s[field] || '';
+    return `
     <div style="margin-bottom:6px;">
       <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;" title="${esc(tip)}">${esc(label)}
-        <button class="copybtn" onclick='copyText(${JSON.stringify(String(text))}, this)' title="Copy this text to the clipboard for pasting into the platform's upload form.">copy</button></div>
-      <div style="font-size:11px;white-space:pre-wrap;word-break:break-word;">${esc(text)}</div>
-    </div>` : '';
-  return `<details style="margin-top:6px;">
-    <summary style="font-size:11px;font-weight:700;cursor:pointer;" title="The LLM-written posting texts for this video. YouTube fields prefill the upload dialog in the Tracker automatically; TikTok/Instagram texts you copy-paste when posting there.">📝 Posting texts (click to open)</summary>
+        <button class="copybtn" onclick='copyText(${JSON.stringify(String(text))}, this)' title="Copy this text to the clipboard for pasting into the platform's upload form. (Copies the SAVED version — press 💾 Save edits first if you just changed it.)">copy</button></div>
+      <textarea class="kit-edit" data-story="${s.id}" data-field="${field}" oninput="markEdited(${s.id})" title="${esc(tip)} — Editable: change it, press 💾 Save edits. If the story is in the Tracker, the tracker record updates too.">${esc(text)}</textarea>
+    </div>`;
+  };
+  return `<details style="margin-top:6px;" ${s.social_clip_id?'':'open'}>
+    <summary style="font-size:11px;font-weight:700;cursor:pointer;" title="The posting texts for this video — written automatically when assembly finished. ALL EDITABLE: change anything, press 💾 Save edits. YouTube fields prefill the upload dialog in the Tracker; TikTok/Instagram texts you copy-paste when posting.">📝 Posting texts (editable — click to open/close)</summary>
     <div style="padding:8px 4px 0;">
-      ${item('YouTube title', s.yt_title, 'Used automatically by the YouTube upload dialog in the Tracker.')}
-      ${item('YouTube description', s.yt_description, 'Contains the tracked YouTube link. Used automatically by the upload dialog.')}
-      ${item('YouTube keywords', s.yt_keyword_tags, 'Comma-separated search keywords, used by the upload dialog.')}
-      ${item('TikTok caption', s.tiktok_caption, 'Paste as the caption when posting on TikTok. Clickable link goes in your bio.')}
-      ${item('TikTok hashtags', s.tiktok_hashtags, 'Add after the caption.')}
-      ${item('Instagram caption', s.instagram_caption, 'Paste when posting the Reel. Clickable link goes in your bio.')}
-      ${item('Instagram hashtags', s.instagram_hashtags, 'Add to the caption or first comment.')}
-      ${item('Instagram alt text', s.instagram_alt_text, 'Accessibility description — paste under Advanced settings → Alt text.')}
-      ${item('Facebook caption', s.fb_caption, 'Contains the tracked Facebook link (clickable on FB).')}
+      ${item('YouTube title', 'yt_title', 'Used automatically by the YouTube upload dialog in the Tracker.')}
+      ${item('YouTube description', 'yt_description', 'Contains the tracked YouTube link — keep it in when editing. Used automatically by the upload dialog.')}
+      ${item('YouTube keywords', 'yt_keyword_tags', 'Comma-separated search keywords, used by the upload dialog.')}
+      ${item('TikTok caption', 'tiktok_caption', 'Paste as the caption when posting on TikTok. Clickable link goes in your bio.')}
+      ${item('TikTok hashtags', 'tiktok_hashtags', 'Add after the caption.')}
+      ${item('Instagram caption', 'instagram_caption', 'Paste when posting the Reel. Clickable link goes in your bio.')}
+      ${item('Instagram hashtags', 'instagram_hashtags', 'Add to the caption or first comment.')}
+      ${item('Instagram alt text', 'instagram_alt_text', 'Accessibility description — paste under Advanced settings → Alt text.')}
+      ${item('Facebook caption', 'fb_caption', 'Contains the tracked Facebook link (clickable on FB) — keep it in when editing.')}
     </div>
   </details>`;
 }
@@ -399,6 +413,9 @@ async function removeFromTracker(storyId, clipId){
 }
 
 async function makeKit(id, btn){
+  const card = document.getElementById('card_'+id);
+  const hasTexts = card && card.querySelector('.kit-edit');
+  if (hasTexts && !confirm('Rewrite the posting texts from scratch?\n\nThis DISCARDS the current texts including any edits you made. Cancel if you only want to tweak — the texts are directly editable on the card.')) return;
   if(btn){ btn.disabled = true; btn.textContent = '📝 Writing…'; }
   try{ await api(`/admin/api/stories/${id}/posting-kit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); }
   catch(e){ alert('Could not generate posting texts: '+e.message); }
@@ -423,10 +440,11 @@ async function assemble(id, btn){
 function storyCard(s){
   const scenes = (Array.isArray(s.scenes)? s.scenes : []).map((sc,i)=>`
     <div class="scene">
-      <div class="scene-head" title="One shot of the video. The duration and the prompt below are what gets sent to the video generator.">Scene ${i+1} · ${esc(sc.duration_s)}s
+      <div class="scene-head" title="One shot of the video. Edit the duration and prompt freely — press 💾 Save edits, then 🎬 Re-make to regenerate the video with your changes.">Scene ${i+1} ·
+        <input type="number" class="scene-dur" min="2" max="10" value="${esc(sc.duration_s)}" data-story="${s.id}" data-scene="${i}" oninput="markEdited(${s.id})" title="Scene length in seconds (2-10). Applies on the next 🎬 video generation.">s
         <button class="copybtn" onclick='copyText(${JSON.stringify(String(sc.video_prompt||''))}, this)' title="Copy this scene's prompt to the clipboard — for pasting manually into Google Flow or the Gemini app (the free/manual path).">copy prompt</button>
       </div>
-      <div class="scene-prompt">${esc(sc.video_prompt)}</div>
+      <textarea class="scene-edit" data-story="${s.id}" data-scene="${i}" oninput="markEdited(${s.id})" title="The video prompt for this scene — click and edit directly. Saved with 💾 Save edits; used the next time you press 🎬.">${esc(sc.video_prompt)}</textarea>
     </div>`).join('');
   const els = (Array.isArray(s.elements_snapshot)? s.elements_snapshot : [])
     .map(e=>esc(e.name)+' ('+esc(e.kind)+')').join(' · ');
@@ -438,8 +456,8 @@ function storyCard(s){
     : `<button class="btn small danger" onclick="delStory(${s.id})" title="Permanently delete this story record from the database. Cannot be undone.">Delete</button>
        <button class="btn small" onclick="act(${s.id},'regenerate', this)" title="Write a new story text into this same card (~$0.001) and put it back into Pending review.">↺ Regenerate</button>`;
   return `
-  <div class="card ${esc(s.status)}">
-    <div class="hook" title="The hook — the text burned onto the video's first frames. Its only job: stop the scroll.">${esc(s.hook_text)}</div>
+  <div class="card ${esc(s.status)}" id="card_${s.id}">
+    <input class="hookedit" id="hook_${s.id}" value="${esc(s.hook_text)}" oninput="markEdited(${s.id})" title="The hook — the text burned onto the video's first frames. Its only job: stop the scroll. Click to edit; applies on the next 🎞 assembly.">
     <div class="meta">
       <span class="badge st-${esc(s.status)}" title="Review status: pending review = waiting for your decision · accepted = ready for video · rejected = discarded.">${esc(s.status.replace('_',' '))}</span>
       <span class="badge type" title="Story type — the narrative formula (pet_pov = pet's perspective, before_after = transformation, demo = product in use, …). Used later to learn which TYPE sells.">${esc(s.story_type||'')}</span>
@@ -453,8 +471,36 @@ function storyCard(s){
     ${els?'<div class="elements-line" title="The elements (cast & props) woven into this story’s prompts.">Elements: '+els+'</div>':''}
     ${s.llm_notes?'<div class="llm-notes" title="Free-text remarks the LLM added for you, the producer.">LLM notes: '+esc(s.llm_notes)+'</div>':''}
     ${s.review_note?'<div class="note" title="Your reason for rejecting — feeds the future learning loop.">Reject note: '+esc(s.review_note)+'</div>':''}
-    <div class="card-actions">${actions} ${videoBlock(s)}</div>
+    <div class="card-actions">
+      <button class="btn primary save-edits" onclick="saveStory(${s.id}, this)" title="Save your edits to hook, scene prompts, durations and posting texts. Appears as soon as you change something. If the story is already in the Tracker, the texts there are updated too. Videos are NOT regenerated automatically — use 🎬 / 🎞 after saving if the change should reach the video.">💾 Save edits</button>
+      ${actions} ${videoBlock(s)}
+    </div>
   </div>`;
+}
+
+function markEdited(id){
+  const card = document.getElementById('card_'+id);
+  if (card) card.classList.add('editdirty');
+}
+
+async function saveStory(id, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  const body = { hook_text: (document.getElementById('hook_'+id)||{}).value || '' };
+  const prompts = [...document.querySelectorAll(`.scene-edit[data-story="${id}"]`)];
+  if (prompts.length){
+    const durs = [...document.querySelectorAll(`.scene-dur[data-story="${id}"]`)];
+    body.scenes = prompts.map((ta,i)=>({
+      duration_s: parseFloat((durs[i]||{}).value) || 5,
+      video_prompt: ta.value,
+    }));
+  }
+  document.querySelectorAll(`.kit-edit[data-story="${id}"]`).forEach(ta=>{
+    body[ta.dataset.field] = ta.value;
+  });
+  try{
+    await api('/admin/api/stories/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  }catch(e){ alert('Save failed: '+e.message); }
+  loadQueue();
 }
 
 async function makeVideo(id, btn){

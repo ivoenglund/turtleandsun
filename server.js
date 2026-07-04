@@ -9417,10 +9417,6 @@ app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
     const { rows } = await pool.query(`
       SELECT vs.*, cc.label AS cta_label, cc.offer_key AS cta_offer_key,
              sc.ref_tag,
-             sc.yt_title, sc.yt_description, sc.yt_keyword_tags,
-             sc.tiktok_caption, sc.tiktok_hashtags,
-             sc.instagram_caption, sc.instagram_hashtags, sc.instagram_alt_text,
-             sc.fb_caption,
              sc.published_tiktok, sc.published_instagram, sc.published_youtube, sc.published_facebook,
              COALESCE(sc.tiktok_views,0)+COALESCE(sc.instagram_views,0)
                +COALESCE(sc.youtube_views,0)+COALESCE(sc.facebook_views,0) AS total_views,
@@ -9599,18 +9595,60 @@ app.post('/admin/api/stories/:id(\\d+)/reject', requireRole('admin'), async (req
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+const STORY_TEXT_FIELDS = [
+  'yt_title', 'yt_description', 'yt_keyword_tags',
+  'tiktok_caption', 'tiktok_hashtags',
+  'instagram_caption', 'instagram_hashtags', 'instagram_alt_text',
+  'fb_caption',
+];
+
 app.put('/admin/api/stories/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
-    const { hook_text, scenes } = req.body || {};
-    const { rows } = await pool.query(`
-      UPDATE video_stories SET
-        hook_text = COALESCE($2, hook_text),
-        scenes = COALESCE($3::jsonb, scenes),
-        updated_at = NOW()
-      WHERE id = $1 RETURNING *`,
-      [req.params.id, hook_text || null, scenes ? JSON.stringify(scenes) : null]);
+    // Field-presence semantics (like the CTA grid): only keys present in the
+    // body are updated. Editable: hook, scenes, and all posting texts.
+    const body = req.body || {};
+    const allowed = ['hook_text', ...STORY_TEXT_FIELDS];
+    const sets = [];
+    const vals = [req.params.id];
+    for (const f of allowed) {
+      if (Object.prototype.hasOwnProperty.call(body, f)) {
+        vals.push(body[f]);
+        sets.push(`${f} = $${vals.length}`);
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'scenes') && Array.isArray(body.scenes)) {
+      vals.push(JSON.stringify(body.scenes));
+      sets.push(`scenes = $${vals.length}::jsonb`);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    sets.push('updated_at = NOW()');
+    const { rows } = await pool.query(
+      `UPDATE video_stories SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, story: rows[0] });
+    const story = rows[0];
+
+    // Already in the tracker? Keep the tracker record in sync so the upload
+    // dialogs always show the edited texts.
+    if (story.social_clip_id) {
+      const clipSets = [];
+      const clipVals = [story.social_clip_id];
+      for (const f of STORY_TEXT_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(body, f)) {
+          clipVals.push(body[f]);
+          clipSets.push(`${f} = $${clipVals.length}`);
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'hook_text')) {
+        clipVals.push(body.hook_text);
+        clipSets.push(`video_overlay_text = $${clipVals.length}`);
+      }
+      if (clipSets.length) {
+        clipSets.push('updated_at = NOW()');
+        await pool.query(
+          `UPDATE social_clips SET ${clipSets.join(', ')} WHERE id = $1`, clipVals);
+      }
+    }
+    res.json({ ok: true, story });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -9792,6 +9830,43 @@ async function runStoryAssemblyJob(story, ctaCard) {
       UPDATE video_stories SET final_status = 'done', final_url = $2, final_error = NULL,
         final_duration_s = $3, final_completed_at = NOW(), updated_at = NOW()
       WHERE id = $1`, [story.id, r2.url, totalDur]);
+
+    // Auto-write posting texts on FIRST assembly only (never overwrites
+    // edited texts on re-assembly). Best effort — a text failure must not
+    // fail the finished video.
+    try {
+      const { rows: fresh } = await pool.query(`
+        SELECT vs.*, ss.text AS sit_text, cc.label AS cta_label, cc.cta_text AS cta_cta_text
+        FROM video_stories vs
+        LEFT JOIN story_situations ss ON ss.id = vs.situation_id
+        LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
+        WHERE vs.id = $1`, [story.id]);
+      const s2 = fresh[0];
+      if (s2 && !s2.yt_title) {
+        const base = 'https://turtleandsun.com/calendar?ref=vs' + story.id;
+        const model = await getStoryLlmModel();
+        const { kit, costUsd } = await storyEngine.generatePostingKit({
+          story: s2,
+          situationText: s2.situation_text || s2.sit_text,
+          ctaCard: s2.cta_label ? { label: s2.cta_label, cta_text: s2.cta_cta_text } : null,
+          links: { yt: base + '&src=yt', fb: base + '&src=fb' },
+          model,
+        });
+        await pool.query(`
+          UPDATE video_stories SET
+            yt_title = $2, yt_description = $3, yt_keyword_tags = $4,
+            tiktok_caption = $5, tiktok_hashtags = $6,
+            instagram_caption = $7, instagram_hashtags = $8, instagram_alt_text = $9,
+            fb_caption = $10, llm_cost_usd = COALESCE(llm_cost_usd, 0) + $11, updated_at = NOW()
+          WHERE id = $1`,
+          [story.id, kit.yt_title, kit.yt_description, kit.yt_keyword_tags,
+           kit.tiktok_caption, kit.tiktok_hashtags,
+           kit.instagram_caption, kit.instagram_hashtags, kit.instagram_alt_text,
+           kit.fb_caption, costUsd]);
+      }
+    } catch (err) {
+      console.warn('[story-assembly] posting texts failed (generate manually with 📝):', err.message);
+    }
   } catch (err) {
     console.error('[story-assembly] failed for story', story.id, ':', err.message);
     await pool.query(`
@@ -9917,8 +9992,12 @@ app.post('/admin/api/stories/:id(\\d+)/create-clip', requireRole('admin'), async
       INSERT INTO social_clips (
         concept_name, output_url, status, ref_tag,
         subject, subject_name, occasion, mood, action, style,
-        custom_tags, video_overlay_text, notes, end_card_enabled
-      ) VALUES ($1, $2, 'done', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, FALSE)
+        custom_tags, video_overlay_text, notes, end_card_enabled,
+        yt_title, yt_description, yt_keyword_tags,
+        tiktok_caption, tiktok_hashtags,
+        instagram_caption, instagram_hashtags, instagram_alt_text, fb_caption
+      ) VALUES ($1, $2, 'done', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, FALSE,
+        $13, $14, $15, $16, $17, $18, $19, $20, $21)
       RETURNING id, ref_tag`,
       [
         'Story #' + s.id + ' — ' + String(s.hook_text || '').slice(0, 60),
@@ -9933,6 +10012,10 @@ app.post('/admin/api/stories/:id(\\d+)/create-clip', requireRole('admin'), async
         tags,
         s.hook_text || null,
         'Video Engine story #' + s.id + ' (hook + end-card already burned in)',
+        s.yt_title || null, s.yt_description || null, s.yt_keyword_tags || null,
+        s.tiktok_caption || null, s.tiktok_hashtags || null,
+        s.instagram_caption || null, s.instagram_hashtags || null,
+        s.instagram_alt_text || null, s.fb_caption || null,
       ]);
     await pool.query(`UPDATE video_stories SET social_clip_id = $2, updated_at = NOW() WHERE id = $1`,
       [s.id, clipRows[0].id]);
@@ -9945,19 +10028,16 @@ app.post('/admin/api/stories/:id(\\d+)/create-clip', requireRole('admin'), async
 app.post('/admin/api/stories/:id(\\d+)/posting-kit', requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT vs.*, ss.text AS sit_text, cc.label AS cta_label, cc.cta_text AS cta_cta_text,
-             sc.id AS clip_id, sc.ref_tag
+      SELECT vs.*, ss.text AS sit_text, cc.label AS cta_label, cc.cta_text AS cta_cta_text
       FROM video_stories vs
       LEFT JOIN story_situations ss ON ss.id = vs.situation_id
       LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
-      LEFT JOIN social_clips sc ON sc.id = vs.social_clip_id
       WHERE vs.id = $1`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const s = rows[0];
-    if (!s.clip_id || !s.ref_tag) {
-      return res.status(400).json({ error: 'Press 📊 Send to Tracker first — the texts need this video\'s tracked link.' });
-    }
-    const base = 'https://turtleandsun.com/calendar?ref=' + encodeURIComponent(s.ref_tag);
+    // ref_tag is deterministic ('vs<id>'), so texts can be written before the
+    // story is in the tracker — the link will be correct either way.
+    const base = 'https://turtleandsun.com/calendar?ref=vs' + s.id;
     const links = { yt: base + '&src=yt', fb: base + '&src=fb' };
     const model = await getStoryLlmModel();
     const { kit, costUsd } = await storyEngine.generatePostingKit({
@@ -9967,19 +10047,29 @@ app.post('/admin/api/stories/:id(\\d+)/posting-kit', requireRole('admin'), async
       links, model,
     });
     await pool.query(`
-      UPDATE social_clips SET
+      UPDATE video_stories SET
         yt_title = $2, yt_description = $3, yt_keyword_tags = $4,
         tiktok_caption = $5, tiktok_hashtags = $6,
         instagram_caption = $7, instagram_hashtags = $8, instagram_alt_text = $9,
-        fb_caption = $10, updated_at = NOW()
+        fb_caption = $10, llm_cost_usd = COALESCE(llm_cost_usd, 0) + $11, updated_at = NOW()
       WHERE id = $1`,
-      [s.clip_id, kit.yt_title, kit.yt_description, kit.yt_keyword_tags,
+      [s.id, kit.yt_title, kit.yt_description, kit.yt_keyword_tags,
        kit.tiktok_caption, kit.tiktok_hashtags,
        kit.instagram_caption, kit.instagram_hashtags, kit.instagram_alt_text,
-       kit.fb_caption]);
-    await pool.query(`
-      UPDATE video_stories SET llm_cost_usd = COALESCE(llm_cost_usd, 0) + $2, updated_at = NOW()
-      WHERE id = $1`, [s.id, costUsd]);
+       kit.fb_caption, costUsd]);
+    if (s.social_clip_id) {
+      await pool.query(`
+        UPDATE social_clips SET
+          yt_title = $2, yt_description = $3, yt_keyword_tags = $4,
+          tiktok_caption = $5, tiktok_hashtags = $6,
+          instagram_caption = $7, instagram_hashtags = $8, instagram_alt_text = $9,
+          fb_caption = $10, updated_at = NOW()
+        WHERE id = $1`,
+        [s.social_clip_id, kit.yt_title, kit.yt_description, kit.yt_keyword_tags,
+         kit.tiktok_caption, kit.tiktok_hashtags,
+         kit.instagram_caption, kit.instagram_hashtags, kit.instagram_alt_text,
+         kit.fb_caption]);
+    }
     res.json({ ok: true, kit });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
