@@ -9652,9 +9652,49 @@ app.put('/admin/api/stories/:id(\\d+)', requireRole('admin'), async (req, res) =
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Deletes the whole story record. If it has a tracker row, that goes too
+// (with the same posted-guard as the tracker's own delete: 409 unless force).
 app.delete('/admin/api/stories/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
+    const force = req.query.force === '1';
+    const { rows } = await pool.query(
+      `SELECT social_clip_id FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const clipId = rows[0].social_clip_id;
+    if (clipId) {
+      const { rows: cr } = await pool.query(
+        `SELECT tiktok_posted_at, instagram_posted_at, yt_posted_at, fb_posted_at
+         FROM social_clips WHERE id = $1`, [clipId]);
+      if (cr.length && !force) {
+        const published = [
+          cr[0].tiktok_posted_at && 'TikTok',
+          cr[0].instagram_posted_at && 'Instagram',
+          cr[0].yt_posted_at && 'YouTube',
+          cr[0].fb_posted_at && 'Facebook',
+        ].filter(Boolean);
+        if (published.length) return res.status(409).json({ published });
+      }
+      await pool.query(`DELETE FROM social_clips WHERE id = $1`, [clipId]);
+    }
     await pool.query(`DELETE FROM video_stories WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Deletes only the assembled final video — story, part-1 video and texts stay.
+// Refused while a tracker row exists (it references the final file).
+app.post('/admin/api/stories/:id(\\d+)/delete-final', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT social_clip_id FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (rows[0].social_clip_id) {
+      return res.status(400).json({ error: 'This final video is registered in the Tracker. Press 🗑 Remove from Tracker first, then delete the assembly — keeps tracking data consistent.' });
+    }
+    await pool.query(`
+      UPDATE video_stories SET final_status = 'none', final_url = NULL, final_error = NULL,
+        final_duration_s = NULL, final_completed_at = NULL, updated_at = NOW()
+      WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

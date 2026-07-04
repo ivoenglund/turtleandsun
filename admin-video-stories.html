@@ -25,7 +25,12 @@ body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13p
 .btn.danger:hover{background:#fff5f5;}
 .btn.small{padding:4px 9px;font-size:11px;}
 .count{color:#888;font-size:12px;margin-left:auto;}
-.list{padding:18px 24px;display:flex;flex-direction:column;gap:14px;max-width:1000px;}
+.list{padding:18px 24px;display:flex;flex-direction:column;gap:14px;max-width:1500px;}
+.story-grid{display:grid;grid-template-columns:minmax(300px,1fr) 260px 300px;gap:14px;align-items:start;}
+@media(max-width:1000px){.story-grid{grid-template-columns:1fr;}}
+.vcol{background:#faf8f2;border:1px solid #eee5d0;border-radius:8px;padding:10px;}
+.colhead{font-size:11px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.colhint{font-size:11px;color:#aaa;line-height:1.5;}
 .card{background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:14px 16px;}
 .card.accepted{border-left:5px solid #4caf50;}
 .card.rejected{border-left:5px solid #e53935;opacity:.75;}
@@ -279,66 +284,68 @@ async function loadQueue(){
   }catch(e){ el.innerHTML = '<div class="empty">Error: '+esc(e.message)+'</div>'; }
 }
 
-function videoBlock(s){
+function videoCol(s){
   const vs = s.video_status || 'none';
   if (vs === 'generating') {
     return `<div class="videobox generating" title="Kling is rendering this video on fal.ai right now. Typically takes 1-6 minutes. This page re-checks every 15 seconds — you can leave and come back.">
-      ⏳ Video generating… started ${fmtDate(s.video_started_at)} (takes 1-6 min, auto-refreshing)</div>`;
+      ⏳ Generating… started ${fmtDate(s.video_started_at)}<br>(1-6 min, auto-refreshing)</div>`;
   }
   if (vs === 'done' && s.video_url) {
     const cost = s.video_cost_usd ? ' · ~$' + Number(s.video_cost_usd).toFixed(2) : '';
-    return `<div class="videobox done">
-      <video src="${esc(s.video_url)}" controls preload="metadata" style="max-width:220px;border-radius:8px;display:block;" title="The finished part-1 clip (no end-card yet — that comes in assembly). Click to play. Right-click for download."></video>
+    return `
+      <video src="${esc(s.video_url)}" controls preload="metadata" style="width:100%;border-radius:8px;display:block;" title="The finished part-1 clip (no end-card yet — that comes in the Final column). Click to play. Right-click for download."></video>
       <div style="font-size:11px;color:#777;margin-top:4px;" title="Model used, clip length, and the estimated fal.ai cost for this generation.">
-        ${esc(s.video_model||'')} · ${esc(s.video_duration_s||'?')}s${cost}
+        ${esc(s.video_duration_s||'?')}s${cost}
         · <a href="${esc(s.video_url)}" target="_blank" title="Open the raw video file in a new tab.">open</a></div>
-      <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
-        <button class="btn small" onclick="makeVideo(${s.id}, this)" title="Generate ANOTHER part-1 video from the same story (new fal.ai cost applies). The current video link is kept in the database but this card will show the newest one.">🎬 Re-make</button>
-        ${finalBlockButton(s)}
-      </div>
-      ${finalBlockStatus(s)}
-    </div>`;
+      <button class="btn small" style="margin-top:4px;" onclick="makeVideo(${s.id}, this)" title="Generate ANOTHER part-1 video from the same story with the current prompts (new fal.ai cost applies). Edit the prompts + 💾 Save first if you want changes to apply.">🎬 Re-make</button>`;
   }
   if (vs === 'error') {
     return `<div class="videobox error" title="The video generation failed. The error text from fal.ai is shown below. Fix the cause (often a content-moderation word in a prompt) or just retry.">
-      ⚠ Video failed: <span style="color:#bf360c;">${esc(s.video_error||'unknown error')}</span>
-      <button class="btn small" onclick="makeVideo(${s.id}, this)" title="Try the generation again with the same story and the tier/audio selected in the toolbar.">↻ Retry video</button>
+      ⚠ Failed: <span style="color:#bf360c;">${esc(s.video_error||'unknown error')}</span>
+      <button class="btn small" onclick="makeVideo(${s.id}, this)" title="Try the generation again with the same story and the tier/audio selected in the toolbar.">↻ Retry</button>
     </div>`;
   }
   if (s.status === 'accepted') {
-    return `<button class="btn primary" onclick="makeVideo(${s.id}, this)" title="Send this accepted story to Kling (via fal.ai) and render the actual part-1 video. Uses the quality tier and audio setting chosen in the toolbar above. A 7s Standard clip with audio costs ~$0.90. Takes 1-6 minutes; the card will show progress.">🎬 Make video</button>`;
+    return `<button class="btn primary" onclick="makeVideo(${s.id}, this)" title="Send this accepted story to Kling (via fal.ai) and render the actual part-1 video. Uses the quality tier and audio setting chosen in the toolbar above. A 7s Standard clip with audio costs ~$0.90. Takes 1-6 minutes; this column shows progress.">🎬 Make video</button>`;
   }
-  return '';
+  return `<div class="colhint" title="Videos are only made from stories you have approved — that's the quality gate.">Accept the story first — the 🎬 button appears here.</div>`;
 }
 
-function finalBlockButton(s){
-  const fs2 = s.final_status || 'none';
-  if (fs2 === 'assembling') return '';
-  const label = fs2 === 'done' ? '🎞 Re-assemble' : '🎞 Assemble final video';
-  return `<button class="btn small primary" onclick="assemble(${s.id}, this)" title="Glue the CTA end-card onto this clip and burn the hook text on top — produces the FINAL video you post. Free (runs on your own server, no AI cost). Needs the story's CTA card to have a video or image URL (CTA end-cards tab). Takes ~30-60 seconds.">${label}</button>`;
-}
-
-function finalBlockStatus(s){
+function finalCol(s){
+  if (s.video_status !== 'done' || !s.video_url) {
+    return `<div class="colhint" title="The final video = part-1 clip + hook text burned on top + CTA end-card glued on the end.">Appears when the part-1 video is done.</div>`;
+  }
   const fs2 = s.final_status || 'none';
   if (fs2 === 'assembling') {
-    return `<div class="videobox generating" style="margin-top:6px;" title="ffmpeg is joining part 1 + end-card and burning the hook text. Usually under a minute; auto-refreshing.">⏳ Assembling final video… (auto-refreshing)</div>`;
+    return `<div class="videobox generating" title="ffmpeg is joining part 1 + end-card and burning the hook text. Usually under a minute; auto-refreshing.">⏳ Assembling… (auto-refreshing)</div>`;
   }
   if (fs2 === 'error') {
-    return `<div class="videobox error" style="margin-top:6px;" title="Assembly failed — error below. Usually a missing/broken end-card URL. Fix and re-assemble.">⚠ Assembly failed: <span style="color:#bf360c;">${esc(s.final_error||'unknown')}</span></div>`;
+    return `<div class="videobox error" title="Assembly failed — error below. Usually a missing/broken end-card on the CTA card. Fix and try again.">⚠ Failed: <span style="color:#bf360c;">${esc(s.final_error||'unknown')}</span></div>
+      <button class="btn small primary" style="margin-top:6px;" onclick="assemble(${s.id}, this)" title="Try the assembly again.">🎞 Retry assembly</button>`;
   }
   if (fs2 === 'done' && s.final_url) {
-    return `<div style="margin-top:8px;border-top:1px dashed #c8e6c9;padding-top:8px;">
+    return `
       <div style="font-size:11px;font-weight:700;color:#1b5e20;margin-bottom:4px;" title="This is the complete video: hook text + story + CTA end-card. This is the file you publish.">✅ FINAL — ready to post (${esc(s.final_duration_s||'?')}s)</div>
-      <video src="${esc(s.final_url)}" controls preload="metadata" style="max-width:220px;border-radius:8px;display:block;" title="The finished, publishable video with hook text and end-card. Right-click → Save video as… to download for posting."></video>
-      <a href="${esc(s.final_url)}" target="_blank" style="font-size:11px;" title="Open the final file in a new tab (from there: right-click → save).">open / download</a>
+      <video src="${esc(s.final_url)}" controls preload="metadata" style="width:100%;border-radius:8px;display:block;" title="The finished, publishable video with hook text and end-card. Right-click → Save video as… to download for posting."></video>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center;">
+        <a href="${esc(s.final_url)}" target="_blank" style="font-size:11px;" title="Open the final file in a new tab (from there: right-click → save).">open / download</a>
+        <button class="btn small" onclick="assemble(${s.id}, this)" title="Assemble again (e.g. after editing the hook or changing the CTA card). Free, ~30-60s. Overwrites this final video.">🎞 Re-assemble</button>
+        <button class="btn small danger" onclick="deleteFinal(${s.id})" title="Delete only this assembled final video. The story, part-1 video and texts all stay — you can assemble again anytime. Blocked while the video is in the Tracker (remove it there first).">✗ Delete assembly</button>
+      </div>
       <div style="margin-top:6px;">
         <button class="btn small ${s.yt_title?'':'primary'}" onclick="makeKit(${s.id}, this)" title="${s.yt_title?'Throw away the current posting texts and have the LLM write fresh ones (~$0.001). Your manual edits to the texts are LOST — edit in place instead if you just want tweaks.':'Have the LLM write the posting texts for this video (~$0.001). Normally happens automatically when assembly finishes — this button is the manual fallback.'}">${s.yt_title?'📝 Rewrite texts (discards edits)':'📝 Generate posting texts'}</button>
       </div>
       ${kitBlock(s)}
-      ${trackerBlock(s)}
-    </div>`;
+      ${trackerBlock(s)}`;
   }
-  return '';
+  return `<button class="btn primary" onclick="assemble(${s.id}, this)" title="Glue the CTA end-card onto the part-1 clip and burn the hook text on top — produces the FINAL video you post, and auto-writes the posting texts. Free (runs on your own server). Needs the story's CTA card to have media (CTA end-cards tab). Takes ~30-60 seconds.">🎞 Assemble final video</button>`;
+}
+
+async function deleteFinal(id){
+  if(!confirm('Delete the assembled final video for story #'+id+'?\n\nThe part-1 video and all texts stay. You can assemble again anytime.')) return;
+  try{ await api('/admin/api/stories/'+id+'/delete-final', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); }
+  catch(e){ alert(e.message); }
+  loadQueue();
 }
 
 function trackerBlock(s){
@@ -453,10 +460,12 @@ function storyCard(s){
       <button class="btn primary" onclick="act(${s.id},'accept')" title="Approve this story. Accepted stories unlock the 🎬 Make video button. Costs nothing.">✓ Accept</button>
       <button class="btn danger" onclick="rejectStory(${s.id})" title="Discard this story (it stays in the Rejected list). You'll be asked for an optional reason — those reasons will later teach the generator what to avoid.">✗ Reject</button>
       <button class="btn" onclick="act(${s.id},'regenerate', this)" title="Keep the same situation, elements and CTA but let the LLM write a completely new story (~$0.001). Replaces the text on this card.">↺ Regenerate</button>`
-    : `<button class="btn small danger" onclick="delStory(${s.id})" title="Permanently delete this story record from the database. Cannot be undone.">Delete</button>
-       <button class="btn small" onclick="act(${s.id},'regenerate', this)" title="Write a new story text into this same card (~$0.001) and put it back into Pending review.">↺ Regenerate</button>`;
+    : `<button class="btn small" onclick="act(${s.id},'regenerate', this)" title="Write a new story text into this same card (~$0.001) and put it back into Pending review.">↺ Regenerate</button>`;
+  const deleteBtn = `<button class="btn small danger" onclick="delStory(${s.id}, ${s.social_clip_id||'null'})" title="Delete this ENTIRE story record: story text, prompts, posting texts and video links — and its Tracker row (with stats) if it has one. Video files stay in storage. Cannot be undone. Use when the whole idea was bad.">🗑 Delete story</button>`;
   return `
   <div class="card ${esc(s.status)}" id="card_${s.id}">
+    <div class="story-grid">
+    <div>
     <input class="hookedit" id="hook_${s.id}" value="${esc(s.hook_text)}" oninput="markEdited(${s.id})" title="The hook — the text burned onto the video's first frames. Its only job: stop the scroll. Click to edit; applies on the next 🎞 assembly.">
     <div class="meta">
       <span class="badge st-${esc(s.status)}" title="Review status: pending review = waiting for your decision · accepted = ready for video · rejected = discarded.">${esc(s.status.replace('_',' '))}</span>
@@ -473,7 +482,11 @@ function storyCard(s){
     ${s.review_note?'<div class="note" title="Your reason for rejecting — feeds the future learning loop.">Reject note: '+esc(s.review_note)+'</div>':''}
     <div class="card-actions">
       <button class="btn primary save-edits" onclick="saveStory(${s.id}, this)" title="Save your edits to hook, scene prompts, durations and posting texts. Appears as soon as you change something. If the story is already in the Tracker, the texts there are updated too. Videos are NOT regenerated automatically — use 🎬 / 🎞 after saving if the change should reach the video.">💾 Save edits</button>
-      ${actions} ${videoBlock(s)}
+      ${actions} ${deleteBtn}
+    </div>
+    </div>
+    <div class="vcol"><div class="colhead" title="Column 2: the AI-generated story clip (part 1), made from the scene prompts on the left.">🎬 Part 1 — video</div>${videoCol(s)}</div>
+    <div class="vcol"><div class="colhead" title="Column 3: the publishable video (part 1 + hook + end-card), its posting texts and the tracker status.">🎞 Final + texts</div>${finalCol(s)}</div>
     </div>
   </div>`;
 }
@@ -528,9 +541,18 @@ async function rejectStory(id){
   catch(e){ alert(e.message); }
   loadQueue();
 }
-async function delStory(id){
-  if(!confirm('Delete story #'+id+'?')) return;
-  try{ await api('/admin/api/stories/'+id, {method:'DELETE'}); }catch(e){ alert(e.message); }
+async function delStory(id, clipId){
+  if(!confirm('Delete story #'+id+' completely?\n\nRemoves the story, its prompts, texts and video links'+(clipId?', AND its Tracker row with stats history':'')+'. The video files themselves stay in storage. Cannot be undone.')) return;
+  try{
+    let r = await fetch('/admin/api/stories/'+id, {method:'DELETE'});
+    if (r.status === 409){
+      const j = await r.json().catch(()=>({}));
+      const where = (j.published||[]).join(', ') || 'a platform';
+      if (!confirm('The Tracker has this video marked as POSTED on: '+where+'.\n\nOnly continue if you have deleted it there too (that part is manual).\n\nDelete everything anyway?')) return loadQueue();
+      r = await fetch('/admin/api/stories/'+id+'?force=1', {method:'DELETE'});
+    }
+    if (!r.ok){ const j = await r.json().catch(()=>({})); alert('Delete failed: '+(j.error||r.status)); }
+  }catch(e){ alert(e.message); }
   loadQueue();
 }
 async function generate(){
