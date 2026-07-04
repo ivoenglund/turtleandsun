@@ -207,7 +207,7 @@ async function loadQueue(){
     else { el.innerHTML = j.stories.map(storyCard).join(''); }
     // Auto-refresh every 15s while any video is rendering.
     clearTimeout(pollTimer);
-    if (j.stories.some(s => s.video_status === 'generating')) {
+    if (j.stories.some(s => s.video_status === 'generating' || s.final_status === 'assembling')) {
       pollTimer = setTimeout(loadQueue, 15000);
     }
   }catch(e){ el.innerHTML = '<div class="empty">Error: '+esc(e.message)+'</div>'; }
@@ -226,7 +226,11 @@ function videoBlock(s){
       <div style="font-size:11px;color:#777;margin-top:4px;" title="Model used, clip length, and the estimated fal.ai cost for this generation.">
         ${esc(s.video_model||'')} · ${esc(s.video_duration_s||'?')}s${cost}
         · <a href="${esc(s.video_url)}" target="_blank" title="Open the raw video file in a new tab.">open</a></div>
-      <button class="btn small" style="margin-top:4px;" onclick="makeVideo(${s.id}, this)" title="Generate ANOTHER video from the same story (new fal.ai cost applies). The current video link is kept in the database but this card will show the newest one.">🎬 Re-make video</button>
+      <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
+        <button class="btn small" onclick="makeVideo(${s.id}, this)" title="Generate ANOTHER part-1 video from the same story (new fal.ai cost applies). The current video link is kept in the database but this card will show the newest one.">🎬 Re-make</button>
+        ${finalBlockButton(s)}
+      </div>
+      ${finalBlockStatus(s)}
     </div>`;
   }
   if (vs === 'error') {
@@ -239,6 +243,39 @@ function videoBlock(s){
     return `<button class="btn primary" onclick="makeVideo(${s.id}, this)" title="Send this accepted story to Kling (via fal.ai) and render the actual part-1 video. Uses the quality tier and audio setting chosen in the toolbar above. A 7s Standard clip with audio costs ~$0.90. Takes 1-6 minutes; the card will show progress.">🎬 Make video</button>`;
   }
   return '';
+}
+
+function finalBlockButton(s){
+  const fs2 = s.final_status || 'none';
+  if (fs2 === 'assembling') return '';
+  const label = fs2 === 'done' ? '🎞 Re-assemble' : '🎞 Assemble final video';
+  return `<button class="btn small primary" onclick="assemble(${s.id}, this)" title="Glue the CTA end-card onto this clip and burn the hook text on top — produces the FINAL video you post. Free (runs on your own server, no AI cost). Needs the story's CTA card to have a video or image URL (CTA end-cards tab). Takes ~30-60 seconds.">${label}</button>`;
+}
+
+function finalBlockStatus(s){
+  const fs2 = s.final_status || 'none';
+  if (fs2 === 'assembling') {
+    return `<div class="videobox generating" style="margin-top:6px;" title="ffmpeg is joining part 1 + end-card and burning the hook text. Usually under a minute; auto-refreshing.">⏳ Assembling final video… (auto-refreshing)</div>`;
+  }
+  if (fs2 === 'error') {
+    return `<div class="videobox error" style="margin-top:6px;" title="Assembly failed — error below. Usually a missing/broken end-card URL. Fix and re-assemble.">⚠ Assembly failed: <span style="color:#bf360c;">${esc(s.final_error||'unknown')}</span></div>`;
+  }
+  if (fs2 === 'done' && s.final_url) {
+    return `<div style="margin-top:8px;border-top:1px dashed #c8e6c9;padding-top:8px;">
+      <div style="font-size:11px;font-weight:700;color:#1b5e20;margin-bottom:4px;" title="This is the complete video: hook text + story + CTA end-card. This is the file you publish.">✅ FINAL — ready to post (${esc(s.final_duration_s||'?')}s)</div>
+      <video src="${esc(s.final_url)}" controls preload="metadata" style="max-width:220px;border-radius:8px;display:block;" title="The finished, publishable video with hook text and end-card. Right-click → Save video as… to download for posting."></video>
+      <a href="${esc(s.final_url)}" target="_blank" style="font-size:11px;" title="Open the final file in a new tab (from there: right-click → save).">open / download</a>
+    </div>`;
+  }
+  return '';
+}
+
+async function assemble(id, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '⏳…'; }
+  try{
+    await api(`/admin/api/stories/${id}/assemble`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  }catch(e){ alert('Could not start assembly: '+e.message); }
+  loadQueue();
 }
 
 function storyCard(s){

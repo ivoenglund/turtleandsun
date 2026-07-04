@@ -9644,6 +9644,194 @@ async function runStoryVideoJob(story, { tier, generateAudio }) {
   }
 }
 
+// ── Assembly: part-1 clip + CTA end-card -> final publishable video ─────────
+// ffmpeg: normalize both parts to 1080x1920/30fps/aac, burn the hook text on
+// part 1 and the CTA text on the end-card, concat, upload to R2.
+// End-card can be a video OR a still image (image is looped for its duration).
+
+async function runStoryAssemblyJob(story, ctaCard) {
+  const os = require('os');
+  const fs2 = require('fs');
+  const pathM = require('path');
+  const { execFile } = require('child_process');
+  const tmpDir = fs2.mkdtempSync(pathM.join(os.tmpdir(), 'tns-story-'));
+  const FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+
+  const ff = (args, timeoutMs = 300000) => new Promise((resolve, reject) => {
+    const bin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
+    execFile(bin, args, { timeout: timeoutMs }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || err.message || '').split('\n').slice(-6).join(' ').slice(0, 500)));
+      else resolve();
+    });
+  });
+
+  const dlFile = async (url, dest) => {
+    const buf = await new Promise((resolve, reject) => {
+      const lib = url.startsWith('https') ? require('https') : require('http');
+      const chunks = [];
+      lib.get(url, r => {
+        if (r.statusCode >= 300 && r.headers.location) {
+          return dlFile(r.headers.location, dest).then(() => resolve(null)).catch(reject);
+        }
+        r.on('data', c => chunks.push(c));
+        r.on('end', () => resolve(Buffer.concat(chunks)));
+      }).on('error', reject);
+    });
+    if (buf) fs2.writeFileSync(dest, buf);
+  };
+
+  const wrapText = (txt, max) => {
+    const words = String(txt).split(' '), lines = [];
+    let line = '';
+    for (const w of words) {
+      if (line && (line + ' ' + w).length > max) { lines.push(line); line = w; }
+      else { line = line ? line + ' ' + w : w; }
+    }
+    if (line) lines.push(line);
+    return lines.join('\n');
+  };
+
+  // drawtext via textfile (expansion=none) — sidesteps quote/colon escaping.
+  const textFilter = (text, file, { size, y }) => {
+    fs2.writeFileSync(file, wrapText(text, 20));
+    return `,drawtext=fontfile=${FONT}:textfile=${file}:expansion=none:fontsize=${size}` +
+      `:fontcolor=white:x=(w-text_w)/2:y=${y}:shadowcolor=black@0.85:shadowx=3:shadowy=3` +
+      `:line_spacing=10`;
+  };
+
+  const SCALE = 'scale=1080:1920:force_original_aspect_ratio=decrease,' +
+    'pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1';
+  const VCODEC = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p'];
+  const ACODEC = ['-c:a', 'aac', '-ar', '44100', '-ac', '2'];
+
+  // Normalize a video part; retries with a silent audio track if the input has none.
+  async function normalizeVideo(inFile, outFile, extraVf) {
+    const vf = SCALE + (extraVf || '');
+    try {
+      await ff(['-y', '-i', inFile, '-vf', vf, '-map', '0:v:0', '-map', '0:a:0',
+        ...VCODEC, ...ACODEC, outFile]);
+    } catch {
+      await ff(['-y', '-i', inFile, '-f', 'lavfi',
+        '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100', '-shortest',
+        '-vf', vf, '-map', '0:v:0', '-map', '1:a:0', ...VCODEC, ...ACODEC, outFile]);
+    }
+  }
+
+  try {
+    // 1. Part 1
+    const part1Raw = pathM.join(tmpDir, 'part1_raw.mp4');
+    const part1 = pathM.join(tmpDir, 'part1.mp4');
+    await dlFile(story.video_url, part1Raw);
+    const hookVf = story.hook_text
+      ? textFilter(story.hook_text, pathM.join(tmpDir, 'hook.txt'), { size: 68, y: 150 })
+      : '';
+    await normalizeVideo(part1Raw, part1, hookVf);
+
+    // 2. End-card (video, or still image looped for duration_s)
+    const part2 = pathM.join(tmpDir, 'part2.mp4');
+    const ctaVf = ctaCard.cta_text
+      ? textFilter(ctaCard.cta_text, pathM.join(tmpDir, 'cta.txt'), { size: 60, y: 'h-h/3' })
+      : '';
+    const cardDur = Math.min(Math.max(parseFloat(ctaCard.duration_s) || 4, 2), 8);
+    if (ctaCard.video_url) {
+      const p2raw = pathM.join(tmpDir, 'part2_raw.mp4');
+      await dlFile(ctaCard.video_url, p2raw);
+      await normalizeVideo(p2raw, part2, ctaVf);
+    } else {
+      const img = pathM.join(tmpDir, 'endcard_img');
+      await dlFile(ctaCard.image_url, img);
+      await ff(['-y', '-loop', '1', '-t', String(cardDur), '-i', img,
+        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100', '-shortest',
+        '-vf', SCALE + ctaVf, '-map', '0:v:0', '-map', '1:a:0', ...VCODEC, ...ACODEC, part2]);
+    }
+
+    // 3. Concat (identical codecs/params -> stream copy)
+    const listFile = pathM.join(tmpDir, 'list.txt');
+    fs2.writeFileSync(listFile, `file '${part1}'\nfile '${part2}'\n`);
+    const outFile = pathM.join(tmpDir, 'final.mp4');
+    await ff(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', outFile]);
+
+    // 4. Upload to R2
+    const { uploadBuffer } = require('./storage');
+    const baseName = `story${story.id}_${(story.story_type || 'video').replace(/[^a-z0-9_-]/gi, '')}`;
+    const r2 = await uploadBuffer({
+      buffer: fs2.readFileSync(outFile), contentType: 'video/mp4',
+      kind: 'video-story-final', baseName,
+    });
+
+    const totalDur = (story.video_duration_s || 0) + Math.round(cardDur);
+    await pool.query(`
+      UPDATE video_stories SET final_status = 'done', final_url = $2, final_error = NULL,
+        final_duration_s = $3, final_completed_at = NOW(), updated_at = NOW()
+      WHERE id = $1`, [story.id, r2.url, totalDur]);
+  } catch (err) {
+    console.error('[story-assembly] failed for story', story.id, ':', err.message);
+    await pool.query(`
+      UPDATE video_stories SET final_status = 'error', final_error = $2, updated_at = NOW()
+      WHERE id = $1`, [story.id, String(err.message || '').slice(0, 2000)]).catch(() => {});
+  } finally {
+    try { fs2.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
+}
+
+app.post('/admin/api/stories/:id(\\d+)/assemble', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const story = rows[0];
+    if (story.video_status !== 'done' || !story.video_url) {
+      return res.status(400).json({ error: 'Make the part-1 video first (🎬) — assembly joins it with the end-card.' });
+    }
+    if (story.final_status === 'assembling') {
+      return res.status(409).json({ error: 'Assembly already running for this story.' });
+    }
+
+    // CTA card: the story's own, else any active one (saved back onto the story).
+    let ctaCard = null;
+    if (story.cta_card_id) {
+      const r = await pool.query(`SELECT * FROM cta_cards WHERE id = $1`, [story.cta_card_id]);
+      ctaCard = r.rows[0] || null;
+    }
+    if (!ctaCard) {
+      const r = await pool.query(`SELECT * FROM cta_cards WHERE active = TRUE ORDER BY random() LIMIT 1`);
+      ctaCard = r.rows[0] || null;
+      if (ctaCard) {
+        await pool.query(`UPDATE video_stories SET cta_card_id = $2 WHERE id = $1`, [story.id, ctaCard.id]);
+      }
+    }
+    if (!ctaCard) {
+      return res.status(400).json({ error: 'No CTA end-card exists. Create one in the CTA end-cards tab first.' });
+    }
+    if (!ctaCard.video_url && !ctaCard.image_url) {
+      return res.status(400).json({
+        error: `CTA card "${ctaCard.label}" has no video or image URL yet. Paste one on the CTA end-cards tab (a still image works — it gets shown for ${ctaCard.duration_s || 4}s).`,
+      });
+    }
+
+    // Ensure ffmpeg exists (same lazy-download as social clips).
+    const fs2 = require('fs');
+    const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
+    if (!fs2.existsSync(ffmpegBin)) {
+      await new Promise((resolve) => {
+        require('child_process').execFile(
+          process.execPath, [path.join(__dirname, 'scripts/download-ffmpeg.js')],
+          { timeout: 180000 }, () => resolve()
+        );
+      });
+    }
+    if (!fs2.existsSync(ffmpegBin)) {
+      return res.status(500).json({ error: 'FFmpeg unavailable on the server — check FFMPEG_PATH.' });
+    }
+
+    await pool.query(`
+      UPDATE video_stories SET final_status = 'assembling', final_error = NULL, updated_at = NOW()
+      WHERE id = $1`, [story.id]);
+    res.json({ ok: true, status: 'assembling' });
+    runStoryAssemblyJob(story, ctaCard)
+      .catch(err => console.error('[story-assembly] job crashed:', err.message));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/admin/api/stories/:id(\\d+)/generate-video', requireRole('admin'), async (req, res) => {
   try {
     const tier = req.body?.tier === 'pro' ? 'pro' : 'standard';

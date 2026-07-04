@@ -1157,6 +1157,14 @@ async function initDb() {
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_started_at   TIMESTAMPTZ;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_completed_at TIMESTAMPTZ;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS generation_id      INTEGER REFERENCES generations(id);
+
+    -- 2026-07-04 (part 3): assembly — part-1 clip + CTA end-card + burned hook
+    -- text, joined with ffmpeg into the final publishable vertical video.
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_status       TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_url          TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_error        TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_duration_s   INTEGER;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS final_completed_at TIMESTAMPTZ;
   `);
 
   // Allow the generations audit log to record video-engine runs.
