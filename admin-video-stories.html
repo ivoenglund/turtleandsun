@@ -347,7 +347,42 @@ function trackerBlock(s){
     <div style="display:flex;gap:4px;flex-wrap:wrap;" title="Tracked links, one per platform. The src parameter tells the tracker WHERE the click came from.">
       ${linkBtn('yt','YouTube')} ${linkBtn('tt','TikTok')} ${linkBtn('ig','Instagram')} ${linkBtn('fb','Facebook')}
     </div>
+    <div style="margin-top:6px;">
+      <button class="btn small ${s.yt_title?'':'primary'}" onclick="makeKit(${s.id}, this)" title="Have the LLM write proper posting texts for THIS story: YouTube title/description/keywords, TikTok caption+hashtags, Instagram caption+hashtags+alt text, Facebook caption — tracked links baked in. Saved onto the tracker record, so the upload dialogs prefill them. ~$0.001. Regenerating overwrites the previous texts.">${s.yt_title?'📝 Regenerate texts':'📝 Generate posting texts'}</button>
+    </div>
+    ${kitBlock(s)}
   </div>`;
+}
+
+function kitBlock(s){
+  if (!s.yt_title) return '';
+  const item = (label, text, tip) => text ? `
+    <div style="margin-bottom:6px;">
+      <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;" title="${esc(tip)}">${esc(label)}
+        <button class="copybtn" onclick='copyText(${JSON.stringify(String(text))}, this)' title="Copy this text to the clipboard for pasting into the platform's upload form.">copy</button></div>
+      <div style="font-size:11px;white-space:pre-wrap;word-break:break-word;">${esc(text)}</div>
+    </div>` : '';
+  return `<details style="margin-top:6px;">
+    <summary style="font-size:11px;font-weight:700;cursor:pointer;" title="The LLM-written posting texts for this video. YouTube fields prefill the upload dialog in the Tracker automatically; TikTok/Instagram texts you copy-paste when posting there.">📝 Posting texts (click to open)</summary>
+    <div style="padding:8px 4px 0;">
+      ${item('YouTube title', s.yt_title, 'Used automatically by the YouTube upload dialog in the Tracker.')}
+      ${item('YouTube description', s.yt_description, 'Contains the tracked YouTube link. Used automatically by the upload dialog.')}
+      ${item('YouTube keywords', s.yt_keyword_tags, 'Comma-separated search keywords, used by the upload dialog.')}
+      ${item('TikTok caption', s.tiktok_caption, 'Paste as the caption when posting on TikTok. Clickable link goes in your bio.')}
+      ${item('TikTok hashtags', s.tiktok_hashtags, 'Add after the caption.')}
+      ${item('Instagram caption', s.instagram_caption, 'Paste when posting the Reel. Clickable link goes in your bio.')}
+      ${item('Instagram hashtags', s.instagram_hashtags, 'Add to the caption or first comment.')}
+      ${item('Instagram alt text', s.instagram_alt_text, 'Accessibility description — paste under Advanced settings → Alt text.')}
+      ${item('Facebook caption', s.fb_caption, 'Contains the tracked Facebook link (clickable on FB).')}
+    </div>
+  </details>`;
+}
+
+async function makeKit(id, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '📝 Writing…'; }
+  try{ await api(`/admin/api/stories/${id}/posting-kit`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); }
+  catch(e){ alert('Could not generate posting texts: '+e.message); }
+  loadQueue();
 }
 
 async function sendToTracker(id, btn){

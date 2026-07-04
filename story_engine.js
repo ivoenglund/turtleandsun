@@ -263,11 +263,96 @@ async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = t
   };
 }
 
+// ---------------------------------------------------------------------------
+// Posting kit (spec component 8) — per-platform titles/descriptions/tags,
+// LLM-written from the story record. The tracked ?ref= links are passed in
+// and MUST appear in the texts (enforced after parsing, belt and braces).
+// ---------------------------------------------------------------------------
+const KIT_FIELDS = [
+  'yt_title', 'yt_description', 'yt_keyword_tags',
+  'tiktok_caption', 'tiktok_hashtags',
+  'instagram_caption', 'instagram_hashtags', 'instagram_alt_text',
+  'fb_caption',
+];
+
+function buildPostingKitPrompt({ story, situationText, ctaCard, links }) {
+  return [
+    'You write social media posting texts for Turtle & Sun, which sells a',
+    'personalised FRIDGE BIRTHDAY CALENDAR (A2 paper wall calendar with the',
+    "family's own birthdays, pets included). Tone: warm, funny, zero corporate.",
+    '',
+    'The video being posted (8-15s vertical, ends on an offer end-card):',
+    `- Hook text on video: ${story.hook_text || story.hook || ''}`,
+    `- Story: ${situationText || ''}`,
+    `- Story type: ${story.story_type || ''} · mood: ${story.mood || ''}`,
+    ctaCard ? `- Offer at the end: ${ctaCard.label}${ctaCard.cta_text ? ' — "' + ctaCard.cta_text + '"' : ''}` : '',
+    '',
+    'Tracked links (use EXACTLY as given, do not shorten or alter):',
+    `- YouTube description link: ${links.yt}`,
+    `- Facebook caption link: ${links.fb}`,
+    '(TikTok/Instagram captions cannot carry clickable links — write "link in bio" there.)',
+    '',
+    'Respond with ONLY a JSON object, no markdown fences:',
+    '{',
+    '  "yt_title": "max 90 chars, curiosity-driven, no clickbait lies, may end with #Shorts",',
+    '  "yt_description": "2-4 short lines. MUST contain the YouTube link. End with 3-5 #hashtags.",',
+    '  "yt_keyword_tags": "8-12 comma-separated search keywords",',
+    '  "tiktok_caption": "max 150 chars incl. \'link in bio\' nudge",',
+    '  "tiktok_hashtags": "3-5 hashtags, space-separated, mix broad + niche",',
+    '  "instagram_caption": "1-3 lines, ends with \'link in bio\' nudge",',
+    '  "instagram_hashtags": "5-8 hashtags, space-separated",',
+    '  "instagram_alt_text": "one factual sentence describing what is seen (accessibility)",',
+    '  "fb_caption": "2-3 lines. MUST contain the Facebook link."',
+    '}',
+    'All texts in English.',
+  ].filter(Boolean).join('\n');
+}
+
+async function generatePostingKit({ story, situationText, ctaCard, links, model }) {
+  const useModel = model || DEFAULT_MODEL;
+  const prompt = buildPostingKitPrompt({ story, situationText, ctaCard, links });
+
+  let lastErr = null;
+  let totalCost = 0;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const result = await fal.subscribe(ROUTER_ENDPOINT, {
+        input: { model: useModel, prompt, temperature: 0.8, max_tokens: 1200 },
+      });
+      const data = result?.data || {};
+      if (data.error) throw new Error(`LLM error: ${data.error}`);
+      totalCost += Number(data?.usage?.cost || 0);
+      const kit = extractJson(data.output);
+
+      const missing = KIT_FIELDS.filter(f => typeof kit[f] !== 'string' || !kit[f].trim());
+      if (missing.length) throw new Error('Posting kit missing fields: ' + missing.join(', '));
+
+      // Enforce the tracked links even if the model dropped them.
+      if (!kit.yt_description.includes(links.yt)) {
+        kit.yt_description = kit.yt_description.trim() + '\n\n' + links.yt;
+      }
+      if (!kit.fb_caption.includes(links.fb)) {
+        kit.fb_caption = kit.fb_caption.trim() + '\n\n' + links.fb;
+      }
+      if (kit.yt_title.length > 100) kit.yt_title = kit.yt_title.slice(0, 97) + '…';
+
+      return { kit, model: useModel, costUsd: totalCost };
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 2) break;
+    }
+  }
+  throw new Error(`Posting kit generation failed after 2 attempts: ${lastErr.message}`);
+}
+
 module.exports = {
   DEFAULT_MODEL,
   ROUTER_ENDPOINT,
   STORY_TYPES,
   VIDEO_MODELS,
+  KIT_FIELDS,
+  buildPostingKitPrompt,
+  generatePostingKit,
   buildSystemPrompt,
   buildUserPrompt,
   extractJson,

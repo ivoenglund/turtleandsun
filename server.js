@@ -3839,6 +3839,11 @@ app.post('/admin/api/social-clips/:id(\\d+)/generate-content', requireRole('admi
       WHERE sc.id = $1`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const clip = rows[0];
+    if (clip.style === 'video-engine') {
+      return res.status(400).json({
+        error: 'This clip comes from the Video Engine — its texts are LLM-written from the story. Use the 📝 Posting texts button on https://turtleandsun.com/admin/video-stories instead (the template here would overwrite them with Loveogram wording).',
+      });
+    }
     const generated = buildPlatformContent(clip);
     // Save generated fields
     await pool.query(`
@@ -9412,6 +9417,10 @@ app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
     const { rows } = await pool.query(`
       SELECT vs.*, cc.label AS cta_label, cc.offer_key AS cta_offer_key,
              sc.ref_tag,
+             sc.yt_title, sc.yt_description, sc.yt_keyword_tags,
+             sc.tiktok_caption, sc.tiktok_hashtags,
+             sc.instagram_caption, sc.instagram_hashtags, sc.instagram_alt_text,
+             sc.fb_caption,
              sc.published_tiktok, sc.published_instagram, sc.published_youtube, sc.published_facebook,
              COALESCE(sc.tiktok_views,0)+COALESCE(sc.instagram_views,0)
                +COALESCE(sc.youtube_views,0)+COALESCE(sc.facebook_views,0) AS total_views,
@@ -9928,6 +9937,50 @@ app.post('/admin/api/stories/:id(\\d+)/create-clip', requireRole('admin'), async
     await pool.query(`UPDATE video_stories SET social_clip_id = $2, updated_at = NOW() WHERE id = $1`,
       [s.id, clipRows[0].id]);
     res.json({ ok: true, social_clip_id: clipRows[0].id, ref_tag: clipRows[0].ref_tag });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Posting kit (spec component 8): LLM-written per-platform texts, saved onto
+// the story's social_clips row so the existing upload dialogs prefill them.
+app.post('/admin/api/stories/:id(\\d+)/posting-kit', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT vs.*, ss.text AS sit_text, cc.label AS cta_label, cc.cta_text AS cta_cta_text,
+             sc.id AS clip_id, sc.ref_tag
+      FROM video_stories vs
+      LEFT JOIN story_situations ss ON ss.id = vs.situation_id
+      LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
+      LEFT JOIN social_clips sc ON sc.id = vs.social_clip_id
+      WHERE vs.id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const s = rows[0];
+    if (!s.clip_id || !s.ref_tag) {
+      return res.status(400).json({ error: 'Press 📊 Send to Tracker first — the texts need this video\'s tracked link.' });
+    }
+    const base = 'https://turtleandsun.com/calendar?ref=' + encodeURIComponent(s.ref_tag);
+    const links = { yt: base + '&src=yt', fb: base + '&src=fb' };
+    const model = await getStoryLlmModel();
+    const { kit, costUsd } = await storyEngine.generatePostingKit({
+      story: s,
+      situationText: s.situation_text || s.sit_text,
+      ctaCard: s.cta_label ? { label: s.cta_label, cta_text: s.cta_cta_text } : null,
+      links, model,
+    });
+    await pool.query(`
+      UPDATE social_clips SET
+        yt_title = $2, yt_description = $3, yt_keyword_tags = $4,
+        tiktok_caption = $5, tiktok_hashtags = $6,
+        instagram_caption = $7, instagram_hashtags = $8, instagram_alt_text = $9,
+        fb_caption = $10, updated_at = NOW()
+      WHERE id = $1`,
+      [s.clip_id, kit.yt_title, kit.yt_description, kit.yt_keyword_tags,
+       kit.tiktok_caption, kit.tiktok_hashtags,
+       kit.instagram_caption, kit.instagram_hashtags, kit.instagram_alt_text,
+       kit.fb_caption]);
+    await pool.query(`
+      UPDATE video_stories SET llm_cost_usd = COALESCE(llm_cost_usd, 0) + $2, updated_at = NOW()
+      WHERE id = $1`, [s.id, costUsd]);
+    res.json({ ok: true, kit });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
