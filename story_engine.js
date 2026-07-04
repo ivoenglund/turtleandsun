@@ -51,6 +51,16 @@ function buildSystemPrompt() {
     'Your job: write ONE story for the first part of a video. Part 2 (the CTA',
     'end-card) already exists and is appended later — do NOT write a CTA scene.',
     '',
+    'WORLD RULES (always true in this universe):',
+    '- ALL animals can talk. They talk to each other and directly to the viewer',
+    '  (looking into the camera — breaking the fourth wall is encouraged, it',
+    '  hooks viewers). Humans in the videos do NOT understand them; that gap is',
+    '  a running comic device.',
+    '- When a character speaks, embed the line inside that scene\'s video_prompt',
+    '  in exactly this form: the dog looks into the camera and says clearly:',
+    '  "it\'s my birthday today". Speech in lowercase, short and punchy,',
+    '  MAX 15 words per 5 seconds of scene (longer lines get audio-compressed).',
+    '',
     'Hard rules:',
     '- Part 1 total length 5-8 seconds, split into 1-3 scenes.',
     '- Each scene gets a `video_prompt`: a rich, self-contained text-to-video /',
@@ -286,13 +296,37 @@ async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames
   });
   const refs = cleaned.slice(0, 10);
   const roleWord = role === 'closing' ? 'CLOSING FRAME (the final image)' : 'OPENING FRAME (the very first image)';
+
+  // Group reference indices per element and bind them INLINE where the
+  // element is mentioned in the scene text — generic "use the references"
+  // instructions preserve animals but let the model invent its own rooms
+  // and products. Inline tags + an explicit photos-beat-words rule fix that.
+  const groups = [];
+  refs.forEach((u, i) => {
+    const nm = String(names[i] || '').trim();
+    let g = groups.find(x => x.name === nm);
+    if (!g) { g = { name: nm, tags: [] }; groups.push(g); }
+    g.tags.push('@Image' + (i + 1));
+  });
+  let scene = String(scenePrompt || '').slice(0, 800);
+  for (const g of groups) {
+    if (!g.name) continue;
+    const tag = g.tags.join(' and ');
+    // Try the full element name, then its first word ("Jack the beagle" -> "Jack").
+    for (const cand of [g.name, g.name.split(/\s+/)[0]]) {
+      if (!cand || cand.length < 3) continue;
+      const re = new RegExp('\\b' + cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      if (re.test(scene)) { scene = scene.replace(re, (m) => `${m} (${tag})`); break; }
+    }
+  }
+
   const lines = [
     `Create the cinematic ${roleWord} of a vertical 9:16 short video.`,
-    `Scene: ${String(scenePrompt || '').slice(0, 800)}`,
+    `Scene: ${scene}`,
   ];
-  if (refs.length) {
-    const refList = refs.map((_, i) => '@Image' + (i + 1) + (names[i] ? ' (' + names[i] + ')' : '')).join(', ');
-    lines.push(`Feature the subjects from the reference images (${refList}) exactly as they really look — preserve identity, colours, markings and proportions.`);
+  if (groups.length) {
+    lines.push('References: ' + groups.map(g => g.tags.join('+') + ' = ' + (g.name || 'subject')).join('; ') + '.');
+    lines.push('Reproduce every referenced subject, product and room EXACTLY as in its reference images — same design, same colours, same layout, same markings. If the scene text conflicts with a reference image, the REFERENCE IMAGE wins.');
   }
   lines.push('Photorealistic, warm light, shallow depth of field. No text, no watermark.');
   const prompt = lines.join('\n');
@@ -460,6 +494,9 @@ async function generateSituationIdeas({ existing = [], count = 10, themes = [], 
     '',
     'A situation is ONE sentence: a concrete, filmable everyday moment where the',
     'calendar plays a role. Pets as protagonists work best. No camera directions.',
+    'WORLD RULE: all animals can talk — to each other and straight to the viewer',
+    '(not to the humans, who never understand them). Situations where pets speak,',
+    'gossip, complain or address the viewer directly are very welcome.',
     '',
     themeList.length === 1
       ? `THEME: every idea must belong to the theme "${themeList[0]}".`
