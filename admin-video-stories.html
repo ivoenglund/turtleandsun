@@ -151,8 +151,9 @@ table.lib th{font-size:13px;}
 .sith{font-size:13px;}
 .sitrow input{font-size:14px;}
 .sitrow .used{font-size:13px;}
-.themerow input{font-size:14px;}
-.elpick summary{font-size:14px;}
+.themerow input{font-size:15px;padding:6px 9px;}
+.themerow{padding:5px 0;}
+.elpick summary{font-size:15px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .elpick-list label{font-size:14px;}
 .elpick-list .elkind{font-size:12px;}
 .uploading{font-size:13px;}
@@ -234,9 +235,9 @@ table.lib th{font-size:13px;}
       <button class="btn primary" onclick="newSit()" title="Add an empty row for writing a situation yourself. Fill in the text, press 💾.">＋ New situation</button>
       <details class="elpick" id="themePick" title="One place for everything about themes: pick the theme the LLM writes ideas within, add your own new themes, rename, pause or delete. Fully data-driven — nothing is hardcoded.">
         <summary id="themePickSummary">Theme: All active (mixed)</summary>
-        <div class="elpick-list" style="min-width:380px;">
+        <div class="elpick-list" style="min-width:540px;max-width:90vw;">
           <label class="themerow" title="No theme filter — the LLM spreads the ideas across ALL active themes and tags each idea with the theme it used.">
-            <input type="radio" name="themeSel" value="" checked onchange="pickThemeById('')"> <b>All active themes (mixed)</b>
+            <input type="radio" name="themeSel" value="" checked onchange="pickThemeById('', true)"> <b>All active themes (mixed)</b>
           </label>
           <div id="themeList"></div>
           <div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid #eee;padding-top:8px;">
@@ -858,16 +859,16 @@ async function genIdeas(){
 // ── Themes (DB-driven, single dropdown: pick + manage) ─────────────────────
 let selectedThemeId = '';
 
-function pickThemeById(id){
-  if (id === '' || id === null || id === undefined){
-    selectedThemeId = '';
-    document.getElementById('themePickSummary').textContent = 'Theme: All active (mixed)';
-    return;
-  }
-  const t = themeRows.find(x => String(x.id) === String(id));
+function pickThemeById(id, closeAfter){
+  const t = (id === '' || id === null || id === undefined)
+    ? null : themeRows.find(x => String(x.id) === String(id));
   selectedThemeId = t ? t.id : '';
   document.getElementById('themePickSummary').textContent =
     'Theme: ' + (t ? t.name : 'All active (mixed)');
+  // Keep the radio in sync no matter how the pick happened (radio OR name click).
+  const radio = document.querySelector(`input[name="themeSel"][value="${t ? t.id : ''}"]`);
+  if (radio) radio.checked = true;
+  if (closeAfter) document.getElementById('themePick').open = false;
 }
 
 function renderThemes(){
@@ -875,8 +876,8 @@ function renderThemes(){
     themeRows.filter(t=>t.active).map(t=>`<option value="${esc(t.name)}">`).join('');
   document.getElementById('themeList').innerHTML = themeRows.length ? themeRows.map(t=>`
     <div class="themerow ${t.active?'':'inactive'}">
-      <input type="radio" name="themeSel" value="${t.id}" ${String(selectedThemeId)===String(t.id)?'checked':''} onchange="pickThemeById(${t.id})" title="Pick this theme — 💡 Generate ideas will write ideas within it only.">
-      <input value="${esc(t.name)}" onchange="renameTheme(${t.id}, this.value)" title="Theme name — edit and click away to save.">
+      <input type="radio" name="themeSel" value="${t.id}" ${String(selectedThemeId)===String(t.id)?'checked':''} onchange="pickThemeById(${t.id}, true)" title="Pick this theme — 💡 Generate ideas will write ideas within it only. Closes the list.">
+      <input value="${esc(t.name)}" onfocus="pickThemeById(${t.id})" onchange="renameTheme(${t.id}, this.value)" title="Click to PICK this theme (list stays open so you can also rename it — type and click away to save).">
       <button class="btn small" onclick="toggleTheme(${t.id}, ${!t.active})" title="on = used for idea generation. off = kept but ignored.">${t.active?'on':'off'}</button>
       <button class="btn small danger" onclick="delTheme(${t.id})" title="Delete this theme. Situations already tagged with it keep their tag.">✗</button>
     </div>`).join('') : '<div style="color:#aaa;">No themes yet — add one below.</div>';
