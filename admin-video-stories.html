@@ -118,6 +118,49 @@ table.lib tr.inactive{opacity:.5;}
 .cta-fields .full{grid-column:1 / -1;}
 .cta-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
 .uploading{font-size:11px;color:#856404;background:#fff3cd;border-radius:6px;padding:3px 6px;position:relative;z-index:2;}
+.themerow input[type=radio]{flex:0 0 auto;width:auto;}
+
+/* ── 2026-07-04: bigger fonts everywhere (small text was too small) ───────── */
+body{font-size:15px;}
+.page-header h1{font-size:21px;}
+.page-header .hint{font-size:13px;}
+.tab{font-size:15px;}
+.toolbar select,.toolbar input,.toolbar textarea{font-size:14px;}
+.btn{font-size:14px;}
+.btn.small{font-size:13px;}
+.copybtn{font-size:12px;}
+.count{font-size:13px;}
+.badge{font-size:12px;}
+.meta{font-size:13px;}
+.hookedit{font-size:18px;}
+.situation{font-size:14px;}
+.scene-head{font-size:13px;}
+.scene-prompt,.scene-edit{font-size:14px;}
+.scene-dur{font-size:13px;}
+.elements-line,.llm-notes,.note{font-size:13px;}
+.kit-edit{font-size:13px;}
+.videobox{font-size:14px;}
+.colhead{font-size:13px;}
+.colhint{font-size:13px;}
+table.lib{font-size:14px;}
+table.lib th{font-size:13px;}
+.form-row input,.form-row select,.form-row textarea{font-size:14px;}
+.cta-fields input,.cta-fields textarea{font-size:14px;}
+.cta-fields label{font-size:12px;}
+.cta-drop{font-size:13px;}
+.sith{font-size:13px;}
+.sitrow input{font-size:14px;}
+.sitrow .used{font-size:13px;}
+.themerow input{font-size:14px;}
+.elpick summary{font-size:14px;}
+.elpick-list label{font-size:14px;}
+.elpick-list .elkind{font-size:12px;}
+.uploading{font-size:13px;}
+.empty,.loading{font-size:14px;}
+/* Catch inline-styled small text in the JS templates too. */
+[style*="font-size:10px"]{font-size:12px !important;}
+[style*="font-size:11px"]{font-size:13px !important;}
+[style*="font-size:12px"]{font-size:14px !important;}
 </style>
 </head>
 <body class="ts-nav-loggedin ts-nav-admin">
@@ -189,23 +232,23 @@ table.lib tr.inactive{opacity:.5;}
     </p>
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
       <button class="btn primary" onclick="newSit()" title="Add an empty row for writing a situation yourself. Fill in the text, press 💾.">＋ New situation</button>
-      <select id="ideaTheme" title="Which theme the LLM should write ideas within. 'All active themes' spreads ideas across every active theme. Manage the theme list itself under ⚙ Themes.">
-        <option value="">All active themes (mixed)</option>
-      </select>
+      <details class="elpick" id="themePick" title="One place for everything about themes: pick the theme the LLM writes ideas within, add your own new themes, rename, pause or delete. Fully data-driven — nothing is hardcoded.">
+        <summary id="themePickSummary">Theme: All active (mixed)</summary>
+        <div class="elpick-list" style="min-width:380px;">
+          <label class="themerow" title="No theme filter — the LLM spreads the ideas across ALL active themes and tags each idea with the theme it used.">
+            <input type="radio" name="themeSel" value="" checked onchange="pickTheme('','All active (mixed)')"> <b>All active themes (mixed)</b>
+          </label>
+          <div id="themeList"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid #eee;padding-top:8px;">
+            <input id="newThemeName" placeholder="New theme… e.g. Pet becomes a royal" style="flex:1;padding:5px 8px;border:1px solid #ccc;border-radius:6px;" title="A theme is a short recurring idea family, e.g. 'Pet becomes a royal' or 'Pet uses the fridge calendar'. Added themes are available immediately.">
+            <button class="btn small primary" onclick="addTheme()" title="Add this theme to the list above.">＋ Add</button>
+          </div>
+        </div>
+      </details>
       <select id="sitGenCount" title="How many new ideas the LLM should write in one go.">
         <option>5</option><option selected>10</option><option>20</option>
       </select>
       <button class="btn primary" id="sitGenBtn" onclick="genIdeas()" title="The LLM writes this many NEW situations within the chosen theme(s) — it sees the existing list and avoids repeats. Added to the grid immediately, tagged with their theme. ~$0.001-0.01 per batch. Then curate: delete the weak, edit the rest.">💡 Generate ideas</button>
-      <details class="elpick" id="themeMgr" title="The theme library — fully data-driven, nothing hardcoded. Add your own themes here; they immediately become available for idea generation.">
-        <summary>⚙ Themes</summary>
-        <div class="elpick-list" style="min-width:340px;">
-          <div style="display:flex;gap:6px;margin-bottom:8px;">
-            <input id="newThemeName" placeholder="New theme… e.g. Pet becomes a royal" style="flex:1;padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px;" title="A theme is a short recurring idea family, e.g. 'Pet becomes a royal' or 'Pet uses the fridge calendar'.">
-            <button class="btn small primary" onclick="addTheme()" title="Add this theme to the library — available for idea generation immediately.">＋</button>
-          </div>
-          <div id="themeList"></div>
-        </div>
-      </details>
     </div>
     <div class="sitgrid" id="sitHead">
       <div class="sith" title="The one-sentence story idea the generator builds a full story around.">Situation</div>
@@ -802,7 +845,7 @@ async function delSitRow(key){
 async function genIdeas(){
   const btn = document.getElementById('sitGenBtn');
   const count = parseInt(document.getElementById('sitGenCount').value, 10) || 10;
-  const theme_id = document.getElementById('ideaTheme').value || null;
+  const theme_id = selectedThemeId || null;
   btn.disabled = true; btn.textContent = '💡 Writing…';
   try{
     await api('/admin/api/story-situations/generate-ideas', {method:'POST',
@@ -812,21 +855,30 @@ async function genIdeas(){
   btn.disabled = false; btn.textContent = '💡 Generate ideas';
 }
 
-// ── Themes (DB-driven) ──────────────────────────────────────────────────────
+// ── Themes (DB-driven, single dropdown: pick + manage) ─────────────────────
+let selectedThemeId = '';
+
+function pickTheme(id, name){
+  selectedThemeId = id;
+  document.getElementById('themePickSummary').textContent = 'Theme: ' + name;
+}
+
 function renderThemes(){
-  const sel = document.getElementById('ideaTheme');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All active themes (mixed)</option>' +
-    themeRows.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
-  sel.value = cur && [...sel.options].some(o=>o.value===cur) ? cur : '';
   document.getElementById('themeOptions').innerHTML =
     themeRows.filter(t=>t.active).map(t=>`<option value="${esc(t.name)}">`).join('');
   document.getElementById('themeList').innerHTML = themeRows.length ? themeRows.map(t=>`
     <div class="themerow ${t.active?'':'inactive'}">
-      <input value="${esc(t.name)}" onchange="renameTheme(${t.id}, this.value)" title="Theme name — edit and press Enter/click away to save.">
+      <input type="radio" name="themeSel" value="${t.id}" ${String(selectedThemeId)===String(t.id)?'checked':''} onchange="pickTheme(${t.id}, ${JSON.stringify(String(t.name))})" title="Pick this theme — 💡 Generate ideas will write ideas within it only.">
+      <input value="${esc(t.name)}" onchange="renameTheme(${t.id}, this.value)" title="Theme name — edit and click away to save.">
       <button class="btn small" onclick="toggleTheme(${t.id}, ${!t.active})" title="on = used for idea generation. off = kept but ignored.">${t.active?'on':'off'}</button>
       <button class="btn small danger" onclick="delTheme(${t.id})" title="Delete this theme. Situations already tagged with it keep their tag.">✗</button>
-    </div>`).join('') : '<div style="color:#aaa;font-size:11px;">No themes yet.</div>';
+    </div>`).join('') : '<div style="color:#aaa;">No themes yet — add one below.</div>';
+  // If the selected theme disappeared or was paused, fall back to mixed.
+  if (selectedThemeId && !themeRows.some(t => String(t.id) === String(selectedThemeId) && t.active)) {
+    pickTheme('', 'All active (mixed)');
+    const r = document.querySelector('input[name="themeSel"][value=""]');
+    if (r) r.checked = true;
+  }
 }
 async function addTheme(){
   const inp = document.getElementById('newThemeName');
