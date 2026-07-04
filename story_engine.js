@@ -203,7 +203,7 @@ function clampDuration(totalS) {
   return Math.min(Math.max(Math.round(totalS || 5), 3), 15);
 }
 
-function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null, elements = null } = {}) {
+function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null, endImageUrl = null, elements = null } = {}) {
   const list = (Array.isArray(scenes) ? scenes : []).filter(s => s && s.video_prompt);
   if (!list.length) throw new Error('Story has no scenes with video prompts');
   const totalS = clampDuration(list.reduce((a, s) => a + (Number(s.duration_s) || 5), 0));
@@ -219,6 +219,9 @@ function buildVideoInput(scenes, { generateAudio = true, startImageUrl = null, e
   // one of the two is ever present.
   if (startImageUrl) base.start_image_url = startImageUrl;
   else base.aspect_ratio = '9:16';
+  // End frame: Kling animates towards it (before/after reveals, loops).
+  // Only meaningful on i2v — ignored without a start image.
+  if (endImageUrl && startImageUrl) base.end_image_url = endImageUrl;
   // Kling v3 elements: characters/objects placed INTO the scene throughout,
   // referenced in prompts as @Element1… (i2v only — needs a start image).
   if (Array.isArray(elements) && elements.length && startImageUrl) {
@@ -253,39 +256,48 @@ function estimateVideoCost(tier, totalS, generateAudio, useI2v) {
 // frame + i2v is the closest — and cheapest — equivalent.
 // ---------------------------------------------------------------------------
 const START_FRAME_IMAGE_MODEL = 'fal-ai/kling-image/o3/image-to-image';
+const FRAME_T2I_MODEL = 'fal-ai/kling-image/o3/text-to-image';
 
-async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames }) {
+// role: 'opening' | 'closing'. With reference images -> i2i (identity
+// preserved); without -> t2i (e.g. a neutral establishing shot for the
+// frame library). Both native 9:16, $0.028.
+async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames, role = 'opening' }) {
   const refs = (referenceImageUrls || []).slice(0, 10);
-  if (!refs.length) throw new Error('no reference images');
   const names = elementNames || [];
-  const refList = refs.map((_, i) => '@Image' + (i + 1) + (names[i] ? ' (' + names[i] + ')' : '')).join(', ');
-  const prompt = [
-    'Create the cinematic OPENING FRAME of a vertical 9:16 short video.',
+  const roleWord = role === 'closing' ? 'CLOSING FRAME (the final image)' : 'OPENING FRAME (the very first image)';
+  const lines = [
+    `Create the cinematic ${roleWord} of a vertical 9:16 short video.`,
     `Scene: ${String(scenePrompt || '').slice(0, 800)}`,
-    `Feature the subjects from the reference images (${refList}) exactly as they really look — preserve identity, colours, markings and proportions.`,
-    'Photorealistic, warm light, shallow depth of field. No text, no watermark.',
-  ].join('\n');
-  const result = await fal.subscribe(START_FRAME_IMAGE_MODEL, {
-    input: {
-      prompt,
-      image_urls: refs,
-      aspect_ratio: '9:16',
-      resolution: '1K',
-      result_type: 'single',
-      num_images: 1,
-      output_format: 'png',
-    },
+  ];
+  if (refs.length) {
+    const refList = refs.map((_, i) => '@Image' + (i + 1) + (names[i] ? ' (' + names[i] + ')' : '')).join(', ');
+    lines.push(`Feature the subjects from the reference images (${refList}) exactly as they really look — preserve identity, colours, markings and proportions.`);
+  }
+  lines.push('Photorealistic, warm light, shallow depth of field. No text, no watermark.');
+  const prompt = lines.join('\n');
+
+  const input = {
+    prompt,
+    aspect_ratio: '9:16',
+    resolution: '1K',
+    result_type: 'single',
+    num_images: 1,
+    output_format: 'png',
+  };
+  if (refs.length) input.image_urls = refs;
+  const result = await fal.subscribe(refs.length ? START_FRAME_IMAGE_MODEL : FRAME_T2I_MODEL, {
+    input,
     storageSettings: { expiresIn: 'never' },
   });
   const url = result?.data?.images?.[0]?.url;
-  if (!url) throw new Error('start-frame composition returned no image');
-  return { url, costUsd: 0.028 };
+  if (!url) throw new Error('frame composition returned no image');
+  return { url, costUsd: 0.028, prompt };
 }
 
-async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true, startImageUrl = null, elements = null }) {
+async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true, startImageUrl = null, endImageUrl = null, elements = null }) {
   const model = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
   const modelId = startImageUrl ? model.i2v.id : model.id;
-  const { input, totalS } = buildVideoInput(scenes, { generateAudio, startImageUrl, elements });
+  const { input, totalS } = buildVideoInput(scenes, { generateAudio, startImageUrl, endImageUrl, elements });
 
   const run = async (payload) => fal.subscribe(modelId, {
     input: payload,

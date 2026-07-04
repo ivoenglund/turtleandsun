@@ -1178,6 +1178,24 @@ async function initDb() {
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS instagram_hashtags TEXT;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS instagram_alt_text TEXT;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS fb_caption         TEXT;
+
+    -- 2026-07-04 (part 6): reviewable start/end frames. The story carries the
+    -- approved frame URLs; story_frames is the reusable library (e.g. the
+    -- standard kitchen establishing shot, generated once, reused for free).
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS start_frame_url TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS end_frame_url   TEXT;
+
+    CREATE TABLE IF NOT EXISTS story_frames (
+      id          SERIAL PRIMARY KEY,
+      label       TEXT NOT NULL,
+      kind        TEXT NOT NULL DEFAULT 'any' CHECK (kind IN ('start','end','any')),
+      image_url   TEXT NOT NULL,
+      prompt      TEXT,
+      source      TEXT NOT NULL DEFAULT 'composed' CHECK (source IN ('composed','uploaded','story')),
+      times_used  INTEGER NOT NULL DEFAULT 0,
+      active      BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
 
   // Allow the generations audit log to record video-engine runs.

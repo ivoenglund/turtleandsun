@@ -128,6 +128,13 @@ table.lib tr.inactive{opacity:.5;}
 .elref img,.elref video{width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block;}
 .elref-x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;padding:1px 5px;}
 .elref-x:hover{background:#e53935;}
+/* Frames strip on story cards */
+.framestrip{display:flex;gap:8px;margin-bottom:8px;}
+.frameslot{flex:1;background:#fff;border:1px dashed #d8d0b8;border-radius:8px;padding:6px;}
+.frameslot-h{font-size:11px;font-weight:800;color:#777;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.frameslot-img{width:100%;border-radius:6px;cursor:zoom-in;display:block;}
+.frameslot-empty{color:#ccc;text-align:center;padding:12px 0;font-size:14px;}
+.frameslot-btns{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;}
 
 /* ── 2026-07-04: bigger fonts everywhere (small text was too small) ───────── */
 body{font-size:15px;}
@@ -184,7 +191,29 @@ table.lib th{font-size:13px;}
   <button class="tab" data-tab="situations" onclick="showTab('situations')" title="The growing list of story ideas ('the dog notices today is his birthday…'). The generator picks one per story. Add your own — more variety here = more variety in videos.">Situations</button>
   <button class="tab" data-tab="elements" onclick="showTab('elements')" title="Your recurring cast & props: pets, the kitchen, and the calendar itself. Their descriptions are written into every video prompt so they look the SAME across all videos (recognition). Kind 'product' = included in every story.">Elements</button>
   <button class="tab" data-tab="ctas" onclick="showTab('ctas')" title="Reusable part-2 end-cards: one per offer (e.g. '25% off for your email'), generated once at top quality, then glued onto every video. Rotating cards = A/B-testing offers.">CTA end-cards</button>
+  <button class="tab" data-tab="frames" onclick="showTab('frames')" title="The reusable frame library: start/end pictures (e.g. the standard kitchen shot) generated or uploaded once, then picked into any story for free via the 📂 button on story cards.">Frames</button>
   <button class="tab" data-tab="insights" onclick="showTab('insights')" title="The feedback loop: views, link clicks and email signups grouped by story type, CTA offer and generator. Answers 'which KIND of video sells?' — and tells you what to generate more of. Only counts videos that were sent to the Tracker.">Insights</button>
+</div>
+
+<!-- ── FRAMES TAB ────────────────────────────────────────────────────────── -->
+<div id="tab-frames" style="display:none;">
+  <div class="lib-wrap">
+    <p style="font-size:13px;color:#777;margin-bottom:10px;">
+      Reusable start/end pictures. Generate or upload once, reuse in any story via 📂 on the card — free on reuse, and identical openings build recognition.
+    </p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <div class="cta-drop" style="width:200px;height:64px;"
+        title="Drag & drop a picture here (or click) to add it to the library. It uploads to central storage; give it a label afterwards."
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="frameLibDrop(event)"
+        onclick="document.getElementById('frameLibFile').click()">
+        <span class="drop-hint">＋ Drop picture<br><small>(or click)</small></span>
+      </div>
+      <input type="file" id="frameLibFile" accept="image/*" style="display:none" onchange="frameLibPicked(event)">
+    </div>
+    <div id="frameGrid"></div>
+  </div>
 </div>
 
 <!-- ── QUEUE TAB ─────────────────────────────────────────────────────────── -->
@@ -331,13 +360,84 @@ function copyText(t, btn){
 // ── Tabs ────────────────────────────────────────────────────────────────────
 function showTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  ['queue','situations','elements','ctas','insights'].forEach(n=>{
+  ['queue','situations','elements','ctas','frames','insights'].forEach(n=>{
     document.getElementById('tab-'+n).style.display = n===name ? '' : 'none';
   });
   if(name==='situations') loadSituations();
   if(name==='elements') loadElements();
   if(name==='ctas') loadCtas();
+  if(name==='frames') loadFrames();
   if(name==='insights') loadInsights();
+}
+
+// ── Frame library tab ───────────────────────────────────────────────────────
+let frameRows = [];
+
+async function loadFrames(){
+  const j = await api('/admin/api/story-frames');
+  frameRows = j.frames;
+  const grid = document.getElementById('frameGrid');
+  if (!frameRows.length){
+    grid.innerHTML = '<div class="empty">Library is empty. Drop a picture above, or press 📚 on a frame you like on a story card.</div>';
+    return;
+  }
+  grid.innerHTML = frameRows.map(f => `
+  <div class="cta-row ${f.active?'':'inactive'}">
+    <div class="cta-media" style="width:110px;">
+      <img src="${esc(f.image_url)}" style="width:100%;border-radius:8px;cursor:zoom-in;" onclick="window.open(${esc(JSON.stringify(f.image_url))},'_blank')" title="Click to view full size.${f.prompt?' Prompt used: '+esc(f.prompt).slice(0,300):''}">
+    </div>
+    <div class="cta-fields" style="grid-template-columns:2fr 1fr;">
+      <div><label title="The name shown when picking frames on a story card.">Label</label>
+        <input value="${esc(f.label)}" onchange="updateFrame(${f.id}, {label: this.value})" title="Edit and click away to save."></div>
+      <div><label title="Where this frame may be used: start, end, or any slot.">Kind</label>
+        <select onchange="updateFrame(${f.id}, {kind: this.value})" title="start / end / any.">
+          ${['any','start','end'].map(k=>`<option value="${k}" ${f.kind===k?'selected':''}>${k}</option>`).join('')}
+        </select>
+        <div style="font-size:12px;color:#999;margin-top:4px;" title="How many stories have used this frame.">used ${f.times_used||0}× · ${esc(f.source)}</div></div>
+    </div>
+    <div class="cta-actions">
+      <button class="btn small" onclick="updateFrame(${f.id}, {active: ${!f.active}})" title="on = pickable from story cards. off = hidden.">${f.active?'on':'off'}</button>
+      <button class="btn small danger" onclick="delFrame(${f.id})" title="Delete from the library. Stories already using this image keep it.">✗ Delete</button>
+    </div>
+  </div>`).join('');
+}
+
+async function updateFrame(id, body){
+  try{ await api('/admin/api/story-frames/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}); }
+  catch(e){ alert(e.message); }
+  loadFrames();
+}
+
+async function delFrame(id){
+  if (!confirm('Delete this frame from the library?')) return;
+  try{ await api('/admin/api/story-frames/'+id, {method:'DELETE'}); }catch(e){ alert(e.message); }
+  loadFrames();
+}
+
+function frameLibDrop(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('dragover');
+  const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) uploadFrameToLib(file);
+}
+function frameLibPicked(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if (file) uploadFrameToLib(file);
+  ev.target.value = '';
+}
+async function uploadFrameToLib(file){
+  if (!file.type.startsWith('image/')) return alert('Only pictures.');
+  try{
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch('/admin/api/story-frames/upload', {method:'POST', body: fd});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    const label = prompt('Label for this frame:', file.name.replace(/\.[^.]+$/,'')) || file.name;
+    await api('/admin/api/story-frames', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ label, kind: 'any', image_url: j.url, source: 'uploaded' })});
+  }catch(e){ alert('Upload failed: '+e.message); }
+  loadFrames();
 }
 
 // ── Insights (feedback loop) ────────────────────────────────────────────────
@@ -381,6 +481,7 @@ async function loadQueue(){
   el.innerHTML = '<div class="loading">Loading…</div>';
   try{
     const j = await api('/admin/api/stories?limit=100' + (status ? '&status='+status : ''));
+    window._stories = j.stories;
     document.getElementById('queueCount').textContent = j.total + ' stories';
     if(!j.stories.length){ el.innerHTML = '<div class="empty">Nothing here. Hit ⚡ Generate stories.</div>'; }
     else { el.innerHTML = j.stories.map(storyCard).join(''); }
@@ -418,6 +519,99 @@ function videoCol(s){
       ${uploadClipBtn(s)}`;
   }
   return `<div class="colhint" title="Videos are only made from stories you have approved — that's the quality gate.">Accept the story first — the 🎬 button appears here.</div>`;
+}
+
+function frameSlot(s, role){
+  const url = role === 'start' ? s.start_frame_url : s.end_frame_url;
+  const label = role === 'start' ? 'Start frame' : 'End frame';
+  const tip = role === 'start'
+    ? "The video's first image. Review it here for $0.03 BEFORE spending ~$1 on the video. Composed from the story's elements + an editable prompt. Leave empty and 🎬 auto-composes one invisibly (as before)."
+    : "Optional: the image the video animates TOWARDS. Great for before/after reveals and loop-friendly endings. Needs a start frame (Kling animates start → end).";
+  return `<div class="frameslot">
+    <div class="frameslot-h" title="${esc(tip)}">${label}</div>
+    ${url
+      ? `<img class="frameslot-img" src="${esc(url)}" onclick="window.open(${esc(JSON.stringify(url))},'_blank')" title="The approved ${label.toLowerCase()} — 🎬 will use exactly this image. Click to view full size.">`
+      : `<div class="frameslot-empty" title="${esc(tip)}">—</div>`}
+    <div class="frameslot-btns">
+      <button class="copybtn" onclick="genFrame(${s.id}, '${role}', this)" title="Compose this frame with AI (~$0.03). You get to edit the prompt first — it's prefilled from the ${role==='start'?'first':'last'} scene.">🖼 ${url?'re-gen':'generate'}</button>
+      <button class="copybtn" onclick="document.getElementById('fr_${role}_${s.id}').click()" title="Upload your own picture as the ${label.toLowerCase()}.">⬆</button>
+      <button class="copybtn" onclick="pickFrameFromLib(${s.id}, '${role}')" title="Pick a saved frame from the library (Frames tab) — free reuse, e.g. the standard kitchen shot.">📂</button>
+      ${url ? `<button class="copybtn" onclick="saveFrameToLib(${s.id}, '${role}')" title="Save this frame to the library so other stories can reuse it for free.">📚</button>
+      <button class="copybtn" onclick="clearFrame(${s.id}, '${role}')" title="Remove this frame from the story (the file stays in storage).">✗</button>` : ''}
+    </div>
+    <input type="file" id="fr_${role}_${s.id}" accept="image/*" style="display:none" onchange="uploadFrame(event, ${s.id}, '${role}')">
+  </div>`;
+}
+
+function framesStrip(s){
+  return `<div class="framestrip" title="Frames control how the video starts and (optionally) ends. Review the cheap picture before paying for the expensive video.">${frameSlot(s,'start')}${frameSlot(s,'end')}</div>`;
+}
+
+async function genFrame(id, role, btn){
+  const card = document.getElementById('card_'+id);
+  const tas = card ? [...card.querySelectorAll('.scene-edit')] : [];
+  const def = role === 'start' ? (tas[0]?.value || '') : (tas[tas.length-1]?.value || '');
+  const p = prompt('Describe the '+(role==='start'?'START':'END')+' frame (edit freely — elements with photos are used as identity references):', def.slice(0, 500));
+  if (p === null) return;
+  if (btn){ btn.disabled = true; btn.textContent = '⏳'; }
+  try{
+    await api('/admin/api/stories/'+id+'/generate-frame', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ role, prompt: p })});
+  }catch(e){ alert('Frame generation failed: '+e.message); }
+  loadQueue();
+}
+
+async function uploadFrame(ev, id, role){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) return alert('Only pictures.');
+  const fd = new FormData();
+  fd.append('file', file);
+  try{
+    const r = await fetch('/admin/api/stories/'+id+'/upload-frame?role='+role, {method:'POST', body: fd});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+  }catch(e){ alert('Upload failed: '+e.message); }
+  loadQueue();
+}
+
+async function pickFrameFromLib(id, role){
+  try{
+    const j = await api('/admin/api/story-frames');
+    const usable = j.frames.filter(f => f.active && (f.kind === 'any' || f.kind === role));
+    if (!usable.length) return alert('No matching frames in the library yet. Save one with 📚 or add one on the Frames tab.');
+    const list = usable.map((f,i)=>(i+1)+'. '+f.label+' ('+f.kind+', used '+f.times_used+'×)').join('\n');
+    const pick = prompt('Type the number of the frame to use as '+role.toUpperCase()+' frame:\n\n'+list);
+    if (pick === null) return;
+    const f = usable[parseInt(pick,10)-1];
+    if (!f) return alert('No frame with that number.');
+    await api('/admin/api/stories/'+id+'/set-frame', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ role, frame_id: f.id })});
+  }catch(e){ alert(e.message); }
+  loadQueue();
+}
+
+async function saveFrameToLib(id, role){
+  const card = document.getElementById('card_'+id);
+  const label = prompt('Label for the library (e.g. "Kitchen standard shot"):');
+  if (!label) return;
+  const story = (window._stories||[]).find(x=>x.id===id);
+  const url = story ? (role==='start' ? story.start_frame_url : story.end_frame_url) : null;
+  if (!url) return alert('No frame to save.');
+  try{
+    await api('/admin/api/story-frames', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ label, kind: role, image_url: url, source: 'story' })});
+    alert('Saved to the library.');
+  }catch(e){ alert(e.message); }
+}
+
+async function clearFrame(id, role){
+  try{
+    await api('/admin/api/stories/'+id+'/set-frame', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ role, url: null })});
+  }catch(e){ alert(e.message); }
+  loadQueue();
 }
 
 function uploadClipBtn(s){
@@ -644,7 +838,7 @@ function storyCard(s){
       ${actions} ${deleteBtn}
     </div>
     </div>
-    <div class="vcol"><div class="colhead" title="Column 2: the AI-generated story clip (part 1), made from the scene prompts on the left.">🎬 Part 1 — video</div>${videoCol(s)}</div>
+    <div class="vcol"><div class="colhead" title="Column 2: the AI-generated story clip (part 1), made from the scene prompts on the left.">🎬 Part 1 — video</div>${s.status==='accepted'?framesStrip(s):''}${videoCol(s)}</div>
     <div class="vcol"><div class="colhead" title="Column 3: the publishable video (part 1 + hook + end-card), its posting texts and the tracker status.">🎞 Final + texts</div>${finalCol(s)}</div>
     </div>
   </div>`;

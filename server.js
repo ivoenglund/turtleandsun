@@ -9604,6 +9604,155 @@ app.post('/admin/api/stories/:id(\\d+)/upload-video', requireRole('admin'), uplo
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Frames: reviewable start/end pictures + reusable library ────────────────
+
+function gatherElementRefs(els) {
+  const isImg = (u) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(u || ''));
+  const refs = [];
+  for (const kind of ['pet', 'product', 'person', 'location', 'prop']) {
+    for (const el of (Array.isArray(els) ? els : []).filter(e => e.kind === kind)) {
+      for (const u of (el.reference_image_urls || []).filter(isImg)) {
+        refs.push({ url: u, name: el.name });
+      }
+    }
+  }
+  return refs;
+}
+
+// Compose a start or end frame for a story ($0.028, synchronous ~10-30s).
+app.post('/admin/api/stories/:id(\\d+)/generate-frame', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const s = rows[0];
+    const role = req.body?.role === 'end' ? 'end' : 'start';
+    const scenes = Array.isArray(s.scenes) ? s.scenes : [];
+    let framePrompt = String(req.body?.prompt || '').trim();
+    if (!framePrompt) {
+      framePrompt = (role === 'start'
+        ? scenes[0]?.video_prompt
+        : scenes[scenes.length - 1]?.video_prompt) || s.hook_text || '';
+    }
+    const refs = gatherElementRefs(s.elements_snapshot);
+    const out = await storyEngine.composeStartFrame({
+      scenePrompt: framePrompt,
+      referenceImageUrls: refs.map(r => r.url),
+      elementNames: refs.map(r => r.name),
+      role: role === 'end' ? 'closing' : 'opening',
+    });
+    const col = role === 'end' ? 'end_frame_url' : 'start_frame_url';
+    await pool.query(`
+      UPDATE video_stories SET ${col} = $2,
+        llm_cost_usd = COALESCE(llm_cost_usd, 0) + $3, updated_at = NOW()
+      WHERE id = $1`, [s.id, out.url, out.costUsd]);
+    res.json({ ok: true, url: out.url, role });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Upload an own picture as a story's start/end frame.
+app.post('/admin/api/stories/:id(\\d+)/upload-frame', requireRole('admin'), upload.single('file'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    const mt = req.file.mimetype || '';
+    if (!mt.startsWith('image/')) return res.status(400).json({ error: `Only pictures (got ${mt || 'unknown'})` });
+    const role = req.query.role === 'end' ? 'end' : 'start';
+    const { uploadBuffer } = require('./storage');
+    const r2 = await uploadBuffer({
+      buffer: req.file.buffer, contentType: mt,
+      kind: 'video-story-frame', baseName: 'story' + req.params.id + '_' + role + 'frame',
+    });
+    const col = role === 'end' ? 'end_frame_url' : 'start_frame_url';
+    await pool.query(`UPDATE video_stories SET ${col} = $2, updated_at = NOW() WHERE id = $1`,
+      [req.params.id, r2.url]);
+    res.json({ ok: true, url: r2.url, role });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Set a frame from the library (frame_id) or clear it (url: null).
+app.post('/admin/api/stories/:id(\\d+)/set-frame', requireRole('admin'), async (req, res) => {
+  try {
+    const role = req.body?.role === 'end' ? 'end' : 'start';
+    const col = role === 'end' ? 'end_frame_url' : 'start_frame_url';
+    let url = null;
+    if (req.body?.frame_id) {
+      const { rows } = await pool.query(`SELECT * FROM story_frames WHERE id = $1`, [req.body.frame_id]);
+      if (!rows.length) return res.status(404).json({ error: 'Library frame not found' });
+      url = rows[0].image_url;
+      await pool.query(`UPDATE story_frames SET times_used = times_used + 1 WHERE id = $1`, [req.body.frame_id]);
+    } else if (typeof req.body?.url === 'string' && req.body.url) {
+      url = req.body.url;
+    }
+    const { rows } = await pool.query(
+      `UPDATE video_stories SET ${col} = $2, updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [req.params.id, url]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, url, role });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Frame library CRUD.
+app.get('/admin/api/story-frames', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM story_frames ORDER BY active DESC, id DESC`);
+    res.json({ frames: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/story-frames', requireRole('admin'), async (req, res) => {
+  try {
+    const { label, kind, image_url, prompt, source } = req.body || {};
+    if (!label || !image_url) return res.status(400).json({ error: 'label and image_url required' });
+    const { rows } = await pool.query(`
+      INSERT INTO story_frames (label, kind, image_url, prompt, source)
+      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [label, ['start', 'end', 'any'].includes(kind) ? kind : 'any',
+       image_url, prompt || null,
+       ['composed', 'uploaded', 'story'].includes(source) ? source : 'uploaded']);
+    res.json({ ok: true, frame: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/admin/api/story-frames/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sets = [];
+    const vals = [req.params.id];
+    for (const f of ['label', 'kind', 'active']) {
+      if (Object.prototype.hasOwnProperty.call(body, f)) {
+        vals.push(body[f]);
+        sets.push(`${f} = $${vals.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    const { rows } = await pool.query(
+      `UPDATE story_frames SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, frame: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/admin/api/story-frames/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM story_frames WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/story-frames/upload', requireRole('admin'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    const mt = req.file.mimetype || '';
+    if (!mt.startsWith('image/')) return res.status(400).json({ error: `Only pictures (got ${mt || 'unknown'})` });
+    const { uploadBuffer } = require('./storage');
+    const baseName = 'frame_' + String(req.file.originalname || 'frame')
+      .replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 60);
+    const r2 = await uploadBuffer({ buffer: req.file.buffer, contentType: mt, kind: 'frame-library', baseName });
+    res.json({ ok: true, url: r2.url });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Generate 1-5 new stories into the queue.
 app.post('/admin/api/stories/generate', requireRole('admin'), async (req, res) => {
   try {
@@ -9881,7 +10030,11 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
     let startImageUrl = null;
     let startCostUsd = 0;
     let startMethod = null;
-    if (startFrame !== 'off') {
+    // Reviewed/approved frame on the story wins; otherwise auto-compose.
+    if (story.start_frame_url) {
+      startImageUrl = story.start_frame_url;
+      startMethod = 'approved';
+    } else if (startFrame !== 'off') {
       try {
         const sf = await prepareStoryStartFrame(story);
         if (sf) { startImageUrl = sf.url; startCostUsd = sf.costUsd || 0; startMethod = sf.method; }
@@ -9889,6 +10042,7 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
         console.warn('[video-story] start-frame prep failed, using text-to-video:', err.message);
       }
     }
+    const endImageUrl = startImageUrl ? (story.end_frame_url || null) : null;
     // Elements mode: subjects placed INTO the scene for the whole video.
     // Prompts get the @ElementN mapping appended so Kling knows who is who.
     let useScenes = scenes;
@@ -9911,12 +10065,13 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
       inputPayload: {
         story_id: story.id, tier, generate_audio: generateAudio,
         start_image_url: startImageUrl, start_frame_method: startMethod,
+        end_image_url: endImageUrl,
         elements_count: elementsPayload ? elementsPayload.length : 0,
       },
       sourceType: 'video_story',
     });
     const out = await storyEngine.generateStoryVideo({
-      scenes: useScenes, tier, generateAudio, startImageUrl, elements: elementsPayload,
+      scenes: useScenes, tier, generateAudio, startImageUrl, endImageUrl, elements: elementsPayload,
     });
     out.estCostUsd = (out.estCostUsd || 0) + startCostUsd;
     // fal output URLs can expire — copy to R2 immediately (same pattern as orders).
