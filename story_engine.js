@@ -172,13 +172,108 @@ async function generateStory({ situationText, elements, ctaCard, generator, mode
   throw new Error(`Story generation failed after 2 attempts: ${lastErr.message}`);
 }
 
+// ---------------------------------------------------------------------------
+// Part-1 video generation — accepted story -> Kling v3 text-to-video on fal.
+// Single scene -> `prompt`; multiple scenes -> `multi_prompt` (XOR rule: never
+// both — see _KLING_V3_REFERENCE.md). Vertical 9:16, native audio optional.
+// Falls back to one concatenated prompt if the multi_prompt call is rejected.
+// ---------------------------------------------------------------------------
+const VIDEO_MODELS = {
+  standard: {
+    id: 'fal-ai/kling-video/v3/standard/text-to-video',
+    label: 'Kling v3 Standard',
+    usdPerSec: { audioOn: 0.126, audioOff: 0.084 },
+  },
+  pro: {
+    id: 'fal-ai/kling-video/v3/pro/text-to-video',
+    label: 'Kling v3 Pro',
+    usdPerSec: { audioOn: 0.336, audioOff: 0.224 },
+  },
+};
+
+function clampDuration(totalS) {
+  return Math.min(Math.max(Math.round(totalS || 5), 3), 15);
+}
+
+function buildVideoInput(scenes, { generateAudio = true } = {}) {
+  const list = (Array.isArray(scenes) ? scenes : []).filter(s => s && s.video_prompt);
+  if (!list.length) throw new Error('Story has no scenes with video prompts');
+  const totalS = clampDuration(list.reduce((a, s) => a + (Number(s.duration_s) || 5), 0));
+  const base = {
+    duration: String(totalS),
+    aspect_ratio: '9:16',
+    generate_audio: !!generateAudio,
+    negative_prompt: 'blur, distort, low quality, text, watermark, subtitles',
+    cfg_scale: 0.5,
+    shot_type: 'customize',
+  };
+  if (list.length === 1) {
+    return { input: { ...base, prompt: list[0].video_prompt }, totalS };
+  }
+  return {
+    input: {
+      ...base,
+      multi_prompt: list.map(s => ({
+        prompt: s.video_prompt,
+        duration: String(clampDuration(Number(s.duration_s) || 5)),
+      })),
+    },
+    totalS,
+  };
+}
+
+function estimateVideoCost(tier, totalS, generateAudio) {
+  const m = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
+  return totalS * (generateAudio ? m.usdPerSec.audioOn : m.usdPerSec.audioOff);
+}
+
+async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true }) {
+  const model = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
+  const { input, totalS } = buildVideoInput(scenes, { generateAudio });
+
+  const run = async (payload) => fal.subscribe(model.id, {
+    input: payload,
+    storageSettings: { expiresIn: 'never' },
+  });
+
+  let result;
+  try {
+    result = await run(input);
+  } catch (err) {
+    // Fallback: if multi_prompt was rejected, retry once as a single
+    // concatenated prompt (keeps the pipeline alive if the shape changes).
+    if (input.multi_prompt) {
+      const { multi_prompt, ...rest } = input;
+      const joined = multi_prompt.map((p, i) => `Shot ${i + 1} (${p.duration}s): ${p.prompt}`).join('\n');
+      result = await run({ ...rest, prompt: joined });
+    } else {
+      throw err;
+    }
+  }
+
+  const url = result?.data?.video?.url;
+  if (!url) throw new Error('Video generation returned no URL');
+  return {
+    url,
+    input,
+    raw: result.data,
+    modelId: model.id,
+    totalS,
+    estCostUsd: estimateVideoCost(tier, totalS, generateAudio),
+  };
+}
+
 module.exports = {
   DEFAULT_MODEL,
   ROUTER_ENDPOINT,
   STORY_TYPES,
+  VIDEO_MODELS,
   buildSystemPrompt,
   buildUserPrompt,
   extractJson,
   validateStory,
   generateStory,
+  buildVideoInput,
+  estimateVideoCost,
+  generateStoryVideo,
 };

@@ -60,6 +60,10 @@ table.lib tr.inactive{opacity:.5;}
 .form-row textarea{min-width:280px;min-height:44px;}
 .copybtn{background:none;border:1px solid #ccc;border-radius:6px;font-size:10px;padding:2px 8px;cursor:pointer;color:#555;}
 .copybtn:hover{background:#f0f7ea;}
+.videobox{font-size:12px;padding:8px 10px;border-radius:8px;}
+.videobox.generating{background:#fff3cd;color:#856404;}
+.videobox.error{background:#fff5f5;border:1px solid #ffccbc;}
+.videobox.done{background:#f0f7ea;border:1px solid #c8e6c9;}
 </style>
 </head>
 <body class="ts-nav-loggedin ts-nav-admin">
@@ -69,31 +73,43 @@ table.lib tr.inactive{opacity:.5;}
 </div>
 
 <div class="tabs">
-  <button class="tab active" data-tab="queue" onclick="showTab('queue')">Review queue</button>
-  <button class="tab" data-tab="situations" onclick="showTab('situations')">Situations</button>
-  <button class="tab" data-tab="elements" onclick="showTab('elements')">Elements</button>
-  <button class="tab" data-tab="ctas" onclick="showTab('ctas')">CTA end-cards</button>
+  <button class="tab active" data-tab="queue" onclick="showTab('queue')" title="The main workflow: generate stories, review them (accept / reject / regenerate), then make videos from accepted ones.">Review queue</button>
+  <button class="tab" data-tab="situations" onclick="showTab('situations')" title="The growing list of story ideas ('the dog notices today is his birthday…'). The generator picks one per story. Add your own — more variety here = more variety in videos.">Situations</button>
+  <button class="tab" data-tab="elements" onclick="showTab('elements')" title="Your recurring cast & props: pets, the kitchen, and the calendar itself. Their descriptions are written into every video prompt so they look the SAME across all videos (recognition). Kind 'product' = included in every story.">Elements</button>
+  <button class="tab" data-tab="ctas" onclick="showTab('ctas')" title="Reusable part-2 end-cards: one per offer (e.g. '25% off for your email'), generated once at top quality, then glued onto every video. Rotating cards = A/B-testing offers.">CTA end-cards</button>
 </div>
 
 <!-- ── QUEUE TAB ─────────────────────────────────────────────────────────── -->
 <div id="tab-queue">
   <div class="toolbar">
-    <select id="gSituation"><option value="">Random situation</option></select>
-    <select id="gCta"><option value="">Random CTA</option></select>
-    <select id="gGenerator">
+    <select id="gSituation" title="Which situation the story is built around. 'Random' picks one of your active situations from the Situations tab. Costs nothing to change.">
+      <option value="">Random situation</option></select>
+    <select id="gCta" title="Which offer the video will end on (part 2 end-card). Only used to align the story's tone — the end-card itself is glued on later during assembly. Manage cards in the CTA end-cards tab.">
+      <option value="">Random CTA</option></select>
+    <select id="gGenerator" title="Which video generator this story is written FOR. Kling = automated, can have 1-3 scenes. Flow / Gemini = you paste the prompt manually into Google's apps, so the story is written as exactly 1 scene. This dropdown does NOT generate any video — it only shapes the text.">
       <option value="kling">Kling (1-3 scenes, automated)</option>
       <option value="flow">Flow / manual paste (1 scene)</option>
       <option value="gemini">Gemini app / manual paste (1 scene)</option>
     </select>
-    <select id="gCount"><option>1</option><option>2</option><option>3</option><option>5</option></select>
-    <button class="btn primary" id="genBtn" onclick="generate()">⚡ Generate</button>
-    <select id="fStatus" onchange="loadQueue()">
+    <select id="gCount" title="How many stories to write in one click. Each story costs ~$0.001 in LLM fees. More stories = more to review."><option>1</option><option>2</option><option>3</option><option>5</option></select>
+    <button class="btn primary" id="genBtn" onclick="generate()" title="Write new STORIES (text only: hook + scene prompts) into the review queue. Does NOT create any video and costs ~$0.001 per story. Videos are made later, from accepted stories, with the 🎬 button on each card.">⚡ Generate stories</button>
+    <span style="border-left:1px solid #ddd;height:24px;"></span>
+    <select id="vTier" title="Which Kling quality tier the 🎬 Make video buttons use. Standard ≈ $0.13/sec with audio (a 7s video ≈ $0.90). Pro ≈ $0.34/sec (7s ≈ $2.35) — better quality, slower, has 'custom elements'. Start with Standard.">
+      <option value="standard">Video: Kling Standard (~$0.13/s)</option>
+      <option value="pro">Video: Kling Pro (~$0.34/s)</option>
+    </select>
+    <select id="vAudio" title="Whether Kling also generates native sound (voices, effects, music). Audio off is ~33% cheaper but silent.">
+      <option value="on">Audio: on</option>
+      <option value="off">Audio: off (cheaper)</option>
+    </select>
+    <select id="fStatus" onchange="loadQueue()" title="Filter the queue below by review status. 'Pending review' = waiting for your accept/reject decision.">
       <option value="pending_review">Pending review</option>
       <option value="accepted">Accepted</option>
       <option value="rejected">Rejected</option>
       <option value="">All</option>
     </select>
-    <span class="count" id="queueCount"></span>
+    <button class="btn" onclick="loadQueue()" title="Reload the list below. The page also auto-refreshes every 15 seconds while a video is being generated.">↻ Refresh</button>
+    <span class="count" id="queueCount" title="Number of stories matching the current filter."></span>
   </div>
   <div class="list" id="queueList"><div class="loading">Loading…</div></div>
 </div>
@@ -102,9 +118,9 @@ table.lib tr.inactive{opacity:.5;}
 <div id="tab-situations" style="display:none;">
   <div class="lib-wrap">
     <div class="form-row">
-      <textarea id="sitText" placeholder="New situation… e.g. The dog notices today is marked on the fridge calendar"></textarea>
-      <input id="sitOccasion" placeholder="occasion (optional, e.g. birthday)" style="width:200px;">
-      <button class="btn primary" onclick="addSituation()">Add</button>
+      <textarea id="sitText" placeholder="New situation… e.g. The dog notices today is marked on the fridge calendar" title="One story idea in plain language. The LLM builds a full story around it. Short and concrete works best."></textarea>
+      <input id="sitOccasion" placeholder="occasion (optional, e.g. birthday)" style="width:200px;" title="Optional label (birthday, christmas, mothers-day…) so you can later see which occasions perform best.">
+      <button class="btn primary" onclick="addSituation()" title="Save this situation to the list. It immediately becomes available to the story generator.">Add</button>
     </div>
     <table class="lib" id="sitTable"></table>
   </div>
@@ -118,16 +134,16 @@ table.lib tr.inactive{opacity:.5;}
       Reference image URLs: one per line — used later for Kling start-frames / custom elements.
     </p>
     <div class="form-row">
-      <input id="elName" placeholder="Name (e.g. Bosse the beagle)" style="width:200px;">
-      <select id="elKind">
+      <input id="elName" placeholder="Name (e.g. Bosse the beagle)" style="width:200px;" title="The element's name — used inside stories ('Bosse stares at the calendar…').">
+      <select id="elKind" title="What kind of element this is. IMPORTANT: kind 'product' (the calendar) is automatically included in EVERY story — that's how the product stays visible and recognisable across all videos. Other kinds are picked at random, max 2 per story.">
         <option value="pet">pet</option><option value="person">person</option>
         <option value="location">location</option><option value="prop">prop</option>
         <option value="product">product</option>
       </select>
-      <textarea id="elDesc" placeholder="Visual description (goes verbatim into video prompts)"></textarea>
-      <textarea id="elPers" placeholder="Personality (optional)" style="min-width:180px;"></textarea>
-      <textarea id="elImgs" placeholder="Reference image URLs, one per line" style="min-width:180px;"></textarea>
-      <button class="btn primary" onclick="addElement()">Add</button>
+      <textarea id="elDesc" placeholder="Visual description (goes verbatim into video prompts)" title="How this element LOOKS, in words. This text is copied into every scene prompt that uses the element, so the video model draws it the same way every time. Be specific: colours, size, markings, style."></textarea>
+      <textarea id="elPers" placeholder="Personality (optional)" style="min-width:180px;" title="How this element BEHAVES (dramatic, lazy, bossy…). Shapes the story, not the looks."></textarea>
+      <textarea id="elImgs" placeholder="Reference image URLs, one per line" style="min-width:180px;" title="Optional photo URLs of the real pet/product. Not used yet by text-to-video — they become start-frames / Kling custom elements in a later build step. Safe to fill in already now."></textarea>
+      <button class="btn primary" onclick="addElement()" title="Save this element. Active elements are immediately available to the story generator.">Add</button>
     </div>
     <table class="lib" id="elTable"></table>
   </div>
@@ -140,12 +156,12 @@ table.lib tr.inactive{opacity:.5;}
       Reusable part-2 end-cards — one per offer, generated once at top quality, rotated across videos.
     </p>
     <div class="form-row">
-      <input id="ctaKey" placeholder="offer_key (e.g. rebate-email)" style="width:160px;">
-      <input id="ctaLabel" placeholder="Label (e.g. 25% off for your email)" style="width:220px;">
-      <input id="ctaText" placeholder="CTA text shown in card (optional)" style="width:220px;">
-      <input id="ctaVideo" placeholder="Video URL (once generated)" style="width:220px;">
-      <input id="ctaDur" placeholder="secs" type="number" step="0.5" value="4" style="width:70px;">
-      <button class="btn primary" onclick="addCta()">Add</button>
+      <input id="ctaKey" placeholder="offer_key (e.g. rebate-email)" style="width:160px;" title="Short internal ID for the offer (no spaces). Used in tracking to answer 'which offer converts best?'. Example: rebate-email, buy-calendar.">
+      <input id="ctaLabel" placeholder="Label (e.g. 25% off for your email)" style="width:220px;" title="Human-readable name of the offer — shown in dropdowns and on story cards.">
+      <input id="ctaText" placeholder="CTA text shown in card (optional)" style="width:220px;" title="The actual call-to-action wording the viewer sees on the end-card, e.g. 'Get 25% off — link in bio'.">
+      <input id="ctaVideo" placeholder="Video URL (once generated)" style="width:220px;" title="URL of the finished 3-5s end-card clip. Generate it ONCE at top quality (Kling Pro), paste the URL here, and it gets reused on every video — that's why part 2 costs nothing per video. Leave empty until you have it.">
+      <input id="ctaDur" placeholder="secs" type="number" step="0.5" value="4" style="width:70px;" title="Length of the end-card clip in seconds (3-5s recommended).">
+      <button class="btn primary" onclick="addCta()" title="Save this offer card. Active cards rotate into new stories and are available for video assembly.">Add</button>
     </div>
     <table class="lib" id="ctaTable"></table>
   </div>
@@ -179,6 +195,7 @@ function showTab(name){
 }
 
 // ── Queue ───────────────────────────────────────────────────────────────────
+let pollTimer = null;
 async function loadQueue(){
   const status = document.getElementById('fStatus').value;
   const el = document.getElementById('queueList');
@@ -186,16 +203,49 @@ async function loadQueue(){
   try{
     const j = await api('/admin/api/stories?limit=100' + (status ? '&status='+status : ''));
     document.getElementById('queueCount').textContent = j.total + ' stories';
-    if(!j.stories.length){ el.innerHTML = '<div class="empty">Nothing here. Hit ⚡ Generate.</div>'; return; }
-    el.innerHTML = j.stories.map(storyCard).join('');
+    if(!j.stories.length){ el.innerHTML = '<div class="empty">Nothing here. Hit ⚡ Generate stories.</div>'; }
+    else { el.innerHTML = j.stories.map(storyCard).join(''); }
+    // Auto-refresh every 15s while any video is rendering.
+    clearTimeout(pollTimer);
+    if (j.stories.some(s => s.video_status === 'generating')) {
+      pollTimer = setTimeout(loadQueue, 15000);
+    }
   }catch(e){ el.innerHTML = '<div class="empty">Error: '+esc(e.message)+'</div>'; }
+}
+
+function videoBlock(s){
+  const vs = s.video_status || 'none';
+  if (vs === 'generating') {
+    return `<div class="videobox generating" title="Kling is rendering this video on fal.ai right now. Typically takes 1-6 minutes. This page re-checks every 15 seconds — you can leave and come back.">
+      ⏳ Video generating… started ${fmtDate(s.video_started_at)} (takes 1-6 min, auto-refreshing)</div>`;
+  }
+  if (vs === 'done' && s.video_url) {
+    const cost = s.video_cost_usd ? ' · ~$' + Number(s.video_cost_usd).toFixed(2) : '';
+    return `<div class="videobox done">
+      <video src="${esc(s.video_url)}" controls preload="metadata" style="max-width:220px;border-radius:8px;display:block;" title="The finished part-1 clip (no end-card yet — that comes in assembly). Click to play. Right-click for download."></video>
+      <div style="font-size:11px;color:#777;margin-top:4px;" title="Model used, clip length, and the estimated fal.ai cost for this generation.">
+        ${esc(s.video_model||'')} · ${esc(s.video_duration_s||'?')}s${cost}
+        · <a href="${esc(s.video_url)}" target="_blank" title="Open the raw video file in a new tab.">open</a></div>
+      <button class="btn small" style="margin-top:4px;" onclick="makeVideo(${s.id}, this)" title="Generate ANOTHER video from the same story (new fal.ai cost applies). The current video link is kept in the database but this card will show the newest one.">🎬 Re-make video</button>
+    </div>`;
+  }
+  if (vs === 'error') {
+    return `<div class="videobox error" title="The video generation failed. The error text from fal.ai is shown below. Fix the cause (often a content-moderation word in a prompt) or just retry.">
+      ⚠ Video failed: <span style="color:#bf360c;">${esc(s.video_error||'unknown error')}</span>
+      <button class="btn small" onclick="makeVideo(${s.id}, this)" title="Try the generation again with the same story and the tier/audio selected in the toolbar.">↻ Retry video</button>
+    </div>`;
+  }
+  if (s.status === 'accepted') {
+    return `<button class="btn primary" onclick="makeVideo(${s.id}, this)" title="Send this accepted story to Kling (via fal.ai) and render the actual part-1 video. Uses the quality tier and audio setting chosen in the toolbar above. A 7s Standard clip with audio costs ~$0.90. Takes 1-6 minutes; the card will show progress.">🎬 Make video</button>`;
+  }
+  return '';
 }
 
 function storyCard(s){
   const scenes = (Array.isArray(s.scenes)? s.scenes : []).map((sc,i)=>`
     <div class="scene">
-      <div class="scene-head">Scene ${i+1} · ${esc(sc.duration_s)}s
-        <button class="copybtn" onclick='copyText(${JSON.stringify(String(sc.video_prompt||''))}, this)'>copy prompt</button>
+      <div class="scene-head" title="One shot of the video. The duration and the prompt below are what gets sent to the video generator.">Scene ${i+1} · ${esc(sc.duration_s)}s
+        <button class="copybtn" onclick='copyText(${JSON.stringify(String(sc.video_prompt||''))}, this)' title="Copy this scene's prompt to the clipboard — for pasting manually into Google Flow or the Gemini app (the free/manual path).">copy prompt</button>
       </div>
       <div class="scene-prompt">${esc(sc.video_prompt)}</div>
     </div>`).join('');
@@ -203,29 +253,42 @@ function storyCard(s){
     .map(e=>esc(e.name)+' ('+esc(e.kind)+')').join(' · ');
   const cost = s.llm_cost_usd ? '$'+Number(s.llm_cost_usd).toFixed(4) : '';
   const actions = s.status === 'pending_review' ? `
-      <button class="btn primary" onclick="act(${s.id},'accept')">✓ Accept</button>
-      <button class="btn danger" onclick="rejectStory(${s.id})">✗ Reject</button>
-      <button class="btn" onclick="act(${s.id},'regenerate', this)">↺ Regenerate</button>`
-    : `<button class="btn small danger" onclick="delStory(${s.id})">Delete</button>
-       <button class="btn small" onclick="act(${s.id},'regenerate', this)">↺ Regenerate</button>`;
+      <button class="btn primary" onclick="act(${s.id},'accept')" title="Approve this story. Accepted stories unlock the 🎬 Make video button. Costs nothing.">✓ Accept</button>
+      <button class="btn danger" onclick="rejectStory(${s.id})" title="Discard this story (it stays in the Rejected list). You'll be asked for an optional reason — those reasons will later teach the generator what to avoid.">✗ Reject</button>
+      <button class="btn" onclick="act(${s.id},'regenerate', this)" title="Keep the same situation, elements and CTA but let the LLM write a completely new story (~$0.001). Replaces the text on this card.">↺ Regenerate</button>`
+    : `<button class="btn small danger" onclick="delStory(${s.id})" title="Permanently delete this story record from the database. Cannot be undone.">Delete</button>
+       <button class="btn small" onclick="act(${s.id},'regenerate', this)" title="Write a new story text into this same card (~$0.001) and put it back into Pending review.">↺ Regenerate</button>`;
   return `
   <div class="card ${esc(s.status)}">
-    <div class="hook">${esc(s.hook_text)}</div>
+    <div class="hook" title="The hook — the text burned onto the video's first frames. Its only job: stop the scroll.">${esc(s.hook_text)}</div>
     <div class="meta">
-      <span class="badge st-${esc(s.status)}">${esc(s.status.replace('_',' '))}</span>
-      <span class="badge type">${esc(s.story_type||'')}</span>
-      ${s.mood?'<span class="badge mood">'+esc(s.mood)+'</span>':''}
-      <span class="badge gen">${esc(s.generator)}</span>
-      ${s.cta_label?'<span class="badge cta">CTA: '+esc(s.cta_label)+'</span>':'<span class="badge" style="background:#ffccbc;color:#bf360c;">no CTA card</span>'}
-      <span>#${s.id} · ${fmtDate(s.created_at)} ${cost?'· '+cost:''} · ${esc(s.llm_model||'')}</span>
+      <span class="badge st-${esc(s.status)}" title="Review status: pending review = waiting for your decision · accepted = ready for video · rejected = discarded.">${esc(s.status.replace('_',' '))}</span>
+      <span class="badge type" title="Story type — the narrative formula (pet_pov = pet's perspective, before_after = transformation, demo = product in use, …). Used later to learn which TYPE sells.">${esc(s.story_type||'')}</span>
+      ${s.mood?'<span class="badge mood" title="The emotional tone the LLM aimed for.">'+esc(s.mood)+'</span>':''}
+      <span class="badge gen" title="Which generator this story was written for: kling = automated (1-3 scenes) · flow/gemini = manual paste into Google's apps (1 scene).">${esc(s.generator)}</span>
+      ${s.cta_label?'<span class="badge cta" title="The offer end-card planned for this video (glued on during assembly).">CTA: '+esc(s.cta_label)+'</span>':'<span class="badge" style="background:#ffccbc;color:#bf360c;" title="No CTA end-card existed when this story was generated. Add one in the CTA end-cards tab — without it the video has no call-to-action and clicks go nowhere.">no CTA card</span>'}
+      <span title="Story ID · when it was generated · what the LLM text generation cost · which LLM wrote it.">#${s.id} · ${fmtDate(s.created_at)} ${cost?'· '+cost:''} · ${esc(s.llm_model||'')}</span>
     </div>
-    ${s.situation_text?'<div class="situation">Situation: '+esc(s.situation_text)+'</div>':''}
+    ${s.situation_text?'<div class="situation" title="The situation from your Situations list that this story was built around.">Situation: '+esc(s.situation_text)+'</div>':''}
     ${scenes}
-    ${els?'<div class="elements-line">Elements: '+els+'</div>':''}
-    ${s.llm_notes?'<div class="llm-notes">LLM notes: '+esc(s.llm_notes)+'</div>':''}
-    ${s.review_note?'<div class="note">Reject note: '+esc(s.review_note)+'</div>':''}
-    <div class="card-actions">${actions}</div>
+    ${els?'<div class="elements-line" title="The elements (cast & props) woven into this story’s prompts.">Elements: '+els+'</div>':''}
+    ${s.llm_notes?'<div class="llm-notes" title="Free-text remarks the LLM added for you, the producer.">LLM notes: '+esc(s.llm_notes)+'</div>':''}
+    ${s.review_note?'<div class="note" title="Your reason for rejecting — feeds the future learning loop.">Reject note: '+esc(s.review_note)+'</div>':''}
+    <div class="card-actions">${actions} ${videoBlock(s)}</div>
   </div>`;
+}
+
+async function makeVideo(id, btn){
+  const tier = document.getElementById('vTier').value;
+  const audio = document.getElementById('vAudio').value === 'on';
+  const secs = 7; const rate = tier==='pro' ? (audio?0.336:0.224) : (audio?0.126:0.084);
+  if(!confirm(`Send story #${id} to Kling ${tier}?\nEstimated cost: ~$${(secs*rate).toFixed(2)} (real cost depends on clip length).\nTakes 1-6 minutes.`)) return;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳…'; }
+  try{
+    await api(`/admin/api/stories/${id}/generate-video`, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ tier, generate_audio: audio })});
+  }catch(e){ alert('Could not start video: '+e.message); }
+  loadQueue();
 }
 
 async function act(id, action, btn){
@@ -258,7 +321,7 @@ async function generate(){
     const j = await api('/admin/api/stories/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     if(j.failures && j.failures.length) alert('Some generations failed:\n'+j.failures.join('\n'));
   }catch(e){ alert('Generation failed: '+e.message); }
-  btn.disabled = false; btn.textContent = '⚡ Generate';
+  btn.disabled = false; btn.textContent = '⚡ Generate stories';
   document.getElementById('fStatus').value = 'pending_review';
   loadQueue();
 }
@@ -291,8 +354,8 @@ async function loadSituations(){
     j.situations.map(s=>`
       <tr class="${s.active?'':'inactive'}">
         <td>${esc(s.text)}</td><td>${esc(s.occasion||'—')}</td><td>${s.times_used}</td>
-        <td><button class="btn small" onclick="toggleSit(${s.id},${!s.active})">${s.active?'on':'off'}</button></td>
-        <td><button class="btn small danger" onclick="delSit(${s.id})">✗</button></td>
+        <td><button class="btn small" onclick="toggleSit(${s.id},${!s.active})" title="on = the generator may pick this situation. Click to switch it ${s.active?'OFF (kept in the list, no longer used)':'ON (used again)'}.">${s.active?'on':'off'}</button></td>
+        <td><button class="btn small danger" onclick="delSit(${s.id})" title="Delete this situation permanently. Existing stories keep their copy of the text.">✗</button></td>
       </tr>`).join('');
 }
 async function addSituation(){
@@ -323,8 +386,8 @@ async function loadElements(){
         <td style="max-width:280px;">${esc(e.description||'—')}</td>
         <td style="max-width:180px;">${esc(e.personality||'—')}</td>
         <td>${(e.reference_image_urls||[]).map(u=>'<a href="'+esc(u)+'" target="_blank">img</a>').join(' ')||'—'}</td>
-        <td><button class="btn small" onclick="toggleEl(${e.id},${!e.active})">${e.active?'on':'off'}</button></td>
-        <td><button class="btn small danger" onclick="delEl(${e.id})">✗</button></td>
+        <td><button class="btn small" onclick="toggleEl(${e.id},${!e.active})" title="on = this element can appear in new stories. Click to ${e.active?'retire it (kept here, no longer used)':'activate it again'}.">${e.active?'on':'off'}</button></td>
+        <td><button class="btn small danger" onclick="delEl(${e.id})" title="Delete this element permanently. Existing stories keep their snapshot of it.">✗</button></td>
       </tr>`).join('') : '<tr><td colspan="7" style="color:#aaa;">No elements yet — add the calendar (kind: product) and your pets first.</td></tr>');
 }
 async function addElement(){
@@ -361,8 +424,8 @@ async function loadCtas(){
         <td>${esc(c.cta_text||'—')}</td>
         <td>${c.video_url?'<a href="'+esc(c.video_url)+'" target="_blank">video</a>':'—'}</td>
         <td>${c.duration_s}</td><td>${c.times_used}</td>
-        <td><button class="btn small" onclick="toggleCta(${c.id},${!c.active})">${c.active?'on':'off'}</button></td>
-        <td><button class="btn small danger" onclick="delCta(${c.id})">✗</button></td>
+        <td><button class="btn small" onclick="toggleCta(${c.id},${!c.active})" title="on = this offer rotates into new stories. Click to ${c.active?'pause it':'activate it'}.">${c.active?'on':'off'}</button></td>
+        <td><button class="btn small danger" onclick="delCta(${c.id})" title="Delete this offer card permanently. Stories that used it keep working (they only lose the label).">✗</button></td>
       </tr>`).join('') : '<tr><td colspan="8" style="color:#aaa;">No CTA cards yet — first one: the rebate-for-email offer.</td></tr>');
 }
 async function addCta(){

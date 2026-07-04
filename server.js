@@ -9601,6 +9601,72 @@ app.delete('/admin/api/stories/:id(\\d+)', requireRole('admin'), async (req, res
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Part-1 video generation (accepted story -> Kling t2v via fal) ───────────
+// Kling takes minutes, so we answer immediately and run the job in the
+// background; the row's video_status drives the queue UI (polled client-side).
+
+async function runStoryVideoJob(story, { tier, generateAudio }) {
+  const modelId = (storyEngine.VIDEO_MODELS[tier] || storyEngine.VIDEO_MODELS.standard).id;
+  const scenes = Array.isArray(story.scenes) ? story.scenes : [];
+  let genLog = { id: null };
+  try {
+    genLog = await generation.logGenerationStart({
+      modelId,
+      inputPayload: { story_id: story.id, tier, generate_audio: generateAudio },
+      sourceType: 'video_story',
+    });
+    const out = await storyEngine.generateStoryVideo({ scenes, tier, generateAudio });
+    // fal output URLs can expire — copy to R2 immediately (same pattern as orders).
+    let finalUrl = out.url;
+    try {
+      const stored = await downloadAndStore({ remoteUrl: out.url, kind: 'video-story' });
+      if (stored?.url) finalUrl = stored.url;
+    } catch (err) {
+      console.warn('[video-story] R2 copy failed, keeping fal URL:', err.message);
+    }
+    await pool.query(`
+      UPDATE video_stories SET
+        video_status = 'done', video_url = $2, video_fal_url = $3, video_model = $4,
+        video_duration_s = $5, video_cost_usd = $6, video_completed_at = NOW(),
+        generation_id = $7, updated_at = NOW()
+      WHERE id = $1`,
+      [story.id, finalUrl, out.url, out.modelId, out.totalS, out.estCostUsd, genLog.id]);
+    await generation.logGenerationFinish(genLog.id, {
+      outputUrl: finalUrl, falOutputUrl: out.url, costUsd: out.estCostUsd,
+    });
+  } catch (err) {
+    console.error('[video-story] generation failed for story', story.id, ':', err.message);
+    await pool.query(`
+      UPDATE video_stories SET video_status = 'error', video_error = $2, updated_at = NOW()
+      WHERE id = $1`,
+      [story.id, String(err.message || '').slice(0, 2000)]).catch(() => {});
+    await generation.logGenerationFailure(genLog.id, err.message);
+  }
+}
+
+app.post('/admin/api/stories/:id(\\d+)/generate-video', requireRole('admin'), async (req, res) => {
+  try {
+    const tier = req.body?.tier === 'pro' ? 'pro' : 'standard';
+    const generateAudio = req.body?.generate_audio !== false;
+    const { rows } = await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const story = rows[0];
+    if (story.status !== 'accepted') {
+      return res.status(400).json({ error: 'Accept the story first — only accepted stories get a video.' });
+    }
+    if (story.video_status === 'generating') {
+      return res.status(409).json({ error: 'A video is already being generated for this story.' });
+    }
+    await pool.query(`
+      UPDATE video_stories SET video_status = 'generating', video_error = NULL,
+        video_started_at = NOW(), updated_at = NOW()
+      WHERE id = $1`, [story.id]);
+    res.json({ ok: true, status: 'generating' });
+    runStoryVideoJob(story, { tier, generateAudio })
+      .catch(err => console.error('[video-story] job crashed:', err.message));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Library CRUD: situations / elements / CTA cards ─────────────────────────
 
 app.get('/admin/api/story-situations', requireRole('admin'), async (req, res) => {

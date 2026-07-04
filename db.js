@@ -1143,6 +1143,28 @@ async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS idx_video_stories_status ON video_stories (status, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_video_stories_cta    ON video_stories (cta_card_id);
+
+    -- 2026-07-04 (same day, part 2): part-1 video generation from accepted
+    -- stories. Kling t2v via fal, runs as a background job; row carries the
+    -- video lifecycle so the queue UI can poll.
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_status       TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_url          TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_fal_url      TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_model        TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_duration_s   INTEGER;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_cost_usd     NUMERIC(10,4);
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_error        TEXT;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_started_at   TIMESTAMPTZ;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS video_completed_at TIMESTAMPTZ;
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS generation_id      INTEGER REFERENCES generations(id);
+  `);
+
+  // Allow the generations audit log to record video-engine runs.
+  // Drop + re-add is idempotent per boot and preserves existing rows.
+  await pool.query(`
+    ALTER TABLE generations DROP CONSTRAINT IF EXISTS generations_source_type_check;
+    ALTER TABLE generations ADD CONSTRAINT generations_source_type_check
+      CHECK (source_type IN ('admin_test', 'customer_order', 'lab_batch', 'preview', 'video_story'));
   `);
 
   // Seed starter situations once (spec open item: "story situation list").
