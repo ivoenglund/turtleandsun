@@ -206,10 +206,10 @@ table.lib th{font-size:13px;}
       <option value="off">Audio: off (cheaper)</option>
     </select>
     <select id="fStatus" onchange="loadQueue()" title="Filter the queue below by review status. 'Pending review' = waiting for your accept/reject decision.">
+      <option value="" selected>All</option>
       <option value="pending_review">Pending review</option>
       <option value="accepted">Accepted</option>
       <option value="rejected">Rejected</option>
-      <option value="">All</option>
     </select>
     <button class="btn" onclick="loadQueue()" title="Reload the list below. The page also auto-refreshes every 15 seconds while a video is being generated.">↻ Refresh</button>
     <button class="btn" onclick="toggleManual()" title="Write a story yourself — no LLM, no premade situation. Your prompt becomes the scene, ready for 🎬 immediately (created as accepted). Elements, CTA and generator are taken from the selectors in this toolbar.">✍ Manual story</button>
@@ -462,7 +462,6 @@ async function createManual(btn){
       })});
     document.getElementById('mPrompt').value = '';
     document.getElementById('mHook').value = '';
-    document.getElementById('fStatus').value = 'accepted';
   }catch(e){ alert('Could not create: '+e.message); }
   btn.disabled = false; btn.textContent = 'Create';
   loadQueue();
@@ -727,7 +726,6 @@ async function generate(){
     if(j.failures && j.failures.length) alert('Some generations failed:\n'+j.failures.join('\n'));
   }catch(e){ alert('Generation failed: '+e.message); }
   btn.disabled = false; btn.textContent = '⚡ Generate stories';
-  document.getElementById('fStatus').value = 'pending_review';
   loadQueue();
 }
 

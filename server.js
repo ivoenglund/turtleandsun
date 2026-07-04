@@ -1139,6 +1139,7 @@ app.get('/admin', requireRole('admin'), (req, res) => {
     )}
 
     ${section('\u{1F3A8} Content',
+      card('Video stories', 'The video engine: generate stories, review, make Kling videos, assemble with end-card, insights.', '/admin/video-stories') +
       card('Studio', 'Concepts with triplet grids — drop a photo to make a new triplet.', '/admin/studio') +
       card('Produce', 'Filter triplets by dimension, make clips (Style A/B), track render status.', '/admin/social-clips') +
       card('Tracker', 'Track published videos: platform metadata, view stats, YouTube auto-fetch.', '/admin/social-tracker') +
