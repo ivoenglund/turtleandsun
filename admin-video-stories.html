@@ -42,7 +42,10 @@ body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13p
 .sitgrid{display:grid;grid-template-columns:minmax(300px,1fr) 190px 130px 52px 148px;gap:0;align-items:center;}
 #sitHead{background:#f0ede6;border:1.5px solid #e3dcc8;border-radius:10px 10px 0 0;border-bottom:none;}
 .sith{font-size:11px;font-weight:800;color:#555;padding:8px 10px;text-transform:uppercase;letter-spacing:.5px;}
-.sitrow{display:grid;grid-template-columns:minmax(300px,1fr) 190px 130px 52px 148px;gap:0;align-items:center;background:#fff;border:1.5px solid #e3dcc8;border-top:none;}
+.sitrow{display:grid;grid-template-columns:minmax(300px,1fr) 190px 130px 52px 148px;gap:0;align-items:start;background:#fff;border:1.5px solid #e3dcc8;border-top:none;}
+.sitrow .used,.sitrow .acts{padding-top:9px;}
+.sit-text{width:100%;border:1px solid transparent;border-radius:6px;padding:6px 8px;font-size:14px;line-height:1.45;font-family:inherit;background:transparent;resize:none;overflow:hidden;display:block;}
+.sit-text:hover,.sit-text:focus{border-color:#ccc;background:#fff;outline:none;}
 .sitrow:last-child{border-radius:0 0 10px 10px;}
 .sitrow.inactive{opacity:.5;}
 .sitrow.dirty{background:#fffbe6;}
@@ -792,7 +795,7 @@ function renderSitGrid(){
   if (!sitRows.length){ grid.innerHTML = '<div class="empty">No situations. Press ＋ or 💡.</div>'; return; }
   grid.innerHTML = sitRows.map(s => `
   <div class="sitrow ${s.active?'':'inactive'}" data-key="${s._key}">
-    <div class="cell"><input value="${esc(s.text||'')}" oninput="sitEdit('${s._key}','text',this.value)" placeholder="One-sentence story idea…" title="The one-sentence story idea. Click and edit directly; press 💾 on the row when done."></div>
+    <div class="cell"><textarea class="sit-text" rows="1" oninput="sitEdit('${s._key}','text',this.value);autoGrow(this)" placeholder="One-sentence story idea…" title="The story idea. The row grows automatically so the whole text is always visible. Edit directly; press 💾 on the row when done.">${esc(s.text||'')}</textarea></div>
     <div class="cell"><input value="${esc(s.theme||'')}" list="themeOptions" oninput="sitEdit('${s._key}','theme',this.value)" placeholder="theme" title="Which theme this idea belongs to. Pick from your list or type a new label."></div>
     <div class="cell"><input value="${esc(s.occasion||'')}" oninput="sitEdit('${s._key}','occasion',this.value)" placeholder="general" title="Occasion label: birthday, christmas, mothers-day, general…"></div>
     <div class="used" title="How many stories have been generated from this situation.">${s.times_used||0}×</div>
@@ -802,6 +805,12 @@ function renderSitGrid(){
       <button class="btn small danger" onclick="delSitRow('${s._key}')" title="Delete permanently. Existing stories keep their copy of the text.">✗</button>
     </div>
   </div>`).join('');
+  document.querySelectorAll('#sitGrid .sit-text').forEach(autoGrow);
+}
+
+function autoGrow(el){
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
 }
 
 function sitEdit(key, field, value){
