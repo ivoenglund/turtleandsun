@@ -93,6 +93,7 @@
           '<div>' +
             '<div class="ts-nav-dd-head">Content</div>' +
             dashLink('/admin/studio', 'Studio') +
+            dashLink('/admin/video-stories', 'Video stories') +
             dashLink('/admin/social-clips', 'Produce') +
             dashLink('/admin/social-tracker', 'Tracker') +
             dashLink('/admin/concepts', 'Concepts library') +
@@ -132,6 +133,7 @@
         '<div class="ts-nav-drawer-head ts-nav-admin-only">Dashboard</div>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin"><strong>Open dashboard &rarr;</strong></a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/studio">Studio</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/video-stories">Video stories</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-clips">Produce</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/social-tracker">Tracker</a>' +
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/concepts">Concepts</a>' +

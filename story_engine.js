@@ -1,0 +1,184 @@
+// story_engine.js
+//
+// Video Engine — story generator (Video Engine spec 2026-07-04, component 1).
+//
+// Generates short-video story records via an LLM: hook text, 1-3 scenes with
+// durations + per-scene video prompts, ready for the review queue.
+//
+// LLM path: fal.ai `openrouter/router` endpoint (fal-ai/any-llm is deprecated).
+// Same FAL_KEY + @fal-ai/client the app already uses for Kling — no new
+// provider account. Charged per token; ~$0.001-0.01 per story depending on
+// model. Model is configurable via system_settings key 'story_llm_model'.
+
+const { fal } = require('@fal-ai/client');
+
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+const ROUTER_ENDPOINT = 'openrouter/router';
+
+const STORY_TYPES = [
+  'before_after',   // real pet photo -> transformed reveal (Kling start+end frame)
+  'pet_pov',        // the pet narrates / reacts
+  'mini_drama',     // tiny 2-scene story with a punchline
+  'demo',           // the calendar itself in use, funny + useful
+  'celebration',    // birthday / occasion moment
+  'absurd_comedy',  // unexpected, loop-friendly gag
+];
+
+// ---------------------------------------------------------------------------
+// Prompt construction
+// ---------------------------------------------------------------------------
+function buildSystemPrompt() {
+  return [
+    'You are the story writer for Turtle & Sun, a brand that sells a personalised',
+    'FRIDGE BIRTHDAY CALENDAR (a beautiful A2 paper wall calendar showing the',
+    "family's own birthdays and occasions, often including pets). We publish",
+    'short vertical AI-generated videos (TikTok / Reels / Shorts) that are funny',
+    'AND useful, built around pets, family occasions, and the calendar.',
+    '',
+    'Your job: write ONE story for the first part of a video. Part 2 (the CTA',
+    'end-card) already exists and is appended later — do NOT write a CTA scene.',
+    '',
+    'Hard rules:',
+    '- Part 1 total length 5-8 seconds, split into 1-3 scenes.',
+    '- Each scene gets a `video_prompt`: a rich, self-contained text-to-video /',
+    '  image-to-video prompt in English. Vertical 9:16. Describe subjects,',
+    '  action, setting, lighting, camera. Repeat the provided ELEMENT',
+    '  descriptions inside every scene prompt that uses them, so the video',
+    '  model renders them consistently across scenes.',
+    '- NO on-screen text inside the video prompts (the hook text is burned in',
+    '  separately during assembly).',
+    '- `hook` is the on-screen hook text: max 8 words, English, curiosity or',
+    '  humour, no emojis, no hashtags.',
+    '- The story should make the viewer feel something in the first second',
+    '  (algorithm rewards % watched; the video loops).',
+    '- Keep it brand-safe, warm, family-friendly. Humour over hard selling.',
+    '',
+    'Respond with ONLY a JSON object, no markdown fences, matching exactly:',
+    '{',
+    '  "hook": "string, max 8 words",',
+    `  "story_type": "one of: ${STORY_TYPES.join(', ')}",`,
+    '  "mood": "one short word, e.g. funny | heartfelt | absurd",',
+    '  "scenes": [',
+    '    { "duration_s": <integer 3-8>, "video_prompt": "string" }',
+    '  ],',
+    '  "notes": "optional: anything the producer should know"',
+    '}',
+    'Scene durations must sum to 5-8 seconds.',
+  ].join('\n');
+}
+
+function buildUserPrompt({ situationText, elements, ctaCard, generator }) {
+  const lines = [];
+  lines.push('SITUATION (build the story around this):');
+  lines.push(situationText || 'A funny everyday moment at home involving the fridge calendar.');
+  lines.push('');
+  lines.push('ELEMENTS (recurring cast/props — use them, keep them consistent):');
+  if (elements && elements.length) {
+    for (const el of elements) {
+      const bits = [`- ${el.name} (${el.kind})`];
+      if (el.description) bits.push(`look: ${el.description}`);
+      if (el.personality) bits.push(`personality: ${el.personality}`);
+      lines.push(bits.join(' — '));
+    }
+  } else {
+    lines.push('- (none provided — invent a charming pet and a cosy kitchen)');
+  }
+  lines.push('');
+  if (ctaCard) {
+    lines.push(`TODAY'S OFFER (part 2 end-card, for tone alignment only — do NOT write it): ${ctaCard.label}${ctaCard.cta_text ? ' — "' + ctaCard.cta_text + '"' : ''}`);
+    lines.push('');
+  }
+  if (generator === 'flow' || generator === 'gemini') {
+    lines.push('CONSTRAINT: this will be generated as ONE single clip (manual path) — use exactly 1 scene.');
+  } else {
+    lines.push('CONSTRAINT: 1-3 scenes (multi-scene is fine; generated via Kling multi-prompt).');
+  }
+  lines.push('');
+  lines.push('Write the story JSON now.');
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// JSON extraction — tolerant of fences / leading prose.
+// ---------------------------------------------------------------------------
+function extractJson(text) {
+  if (!text) throw new Error('LLM returned empty output');
+  let t = String(text).trim();
+  t = t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const first = t.indexOf('{');
+  const last = t.lastIndexOf('}');
+  if (first === -1 || last === -1 || last <= first) {
+    throw new Error('No JSON object found in LLM output');
+  }
+  return JSON.parse(t.slice(first, last + 1));
+}
+
+function validateStory(story) {
+  const errors = [];
+  if (!story.hook || typeof story.hook !== 'string') errors.push('missing hook');
+  if (story.hook && story.hook.split(/\s+/).length > 12) errors.push('hook too long');
+  if (!Array.isArray(story.scenes) || story.scenes.length < 1 || story.scenes.length > 3) {
+    errors.push('scenes must be an array of 1-3');
+  } else {
+    let total = 0;
+    for (const s of story.scenes) {
+      const d = Number(s.duration_s);
+      if (!Number.isFinite(d) || d < 2 || d > 10) errors.push(`bad scene duration: ${s.duration_s}`);
+      if (!s.video_prompt || String(s.video_prompt).length < 40) errors.push('scene video_prompt too short');
+      total += d;
+    }
+    if (total < 4 || total > 10) errors.push(`scene durations sum to ${total}s (want 5-8)`);
+  }
+  if (!STORY_TYPES.includes(story.story_type)) story.story_type = 'mini_drama';
+  return errors;
+}
+
+// ---------------------------------------------------------------------------
+// Main entry. Returns { story, model, costUsd, raw }.
+// One automatic retry on parse/validation failure.
+// ---------------------------------------------------------------------------
+async function generateStory({ situationText, elements, ctaCard, generator, model }) {
+  const useModel = model || DEFAULT_MODEL;
+  const systemPrompt = buildSystemPrompt();
+  const prompt = buildUserPrompt({ situationText, elements, ctaCard, generator });
+
+  let lastErr = null;
+  let totalCost = 0;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const result = await fal.subscribe(ROUTER_ENDPOINT, {
+        input: {
+          model: useModel,
+          system_prompt: systemPrompt,
+          prompt,
+          temperature: 0.9,
+          max_tokens: 1500,
+        },
+      });
+      const data = result?.data || {};
+      if (data.error) throw new Error(`LLM error: ${data.error}`);
+      totalCost += Number(data?.usage?.cost || 0);
+
+      const story = extractJson(data.output);
+      const errors = validateStory(story);
+      if (errors.length) throw new Error('Story validation failed: ' + errors.join('; '));
+
+      return { story, model: useModel, costUsd: totalCost, raw: data };
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 2) break;
+    }
+  }
+  throw new Error(`Story generation failed after 2 attempts: ${lastErr.message}`);
+}
+
+module.exports = {
+  DEFAULT_MODEL,
+  ROUTER_ENDPOINT,
+  STORY_TYPES,
+  buildSystemPrompt,
+  buildUserPrompt,
+  extractJson,
+  validateStory,
+  generateStory,
+};

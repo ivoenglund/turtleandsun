@@ -1070,6 +1070,108 @@ async function initDb() {
     );
   `);
 
+  // ====================================================================
+  // Video Engine (2026-07-04) — story generator + review queue.
+  // Spec: Claude_Workspace/03_Turtleandsun/01_Context/_SPEC_VIDEO_ENGINE_2026-07-04.md
+  // story_elements  = recurring cast/props (component 2)
+  // story_situations = growing situation list (input to component 1)
+  // cta_cards       = reusable part-2 end-cards (component 3)
+  // video_stories   = the story record itself (component 1)
+  // All additive, all idempotent.
+  // ====================================================================
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS story_elements (
+      id                   SERIAL PRIMARY KEY,
+      name                 TEXT NOT NULL,
+      kind                 TEXT NOT NULL DEFAULT 'pet'
+                             CHECK (kind IN ('pet','person','location','prop','product')),
+      description          TEXT,
+      personality          TEXT,
+      reference_image_urls TEXT[] NOT NULL DEFAULT '{}',
+      active               BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order           INTEGER NOT NULL DEFAULT 0,
+      created_at           TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS story_situations (
+      id          SERIAL PRIMARY KEY,
+      text        TEXT NOT NULL,
+      occasion    TEXT,
+      active      BOOLEAN NOT NULL DEFAULT TRUE,
+      times_used  INTEGER NOT NULL DEFAULT 0,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS cta_cards (
+      id          SERIAL PRIMARY KEY,
+      offer_key   TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      cta_text    TEXT,
+      video_url   TEXT,
+      image_url   TEXT,
+      duration_s  NUMERIC(5,2) NOT NULL DEFAULT 4,
+      active      BOOLEAN NOT NULL DEFAULT TRUE,
+      times_used  INTEGER NOT NULL DEFAULT 0,
+      notes       TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS video_stories (
+      id                SERIAL PRIMARY KEY,
+      status            TEXT NOT NULL DEFAULT 'pending_review'
+                          CHECK (status IN ('pending_review','accepted','rejected')),
+      hook_text         TEXT,
+      story_type        TEXT,
+      mood              TEXT,
+      situation_id      INTEGER REFERENCES story_situations(id) ON DELETE SET NULL,
+      situation_text    TEXT,
+      scenes            JSONB NOT NULL DEFAULT '[]',
+      element_ids       INTEGER[] NOT NULL DEFAULT '{}',
+      elements_snapshot JSONB NOT NULL DEFAULT '[]',
+      cta_card_id       INTEGER REFERENCES cta_cards(id) ON DELETE SET NULL,
+      generator         TEXT NOT NULL DEFAULT 'kling'
+                          CHECK (generator IN ('kling','flow','gemini')),
+      language          TEXT NOT NULL DEFAULT 'en',
+      llm_model         TEXT,
+      llm_cost_usd      NUMERIC(10,6),
+      llm_notes         TEXT,
+      review_note       TEXT,
+      social_clip_id    INTEGER REFERENCES social_clips(id) ON DELETE SET NULL,
+      created_at        TIMESTAMPTZ DEFAULT NOW(),
+      reviewed_at       TIMESTAMPTZ,
+      updated_at        TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_video_stories_status ON video_stories (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_video_stories_cta    ON video_stories (cta_card_id);
+  `);
+
+  // Seed starter situations once (spec open item: "story situation list").
+  // Only when the table is empty — Ivo edits/extends via the dashboard after.
+  const sitCount = await pool.query(`SELECT COUNT(*)::int AS n FROM story_situations`);
+  if (sitCount.rows[0].n === 0) {
+    const seedSituations = [
+      ['The dog notices TODAY is marked on the fridge calendar — and it is his birthday.', 'birthday'],
+      ['Someone almost forgets grandma’s birthday; the fridge calendar saves the day at the last second.', 'birthday'],
+      ['The cat sits in front of the fridge, judging the humans for forgetting a date. The calendar knows.', 'general'],
+      ['Morning chaos: school, coffee, keys — one glance at the fridge calendar restores order.', 'general'],
+      ['The dog "reads" the calendar and starts preparing a surprise party for the cat.', 'birthday'],
+      ['A pet realises its OWN birthday is on the family calendar — pure joy.', 'birthday'],
+      ['Two pets argue about whose birthday comes first; the fridge calendar settles it.', 'birthday'],
+      ['Christmas panic averted: every family date was already on the fridge calendar since January.', 'christmas'],
+      ['New year: the family hangs the new calendar and the pets inspect every birthday on it.', 'new-year'],
+      ['The dog brings a gift to the neighbour’s door — the calendar said it was their pup’s big day.', 'birthday'],
+      ['Mother’s day almost slips by; the fridge calendar quietly saved the relationship.', 'mothers-day'],
+      ['A houseguest is amazed the family NEVER forgets a birthday. Camera pans to the fridge.', 'general'],
+    ];
+    for (const [text, occ] of seedSituations) {
+      await pool.query(
+        `INSERT INTO story_situations (text, occasion) VALUES ($1, $2)`,
+        [text, occ]
+      );
+    }
+    console.log(`Seeded ${seedSituations.length} story situations`);
+  }
+
   console.log('Database tables ready');
 }
 

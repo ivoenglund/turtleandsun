@@ -24,6 +24,7 @@ const { uploadStream, downloadAndStore, deleteFromR2 } = require('./storage');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
 const generation = require('./generation');
+const storyEngine = require('./story_engine');
 const cron = require('node-cron');
 const crypto = require('crypto');
 const { lookup: geoLookup } = require('./geoip');
@@ -9375,6 +9376,371 @@ app.get('/admin/api/tracker/channel-followers', requireRole('admin'), async (req
 // Serve admin-social-tracker.html
 app.get('/admin/social-tracker', requireRole('admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-social-tracker.html'));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Video Engine — story generator + review queue (spec 2026-07-04, component 1)
+// Libraries: story_elements (component 2), cta_cards (component 3),
+// story_situations. LLM via fal openrouter/router (see story_engine.js).
+// ═══════════════════════════════════════════════════════════════════════════
+
+app.get('/admin/video-stories', requireRole('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-video-stories.html'));
+});
+
+async function getStoryLlmModel() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT value FROM system_settings WHERE key = 'story_llm_model'`
+    );
+    return rows[0]?.value || storyEngine.DEFAULT_MODEL;
+  } catch { return storyEngine.DEFAULT_MODEL; }
+}
+
+// List stories (review queue). ?status=pending_review|accepted|rejected
+app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
+  try {
+    const status = req.query.status || null;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const params = [];
+    let where = '';
+    if (status) { params.push(status); where = `WHERE vs.status = $1`; }
+    params.push(limit, offset);
+    const { rows } = await pool.query(`
+      SELECT vs.*, cc.label AS cta_label, cc.offer_key AS cta_offer_key,
+             COUNT(*) OVER() AS total_count
+      FROM video_stories vs
+      LEFT JOIN cta_cards cc ON cc.id = vs.cta_card_id
+      ${where}
+      ORDER BY vs.created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+    const total = rows.length ? parseInt(rows[0].total_count, 10) : 0;
+    res.json({ stories: rows.map(({ total_count, ...r }) => r), total });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Shared generation core: picks situation/CTA/elements, calls the LLM.
+async function generateStoryRecord({ situationId, ctaCardId, generator }) {
+  // 1. Situation: requested or random active.
+  let situation = null;
+  if (situationId) {
+    const { rows } = await pool.query(`SELECT * FROM story_situations WHERE id = $1`, [situationId]);
+    situation = rows[0] || null;
+  }
+  if (!situation) {
+    const { rows } = await pool.query(
+      `SELECT * FROM story_situations WHERE active = TRUE ORDER BY random() LIMIT 1`);
+    situation = rows[0] || null;
+  }
+
+  // 2. CTA card: requested or random active (may be null while library is empty).
+  let ctaCard = null;
+  if (ctaCardId) {
+    const { rows } = await pool.query(`SELECT * FROM cta_cards WHERE id = $1`, [ctaCardId]);
+    ctaCard = rows[0] || null;
+  }
+  if (!ctaCard) {
+    const { rows } = await pool.query(
+      `SELECT * FROM cta_cards WHERE active = TRUE ORDER BY random() LIMIT 1`);
+    ctaCard = rows[0] || null;
+  }
+
+  // 3. Elements: every active product element (the calendar must look the same
+  //    everywhere = recognition) + up to 2 random other active elements.
+  const { rows: productEls } = await pool.query(
+    `SELECT * FROM story_elements WHERE active = TRUE AND kind = 'product' ORDER BY sort_order`);
+  const { rows: otherEls } = await pool.query(
+    `SELECT * FROM story_elements WHERE active = TRUE AND kind <> 'product' ORDER BY random() LIMIT 2`);
+  const elements = [...productEls, ...otherEls];
+
+  // 4. LLM call.
+  const model = await getStoryLlmModel();
+  const gen = generator === 'flow' || generator === 'gemini' ? generator : 'kling';
+  const { story, costUsd } = await storyEngine.generateStory({
+    situationText: situation?.text,
+    elements: elements.map(e => ({
+      name: e.name, kind: e.kind, description: e.description, personality: e.personality,
+    })),
+    ctaCard: ctaCard ? { label: ctaCard.label, cta_text: ctaCard.cta_text } : null,
+    generator: gen,
+    model,
+  });
+
+  // 5. Persist.
+  const { rows: inserted } = await pool.query(`
+    INSERT INTO video_stories (
+      status, hook_text, story_type, mood,
+      situation_id, situation_text, scenes,
+      element_ids, elements_snapshot, cta_card_id,
+      generator, llm_model, llm_cost_usd, llm_notes
+    ) VALUES (
+      'pending_review', $1, $2, $3,
+      $4, $5, $6::jsonb,
+      $7, $8::jsonb, $9,
+      $10, $11, $12, $13
+    ) RETURNING *`,
+    [
+      story.hook, story.story_type, story.mood || null,
+      situation?.id || null, situation?.text || null, JSON.stringify(story.scenes),
+      elements.map(e => e.id),
+      JSON.stringify(elements.map(e => ({
+        id: e.id, name: e.name, kind: e.kind,
+        description: e.description, personality: e.personality,
+        reference_image_urls: e.reference_image_urls,
+      }))),
+      ctaCard?.id || null,
+      gen, model, costUsd, story.notes || null,
+    ]);
+
+  if (situation) {
+    await pool.query(`UPDATE story_situations SET times_used = times_used + 1 WHERE id = $1`, [situation.id]);
+  }
+  if (ctaCard) {
+    await pool.query(`UPDATE cta_cards SET times_used = times_used + 1 WHERE id = $1`, [ctaCard.id]);
+  }
+  return inserted[0];
+}
+
+// Generate 1-5 new stories into the queue.
+app.post('/admin/api/stories/generate', requireRole('admin'), async (req, res) => {
+  try {
+    const { situation_id, cta_card_id, generator } = req.body || {};
+    const count = Math.min(Math.max(parseInt(req.body?.count, 10) || 1, 1), 5);
+    const created = [];
+    const failures = [];
+    for (let i = 0; i < count; i++) {
+      try {
+        created.push(await generateStoryRecord({
+          situationId: situation_id || null,
+          ctaCardId: cta_card_id || null,
+          generator,
+        }));
+      } catch (err) { failures.push(err.message); }
+    }
+    if (!created.length) {
+      return res.status(500).json({ error: failures.join(' | ') || 'generation failed' });
+    }
+    res.json({ ok: true, created, failures });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Regenerate: same situation + CTA + elements, fresh story, same row.
+app.post('/admin/api/stories/:id(\\d+)/regenerate', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const old = rows[0];
+    let ctaCard = null;
+    if (old.cta_card_id) {
+      const r = await pool.query(`SELECT * FROM cta_cards WHERE id = $1`, [old.cta_card_id]);
+      ctaCard = r.rows[0] || null;
+    }
+    const elements = Array.isArray(old.elements_snapshot) ? old.elements_snapshot : [];
+    const model = await getStoryLlmModel();
+    const { story, costUsd } = await storyEngine.generateStory({
+      situationText: old.situation_text,
+      elements,
+      ctaCard: ctaCard ? { label: ctaCard.label, cta_text: ctaCard.cta_text } : null,
+      generator: old.generator,
+      model,
+    });
+    const { rows: updated } = await pool.query(`
+      UPDATE video_stories SET
+        hook_text = $2, story_type = $3, mood = $4, scenes = $5::jsonb,
+        llm_model = $6, llm_cost_usd = COALESCE(llm_cost_usd, 0) + $7,
+        llm_notes = $8, status = 'pending_review', review_note = NULL,
+        reviewed_at = NULL, updated_at = NOW()
+      WHERE id = $1 RETURNING *`,
+      [old.id, story.hook, story.story_type, story.mood || null,
+       JSON.stringify(story.scenes), model, costUsd, story.notes || null]);
+    res.json({ ok: true, story: updated[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/stories/:id(\\d+)/accept', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      UPDATE video_stories SET status = 'accepted', reviewed_at = NOW(), updated_at = NOW()
+      WHERE id = $1 RETURNING *`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, story: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/stories/:id(\\d+)/reject', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      UPDATE video_stories SET status = 'rejected', review_note = $2,
+        reviewed_at = NOW(), updated_at = NOW()
+      WHERE id = $1 RETURNING *`, [req.params.id, req.body?.note || null]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, story: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/admin/api/stories/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const { hook_text, scenes } = req.body || {};
+    const { rows } = await pool.query(`
+      UPDATE video_stories SET
+        hook_text = COALESCE($2, hook_text),
+        scenes = COALESCE($3::jsonb, scenes),
+        updated_at = NOW()
+      WHERE id = $1 RETURNING *`,
+      [req.params.id, hook_text || null, scenes ? JSON.stringify(scenes) : null]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, story: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/admin/api/stories/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM video_stories WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Library CRUD: situations / elements / CTA cards ─────────────────────────
+
+app.get('/admin/api/story-situations', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM story_situations ORDER BY active DESC, id DESC`);
+    res.json({ situations: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/story-situations', requireRole('admin'), async (req, res) => {
+  try {
+    const { text, occasion } = req.body || {};
+    if (!text) return res.status(400).json({ error: 'text required' });
+    const { rows } = await pool.query(
+      `INSERT INTO story_situations (text, occasion) VALUES ($1, $2) RETURNING *`,
+      [text, occasion || null]);
+    res.json({ ok: true, situation: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/admin/api/story-situations/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const { text, occasion, active } = req.body || {};
+    const { rows } = await pool.query(`
+      UPDATE story_situations SET
+        text = COALESCE($2, text),
+        occasion = COALESCE($3, occasion),
+        active = COALESCE($4, active)
+      WHERE id = $1 RETURNING *`,
+      [req.params.id, text ?? null, occasion ?? null,
+       typeof active === 'boolean' ? active : null]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, situation: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/admin/api/story-situations/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM story_situations WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/admin/api/story-elements', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM story_elements ORDER BY active DESC, sort_order, id`);
+    res.json({ elements: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/story-elements', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, kind, description, personality, reference_image_urls } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const { rows } = await pool.query(`
+      INSERT INTO story_elements (name, kind, description, personality, reference_image_urls)
+      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [name, kind || 'pet', description || null, personality || null,
+       Array.isArray(reference_image_urls) ? reference_image_urls : []]);
+    res.json({ ok: true, element: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/admin/api/story-elements/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, kind, description, personality, reference_image_urls, active } = req.body || {};
+    const { rows } = await pool.query(`
+      UPDATE story_elements SET
+        name = COALESCE($2, name),
+        kind = COALESCE($3, kind),
+        description = COALESCE($4, description),
+        personality = COALESCE($5, personality),
+        reference_image_urls = COALESCE($6, reference_image_urls),
+        active = COALESCE($7, active)
+      WHERE id = $1 RETURNING *`,
+      [req.params.id, name ?? null, kind ?? null, description ?? null, personality ?? null,
+       Array.isArray(reference_image_urls) ? reference_image_urls : null,
+       typeof active === 'boolean' ? active : null]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, element: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/admin/api/story-elements/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM story_elements WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/admin/api/cta-cards', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM cta_cards ORDER BY active DESC, id DESC`);
+    res.json({ cards: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/cta-cards', requireRole('admin'), async (req, res) => {
+  try {
+    const { offer_key, label, cta_text, video_url, image_url, duration_s, notes } = req.body || {};
+    if (!offer_key || !label) return res.status(400).json({ error: 'offer_key and label required' });
+    const { rows } = await pool.query(`
+      INSERT INTO cta_cards (offer_key, label, cta_text, video_url, image_url, duration_s, notes)
+      VALUES ($1, $2, $3, $4, $5, COALESCE($6, 4), $7) RETURNING *`,
+      [offer_key, label, cta_text || null, video_url || null, image_url || null,
+       duration_s || null, notes || null]);
+    res.json({ ok: true, card: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/admin/api/cta-cards/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const { offer_key, label, cta_text, video_url, image_url, duration_s, notes, active } = req.body || {};
+    const { rows } = await pool.query(`
+      UPDATE cta_cards SET
+        offer_key = COALESCE($2, offer_key),
+        label = COALESCE($3, label),
+        cta_text = COALESCE($4, cta_text),
+        video_url = COALESCE($5, video_url),
+        image_url = COALESCE($6, image_url),
+        duration_s = COALESCE($7, duration_s),
+        notes = COALESCE($8, notes),
+        active = COALESCE($9, active)
+      WHERE id = $1 RETURNING *`,
+      [req.params.id, offer_key ?? null, label ?? null, cta_text ?? null,
+       video_url ?? null, image_url ?? null, duration_s ?? null, notes ?? null,
+       typeof active === 'boolean' ? active : null]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, card: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/admin/api/cta-cards/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM cta_cards WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 if (process.env.SENTRY_DSN) {

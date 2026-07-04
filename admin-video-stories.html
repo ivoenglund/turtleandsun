@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video Stories — Admin</title>
+<script src="/nav.js?v=20260704a"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13px;}
+.page-header{padding:16px 24px 10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;}
+.page-header h1{font-size:18px;font-weight:800;}
+.page-header .hint{font-size:12px;color:#888;line-height:1.5;}
+.tabs{display:flex;gap:6px;padding:0 24px;border-bottom:1px solid #e3dcc8;background:#fff;}
+.tab{padding:10px 16px;font-size:13px;font-weight:700;color:#666;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;}
+.tab.active{color:#1C2A14;border-bottom-color:#FFE800;}
+.toolbar{padding:12px 24px;background:#fff;border-bottom:1px solid #e3dcc8;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.toolbar select,.toolbar input,.toolbar textarea{padding:7px 10px;border-radius:8px;border:1px solid #ccc;font-size:13px;font-family:inherit;}
+.btn{padding:7px 14px;border-radius:8px;border:1.5px solid #1C2A14;background:#fff;color:#1C2A14;font-size:12px;font-weight:700;cursor:pointer;}
+.btn:hover{background:#f0f7ea;}
+.btn.primary{background:#1C2A14;color:#FFE800;border:none;}
+.btn.primary:hover{background:#2d4a24;}
+.btn.primary:disabled{opacity:.5;cursor:wait;}
+.btn.danger{border-color:#e53935;color:#e53935;}
+.btn.danger:hover{background:#fff5f5;}
+.btn.small{padding:4px 9px;font-size:11px;}
+.count{color:#888;font-size:12px;margin-left:auto;}
+.list{padding:18px 24px;display:flex;flex-direction:column;gap:14px;max-width:1000px;}
+.card{background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:14px 16px;}
+.card.accepted{border-left:5px solid #4caf50;}
+.card.rejected{border-left:5px solid #e53935;opacity:.75;}
+.card.pending_review{border-left:5px solid #FFE800;}
+.hook{font-size:16px;font-weight:800;margin-bottom:6px;}
+.meta{font-size:11px;color:#888;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;}
+.badge.type{background:#e3f2fd;color:#0d47a1;}
+.badge.mood{background:#f3e5f5;color:#6a1b9a;}
+.badge.gen{background:#fff3cd;color:#856404;}
+.badge.cta{background:#c8e6c9;color:#1b5e20;}
+.badge.st-accepted{background:#c8e6c9;color:#1b5e20;}
+.badge.st-rejected{background:#ffccbc;color:#bf360c;}
+.badge.st-pending_review{background:#fff3cd;color:#856404;}
+.situation{font-size:12px;color:#555;font-style:italic;margin-bottom:10px;}
+.scene{background:#faf8f2;border:1px solid #eee5d0;border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.scene-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;font-weight:700;color:#555;}
+.scene-prompt{font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+.elements-line{font-size:11px;color:#777;margin:8px 0;}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.note{font-size:11px;color:#bf360c;margin-top:6px;}
+.llm-notes{font-size:11px;color:#777;margin-top:6px;font-style:italic;}
+.loading{text-align:center;padding:60px;color:#aaa;}
+.empty{text-align:center;padding:40px;color:#aaa;font-size:13px;}
+table.lib{width:100%;border-collapse:collapse;background:#fff;font-size:12px;}
+table.lib th{text-align:left;padding:8px 10px;background:#f0ede6;font-size:11px;border-bottom:1px solid #e3dcc8;}
+table.lib td{padding:8px 10px;border-bottom:1px solid #f0ede6;vertical-align:top;}
+table.lib tr.inactive{opacity:.5;}
+.lib-wrap{padding:18px 24px;max-width:1000px;}
+.form-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:flex-start;}
+.form-row input,.form-row select,.form-row textarea{padding:7px 10px;border-radius:8px;border:1px solid #ccc;font-size:12px;font-family:inherit;}
+.form-row textarea{min-width:280px;min-height:44px;}
+.copybtn{background:none;border:1px solid #ccc;border-radius:6px;font-size:10px;padding:2px 8px;cursor:pointer;color:#555;}
+.copybtn:hover{background:#f0f7ea;}
+</style>
+</head>
+<body class="ts-nav-loggedin ts-nav-admin">
+<div class="page-header">
+  <h1>Video Stories</h1>
+  <span class="hint"><a href="/admin" style="color:#3A6B20;text-decoration:none;">← Admin</a> &nbsp;·&nbsp; Generate → 30-sec review → accept / reject / regenerate. Never skip review.</span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="queue" onclick="showTab('queue')">Review queue</button>
+  <button class="tab" data-tab="situations" onclick="showTab('situations')">Situations</button>
+  <button class="tab" data-tab="elements" onclick="showTab('elements')">Elements</button>
+  <button class="tab" data-tab="ctas" onclick="showTab('ctas')">CTA end-cards</button>
+</div>
+
+<!-- ── QUEUE TAB ─────────────────────────────────────────────────────────── -->
+<div id="tab-queue">
+  <div class="toolbar">
+    <select id="gSituation"><option value="">Random situation</option></select>
+    <select id="gCta"><option value="">Random CTA</option></select>
+    <select id="gGenerator">
+      <option value="kling">Kling (1-3 scenes, automated)</option>
+      <option value="flow">Flow / manual paste (1 scene)</option>
+      <option value="gemini">Gemini app / manual paste (1 scene)</option>
+    </select>
+    <select id="gCount"><option>1</option><option>2</option><option>3</option><option>5</option></select>
+    <button class="btn primary" id="genBtn" onclick="generate()">⚡ Generate</button>
+    <select id="fStatus" onchange="loadQueue()">
+      <option value="pending_review">Pending review</option>
+      <option value="accepted">Accepted</option>
+      <option value="rejected">Rejected</option>
+      <option value="">All</option>
+    </select>
+    <span class="count" id="queueCount"></span>
+  </div>
+  <div class="list" id="queueList"><div class="loading">Loading…</div></div>
+</div>
+
+<!-- ── SITUATIONS TAB ────────────────────────────────────────────────────── -->
+<div id="tab-situations" style="display:none;">
+  <div class="lib-wrap">
+    <div class="form-row">
+      <textarea id="sitText" placeholder="New situation… e.g. The dog notices today is marked on the fridge calendar"></textarea>
+      <input id="sitOccasion" placeholder="occasion (optional, e.g. birthday)" style="width:200px;">
+      <button class="btn primary" onclick="addSituation()">Add</button>
+    </div>
+    <table class="lib" id="sitTable"></table>
+  </div>
+</div>
+
+<!-- ── ELEMENTS TAB ──────────────────────────────────────────────────────── -->
+<div id="tab-elements" style="display:none;">
+  <div class="lib-wrap">
+    <p style="font-size:12px;color:#777;margin-bottom:10px;">
+      Recurring cast &amp; props. Elements of kind <b>product</b> (the calendar) are included in EVERY story.
+      Reference image URLs: one per line — used later for Kling start-frames / custom elements.
+    </p>
+    <div class="form-row">
+      <input id="elName" placeholder="Name (e.g. Bosse the beagle)" style="width:200px;">
+      <select id="elKind">
+        <option value="pet">pet</option><option value="person">person</option>
+        <option value="location">location</option><option value="prop">prop</option>
+        <option value="product">product</option>
+      </select>
+      <textarea id="elDesc" placeholder="Visual description (goes verbatim into video prompts)"></textarea>
+      <textarea id="elPers" placeholder="Personality (optional)" style="min-width:180px;"></textarea>
+      <textarea id="elImgs" placeholder="Reference image URLs, one per line" style="min-width:180px;"></textarea>
+      <button class="btn primary" onclick="addElement()">Add</button>
+    </div>
+    <table class="lib" id="elTable"></table>
+  </div>
+</div>
+
+<!-- ── CTA CARDS TAB ─────────────────────────────────────────────────────── -->
+<div id="tab-ctas" style="display:none;">
+  <div class="lib-wrap">
+    <p style="font-size:12px;color:#777;margin-bottom:10px;">
+      Reusable part-2 end-cards — one per offer, generated once at top quality, rotated across videos.
+    </p>
+    <div class="form-row">
+      <input id="ctaKey" placeholder="offer_key (e.g. rebate-email)" style="width:160px;">
+      <input id="ctaLabel" placeholder="Label (e.g. 25% off for your email)" style="width:220px;">
+      <input id="ctaText" placeholder="CTA text shown in card (optional)" style="width:220px;">
+      <input id="ctaVideo" placeholder="Video URL (once generated)" style="width:220px;">
+      <input id="ctaDur" placeholder="secs" type="number" step="0.5" value="4" style="width:70px;">
+      <button class="btn primary" onclick="addCta()">Add</button>
+    </div>
+    <table class="lib" id="ctaTable"></table>
+  </div>
+</div>
+
+<script>
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(s){return s?new Date(s).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'}):'—';}
+async function api(url, opts){
+  const r = await fetch(url, opts);
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+function copyText(t, btn){
+  navigator.clipboard.writeText(t).then(()=>{
+    const o = btn.textContent; btn.textContent = '✓ copied';
+    setTimeout(()=>btn.textContent=o, 1200);
+  });
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────────
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  ['queue','situations','elements','ctas'].forEach(n=>{
+    document.getElementById('tab-'+n).style.display = n===name ? '' : 'none';
+  });
+  if(name==='situations') loadSituations();
+  if(name==='elements') loadElements();
+  if(name==='ctas') loadCtas();
+}
+
+// ── Queue ───────────────────────────────────────────────────────────────────
+async function loadQueue(){
+  const status = document.getElementById('fStatus').value;
+  const el = document.getElementById('queueList');
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  try{
+    const j = await api('/admin/api/stories?limit=100' + (status ? '&status='+status : ''));
+    document.getElementById('queueCount').textContent = j.total + ' stories';
+    if(!j.stories.length){ el.innerHTML = '<div class="empty">Nothing here. Hit ⚡ Generate.</div>'; return; }
+    el.innerHTML = j.stories.map(storyCard).join('');
+  }catch(e){ el.innerHTML = '<div class="empty">Error: '+esc(e.message)+'</div>'; }
+}
+
+function storyCard(s){
+  const scenes = (Array.isArray(s.scenes)? s.scenes : []).map((sc,i)=>`
+    <div class="scene">
+      <div class="scene-head">Scene ${i+1} · ${esc(sc.duration_s)}s
+        <button class="copybtn" onclick='copyText(${JSON.stringify(String(sc.video_prompt||''))}, this)'>copy prompt</button>
+      </div>
+      <div class="scene-prompt">${esc(sc.video_prompt)}</div>
+    </div>`).join('');
+  const els = (Array.isArray(s.elements_snapshot)? s.elements_snapshot : [])
+    .map(e=>esc(e.name)+' ('+esc(e.kind)+')').join(' · ');
+  const cost = s.llm_cost_usd ? '$'+Number(s.llm_cost_usd).toFixed(4) : '';
+  const actions = s.status === 'pending_review' ? `
+      <button class="btn primary" onclick="act(${s.id},'accept')">✓ Accept</button>
+      <button class="btn danger" onclick="rejectStory(${s.id})">✗ Reject</button>
+      <button class="btn" onclick="act(${s.id},'regenerate', this)">↺ Regenerate</button>`
+    : `<button class="btn small danger" onclick="delStory(${s.id})">Delete</button>
+       <button class="btn small" onclick="act(${s.id},'regenerate', this)">↺ Regenerate</button>`;
+  return `
+  <div class="card ${esc(s.status)}">
+    <div class="hook">${esc(s.hook_text)}</div>
+    <div class="meta">
+      <span class="badge st-${esc(s.status)}">${esc(s.status.replace('_',' '))}</span>
+      <span class="badge type">${esc(s.story_type||'')}</span>
+      ${s.mood?'<span class="badge mood">'+esc(s.mood)+'</span>':''}
+      <span class="badge gen">${esc(s.generator)}</span>
+      ${s.cta_label?'<span class="badge cta">CTA: '+esc(s.cta_label)+'</span>':'<span class="badge" style="background:#ffccbc;color:#bf360c;">no CTA card</span>'}
+      <span>#${s.id} · ${fmtDate(s.created_at)} ${cost?'· '+cost:''} · ${esc(s.llm_model||'')}</span>
+    </div>
+    ${s.situation_text?'<div class="situation">Situation: '+esc(s.situation_text)+'</div>':''}
+    ${scenes}
+    ${els?'<div class="elements-line">Elements: '+els+'</div>':''}
+    ${s.llm_notes?'<div class="llm-notes">LLM notes: '+esc(s.llm_notes)+'</div>':''}
+    ${s.review_note?'<div class="note">Reject note: '+esc(s.review_note)+'</div>':''}
+    <div class="card-actions">${actions}</div>
+  </div>`;
+}
+
+async function act(id, action, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{ await api(`/admin/api/stories/${id}/${action}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); }
+  catch(e){ alert(e.message); }
+  loadQueue();
+}
+async function rejectStory(id){
+  const note = prompt('Why reject? (feeds the learning loop — optional)') || null;
+  try{ await api(`/admin/api/stories/${id}/reject`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({note})}); }
+  catch(e){ alert(e.message); }
+  loadQueue();
+}
+async function delStory(id){
+  if(!confirm('Delete story #'+id+'?')) return;
+  try{ await api('/admin/api/stories/'+id, {method:'DELETE'}); }catch(e){ alert(e.message); }
+  loadQueue();
+}
+async function generate(){
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true; btn.textContent = '⚡ Generating…';
+  try{
+    const body = {
+      situation_id: document.getElementById('gSituation').value || null,
+      cta_card_id: document.getElementById('gCta').value || null,
+      generator: document.getElementById('gGenerator').value,
+      count: parseInt(document.getElementById('gCount').value, 10),
+    };
+    const j = await api('/admin/api/stories/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(j.failures && j.failures.length) alert('Some generations failed:\n'+j.failures.join('\n'));
+  }catch(e){ alert('Generation failed: '+e.message); }
+  btn.disabled = false; btn.textContent = '⚡ Generate';
+  document.getElementById('fStatus').value = 'pending_review';
+  loadQueue();
+}
+
+// ── Pickers (situation + CTA dropdowns in toolbar) ─────────────────────────
+async function loadPickers(){
+  try{
+    const [s, c] = await Promise.all([
+      api('/admin/api/story-situations'), api('/admin/api/cta-cards'),
+    ]);
+    const sSel = document.getElementById('gSituation');
+    s.situations.filter(x=>x.active).forEach(x=>{
+      const o = document.createElement('option'); o.value = x.id;
+      o.textContent = x.text.slice(0,70) + (x.text.length>70?'…':'');
+      sSel.appendChild(o);
+    });
+    const cSel = document.getElementById('gCta');
+    c.cards.filter(x=>x.active).forEach(x=>{
+      const o = document.createElement('option'); o.value = x.id; o.textContent = x.label;
+      cSel.appendChild(o);
+    });
+  }catch(e){ /* pickers stay empty */ }
+}
+
+// ── Situations lib ──────────────────────────────────────────────────────────
+async function loadSituations(){
+  const j = await api('/admin/api/story-situations');
+  document.getElementById('sitTable').innerHTML =
+    '<tr><th>Situation</th><th>Occasion</th><th>Used</th><th>Active</th><th></th></tr>' +
+    j.situations.map(s=>`
+      <tr class="${s.active?'':'inactive'}">
+        <td>${esc(s.text)}</td><td>${esc(s.occasion||'—')}</td><td>${s.times_used}</td>
+        <td><button class="btn small" onclick="toggleSit(${s.id},${!s.active})">${s.active?'on':'off'}</button></td>
+        <td><button class="btn small danger" onclick="delSit(${s.id})">✗</button></td>
+      </tr>`).join('');
+}
+async function addSituation(){
+  const text = document.getElementById('sitText').value.trim();
+  if(!text) return;
+  await api('/admin/api/story-situations', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({text, occasion: document.getElementById('sitOccasion').value.trim()||null})});
+  document.getElementById('sitText').value=''; document.getElementById('sitOccasion').value='';
+  loadSituations();
+}
+async function toggleSit(id, active){
+  await api('/admin/api/story-situations/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
+  loadSituations();
+}
+async function delSit(id){
+  if(!confirm('Delete situation?')) return;
+  await api('/admin/api/story-situations/'+id, {method:'DELETE'}); loadSituations();
+}
+
+// ── Elements lib ────────────────────────────────────────────────────────────
+async function loadElements(){
+  const j = await api('/admin/api/story-elements');
+  document.getElementById('elTable').innerHTML =
+    '<tr><th>Name</th><th>Kind</th><th>Description</th><th>Personality</th><th>Refs</th><th>Active</th><th></th></tr>' +
+    (j.elements.length ? j.elements.map(e=>`
+      <tr class="${e.active?'':'inactive'}">
+        <td><b>${esc(e.name)}</b></td><td>${esc(e.kind)}</td>
+        <td style="max-width:280px;">${esc(e.description||'—')}</td>
+        <td style="max-width:180px;">${esc(e.personality||'—')}</td>
+        <td>${(e.reference_image_urls||[]).map(u=>'<a href="'+esc(u)+'" target="_blank">img</a>').join(' ')||'—'}</td>
+        <td><button class="btn small" onclick="toggleEl(${e.id},${!e.active})">${e.active?'on':'off'}</button></td>
+        <td><button class="btn small danger" onclick="delEl(${e.id})">✗</button></td>
+      </tr>`).join('') : '<tr><td colspan="7" style="color:#aaa;">No elements yet — add the calendar (kind: product) and your pets first.</td></tr>');
+}
+async function addElement(){
+  const name = document.getElementById('elName').value.trim();
+  if(!name) return;
+  const imgs = document.getElementById('elImgs').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  await api('/admin/api/story-elements', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      name, kind: document.getElementById('elKind').value,
+      description: document.getElementById('elDesc').value.trim()||null,
+      personality: document.getElementById('elPers').value.trim()||null,
+      reference_image_urls: imgs,
+    })});
+  ['elName','elDesc','elPers','elImgs'].forEach(id=>document.getElementById(id).value='');
+  loadElements();
+}
+async function toggleEl(id, active){
+  await api('/admin/api/story-elements/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
+  loadElements();
+}
+async function delEl(id){
+  if(!confirm('Delete element?')) return;
+  await api('/admin/api/story-elements/'+id, {method:'DELETE'}); loadElements();
+}
+
+// ── CTA cards lib ───────────────────────────────────────────────────────────
+async function loadCtas(){
+  const j = await api('/admin/api/cta-cards');
+  document.getElementById('ctaTable').innerHTML =
+    '<tr><th>Offer key</th><th>Label</th><th>CTA text</th><th>Video</th><th>Secs</th><th>Used</th><th>Active</th><th></th></tr>' +
+    (j.cards.length ? j.cards.map(c=>`
+      <tr class="${c.active?'':'inactive'}">
+        <td><b>${esc(c.offer_key)}</b></td><td>${esc(c.label)}</td>
+        <td>${esc(c.cta_text||'—')}</td>
+        <td>${c.video_url?'<a href="'+esc(c.video_url)+'" target="_blank">video</a>':'—'}</td>
+        <td>${c.duration_s}</td><td>${c.times_used}</td>
+        <td><button class="btn small" onclick="toggleCta(${c.id},${!c.active})">${c.active?'on':'off'}</button></td>
+        <td><button class="btn small danger" onclick="delCta(${c.id})">✗</button></td>
+      </tr>`).join('') : '<tr><td colspan="8" style="color:#aaa;">No CTA cards yet — first one: the rebate-for-email offer.</td></tr>');
+}
+async function addCta(){
+  const offer_key = document.getElementById('ctaKey').value.trim();
+  const label = document.getElementById('ctaLabel').value.trim();
+  if(!offer_key || !label) return alert('offer_key and label required');
+  await api('/admin/api/cta-cards', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      offer_key, label,
+      cta_text: document.getElementById('ctaText').value.trim()||null,
+      video_url: document.getElementById('ctaVideo').value.trim()||null,
+      duration_s: parseFloat(document.getElementById('ctaDur').value)||4,
+    })});
+  ['ctaKey','ctaLabel','ctaText','ctaVideo'].forEach(id=>document.getElementById(id).value='');
+  loadCtas();
+}
+async function toggleCta(id, active){
+  await api('/admin/api/cta-cards/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
+  loadCtas();
+}
+async function delCta(id){
+  if(!confirm('Delete CTA card?')) return;
+  await api('/admin/api/cta-cards/'+id, {method:'DELETE'}); loadCtas();
+}
+
+loadPickers();
+loadQueue();
+</script>
+</body>
+</html>
