@@ -1188,6 +1188,37 @@ async function initDb() {
       CHECK (source_type IN ('admin_test', 'customer_order', 'lab_batch', 'preview', 'video_story'));
   `);
 
+  // Themes (2026-07-04 part 5): DB-driven idea themes for bulk situation
+  // generation. Editable in the UI — never hardcode more here, seed only.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS story_themes (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL,
+      active     BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    ALTER TABLE story_situations ADD COLUMN IF NOT EXISTS theme TEXT;
+  `);
+  const themeCount = await pool.query(`SELECT COUNT(*)::int AS n FROM story_themes`);
+  if (themeCount.rows[0].n === 0) {
+    const seedThemes = [
+      'Pet becomes a royal',
+      'Pet uses the fridge calendar',
+      'Pet saves a forgotten birthday',
+      'Pet plans a secret party',
+      'Morning chaos rescued by the calendar',
+      'Pets argue about calendar dates',
+      'Pet silently judges the humans',
+      'Holiday panic averted',
+      'New calendar unboxing ceremony',
+      'Pet delivers gifts exactly on time',
+    ];
+    for (const name of seedThemes) {
+      await pool.query(`INSERT INTO story_themes (name) VALUES ($1)`, [name]);
+    }
+    console.log(`Seeded ${seedThemes.length} story themes`);
+  }
+
   // Seed starter situations once (spec open item: "story situation list").
   // Only when the table is empty — Ivo edits/extends via the dashboard after.
   const sitCount = await pool.query(`SELECT COUNT(*)::int AS n FROM story_situations`);

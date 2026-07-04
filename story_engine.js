@@ -349,9 +349,10 @@ async function generatePostingKit({ story, situationText, ctaCard, links, model 
 // Situation idea generator — bulk-writes NEW story situations for the library.
 // The admin reviews, edits or deletes them in the Situations grid.
 // ---------------------------------------------------------------------------
-async function generateSituationIdeas({ existing = [], count = 10, model }) {
+async function generateSituationIdeas({ existing = [], count = 10, themes = [], model }) {
   const useModel = model || DEFAULT_MODEL;
   const n = Math.min(Math.max(parseInt(count, 10) || 10, 1), 20);
+  const themeList = (themes || []).filter(Boolean).slice(0, 20);
   const prompt = [
     'You invent story SITUATIONS for Turtle & Sun short videos. The product:',
     "a personalised FRIDGE BIRTHDAY CALENDAR (A2 paper wall calendar with the family's",
@@ -361,6 +362,12 @@ async function generateSituationIdeas({ existing = [], count = 10, model }) {
     'A situation is ONE sentence: a concrete, filmable everyday moment where the',
     'calendar plays a role. Pets as protagonists work best. No camera directions.',
     '',
+    themeList.length === 1
+      ? `THEME: every idea must belong to the theme "${themeList[0]}".`
+      : themeList.length > 1
+        ? 'THEMES (spread the ideas across these; tag each idea with the theme used):\n' + themeList.map(t => '- ' + t).join('\n')
+        : 'No theme constraint — free variation.',
+    '',
     'ALREADY IN THE LIBRARY (do NOT repeat or closely paraphrase these):',
     ...existing.slice(0, 60).map(t => '- ' + t),
     '',
@@ -368,7 +375,7 @@ async function generateSituationIdeas({ existing = [], count = 10, model }) {
     'christmas, mothers/fathers day, name days, anniversaries, general everyday).',
     '',
     'Respond with ONLY a JSON object, no markdown fences:',
-    '{ "ideas": [ { "text": "one-sentence situation", "occasion": "birthday|christmas|mothers-day|fathers-day|new-year|anniversary|general" } ] }',
+    '{ "ideas": [ { "text": "one-sentence situation", "occasion": "birthday|christmas|mothers-day|fathers-day|new-year|anniversary|general", "theme": "the theme this idea belongs to" } ] }',
   ].join('\n');
 
   let lastErr = null;
@@ -385,7 +392,11 @@ async function generateSituationIdeas({ existing = [], count = 10, model }) {
       const ideas = (Array.isArray(parsed.ideas) ? parsed.ideas : [])
         .filter(i => i && typeof i.text === 'string' && i.text.trim().length >= 20)
         .slice(0, n)
-        .map(i => ({ text: i.text.trim(), occasion: (i.occasion || 'general').trim() }));
+        .map(i => ({
+          text: i.text.trim(),
+          occasion: (i.occasion || 'general').trim(),
+          theme: (i.theme || themeList[0] || '').trim() || null,
+        }));
       if (!ideas.length) throw new Error('No usable ideas in LLM output');
       return { ideas, model: useModel, costUsd: totalCost };
     } catch (err) {

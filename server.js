@@ -9527,6 +9527,82 @@ async function generateStoryRecord({ situationId, ctaCardId, generator, elementI
   return inserted[0];
 }
 
+// Manual story: the admin writes the prompt directly — no LLM, no situation.
+// Created as 'accepted' (it IS the admin's own words) so 🎬 works immediately.
+app.post('/admin/api/stories/manual', requireRole('admin'), async (req, res) => {
+  try {
+    const { hook_text, prompt, duration_s, element_ids, generator, cta_card_id } = req.body || {};
+    if (!prompt || String(prompt).trim().length < 20) {
+      return res.status(400).json({ error: 'Write a scene prompt of at least 20 characters.' });
+    }
+    const gen = ['kling', 'flow', 'gemini'].includes(generator) ? generator : 'kling';
+    const dur = Math.min(Math.max(parseInt(duration_s, 10) || 6, 2), 15);
+    let elements = [];
+    if (Array.isArray(element_ids) && element_ids.length) {
+      const { rows } = await pool.query(
+        `SELECT * FROM story_elements WHERE id = ANY($1::int[]) ORDER BY sort_order, id`,
+        [element_ids.map(Number).filter(Number.isFinite)]);
+      elements = rows;
+    }
+    let ctaCard = null;
+    if (cta_card_id) {
+      const r = await pool.query(`SELECT * FROM cta_cards WHERE id = $1`, [cta_card_id]);
+      ctaCard = r.rows[0] || null;
+    }
+    if (!ctaCard) {
+      const r = await pool.query(`SELECT * FROM cta_cards WHERE active = TRUE ORDER BY random() LIMIT 1`);
+      ctaCard = r.rows[0] || null;
+    }
+    const { rows: ins } = await pool.query(`
+      INSERT INTO video_stories (
+        status, hook_text, story_type, situation_text, scenes,
+        element_ids, elements_snapshot, cta_card_id, generator, llm_model
+      ) VALUES ('accepted', $1, 'manual', NULL, $2::jsonb, $3, $4::jsonb, $5, $6, 'manual')
+      RETURNING *`,
+      [hook_text || null,
+       JSON.stringify([{ duration_s: dur, video_prompt: String(prompt).trim() }]),
+       elements.map(e => e.id),
+       JSON.stringify(elements.map(e => ({
+         id: e.id, name: e.name, kind: e.kind,
+         description: e.description, personality: e.personality,
+         reference_image_urls: e.reference_image_urls,
+       }))),
+       ctaCard?.id || null, gen]);
+    res.json({ ok: true, story: ins[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Clip intake (spec component 5): upload a manually generated part-1 clip
+// (Google Flow / Gemini download) — stored in R2, story behaves as if Kling
+// had made it: assembly, texts, tracker all work the same.
+app.post('/admin/api/stories/:id(\\d+)/upload-video', requireRole('admin'), upload.single('file'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    const mt = req.file.mimetype || '';
+    if (!mt.startsWith('video/')) {
+      return res.status(400).json({ error: `Only video files are accepted (got ${mt || 'unknown'})` });
+    }
+    if (req.file.size > 500 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large (max 500 MB)' });
+    }
+    const { uploadBuffer } = require('./storage');
+    const r2 = await uploadBuffer({
+      buffer: req.file.buffer, contentType: mt,
+      kind: 'video-story-part1', baseName: 'story' + req.params.id + '_manual',
+    });
+    const dur = parseInt(req.query.duration_s, 10) || null;
+    await pool.query(`
+      UPDATE video_stories SET
+        video_status = 'done', video_url = $2, video_fal_url = NULL,
+        video_model = 'manual-upload', video_duration_s = $3, video_cost_usd = NULL,
+        video_error = NULL, video_completed_at = NOW(), updated_at = NOW()
+      WHERE id = $1`, [req.params.id, r2.url, dur]);
+    res.json({ ok: true, url: r2.url });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Generate 1-5 new stories into the queue.
 app.post('/admin/api/stories/generate', requireRole('admin'), async (req, res) => {
   try {
@@ -10166,18 +10242,71 @@ app.get('/admin/api/stories/insights', requireRole('admin'), async (req, res) =>
 app.post('/admin/api/story-situations/generate-ideas', requireRole('admin'), async (req, res) => {
   try {
     const count = Math.min(Math.max(parseInt(req.body?.count, 10) || 10, 1), 20);
+    const themeId = parseInt(req.body?.theme_id, 10) || null;
+    let themes = [];
+    if (themeId) {
+      const r = await pool.query(`SELECT name FROM story_themes WHERE id = $1`, [themeId]);
+      themes = r.rows.map(x => x.name);
+    } else {
+      const r = await pool.query(`SELECT name FROM story_themes WHERE active = TRUE ORDER BY id`);
+      themes = r.rows.map(x => x.name);
+    }
     const { rows: existing } = await pool.query(
       `SELECT text FROM story_situations ORDER BY id DESC LIMIT 60`);
     const model = await getStoryLlmModel();
     const { ideas, costUsd } = await storyEngine.generateSituationIdeas({
-      existing: existing.map(r => r.text), count, model,
+      existing: existing.map(r => r.text), count, themes, model,
     });
     for (const idea of ideas) {
       await pool.query(
-        `INSERT INTO story_situations (text, occasion) VALUES ($1, $2)`,
-        [idea.text, idea.occasion || 'general']);
+        `INSERT INTO story_situations (text, occasion, theme) VALUES ($1, $2, $3)`,
+        [idea.text, idea.occasion || 'general', idea.theme || null]);
     }
     res.json({ ok: true, created: ideas.length, cost_usd: costUsd });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Theme library CRUD (DB-driven — nothing hardcoded) ──────────────────────
+app.get('/admin/api/story-themes', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM story_themes ORDER BY active DESC, id`);
+    res.json({ themes: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/admin/api/story-themes', requireRole('admin'), async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const { rows } = await pool.query(
+      `INSERT INTO story_themes (name) VALUES ($1) RETURNING *`, [name]);
+    res.json({ ok: true, theme: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/admin/api/story-themes/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sets = [];
+    const vals = [req.params.id];
+    for (const f of ['name', 'active']) {
+      if (Object.prototype.hasOwnProperty.call(body, f)) {
+        vals.push(body[f]);
+        sets.push(`${f} = $${vals.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    const { rows } = await pool.query(
+      `UPDATE story_themes SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, theme: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/admin/api/story-themes/:id(\\d+)', requireRole('admin'), async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM story_themes WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -10191,11 +10320,11 @@ app.get('/admin/api/story-situations', requireRole('admin'), async (req, res) =>
 
 app.post('/admin/api/story-situations', requireRole('admin'), async (req, res) => {
   try {
-    const { text, occasion } = req.body || {};
+    const { text, occasion, theme } = req.body || {};
     if (!text) return res.status(400).json({ error: 'text required' });
     const { rows } = await pool.query(
-      `INSERT INTO story_situations (text, occasion) VALUES ($1, $2) RETURNING *`,
-      [text, occasion || null]);
+      `INSERT INTO story_situations (text, occasion, theme) VALUES ($1, $2, $3) RETURNING *`,
+      [text, occasion || null, theme || null]);
     res.json({ ok: true, situation: rows[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -10206,7 +10335,7 @@ app.put('/admin/api/story-situations/:id(\\d+)', requireRole('admin'), async (re
     const body = req.body || {};
     const sets = [];
     const vals = [req.params.id];
-    for (const f of ['text', 'occasion', 'active']) {
+    for (const f of ['text', 'occasion', 'theme', 'active']) {
       if (Object.prototype.hasOwnProperty.call(body, f)) {
         vals.push(body[f]);
         sets.push(`${f} = $${vals.length}`);

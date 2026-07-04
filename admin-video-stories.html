@@ -38,6 +38,22 @@ body{font-family:Arial,sans-serif;background:#f5f2ea;color:#1C0A00;font-size:13p
 .elpick-list{position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:10px 12px;min-width:240px;box-shadow:0 6px 20px rgba(0,0,0,0.12);max-height:280px;overflow:auto;}
 .elpick-list label{display:flex;gap:8px;align-items:center;font-size:12px;padding:4px 0;cursor:pointer;white-space:nowrap;}
 .elpick-list .elkind{font-size:10px;color:#999;}
+/* Situations header-grid: one compact row per situation */
+.sitgrid{display:grid;grid-template-columns:minmax(300px,1fr) 190px 130px 52px 148px;gap:0;align-items:center;}
+#sitHead{background:#f0ede6;border:1.5px solid #e3dcc8;border-radius:10px 10px 0 0;border-bottom:none;}
+.sith{font-size:11px;font-weight:800;color:#555;padding:8px 10px;text-transform:uppercase;letter-spacing:.5px;}
+.sitrow{display:grid;grid-template-columns:minmax(300px,1fr) 190px 130px 52px 148px;gap:0;align-items:center;background:#fff;border:1.5px solid #e3dcc8;border-top:none;}
+.sitrow:last-child{border-radius:0 0 10px 10px;}
+.sitrow.inactive{opacity:.5;}
+.sitrow.dirty{background:#fffbe6;}
+.sitrow input{width:100%;border:1px solid transparent;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;background:transparent;}
+.sitrow input:hover,.sitrow input:focus{border-color:#ccc;background:#fff;outline:none;}
+.sitrow .cell{padding:3px 6px;}
+.sitrow .used{font-size:11px;color:#999;text-align:center;}
+.sitrow .acts{display:flex;gap:4px;padding:3px 6px;}
+.themerow{display:flex;gap:6px;align-items:center;padding:3px 0;}
+.themerow input{flex:1;padding:4px 7px;border:1px solid #eee;border-radius:6px;font-size:12px;}
+.themerow.inactive{opacity:.5;}
 .card{background:#fff;border:1.5px solid #e3dcc8;border-radius:10px;padding:14px 16px;}
 .card.accepted{border-left:5px solid #4caf50;}
 .card.rejected{border-left:5px solid #e53935;opacity:.75;}
@@ -152,7 +168,14 @@ table.lib tr.inactive{opacity:.5;}
       <option value="">All</option>
     </select>
     <button class="btn" onclick="loadQueue()" title="Reload the list below. The page also auto-refreshes every 15 seconds while a video is being generated.">↻ Refresh</button>
+    <button class="btn" onclick="toggleManual()" title="Write a story yourself — no LLM, no premade situation. Your prompt becomes the scene, ready for 🎬 immediately (created as accepted). Elements, CTA and generator are taken from the selectors in this toolbar.">✍ Manual story</button>
     <span class="count" id="queueCount" title="Number of stories matching the current filter."></span>
+  </div>
+  <div class="toolbar" id="manualPanel" style="display:none;background:#fffbe6;">
+    <input id="mHook" placeholder="Hook text (burned on video, max ~8 words — optional)" style="width:280px;" title="The on-screen hook text for this video. Optional; you can also add/edit it later on the card.">
+    <textarea id="mPrompt" placeholder="Your video prompt — describe the whole scene: subject, action, setting, lighting, camera. Vertical 9:16." style="flex:1;min-width:320px;min-height:56px;" title="Exactly what gets sent to the video generator (or copied to Flow/Gemini). You write it, nothing is added — include element descriptions yourself or tick elements in the toolbar picker to have them attached to the story record."></textarea>
+    <input id="mDur" type="number" min="2" max="15" value="6" style="width:64px;" title="Clip length in seconds (2-15).">
+    <button class="btn primary" onclick="createManual(this)" title="Create the story (status: accepted). Uses the Elements picker, CTA and generator selectors from the toolbar above. Then press 🎬 to render with Kling — or copy the prompt to Flow and use ⬆ Upload own clip.">Create</button>
   </div>
   <div class="list" id="queueList"><div class="loading">Loading…</div></div>
 </div>
@@ -161,17 +184,38 @@ table.lib tr.inactive{opacity:.5;}
 <div id="tab-situations" style="display:none;">
   <div class="lib-wrap">
     <p style="font-size:12px;color:#777;margin-bottom:10px;">
-      The idea library the story generator draws from. Everything is editable in the grid — change text or occasion, press <b>Save</b> on the row.
-      💡 lets the LLM write new ideas in bulk; delete the ones you don't like, edit the rest.
+      The idea library the story generator draws from. One row per situation — edit anything directly, press 💾 on the row.
+      💡 writes new ideas from your themes; curate afterwards.
     </p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-      <button class="btn primary" onclick="newSit()" title="Add an empty row for writing a situation yourself. Fill in the text, press Save.">＋ New situation</button>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+      <button class="btn primary" onclick="newSit()" title="Add an empty row for writing a situation yourself. Fill in the text, press 💾.">＋ New situation</button>
+      <select id="ideaTheme" title="Which theme the LLM should write ideas within. 'All active themes' spreads ideas across every active theme. Manage the theme list itself under ⚙ Themes.">
+        <option value="">All active themes (mixed)</option>
+      </select>
       <select id="sitGenCount" title="How many new ideas the LLM should write in one go.">
         <option>5</option><option selected>10</option><option>20</option>
       </select>
-      <button class="btn primary" id="sitGenBtn" onclick="genIdeas()" title="The LLM writes this many NEW situations (it sees the existing list and avoids repeats) and adds them to the grid, active immediately. ~$0.001-0.01. Then curate: delete the weak ones, edit the good ones.">💡 Generate ideas</button>
+      <button class="btn primary" id="sitGenBtn" onclick="genIdeas()" title="The LLM writes this many NEW situations within the chosen theme(s) — it sees the existing list and avoids repeats. Added to the grid immediately, tagged with their theme. ~$0.001-0.01 per batch. Then curate: delete the weak, edit the rest.">💡 Generate ideas</button>
+      <details class="elpick" id="themeMgr" title="The theme library — fully data-driven, nothing hardcoded. Add your own themes here; they immediately become available for idea generation.">
+        <summary>⚙ Themes</summary>
+        <div class="elpick-list" style="min-width:340px;">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <input id="newThemeName" placeholder="New theme… e.g. Pet becomes a royal" style="flex:1;padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:12px;" title="A theme is a short recurring idea family, e.g. 'Pet becomes a royal' or 'Pet uses the fridge calendar'.">
+            <button class="btn small primary" onclick="addTheme()" title="Add this theme to the library — available for idea generation immediately.">＋</button>
+          </div>
+          <div id="themeList"></div>
+        </div>
+      </details>
+    </div>
+    <div class="sitgrid" id="sitHead">
+      <div class="sith" title="The one-sentence story idea the generator builds a full story around.">Situation</div>
+      <div class="sith" title="Which theme this idea belongs to. Type freely or pick from your theme list.">Theme</div>
+      <div class="sith" title="Occasion label (birthday, christmas…) — lets Insights show which occasions perform.">Occasion</div>
+      <div class="sith" title="How many stories have been generated from this situation.">Used</div>
+      <div class="sith" title="Save / activate / delete.">Actions</div>
     </div>
     <div id="sitGrid"></div>
+    <datalist id="themeOptions"></datalist>
   </div>
 </div>
 
@@ -320,12 +364,64 @@ function videoCol(s){
     return `<div class="videobox error" title="The video generation failed. The error text from fal.ai is shown below. Fix the cause (often a content-moderation word in a prompt) or just retry.">
       ⚠ Failed: <span style="color:#bf360c;">${esc(s.video_error||'unknown error')}</span>
       <button class="btn small" onclick="makeVideo(${s.id}, this)" title="Try the generation again with the same story and the tier/audio selected in the toolbar.">↻ Retry</button>
-    </div>`;
+    </div>${uploadClipBtn(s)}`;
   }
   if (s.status === 'accepted') {
-    return `<button class="btn primary" onclick="makeVideo(${s.id}, this)" title="Send this accepted story to Kling (via fal.ai) and render the actual part-1 video. Uses the quality tier and audio setting chosen in the toolbar above. A 7s Standard clip with audio costs ~$0.90. Takes 1-6 minutes; this column shows progress.">🎬 Make video</button>`;
+    return `<button class="btn primary" onclick="makeVideo(${s.id}, this)" title="Send this accepted story to Kling (via fal.ai) and render the actual part-1 video. Uses the quality tier and audio setting chosen in the toolbar above. A 7s Standard clip with audio costs ~$0.90. Takes 1-6 minutes; this column shows progress.">🎬 Make video</button>
+      ${uploadClipBtn(s)}`;
   }
   return `<div class="colhint" title="Videos are only made from stories you have approved — that's the quality gate.">Accept the story first — the 🎬 button appears here.</div>`;
+}
+
+function uploadClipBtn(s){
+  return `<div style="margin-top:6px;">
+    <button class="btn small" onclick="document.getElementById('upl_${s.id}').click()" title="The manual/free path (Google Flow or Gemini): copy the scene prompt (copy button on the left), generate the clip in Google's app, download the file — then upload it here. It becomes this story's part-1 video, stored centrally in R2, and assembly/texts/tracker work exactly as with Kling. $0 generation cost.">⬆ Upload own clip (Flow/Gemini)</button>
+    <input type="file" id="upl_${s.id}" accept="video/*" style="display:none" onchange="uploadClip(event, ${s.id})">
+  </div>`;
+}
+
+async function uploadClip(ev, id){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('video/')) return alert('Only video files, please (got: '+(file.type||'unknown')+').');
+  if (file.size > 500*1024*1024) return alert('File too large (max 500 MB).');
+  const dur = prompt('Clip length in seconds? (used for stats display)', '6');
+  const fd = new FormData();
+  fd.append('file', file);
+  try{
+    const r = await fetch('/admin/api/stories/'+id+'/upload-video?duration_s='+encodeURIComponent(dur||''), {method:'POST', body: fd});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+  }catch(e){ alert('Upload failed: '+e.message); }
+  loadQueue();
+}
+
+function toggleManual(){
+  const p = document.getElementById('manualPanel');
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function createManual(btn){
+  const prompt_ = document.getElementById('mPrompt').value.trim();
+  if (prompt_.length < 20) return alert('Write a scene prompt of at least 20 characters.');
+  btn.disabled = true; btn.textContent = '…';
+  try{
+    await api('/admin/api/stories/manual', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        hook_text: document.getElementById('mHook').value.trim() || null,
+        prompt: prompt_,
+        duration_s: parseInt(document.getElementById('mDur').value, 10) || 6,
+        element_ids: pickedElementIds(),
+        generator: document.getElementById('gGenerator').value,
+        cta_card_id: document.getElementById('gCta').value || null,
+      })});
+    document.getElementById('mPrompt').value = '';
+    document.getElementById('mHook').value = '';
+    document.getElementById('fStatus').value = 'accepted';
+  }catch(e){ alert('Could not create: '+e.message); }
+  btn.disabled = false; btn.textContent = 'Create';
+  loadQueue();
 }
 
 function finalCol(s){
@@ -627,20 +723,25 @@ function pickedElementIds(){
   return [...document.querySelectorAll('.elpick-cb:checked')].map(cb => parseInt(cb.value, 10));
 }
 
-// ── Situations: editable grid + LLM idea generation ─────────────────────────
+// ── Situations: one-row header grid + themes + LLM idea generation ──────────
 let sitRows = [];
 let sitSeq = 0;
+let themeRows = [];
 
 async function loadSituations(){
-  const j = await api('/admin/api/story-situations');
+  const [j, t] = await Promise.all([
+    api('/admin/api/story-situations'), api('/admin/api/story-themes'),
+  ]);
   sitRows = j.situations.map(s => ({ ...s, _key: 'db' + s.id }));
+  themeRows = t.themes;
+  renderThemes();
   renderSitGrid();
 }
 
 function sitByKey(key){ return sitRows.find(s => s._key === key); }
 
 function newSit(){
-  sitRows.unshift({ id: null, _key: 'new' + (++sitSeq), text: '', occasion: '', active: true, times_used: 0 });
+  sitRows.unshift({ id: null, _key: 'new' + (++sitSeq), text: '', occasion: '', theme: '', active: true, times_used: 0 });
   renderSitGrid();
 }
 
@@ -648,25 +749,22 @@ function renderSitGrid(){
   const grid = document.getElementById('sitGrid');
   if (!sitRows.length){ grid.innerHTML = '<div class="empty">No situations. Press ＋ or 💡.</div>'; return; }
   grid.innerHTML = sitRows.map(s => `
-  <div class="cta-row ${s.active?'':'inactive'}" data-key="${s._key}">
-    <div class="cta-fields" style="grid-template-columns:3fr 1fr;">
-      <div><label title="The one-sentence story idea the generator builds a full story around. Concrete and filmable works best.">Situation</label>
-        <textarea style="min-height:44px;" oninput="sitEdit('${s._key}','text',this.value)" title="Click and edit directly. Press Save on this row when done. Stories already generated from the old wording keep their copy.">${esc(s.text||'')}</textarea></div>
-      <div><label title="Occasion label (birthday, christmas, mothers-day…) — lets the Insights view show which occasions perform.">Occasion</label>
-        <input value="${esc(s.occasion||'')}" oninput="sitEdit('${s._key}','occasion',this.value)" placeholder="general" title="Optional. Examples: birthday, christmas, mothers-day, general.">
-        <div style="font-size:10px;color:#999;margin-top:4px;" title="How many stories have been generated from this situation.">used ${s.times_used||0}×</div></div>
-    </div>
-    <div class="cta-actions">
-      <button class="btn primary" onclick="saveSit('${s._key}', this)" title="Save this row's text and occasion. Always clickable.">💾 Save</button>
-      <button class="btn small" onclick="toggleSitRow('${s._key}')" title="on = the generator may pick this situation. off = kept in the list but never used.">${s.active?'on':'off'}</button>
-      <button class="btn small danger" onclick="delSitRow('${s._key}')" title="Delete this situation permanently. Existing stories keep their copy of the text.">✗ Delete</button>
+  <div class="sitrow ${s.active?'':'inactive'}" data-key="${s._key}">
+    <div class="cell"><input value="${esc(s.text||'')}" oninput="sitEdit('${s._key}','text',this.value)" placeholder="One-sentence story idea…" title="The one-sentence story idea. Click and edit directly; press 💾 on the row when done."></div>
+    <div class="cell"><input value="${esc(s.theme||'')}" list="themeOptions" oninput="sitEdit('${s._key}','theme',this.value)" placeholder="theme" title="Which theme this idea belongs to. Pick from your list or type a new label."></div>
+    <div class="cell"><input value="${esc(s.occasion||'')}" oninput="sitEdit('${s._key}','occasion',this.value)" placeholder="general" title="Occasion label: birthday, christmas, mothers-day, general…"></div>
+    <div class="used" title="How many stories have been generated from this situation.">${s.times_used||0}×</div>
+    <div class="acts">
+      <button class="btn small primary" onclick="saveSit('${s._key}', this)" title="Save this row.">💾</button>
+      <button class="btn small" onclick="toggleSitRow('${s._key}')" title="on = the generator may pick this situation. off = kept but never used.">${s.active?'on':'off'}</button>
+      <button class="btn small danger" onclick="delSitRow('${s._key}')" title="Delete permanently. Existing stories keep their copy of the text.">✗</button>
     </div>
   </div>`).join('');
 }
 
 function sitEdit(key, field, value){
   const s = sitByKey(key); if (s) s[field] = value;
-  const row = document.querySelector(`.cta-row[data-key="${key}"]`);
+  const row = document.querySelector(`.sitrow[data-key="${key}"]`);
   if (row) row.classList.add('dirty');
 }
 
@@ -674,12 +772,13 @@ async function saveSit(key, btn){
   const s = sitByKey(key); if (!s) return;
   if (!String(s.text||'').trim()) return alert('The situation text is empty.');
   if (btn){ btn.disabled = true; btn.textContent = '…'; }
-  const body = { text: s.text.trim(), occasion: (s.occasion||'').trim() || null, active: !!s.active };
+  const body = { text: s.text.trim(), occasion: (s.occasion||'').trim() || null,
+    theme: (s.theme||'').trim() || null, active: !!s.active };
   try{
     if (s.id) await api('/admin/api/story-situations/'+s.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     else await api('/admin/api/story-situations', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     await loadSituations();
-  }catch(e){ alert('Save failed: '+e.message); if (btn){ btn.disabled = false; btn.textContent = '💾 Save'; } }
+  }catch(e){ alert('Save failed: '+e.message); if (btn){ btn.disabled = false; btn.textContent = '💾'; } }
 }
 
 async function toggleSitRow(key){
@@ -703,13 +802,54 @@ async function delSitRow(key){
 async function genIdeas(){
   const btn = document.getElementById('sitGenBtn');
   const count = parseInt(document.getElementById('sitGenCount').value, 10) || 10;
+  const theme_id = document.getElementById('ideaTheme').value || null;
   btn.disabled = true; btn.textContent = '💡 Writing…';
   try{
-    const j = await api('/admin/api/story-situations/generate-ideas', {method:'POST',
-      headers:{'Content-Type':'application/json'}, body: JSON.stringify({count})});
+    await api('/admin/api/story-situations/generate-ideas', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({count, theme_id})});
     await loadSituations();
   }catch(e){ alert('Idea generation failed: '+e.message); }
   btn.disabled = false; btn.textContent = '💡 Generate ideas';
+}
+
+// ── Themes (DB-driven) ──────────────────────────────────────────────────────
+function renderThemes(){
+  const sel = document.getElementById('ideaTheme');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All active themes (mixed)</option>' +
+    themeRows.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  sel.value = cur && [...sel.options].some(o=>o.value===cur) ? cur : '';
+  document.getElementById('themeOptions').innerHTML =
+    themeRows.filter(t=>t.active).map(t=>`<option value="${esc(t.name)}">`).join('');
+  document.getElementById('themeList').innerHTML = themeRows.length ? themeRows.map(t=>`
+    <div class="themerow ${t.active?'':'inactive'}">
+      <input value="${esc(t.name)}" onchange="renameTheme(${t.id}, this.value)" title="Theme name — edit and press Enter/click away to save.">
+      <button class="btn small" onclick="toggleTheme(${t.id}, ${!t.active})" title="on = used for idea generation. off = kept but ignored.">${t.active?'on':'off'}</button>
+      <button class="btn small danger" onclick="delTheme(${t.id})" title="Delete this theme. Situations already tagged with it keep their tag.">✗</button>
+    </div>`).join('') : '<div style="color:#aaa;font-size:11px;">No themes yet.</div>';
+}
+async function addTheme(){
+  const inp = document.getElementById('newThemeName');
+  const name = inp.value.trim();
+  if (!name) return;
+  try{ await api('/admin/api/story-themes', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})}); inp.value=''; }
+  catch(e){ alert(e.message); }
+  const t = await api('/admin/api/story-themes'); themeRows = t.themes; renderThemes();
+}
+async function renameTheme(id, name){
+  if (!name.trim()) return;
+  try{ await api('/admin/api/story-themes/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name: name.trim()})}); }
+  catch(e){ alert(e.message); }
+}
+async function toggleTheme(id, active){
+  try{ await api('/admin/api/story-themes/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})}); }
+  catch(e){ alert(e.message); }
+  const t = await api('/admin/api/story-themes'); themeRows = t.themes; renderThemes();
+}
+async function delTheme(id){
+  if (!confirm('Delete this theme?')) return;
+  try{ await api('/admin/api/story-themes/'+id, {method:'DELETE'}); }catch(e){ alert(e.message); }
+  const t = await api('/admin/api/story-themes'); themeRows = t.themes; renderThemes();
 }
 
 // ── Elements lib ────────────────────────────────────────────────────────────
