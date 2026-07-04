@@ -236,7 +236,7 @@ table.lib th{font-size:13px;}
         <summary id="themePickSummary">Theme: All active (mixed)</summary>
         <div class="elpick-list" style="min-width:380px;">
           <label class="themerow" title="No theme filter — the LLM spreads the ideas across ALL active themes and tags each idea with the theme it used.">
-            <input type="radio" name="themeSel" value="" checked onchange="pickTheme('','All active (mixed)')"> <b>All active themes (mixed)</b>
+            <input type="radio" name="themeSel" value="" checked onchange="pickThemeById('')"> <b>All active themes (mixed)</b>
           </label>
           <div id="themeList"></div>
           <div style="display:flex;gap:6px;margin-top:8px;border-top:1px solid #eee;padding-top:8px;">
@@ -514,7 +514,7 @@ function trackerBlock(s){
   const ctr = views > 0 ? (100*clicks/views).toFixed(2)+'%' : '—';
   const pub = ['tiktok','instagram','youtube','facebook'].filter(p=>s['published_'+p]).map(p=>p[0].toUpperCase()+p.slice(1,2)).join(' ');
   const base = 'https://turtleandsun.com/calendar?ref=' + encodeURIComponent(s.ref_tag||'');
-  const linkBtn = (src, label) => `<button class="copybtn" onclick='copyText(${JSON.stringify(base + '&src=' + src)}, this)' title="Copy the tracked link for ${label}. Put THIS link in the video description / bio when posting there — clicks on it are counted for this story.">${label} link</button>`;
+  const linkBtn = (src, label) => `<button class="copybtn" onclick="copyText(${esc(JSON.stringify(base + '&src=' + src))}, this)" title="Copy the tracked link for ${label}. Put THIS link in the video description / bio when posting there — clicks on it are counted for this story.">${label} link</button>`;
   return `<div style="margin-top:8px;background:#faf8f2;border:1px solid #eee5d0;border-radius:8px;padding:8px 10px;">
     <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px;" title="Live numbers from the tracker for this video. Views come from the platform stats (refreshed daily / on demand in the Tracker page). Clicks = visits on this video's ?ref= link. Emails = waitlist signups that arrived through it.">
       📊 In tracker as <a href="/admin/social-tracker" title="Open the Social Tracker — publish buttons, per-platform stats and the calendar live there.">${esc(s.ref_tag||'')}</a>
@@ -536,7 +536,7 @@ function kitBlock(s){
     return `
     <div style="margin-bottom:6px;">
       <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;" title="${esc(tip)}">${esc(label)}
-        <button class="copybtn" onclick='copyText(${JSON.stringify(String(text))}, this)' title="Copy this text to the clipboard for pasting into the platform's upload form. (Copies the SAVED version — press 💾 Save edits first if you just changed it.)">copy</button></div>
+        <button class="copybtn" onclick="copyText(${esc(JSON.stringify(String(text)))}, this)" title="Copy this text to the clipboard for pasting into the platform's upload form. (Copies the SAVED version — press 💾 Save edits first if you just changed it.)">copy</button></div>
       <textarea class="kit-edit" data-story="${s.id}" data-field="${field}" oninput="markEdited(${s.id})" title="${esc(tip)} — Editable: change it, press 💾 Save edits. If the story is in the Tracker, the tracker record updates too.">${esc(text)}</textarea>
     </div>`;
   };
@@ -605,7 +605,7 @@ function storyCard(s){
     <div class="scene">
       <div class="scene-head" title="One shot of the video. Edit the duration and prompt freely — press 💾 Save edits, then 🎬 Re-make to regenerate the video with your changes.">Scene ${i+1} ·
         <input type="number" class="scene-dur" min="2" max="10" value="${esc(sc.duration_s)}" data-story="${s.id}" data-scene="${i}" oninput="markEdited(${s.id})" title="Scene length in seconds (2-10). Applies on the next 🎬 video generation.">s
-        <button class="copybtn" onclick='copyText(${JSON.stringify(String(sc.video_prompt||''))}, this)' title="Copy this scene's prompt to the clipboard — for pasting manually into Google Flow or the Gemini app (the free/manual path).">copy prompt</button>
+        <button class="copybtn" onclick="copyText(${esc(JSON.stringify(String(sc.video_prompt||'')))}, this)" title="Copy this scene's prompt to the clipboard — for pasting manually into Google Flow or the Gemini app (the free/manual path).">copy prompt</button>
       </div>
       <textarea class="scene-edit" data-story="${s.id}" data-scene="${i}" oninput="markEdited(${s.id})" title="The video prompt for this scene — click and edit directly. Saved with 💾 Save edits; used the next time you press 🎬.">${esc(sc.video_prompt)}</textarea>
     </div>`).join('');
@@ -858,9 +858,16 @@ async function genIdeas(){
 // ── Themes (DB-driven, single dropdown: pick + manage) ─────────────────────
 let selectedThemeId = '';
 
-function pickTheme(id, name){
-  selectedThemeId = id;
-  document.getElementById('themePickSummary').textContent = 'Theme: ' + name;
+function pickThemeById(id){
+  if (id === '' || id === null || id === undefined){
+    selectedThemeId = '';
+    document.getElementById('themePickSummary').textContent = 'Theme: All active (mixed)';
+    return;
+  }
+  const t = themeRows.find(x => String(x.id) === String(id));
+  selectedThemeId = t ? t.id : '';
+  document.getElementById('themePickSummary').textContent =
+    'Theme: ' + (t ? t.name : 'All active (mixed)');
 }
 
 function renderThemes(){
@@ -868,14 +875,14 @@ function renderThemes(){
     themeRows.filter(t=>t.active).map(t=>`<option value="${esc(t.name)}">`).join('');
   document.getElementById('themeList').innerHTML = themeRows.length ? themeRows.map(t=>`
     <div class="themerow ${t.active?'':'inactive'}">
-      <input type="radio" name="themeSel" value="${t.id}" ${String(selectedThemeId)===String(t.id)?'checked':''} onchange="pickTheme(${t.id}, ${JSON.stringify(String(t.name))})" title="Pick this theme — 💡 Generate ideas will write ideas within it only.">
+      <input type="radio" name="themeSel" value="${t.id}" ${String(selectedThemeId)===String(t.id)?'checked':''} onchange="pickThemeById(${t.id})" title="Pick this theme — 💡 Generate ideas will write ideas within it only.">
       <input value="${esc(t.name)}" onchange="renameTheme(${t.id}, this.value)" title="Theme name — edit and click away to save.">
       <button class="btn small" onclick="toggleTheme(${t.id}, ${!t.active})" title="on = used for idea generation. off = kept but ignored.">${t.active?'on':'off'}</button>
       <button class="btn small danger" onclick="delTheme(${t.id})" title="Delete this theme. Situations already tagged with it keep their tag.">✗</button>
     </div>`).join('') : '<div style="color:#aaa;">No themes yet — add one below.</div>';
   // If the selected theme disappeared or was paused, fall back to mixed.
   if (selectedThemeId && !themeRows.some(t => String(t.id) === String(selectedThemeId) && t.active)) {
-    pickTheme('', 'All active (mixed)');
+    pickThemeById('');
     const r = document.querySelector('input[name="themeSel"][value=""]');
     if (r) r.checked = true;
   }
