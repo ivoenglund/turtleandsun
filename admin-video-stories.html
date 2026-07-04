@@ -519,7 +519,8 @@ function renderCtaGrid(){
         <div style="padding:6px 2px;font-size:12px;">${c.times_used||0}×</div></div>
     </div>
     <div class="cta-actions">
-      <button class="btn primary" onclick="saveCta('${c._key}', this)" ${c._dirty?'':'disabled'} title="Save this row's changes to the database. Lights up yellow-edged when there are unsaved edits.">💾 Save</button>
+      <button class="btn primary" onclick="saveCta('${c._key}', this)" title="Save this row to the database. Always clickable — saving without changes is harmless. Note: dropping a file on an already-saved row stores itself automatically (you'll see ✓ media saved).">💾 Save</button>
+      ${c._savedFlash ? '<span style="font-size:11px;color:#1b5e20;font-weight:700;" title="The dropped file was uploaded and stored on this card automatically — no Save needed.">✓ media saved</span>' : ''}
       <button class="btn small" onclick="ctaToggle('${c._key}')" title="on = this offer rotates into new stories and can be assembled. off = paused (kept, not used).">${c.active?'on':'off'}</button>
       <button class="btn small danger" onclick="delCta('${c._key}')" title="Delete this offer card permanently. Stories that used it keep working; they only lose the label.">✗ Delete</button>
     </div>
@@ -531,7 +532,7 @@ function ctaEdit(key, field, value){
   c[field] = field === 'duration_s' ? (parseFloat(value)||4) : value;
   if (!c._dirty){ c._dirty = true;
     const row = document.querySelector(`.cta-row[data-key="${key}"]`);
-    if (row){ row.classList.add('dirty'); const b = row.querySelector('.cta-actions .btn.primary'); if (b) b.disabled = false; }
+    if (row) row.classList.add('dirty');
   }
 }
 
@@ -598,6 +599,8 @@ async function uploadCtaFile(key, file){
     if (c.id){
       await api('/admin/api/cta-cards/'+c.id, {method:'PUT', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ video_url: c.video_url, image_url: c.image_url })});
+      c._savedFlash = true;
+      setTimeout(() => { c._savedFlash = false; renderCtaGrid(); }, 4000);
     } else { c._dirty = true; }
   }catch(e){ alert('Upload failed: '+e.message); }
   c._uploading = false;
