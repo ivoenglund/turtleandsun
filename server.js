@@ -10380,21 +10380,42 @@ app.post('/admin/api/story-elements', requireRole('admin'), async (req, res) => 
 
 app.put('/admin/api/story-elements/:id(\\d+)', requireRole('admin'), async (req, res) => {
   try {
-    const { name, kind, description, personality, reference_image_urls, active } = req.body || {};
-    const { rows } = await pool.query(`
-      UPDATE story_elements SET
-        name = COALESCE($2, name),
-        kind = COALESCE($3, kind),
-        description = COALESCE($4, description),
-        personality = COALESCE($5, personality),
-        reference_image_urls = COALESCE($6, reference_image_urls),
-        active = COALESCE($7, active)
-      WHERE id = $1 RETURNING *`,
-      [req.params.id, name ?? null, kind ?? null, description ?? null, personality ?? null,
-       Array.isArray(reference_image_urls) ? reference_image_urls : null,
-       typeof active === 'boolean' ? active : null]);
+    // Presence-based: only keys in the body change; arrays replace wholesale.
+    const body = req.body || {};
+    const sets = [];
+    const vals = [req.params.id];
+    for (const f of ['name', 'kind', 'description', 'personality', 'reference_image_urls', 'active']) {
+      if (Object.prototype.hasOwnProperty.call(body, f)) {
+        vals.push(f === 'reference_image_urls'
+          ? (Array.isArray(body[f]) ? body[f] : [])
+          : body[f]);
+        sets.push(`${f} = $${vals.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    const { rows } = await pool.query(
+      `UPDATE story_elements SET ${sets.join(', ')} WHERE id = $1 RETURNING *`, vals);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, element: rows[0] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Drag-and-drop upload of a reference image/video for an element -> R2.
+app.post('/admin/api/story-elements/upload', requireRole('admin'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    const mt = req.file.mimetype || '';
+    if (!mt.startsWith('image/') && !mt.startsWith('video/')) {
+      return res.status(400).json({ error: `Only image or video files are accepted (got ${mt || 'unknown'})` });
+    }
+    if (req.file.size > 300 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large (max 300 MB)' });
+    }
+    const { uploadBuffer } = require('./storage');
+    const baseName = 'element_' + String(req.file.originalname || 'ref')
+      .replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 60);
+    const r2 = await uploadBuffer({ buffer: req.file.buffer, contentType: mt, kind: 'element-ref', baseName });
+    res.json({ ok: true, url: r2.url, media_type: mt.startsWith('video/') ? 'video' : 'image' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

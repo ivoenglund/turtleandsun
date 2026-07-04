@@ -122,6 +122,12 @@ table.lib tr.inactive{opacity:.5;}
 .cta-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
 .uploading{font-size:11px;color:#856404;background:#fff3cd;border-radius:6px;padding:3px 6px;position:relative;z-index:2;}
 .themerow input[type=radio]{flex:0 0 auto;width:auto;}
+/* Element reference thumbnails */
+.elrefs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+.elref{position:relative;width:76px;height:76px;border-radius:8px;overflow:hidden;border:1px solid #e3dcc8;}
+.elref img,.elref video{width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block;}
+.elref-x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;padding:1px 5px;}
+.elref-x:hover{background:#e53935;}
 
 /* ── 2026-07-04: bigger fonts everywhere (small text was too small) ───────── */
 body{font-size:15px;}
@@ -269,23 +275,12 @@ table.lib th{font-size:13px;}
 <!-- ── ELEMENTS TAB ──────────────────────────────────────────────────────── -->
 <div id="tab-elements" style="display:none;">
   <div class="lib-wrap">
-    <p style="font-size:12px;color:#777;margin-bottom:10px;">
-      Recurring cast &amp; props. Elements of kind <b>product</b> (the calendar) are included in EVERY story.
-      Reference image URLs: one per line — used later for Kling start-frames / custom elements.
+    <p style="font-size:13px;color:#777;margin-bottom:10px;">
+      Recurring cast &amp; props. Kind <b>product</b> (the calendar) is included in EVERY story.
+      Drag &amp; drop photos/clips of the real pet or product onto a row — stored centrally, used later as Kling start-frames / custom elements.
     </p>
-    <div class="form-row">
-      <input id="elName" placeholder="Name (e.g. Bosse the beagle)" style="width:200px;" title="The element's name — used inside stories ('Bosse stares at the calendar…').">
-      <select id="elKind" title="What kind of element this is. IMPORTANT: kind 'product' (the calendar) is automatically included in EVERY story — that's how the product stays visible and recognisable across all videos. Other kinds are picked at random, max 2 per story.">
-        <option value="pet">pet</option><option value="person">person</option>
-        <option value="location">location</option><option value="prop">prop</option>
-        <option value="product">product</option>
-      </select>
-      <textarea id="elDesc" placeholder="Visual description (goes verbatim into video prompts)" title="How this element LOOKS, in words. This text is copied into every scene prompt that uses the element, so the video model draws it the same way every time. Be specific: colours, size, markings, style."></textarea>
-      <textarea id="elPers" placeholder="Personality (optional)" style="min-width:180px;" title="How this element BEHAVES (dramatic, lazy, bossy…). Shapes the story, not the looks."></textarea>
-      <textarea id="elImgs" placeholder="Reference image URLs, one per line" style="min-width:180px;" title="Optional photo URLs of the real pet/product. Not used yet by text-to-video — they become start-frames / Kling custom elements in a later build step. Safe to fill in already now."></textarea>
-      <button class="btn primary" onclick="addElement()" title="Save this element. Active elements are immediately available to the story generator.">Add</button>
-    </div>
-    <table class="lib" id="elTable"></table>
+    <button class="btn primary" onclick="newElement()" style="margin-bottom:12px;" title="Add an empty element row. Fill in name + visual description (required for consistent videos), drop reference photos, press Save.">＋ New element</button>
+    <div id="elGrid"></div>
   </div>
 </div>
 
@@ -919,42 +914,158 @@ async function delTheme(id){
   const t = await api('/admin/api/story-themes'); themeRows = t.themes; renderThemes();
 }
 
-// ── Elements lib ────────────────────────────────────────────────────────────
+// ── Elements: editable grid with drag-and-drop reference media ──────────────
+let elRows = [];
+let elSeq = 0;
+
+const isVideoUrl = (u) => /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(u||''));
+
 async function loadElements(){
   const j = await api('/admin/api/story-elements');
-  document.getElementById('elTable').innerHTML =
-    '<tr><th>Name</th><th>Kind</th><th>Description</th><th>Personality</th><th>Refs</th><th>Active</th><th></th></tr>' +
-    (j.elements.length ? j.elements.map(e=>`
-      <tr class="${e.active?'':'inactive'}">
-        <td><b>${esc(e.name)}</b></td><td>${esc(e.kind)}</td>
-        <td style="max-width:280px;">${esc(e.description||'—')}</td>
-        <td style="max-width:180px;">${esc(e.personality||'—')}</td>
-        <td>${(e.reference_image_urls||[]).map(u=>'<a href="'+esc(u)+'" target="_blank">img</a>').join(' ')||'—'}</td>
-        <td><button class="btn small" onclick="toggleEl(${e.id},${!e.active})" title="on = this element can appear in new stories. Click to ${e.active?'retire it (kept here, no longer used)':'activate it again'}.">${e.active?'on':'off'}</button></td>
-        <td><button class="btn small danger" onclick="delEl(${e.id})" title="Delete this element permanently. Existing stories keep their snapshot of it.">✗</button></td>
-      </tr>`).join('') : '<tr><td colspan="7" style="color:#aaa;">No elements yet — add the calendar (kind: product) and your pets first.</td></tr>');
+  elRows = j.elements.map(e => ({ ...e, _key: 'db' + e.id }));
+  renderElGrid();
 }
-async function addElement(){
-  const name = document.getElementById('elName').value.trim();
-  if(!name) return;
-  const imgs = document.getElementById('elImgs').value.split('\n').map(s=>s.trim()).filter(Boolean);
-  await api('/admin/api/story-elements', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      name, kind: document.getElementById('elKind').value,
-      description: document.getElementById('elDesc').value.trim()||null,
-      personality: document.getElementById('elPers').value.trim()||null,
-      reference_image_urls: imgs,
-    })});
-  ['elName','elDesc','elPers','elImgs'].forEach(id=>document.getElementById(id).value='');
+
+function elByKey(key){ return elRows.find(e => e._key === key); }
+
+function newElement(){
+  elRows.unshift({ id: null, _key: 'new' + (++elSeq), name: '', kind: 'pet',
+    description: '', personality: '', reference_image_urls: [], active: true });
+  renderElGrid();
+}
+
+function elRefThumbs(e){
+  const refs = e.reference_image_urls || [];
+  const thumbs = refs.map((u, i) => `
+    <div class="elref" title="Reference ${i+1}. Click to open full size; ✗ removes it from this element (the file stays in storage).">
+      ${isVideoUrl(u)
+        ? `<video src="${esc(u)}" muted onclick="window.open(${esc(JSON.stringify(u))},'_blank')"></video>`
+        : `<img src="${esc(u)}" onclick="window.open(${esc(JSON.stringify(u))},'_blank')">`}
+      <button class="elref-x" onclick="removeElRef('${e._key}', ${i})" title="Remove this reference from the element.">✗</button>
+    </div>`).join('');
+  return `
+    <div class="elrefs">${thumbs}</div>
+    <div class="cta-drop" style="height:74px;"
+      title="Drag & drop a photo or clip of the real ${esc(e.name||'element')} here (or click to choose a file). Uploaded to central storage and added to this element's references. Several files OK — one at a time."
+      ondragover="event.preventDefault();this.classList.add('dragover')"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="elDrop(event,'${e._key}')"
+      onclick="document.getElementById('elfile_${e._key}').click()">
+      ${e._uploading ? '<span class="uploading">⏳ Uploading…</span>' : '<span class="drop-hint">＋ Drop photo/clip<br><small>(or click)</small></span>'}
+    </div>
+    <input type="file" id="elfile_${e._key}" accept="image/*,video/*" style="display:none" onchange="elFilePicked(event,'${e._key}')">`;
+}
+
+function renderElGrid(){
+  const grid = document.getElementById('elGrid');
+  if (!elRows.length){
+    grid.innerHTML = '<div class="empty">No elements yet — add the calendar (kind: product) and your pets first.</div>';
+    return;
+  }
+  grid.innerHTML = elRows.map(e => `
+  <div class="cta-row ${e.active?'':'inactive'}" data-key="${e._key}">
+    <div class="cta-media" style="width:170px;">${elRefThumbs(e)}</div>
+    <div class="cta-fields">
+      <div><label title="The element's name — used inside stories ('Bosse stares at the calendar…').">Name</label>
+        <input value="${esc(e.name||'')}" oninput="elEdit('${e._key}','name',this.value)" placeholder="Bosse the beagle" title="Required."></div>
+      <div><label title="IMPORTANT: kind 'product' (the calendar) is automatically included in EVERY story. Other kinds are picked at random (max 2) unless you choose them in the queue's Elements picker.">Kind</label>
+        <select onchange="elEdit('${e._key}','kind',this.value)" title="pet / person / location / prop / product.">
+          ${['pet','person','location','prop','product'].map(k=>`<option value="${k}" ${e.kind===k?'selected':''}>${k}</option>`).join('')}
+        </select></div>
+      <div class="full"><label title="How this element LOOKS, in words. Copied verbatim into every scene prompt that uses it — that's what keeps it consistent across videos. Be specific: colours, size, markings, style.">Visual description</label>
+        <textarea oninput="elEdit('${e._key}','description',this.value)" title="Goes verbatim into the video prompts.">${esc(e.description||'')}</textarea></div>
+      <div class="full"><label title="How this element BEHAVES (dramatic, lazy, bossy…). Shapes the story, not the looks. Optional.">Personality</label>
+        <textarea style="min-height:34px;" oninput="elEdit('${e._key}','personality',this.value)" title="Optional.">${esc(e.personality||'')}</textarea></div>
+    </div>
+    <div class="cta-actions">
+      <button class="btn primary" onclick="saveElement('${e._key}', this)" title="Save this row. Always clickable. Note: stories already generated keep their old snapshot — new stories use the updated element.">💾 Save</button>
+      <button class="btn small" onclick="toggleElRow('${e._key}')" title="on = can appear in new stories. off = retired (kept, unused).">${e.active?'on':'off'}</button>
+      <button class="btn small danger" onclick="delElRow('${e._key}')" title="Delete this element permanently. Existing stories keep their snapshot of it.">✗ Delete</button>
+    </div>
+  </div>`).join('');
+}
+
+function elEdit(key, field, value){
+  const e = elByKey(key); if (e) e[field] = value;
+  const row = document.querySelector(`.cta-row[data-key="${key}"]`);
+  if (row) row.classList.add('dirty');
+}
+
+async function saveElement(key, btn){
+  const e = elByKey(key); if (!e) return;
+  if (!String(e.name||'').trim()) return alert('Name is required.');
+  if (btn){ btn.disabled = true; btn.textContent = '…'; }
+  const body = { name: e.name.trim(), kind: e.kind || 'pet',
+    description: (e.description||'').trim() || null,
+    personality: (e.personality||'').trim() || null,
+    reference_image_urls: e.reference_image_urls || [], active: !!e.active };
+  try{
+    if (e.id) await api('/admin/api/story-elements/'+e.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    else await api('/admin/api/story-elements', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    await loadElements();
+  }catch(err){ alert('Save failed: '+err.message); if (btn){ btn.disabled = false; btn.textContent = '💾 Save'; } }
+}
+
+async function toggleElRow(key){
+  const e = elByKey(key); if (!e) return;
+  e.active = !e.active;
+  if (e.id){
+    try{ await api('/admin/api/story-elements/'+e.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active: e.active})}); }
+    catch(err){ alert(err.message); e.active = !e.active; }
+  }
+  renderElGrid();
+}
+
+async function delElRow(key){
+  const e = elByKey(key); if (!e) return;
+  if (!e.id){ elRows = elRows.filter(x => x._key !== key); renderElGrid(); return; }
+  if (!confirm('Delete element "'+(e.name||'?')+'" permanently?')) return;
+  try{ await api('/admin/api/story-elements/'+e.id, {method:'DELETE'}); }catch(err){ alert(err.message); }
   loadElements();
 }
-async function toggleEl(id, active){
-  await api('/admin/api/story-elements/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({active})});
-  loadElements();
+
+function elDrop(ev, key){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('dragover');
+  const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) uploadElRef(key, file);
 }
-async function delEl(id){
-  if(!confirm('Delete element?')) return;
-  await api('/admin/api/story-elements/'+id, {method:'DELETE'}); loadElements();
+function elFilePicked(ev, key){
+  const file = ev.target.files && ev.target.files[0];
+  if (file) uploadElRef(key, file);
+  ev.target.value = '';
+}
+
+async function uploadElRef(key, file){
+  const e = elByKey(key); if (!e) return;
+  if (!/^(image|video)\//.test(file.type)) return alert('Only picture or video files (got: '+(file.type||'unknown')+').');
+  if (file.size > 300*1024*1024) return alert('File too large (max 300 MB).');
+  e._uploading = true; renderElGrid();
+  try{
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch('/admin/api/story-elements/upload', { method:'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    e.reference_image_urls = [...(e.reference_image_urls||[]), j.url];
+    if (e.id){
+      await api('/admin/api/story-elements/'+e.id, {method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ reference_image_urls: e.reference_image_urls })});
+    }
+  }catch(err){ alert('Upload failed: '+err.message); }
+  e._uploading = false;
+  renderElGrid();
+}
+
+async function removeElRef(key, index){
+  const e = elByKey(key); if (!e) return;
+  e.reference_image_urls = (e.reference_image_urls||[]).filter((_, i) => i !== index);
+  if (e.id){
+    try{ await api('/admin/api/story-elements/'+e.id, {method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ reference_image_urls: e.reference_image_urls })}); }
+    catch(err){ alert(err.message); }
+  }
+  renderElGrid();
 }
 
 // ── CTA cards: editable grid with drag-and-drop media upload ────────────────
