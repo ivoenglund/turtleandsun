@@ -214,8 +214,8 @@ table.lib th{font-size:13px;}
       <option value="on">Audio: on</option>
       <option value="off">Audio: off (cheaper)</option>
     </select>
-    <select id="vStart" title="Start frame = the video's first image comes from an element's reference photo (pet first, then product), auto-cropped to vertical. This is what keeps Jack looking like the REAL Jack across videos. 'auto' uses a photo when one exists on the story's elements (Elements tab), otherwise plain text-to-video. Bonus: with a start frame, Pro tier costs $0.17/s instead of $0.34/s.">
-      <option value="auto">Start frame: auto</option>
+    <select id="vStart" title="Start frame keeps the REAL pet/product recognisable across videos. 'auto': the AI COMPOSES the opening frame — your element reference photos (any shape, no cropping) are rendered INTO scene 1 at vertical 9:16 (+$0.03), and the video animates from there. If composition fails it falls back to a plain crop, and with no element photos at all it's normal text-to-video. Bonus: with a start frame, Pro tier costs $0.17/s instead of $0.34/s.">
+      <option value="auto">Start frame: auto (AI-composed)</option>
       <option value="off">Start frame: off</option>
     </select>
     <select id="fStatus" onchange="loadQueue()" title="Filter the queue below by review status. 'Pending review' = waiting for your accept/reject decision.">

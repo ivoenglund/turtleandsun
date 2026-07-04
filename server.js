@@ -9797,36 +9797,61 @@ app.post('/admin/api/stories/:id(\\d+)/delete-final', requireRole('admin'), asyn
 async function prepareStoryStartFrame(story) {
   const els = Array.isArray(story.elements_snapshot) ? story.elements_snapshot : [];
   const isImg = (u) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(u || ''));
-  let refUrl = null;
+  // Gather reference photos in priority order (pet first, then product, …),
+  // keeping the element name next to each photo for the composition prompt.
+  const refs = [];
   for (const kind of ['pet', 'product', 'person', 'location', 'prop']) {
-    const el = els.find(e => e.kind === kind
-      && Array.isArray(e.reference_image_urls) && e.reference_image_urls.some(isImg));
-    if (el) { refUrl = el.reference_image_urls.find(isImg); break; }
+    for (const el of els.filter(e => e.kind === kind)) {
+      for (const u of (el.reference_image_urls || []).filter(isImg)) {
+        refs.push({ url: u, name: el.name });
+      }
+    }
   }
-  if (!refUrl) return null;
+  if (!refs.length) return null;
 
-  const buf = await new Promise((resolve, reject) => {
-    const get = (url, hops) => {
-      if (hops > 4) return reject(new Error('too many redirects'));
-      const lib = url.startsWith('https') ? require('https') : require('http');
-      lib.get(url, r => {
-        if (r.statusCode >= 300 && r.headers.location) return get(r.headers.location, hops + 1);
-        const chunks = [];
-        r.on('data', c => chunks.push(c));
-        r.on('end', () => resolve(Buffer.concat(chunks)));
-      }).on('error', reject);
-    };
-    get(refUrl, 0);
-  });
+  const scenes = Array.isArray(story.scenes) ? story.scenes : [];
+  const scenePrompt = scenes[0]?.video_prompt || story.hook_text || '';
 
-  const sharp = require('sharp');
-  const cropped = await sharp(buf).resize(1080, 1920, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
-  const { uploadBuffer } = require('./storage');
-  const r2 = await uploadBuffer({
-    buffer: cropped, contentType: 'image/jpeg',
-    kind: 'video-story-startframe', baseName: 'story' + story.id + '_start',
-  });
-  return r2.url;
+  // Preferred: AI-composed opening frame (native 9:16, subjects rendered INTO
+  // the scene — no cropping, identity preserved). $0.028.
+  try {
+    const composed = await storyEngine.composeStartFrame({
+      scenePrompt,
+      referenceImageUrls: refs.map(r => r.url),
+      elementNames: refs.map(r => r.name),
+    });
+    return { url: composed.url, costUsd: composed.costUsd, method: 'composed' };
+  } catch (err) {
+    console.warn('[video-story] start-frame composition failed, falling back to crop:', err.message);
+  }
+
+  // Fallback: plain 9:16 cover-crop of the best photo.
+  try {
+    const buf = await new Promise((resolve, reject) => {
+      const get = (url, hops) => {
+        if (hops > 4) return reject(new Error('too many redirects'));
+        const lib = url.startsWith('https') ? require('https') : require('http');
+        lib.get(url, r => {
+          if (r.statusCode >= 300 && r.headers.location) return get(r.headers.location, hops + 1);
+          const chunks = [];
+          r.on('data', c => chunks.push(c));
+          r.on('end', () => resolve(Buffer.concat(chunks)));
+        }).on('error', reject);
+      };
+      get(refs[0].url, 0);
+    });
+    const sharp = require('sharp');
+    const cropped = await sharp(buf).resize(1080, 1920, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+    const { uploadBuffer } = require('./storage');
+    const r2 = await uploadBuffer({
+      buffer: cropped, contentType: 'image/jpeg',
+      kind: 'video-story-startframe', baseName: 'story' + story.id + '_start',
+    });
+    return { url: r2.url, costUsd: 0, method: 'cropped' };
+  } catch (err) {
+    console.warn('[video-story] start-frame crop fallback failed too:', err.message);
+    return null;
+  }
 }
 
 async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
@@ -9836,9 +9861,12 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
     // Start frame: element photo anchors frame 1 = visual consistency across
     // videos. 'off' skips it; any preparation failure falls back to pure t2v.
     let startImageUrl = null;
+    let startCostUsd = 0;
+    let startMethod = null;
     if (startFrame !== 'off') {
       try {
-        startImageUrl = await prepareStoryStartFrame(story);
+        const sf = await prepareStoryStartFrame(story);
+        if (sf) { startImageUrl = sf.url; startCostUsd = sf.costUsd || 0; startMethod = sf.method; }
       } catch (err) {
         console.warn('[video-story] start-frame prep failed, using text-to-video:', err.message);
       }
@@ -9847,10 +9875,14 @@ async function runStoryVideoJob(story, { tier, generateAudio, startFrame }) {
     const modelId = startImageUrl ? tierDef.i2v.id : tierDef.id;
     genLog = await generation.logGenerationStart({
       modelId,
-      inputPayload: { story_id: story.id, tier, generate_audio: generateAudio, start_image_url: startImageUrl },
+      inputPayload: {
+        story_id: story.id, tier, generate_audio: generateAudio,
+        start_image_url: startImageUrl, start_frame_method: startMethod,
+      },
       sourceType: 'video_story',
     });
     const out = await storyEngine.generateStoryVideo({ scenes, tier, generateAudio, startImageUrl });
+    out.estCostUsd = (out.estCostUsd || 0) + startCostUsd;
     // fal output URLs can expire — copy to R2 immediately (same pattern as orders).
     let finalUrl = out.url;
     try {

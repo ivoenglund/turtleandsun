@@ -240,6 +240,43 @@ function estimateVideoCost(tier, totalS, generateAudio, useI2v) {
   return totalS * (generateAudio ? rates.audioOn : rates.audioOff);
 }
 
+// ---------------------------------------------------------------------------
+// Start-frame COMPOSITION — the abstract path. Element reference photos (any
+// aspect ratio) go into Kling Image O3 i2i, which renders the subjects INTO
+// the story's first scene at native 9:16. No cropping; identity preserved.
+// $0.028 per frame. fal exposes no video "custom elements", so this composed
+// frame + i2v is the closest — and cheapest — equivalent.
+// ---------------------------------------------------------------------------
+const START_FRAME_IMAGE_MODEL = 'fal-ai/kling-image/o3/image-to-image';
+
+async function composeStartFrame({ scenePrompt, referenceImageUrls, elementNames }) {
+  const refs = (referenceImageUrls || []).slice(0, 10);
+  if (!refs.length) throw new Error('no reference images');
+  const names = elementNames || [];
+  const refList = refs.map((_, i) => '@Image' + (i + 1) + (names[i] ? ' (' + names[i] + ')' : '')).join(', ');
+  const prompt = [
+    'Create the cinematic OPENING FRAME of a vertical 9:16 short video.',
+    `Scene: ${String(scenePrompt || '').slice(0, 800)}`,
+    `Feature the subjects from the reference images (${refList}) exactly as they really look — preserve identity, colours, markings and proportions.`,
+    'Photorealistic, warm light, shallow depth of field. No text, no watermark.',
+  ].join('\n');
+  const result = await fal.subscribe(START_FRAME_IMAGE_MODEL, {
+    input: {
+      prompt,
+      image_urls: refs,
+      aspect_ratio: '9:16',
+      resolution: '1K',
+      result_type: 'single',
+      num_images: 1,
+      output_format: 'png',
+    },
+    storageSettings: { expiresIn: 'never' },
+  });
+  const url = result?.data?.images?.[0]?.url;
+  if (!url) throw new Error('start-frame composition returned no image');
+  return { url, costUsd: 0.028 };
+}
+
 async function generateStoryVideo({ scenes, tier = 'standard', generateAudio = true, startImageUrl = null }) {
   const model = VIDEO_MODELS[tier] || VIDEO_MODELS.standard;
   const modelId = startImageUrl ? model.i2v.id : model.id;
@@ -438,4 +475,6 @@ module.exports = {
   buildVideoInput,
   estimateVideoCost,
   generateStoryVideo,
+  START_FRAME_IMAGE_MODEL,
+  composeStartFrame,
 };
