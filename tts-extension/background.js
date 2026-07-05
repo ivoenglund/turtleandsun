@@ -42,7 +42,9 @@ async function scrapeTikTokFollowers() {
   await sleep(2500);
   const [{ result: followers }] = await chrome.scripting.executeScript({
     target: { tabId: profTab.id },
-    func: () => {
+    args: [username],
+    func: async (uname) => {
+      const zzz = (ms) => new Promise(r => setTimeout(r, ms));
       const parseNum = (t) => {
         t = String(t).replace(/ /g, ' ').trim();
         const m = t.match(/^(\d+(?:[.,]\d+)?)\s*(k|m|tn|mn|md)?$/i);
@@ -61,12 +63,20 @@ async function scrapeTikTokFollowers() {
         const plain = t.replace(/[\s.,]/g, '');
         return /^\d+$/.test(plain) && /^[\d\s.,]+$/.test(t) ? Number(plain) : null;
       };
-      // Preferred: TikTok's stable data attribute.
-      const el = document.querySelector('strong[data-e2e="followers-count"]');
-      if (el) { const n = parseNum(el.innerText); if (n !== null) return n; }
-      // Fallback: "<number> Followers/Följare" anywhere in the page text.
-      const m = (document.body.innerText || '').match(/([\d.,\s]+(?:tn|k|mn|m)?)\s*(followers|följare)/i);
-      if (m) { const n = parseNum(m[1]); if (n !== null) return n; }
+      // Preferred: TikTok's stable data attribute — wait patiently for it,
+      // the profile app renders late and a hasty read produces phantom zeros.
+      for (let i = 0; i < 15; i++) {
+        const el = document.querySelector('strong[data-e2e="followers-count"]');
+        if (el) { const n = parseNum(el.innerText); if (n !== null) return n; }
+        await zzz(800);
+      }
+      // Fallback only if this is provably OUR profile page (not a suggestion
+      // panel or an error page), and never trust a fallback zero.
+      const onOwnProfile = (document.body.innerText || '').toLowerCase().includes('@' + uname.toLowerCase());
+      if (onOwnProfile) {
+        const m = (document.body.innerText || '').match(/([\d.,\s]+(?:tn|k|mn|m)?)\s*(followers|följare)/i);
+        if (m) { const n = parseNum(m[1]); if (n !== null && n > 0) return n; }
+      }
       return null;
     },
   });

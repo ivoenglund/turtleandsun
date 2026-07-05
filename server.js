@@ -8645,11 +8645,14 @@ app.post('/admin/api/tracker/tiktok-followers', requireRole('admin'), async (req
     if (!Number.isFinite(followers) || followers < 0) {
       return res.status(400).json({ error: 'followers must be a non-negative number' });
     }
+    // Within one day, keep the highest reading — protects the real number
+    // from a flaky zero scrape. Genuine declines still show across days.
     await pool.query(`
       INSERT INTO channel_daily_stats (platform, stat_date, subscribers)
       VALUES ('tiktok', CURRENT_DATE, $1)
       ON CONFLICT (platform, stat_date)
-      DO UPDATE SET subscribers = EXCLUDED.subscribers`, [followers]);
+      DO UPDATE SET subscribers = GREATEST(channel_daily_stats.subscribers, EXCLUDED.subscribers)`,
+      [followers]);
     res.json({ ok: true, followers });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
