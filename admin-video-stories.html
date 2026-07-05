@@ -235,6 +235,13 @@ table.lib th{font-size:13px;}
     <select id="gCount" title="How many stories to write in one click. Each story costs ~$0.001 in LLM fees. More stories = more to review."><option>1</option><option>2</option><option>3</option><option>5</option></select>
     <button class="btn primary" id="genBtn" onclick="generate()" title="Write new STORIES (text only: hook + scene prompts) into the review queue. Does NOT create any video and costs ~$0.001 per story. Videos are made later, from accepted stories, with the 🎬 button on each card.">⚡ Generate stories</button>
     <span style="border-left:1px solid #ddd;height:24px;"></span>
+    <select id="vModel" onchange="saveVS()" title="Which LLM writes the stories, ideas and posting texts (via fal's OpenRouter endpoint, billed per word on your fal account). Even the most expensive choice costs ~5 cents per video — the writer is the wrong place to save money. Try them against each other: generate the same situation with two models and compare.">
+      <option value="google/gemini-2.5-flash">Writer: Gemini Flash (~$0.002/story)</option>
+      <option value="moonshotai/kimi-k2.5">Writer: Kimi K2.5 (~$0.003)</option>
+      <option value="openai/o3">Writer: GPT o3 (~$0.007)</option>
+      <option value="anthropic/claude-sonnet-4.6">Writer: Claude Sonnet (~$0.012)</option>
+      <option value="anthropic/claude-opus-4.8">Writer: Claude Opus (~$0.02)</option>
+    </select>
     <select id="vAuto" onchange="saveVS()" title="Auto-produce: when ON, pressing ✓ Accept on a story starts the whole chain automatically — frame → video → assembly → texts. Kling stories run through; Flow/Gemini stories park at 'waiting for your clip'. When OFF, everything is manual as before. All manual buttons work in both modes.">
       <option value="on">Auto-produce: on</option>
       <option value="off">Auto-produce: off</option>
@@ -495,7 +502,7 @@ async function loadVS(){
   try{
     const j = await api('/admin/api/video-settings');
     const s = j.settings || {};
-    const map = { vs_tier:'vTier', vs_audio:'vAudio', vs_consistency:'vStart', vs_auto:'vAuto', vs_pause_frame:'vPause' };
+    const map = { vs_tier:'vTier', vs_audio:'vAudio', vs_consistency:'vStart', vs_auto:'vAuto', vs_pause_frame:'vPause', story_llm_model:'vModel' };
     for (const [k, id] of Object.entries(map)){
       const el = document.getElementById(id);
       if (el && s[k] && [...el.options].some(o=>o.value===s[k])) el.value = s[k];
@@ -513,6 +520,7 @@ async function saveVS(){
         vs_consistency: document.getElementById('vStart').value,
         vs_auto: document.getElementById('vAuto').value,
         vs_pause_frame: document.getElementById('vPause').value,
+        story_llm_model: document.getElementById('vModel').value,
       })});
   }catch(e){ /* non-fatal */ }
 }

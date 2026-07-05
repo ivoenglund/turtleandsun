@@ -10488,6 +10488,7 @@ const VS_DEFAULTS = {
   vs_consistency: 'elements',// elements | auto | off (start-frame mode)
   vs_auto: 'off',            // accept starts production (opt-in)
   vs_pause_frame: 'yes',     // pause after frame for approval
+  story_llm_model: 'google/gemini-2.5-flash', // the writer (openrouter/router model id)
 };
 
 async function getVideoSettings() {
