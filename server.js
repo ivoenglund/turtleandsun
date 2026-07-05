@@ -9216,6 +9216,13 @@ async function fetchTikTokStatsBatch() {
   const qd = await qr.json();
   console.log('[tiktok-stats] query response:', JSON.stringify(qd).slice(0, 300));
 
+  // Surface API refusals instead of silently reporting "0 updated" —
+  // e.g. scope_not_authorized while the developer app awaits approval.
+  if (qd.error && qd.error.code && qd.error.code !== 'ok') {
+    throw new Error(`TikTok API refused: ${qd.error.code} — ${qd.error.message || ''}`.trim() +
+      ' (stats via API require the approved developer app; enter TikTok views manually until then)');
+  }
+
   const videos = qd.data?.videos || [];
   let updated = 0;
   for (const v of videos) {
