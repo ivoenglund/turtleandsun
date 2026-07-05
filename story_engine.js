@@ -423,7 +423,9 @@ function buildPostingKitPrompt({ story, situationText, ctaCard, links }) {
     'Tracked links (use EXACTLY as given, do not shorten or alter):',
     `- YouTube description link: ${links.yt}`,
     `- Facebook caption link: ${links.fb}`,
-    '(TikTok/Instagram captions cannot carry clickable links — write "link in bio" there.)',
+    '(TikTok/Instagram captions cannot carry clickable links — but EVERY caption on EVERY platform',
+    'must contain the plain domain "turtleandsun.com" so viewers can read and type it,',
+    'plus a "link in bio" nudge on TikTok/Instagram.)',
     '',
     'Respond with ONLY a JSON object, no markdown fences:',
     '{',
@@ -466,6 +468,13 @@ async function generatePostingKit({ story, situationText, ctaCard, links, model 
       }
       if (!kit.fb_caption.includes(links.fb)) {
         kit.fb_caption = kit.fb_caption.trim() + '\n\n' + links.fb;
+      }
+      // Every caption must carry the plain domain (readable/typeable even
+      // where links aren't clickable).
+      for (const f of ['tiktok_caption', 'instagram_caption', 'yt_description', 'fb_caption']) {
+        if (!/turtleandsun\.com/i.test(kit[f])) {
+          kit[f] = kit[f].trim() + (f.endsWith('_caption') && f.startsWith('tik') ? ' · ' : '\n') + 'turtleandsun.com';
+        }
       }
       if (kit.yt_title.length > 100) kit.yt_title = kit.yt_title.slice(0, 97) + '…';
 
