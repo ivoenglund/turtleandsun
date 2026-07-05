@@ -9405,6 +9405,34 @@ async function getStoryLlmModel() {
   } catch { return storyEngine.DEFAULT_MODEL; }
 }
 
+// The show's tone bible — editable text, stored in system_settings.
+async function getStoryTone() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT value FROM system_settings WHERE key = 'story_tone'`);
+    return (rows[0]?.value || '').trim() || storyEngine.DEFAULT_STORY_TONE;
+  } catch { return storyEngine.DEFAULT_STORY_TONE; }
+}
+
+app.get('/admin/api/story-tone', requireRole('admin'), async (req, res) => {
+  res.json({ tone: await getStoryTone(), is_default: (await getStoryTone()) === storyEngine.DEFAULT_STORY_TONE });
+});
+
+app.post('/admin/api/story-tone', requireRole('admin'), async (req, res) => {
+  try {
+    const tone = String(req.body?.tone || '').trim();
+    if (!tone) {
+      // Empty = reset to the built-in default.
+      await pool.query(`DELETE FROM system_settings WHERE key = 'story_tone'`);
+    } else {
+      await pool.query(`
+        INSERT INTO system_settings (key, value) VALUES ('story_tone', $1)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [tone]);
+    }
+    res.json({ ok: true, tone: await getStoryTone() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // List stories (review queue). ?status=pending_review|accepted|rejected
 app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
   try {
@@ -9482,8 +9510,10 @@ async function generateStoryRecord({ situationId, ctaCardId, generator, elementI
 
   // 4. LLM call.
   const model = await getStoryLlmModel();
+  const toneText = await getStoryTone();
   const gen = generator === 'flow' || generator === 'gemini' ? generator : 'kling';
   const { story, costUsd } = await storyEngine.generateStory({
+    toneText,
     situationText: situation?.text,
     elements: elements.map(e => ({
       name: e.name, kind: e.kind, description: e.description, personality: e.personality,
@@ -9811,7 +9841,9 @@ app.post('/admin/api/stories/:id(\\d+)/regenerate', requireRole('admin'), async 
     }
     const elements = Array.isArray(old.elements_snapshot) ? old.elements_snapshot : [];
     const model = await getStoryLlmModel();
+    const toneText = await getStoryTone();
     const { story, costUsd } = await storyEngine.generateStory({
+      toneText,
       situationText: old.situation_text,
       elements,
       ctaCard: ctaCard ? { label: ctaCard.label, cta_text: ctaCard.cta_text } : null,
@@ -10716,8 +10748,9 @@ app.post('/admin/api/story-situations/generate-ideas', requireRole('admin'), asy
     const { rows: existing } = await pool.query(
       `SELECT text FROM story_situations ORDER BY id DESC LIMIT 60`);
     const model = await getStoryLlmModel();
+    const toneText = await getStoryTone();
     const { ideas, costUsd } = await storyEngine.generateSituationIdeas({
-      existing: existing.map(r => r.text), count, themes, model,
+      existing: existing.map(r => r.text), count, themes, model, toneText,
     });
     for (const idea of ideas) {
       await pool.query(

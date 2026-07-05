@@ -264,6 +264,7 @@ table.lib th{font-size:13px;}
     </select>
     <button class="btn" onclick="loadQueue()" title="Reload the list below. The page also auto-refreshes every 15 seconds while a video is being generated.">↻ Refresh</button>
     <button class="btn" onclick="toggleManual()" title="Write a story yourself — no LLM, no premade situation. Your prompt becomes the scene, ready for 🎬 immediately (created as accepted). Elements, CTA and generator are taken from the selectors in this toolbar.">✍ Manual story</button>
+    <button class="btn" onclick="toggleTone()" title="The show's tone bible — the rules and the north-star example episode every generated story and idea must follow. Edit freely as the show finds itself; saved in the database, applies to the next generation immediately. Empty + Save = reset to the built-in default.">🎭 Tone</button>
     <span class="count" id="queueCount" title="Number of stories matching the current filter."></span>
   </div>
   <div class="toolbar" id="manualPanel" style="display:none;background:#fffbe6;">
@@ -271,6 +272,10 @@ table.lib th{font-size:13px;}
     <textarea id="mPrompt" placeholder="Your video prompt — describe the whole scene: subject, action, setting, lighting, camera. Vertical 9:16." style="flex:1;min-width:320px;min-height:56px;" title="Exactly what gets sent to the video generator (or copied to Flow/Gemini). You write it, nothing is added — include element descriptions yourself or tick elements in the toolbar picker to have them attached to the story record."></textarea>
     <input id="mDur" type="number" min="2" max="15" value="6" style="width:64px;" title="Clip length in seconds (2-15).">
     <button class="btn primary" onclick="createManual(this)" title="Create the story (status: accepted). Uses the Elements picker, CTA and generator selectors from the toolbar above. Then press 🎬 to render with Kling — or copy the prompt to Flow and use ⬆ Upload own clip.">Create</button>
+  </div>
+  <div class="toolbar" id="tonePanel" style="display:none;background:#eef7f0;">
+    <textarea id="toneText" style="flex:1;min-width:340px;min-height:160px;font-size:14px;line-height:1.5;" title="The tone bible: rules + north-star example. Every ⚡ generated story and 💡 generated idea follows this text. Write it like you'd brief a writer."></textarea>
+    <button class="btn primary" onclick="saveTone(this)" title="Save — applies to the next generation immediately. Save with the box empty to reset to the built-in default.">💾 Save tone</button>
   </div>
   <div id="statusStrip" style="padding:8px 24px;display:none;background:#fff;border-bottom:1px solid #e3dcc8;font-size:14px;" title="Production overview: what the machine is doing and what waits for you."></div>
   <div class="list" id="queueList"><div class="loading">Loading…</div></div>
@@ -729,6 +734,27 @@ async function uploadClip(ev, id){
 function toggleManual(){
   const p = document.getElementById('manualPanel');
   p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function toggleTone(){
+  const p = document.getElementById('tonePanel');
+  if (p.style.display === 'none'){
+    try{
+      const j = await api('/admin/api/story-tone');
+      document.getElementById('toneText').value = j.tone || '';
+    }catch(e){ alert(e.message); return; }
+    p.style.display = 'flex';
+  } else p.style.display = 'none';
+}
+
+async function saveTone(btn){
+  btn.disabled = true; btn.textContent = '…';
+  try{
+    await api('/admin/api/story-tone', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ tone: document.getElementById('toneText').value })});
+    document.getElementById('tonePanel').style.display = 'none';
+  }catch(e){ alert('Save failed: '+e.message); }
+  btn.disabled = false; btn.textContent = '💾 Save tone';
 }
 
 async function createManual(btn){

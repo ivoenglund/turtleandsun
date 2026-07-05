@@ -40,7 +40,24 @@ const STORY_TYPES = [
 // ---------------------------------------------------------------------------
 // Prompt construction
 // ---------------------------------------------------------------------------
-function buildSystemPrompt() {
+// The show's tone bible — DB-editable (system_settings key 'story_tone');
+// this constant is only the default/reset value.
+const DEFAULT_STORY_TONE = [
+  'TONE OF THE SHOW (follow strictly):',
+  '- Loving: conflict comes from caring, never malice. Characters tease, never wound. Every episode ends warm.',
+  '- Relatable: plots are household micro-events everyone recognises (waiting by the door, a date almost forgotten, dinner smells).',
+  '- Trustworthy: characters never act out of character; no fake-outs, no cruelty for laughs.',
+  '- A little drama: ONE small stake per episode, felt enormously through animal eyes, resolved within the episode.',
+  '- The sadness is never the punchline — the PIVOT is. Feelings are played straight; comedy lives in the timing.',
+  '',
+  'NORTH-STAR EXAMPLE (write episodes with this shape and heart):',
+  'Scene 1: Kitten sits alone on the floor, looking down, then into the camera, and says quietly:',
+  '"i\'m so lonely. nobody likes me. i never know what to say. i always mess everything up… i\'m sorry." A beat of silence.',
+  'Scene 2: The dog\'s head pops through the doorway: "wanna play football?" The kitten, already getting up: "okay."',
+  'Why it works: long heavy beat → pattern break → two-word warm resolution. Presence beats advice.',
+].join('\n');
+
+function buildSystemPrompt(toneText) {
   return [
     'You are the story writer for Turtle & Sun, a brand that sells a personalised',
     'FRIDGE BIRTHDAY CALENDAR (a beautiful A2 paper wall calendar showing the',
@@ -60,6 +77,8 @@ function buildSystemPrompt() {
     '  in exactly this form: the dog looks into the camera and says clearly:',
     '  "it\'s my birthday today". Speech in lowercase, short and punchy,',
     '  MAX 15 words per 5 seconds of scene (longer lines get audio-compressed).',
+    '',
+    (toneText && String(toneText).trim()) ? String(toneText).trim() : DEFAULT_STORY_TONE,
     '',
     'Hard rules:',
     '- Part 1 total length 5-8 seconds, split into 1-3 scenes.',
@@ -160,9 +179,9 @@ function validateStory(story) {
 // Main entry. Returns { story, model, costUsd, raw }.
 // One automatic retry on parse/validation failure.
 // ---------------------------------------------------------------------------
-async function generateStory({ situationText, elements, ctaCard, generator, model }) {
+async function generateStory({ situationText, elements, ctaCard, generator, model, toneText }) {
   const useModel = model || DEFAULT_MODEL;
-  const systemPrompt = buildSystemPrompt();
+  const systemPrompt = buildSystemPrompt(toneText);
   const prompt = buildUserPrompt({ situationText, elements, ctaCard, generator });
 
   let lastErr = null;
@@ -516,7 +535,7 @@ async function generatePostingKit({ story, situationText, ctaCard, links, model 
 // Situation idea generator — bulk-writes NEW story situations for the library.
 // The admin reviews, edits or deletes them in the Situations grid.
 // ---------------------------------------------------------------------------
-async function generateSituationIdeas({ existing = [], count = 10, themes = [], model }) {
+async function generateSituationIdeas({ existing = [], count = 10, themes = [], model, toneText }) {
   const useModel = model || DEFAULT_MODEL;
   const n = Math.min(Math.max(parseInt(count, 10) || 10, 1), 20);
   const themeList = (themes || []).filter(Boolean).slice(0, 20);
@@ -531,6 +550,8 @@ async function generateSituationIdeas({ existing = [], count = 10, themes = [], 
     'WORLD RULE: all animals can talk — to each other and straight to the viewer',
     '(not to the humans, who never understand them). Situations where pets speak,',
     'gossip, complain or address the viewer directly are very welcome.',
+    '',
+    (toneText && String(toneText).trim()) ? String(toneText).trim() : DEFAULT_STORY_TONE,
     '',
     themeList.length === 1
       ? `THEME: every idea must belong to the theme "${themeList[0]}".`
@@ -579,6 +600,7 @@ async function generateSituationIdeas({ existing = [], count = 10, themes = [], 
 
 module.exports = {
   DEFAULT_MODEL,
+  DEFAULT_STORY_TONE,
   ROUTER_ENDPOINT,
   STORY_TYPES,
   VIDEO_MODELS,
