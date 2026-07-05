@@ -9204,6 +9204,11 @@ async function fetchTikTokStatsBatch() {
         `UPDATE platform_tokens SET access_token=$1, token_expiry=$2, updated_at=NOW() WHERE platform='tiktok'`,
         [rd.access_token, new Date(Date.now() + (rd.expires_in||86400)*1000)]
       );
+    } else {
+      // Don't limp on with a dead token — say why the refresh failed.
+      throw new Error('TikTok token refresh failed: ' +
+        (rd.error_description || rd.error || JSON.stringify(rd).slice(0, 200)) +
+        ' — reconnect at https://turtleandsun.com/admin/tiktok/connect');
     }
   }
 
