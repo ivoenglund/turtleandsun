@@ -123,6 +123,22 @@ html,body{
   margin-top:4px;
 }
 
+.points{
+  list-style:none;
+  text-align:left;
+  margin:0 auto 36px;
+  max-width:420px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.points li{
+  font-size:clamp(14px,2vw,16px);
+  color:rgba(255,255,255,0.85);
+  line-height:1.45;
+}
+.points strong{color:#FFE800;font-weight:700;}
+
 /* ── Success state ── */
 .wl-success{
   display:none;
@@ -182,12 +198,26 @@ html,body{
 
   <div class="card">
     <div class="coming-soon">Coming soon</div>
-    <h1 class="headline">Your family calendar.<br>Finally worth printing.</h1>
+    <h1 class="headline">Every birthday you care about.<br>On one printed calendar.</h1>
+
+    <p class="sub">
+      A real paper wall calendar for your fridge — with
+      <strong>your family's birthdays already filled in</strong>.
+      Connect the contacts in your phone and every birthday appears
+      automatically. No typing. Pets count as family.
+    </p>
+
+    <ul class="points">
+      <li>📇 Your contacts become the calendar — birthdays fill in themselves</li>
+      <li>🖨️ Printed in big A2 format, made for the fridge door</li>
+      <li>🎁 Waitlist members get <strong>25% off</strong> their first calendar at launch</li>
+    </ul>
 
     <div id="wl-form-wrap">
       <form class="wl-form" id="wlForm" novalidate>
         <input class="wl-input" id="wlEmail" type="email" placeholder="Your email address" autocomplete="email" required>
         <button class="wl-btn" id="wlBtn" type="submit">Join the waitlist — get 25% off</button>
+        <div class="wl-note">Your 25% code arrives by email right away. One email at launch — no spam.</div>
       </form>
     </div>
 
