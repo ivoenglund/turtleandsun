@@ -235,15 +235,23 @@ table.lib th{font-size:13px;}
     <select id="gCount" title="How many stories to write in one click. Each story costs ~$0.001 in LLM fees. More stories = more to review."><option>1</option><option>2</option><option>3</option><option>5</option></select>
     <button class="btn primary" id="genBtn" onclick="generate()" title="Write new STORIES (text only: hook + scene prompts) into the review queue. Does NOT create any video and costs ~$0.001 per story. Videos are made later, from accepted stories, with the 🎬 button on each card.">⚡ Generate stories</button>
     <span style="border-left:1px solid #ddd;height:24px;"></span>
-    <select id="vTier" title="Which Kling quality tier the 🎬 Make video buttons use. Standard ≈ $0.13/sec with audio (a 7s video ≈ $0.90). Pro ≈ $0.34/sec (7s ≈ $2.35) — better quality, slower, has 'custom elements'. Start with Standard.">
+    <select id="vAuto" onchange="saveVS()" title="Auto-produce: when ON, pressing ✓ Accept on a story starts the whole chain automatically — frame → video → assembly → texts. Kling stories run through; Flow/Gemini stories park at 'waiting for your clip'. When OFF, everything is manual as before. All manual buttons work in both modes.">
+      <option value="on">Auto-produce: on</option>
+      <option value="off">Auto-produce: off</option>
+    </select>
+    <select id="vPause" onchange="saveVS()" title="When auto-producing: pause after the start frame is composed so you can approve the $0.03 picture before the ~$1 video is made. 'no' runs straight through — faster, slightly riskier. Recommended: yes while testing new elements, no once compositions are reliably good.">
+      <option value="yes">Pause after frame: yes</option>
+      <option value="no">Pause after frame: no</option>
+    </select>
+    <select id="vTier" onchange="saveVS()" title="Which Kling quality tier the 🎬 Make video buttons use. Standard ≈ $0.13/sec with audio (a 7s video ≈ $0.90). Pro ≈ $0.34/sec (7s ≈ $2.35) — better quality, slower, has 'custom elements'. Start with Standard.">
       <option value="standard">Video: Kling Standard (~$0.13/s)</option>
       <option value="pro">Video: Kling Pro (~$0.34/s)</option>
     </select>
-    <select id="vAudio" title="Whether Kling also generates native sound (voices, effects, music). Audio off is ~33% cheaper but silent.">
+    <select id="vAudio" onchange="saveVS()" title="Whether Kling also generates native sound (voices, effects, music). Audio off is ~33% cheaper but silent — keep ON when stories contain speech.">
       <option value="on">Audio: on</option>
       <option value="off">Audio: off (cheaper)</option>
     </select>
-    <select id="vStart" title="How the REAL pets/products stay recognisable in the video. 'Elements in scene' (best): every element with reference photos is passed to Kling as a scene element (@Element1…) present throughout ALL scenes — plus an AI-composed opening frame (+$0.03). 'Start frame only': just the composed opening frame. 'Off': pure text-to-video, looks are described in words only. No photos on the elements = automatically plain text-to-video whatever you pick.">
+    <select id="vStart" onchange="saveVS()" title="How the REAL pets/products stay recognisable in the video. 'Elements in scene' (best): every element with reference photos is passed to Kling as a scene element (@Element1…) present throughout ALL scenes — plus an AI-composed opening frame (+$0.03). 'Start frame only': just the composed opening frame. 'Off': pure text-to-video, looks are described in words only. No photos on the elements = automatically plain text-to-video whatever you pick.">
       <option value="elements">Consistency: elements in scene (best)</option>
       <option value="auto">Consistency: start frame only</option>
       <option value="off">Consistency: off</option>
@@ -264,6 +272,7 @@ table.lib th{font-size:13px;}
     <input id="mDur" type="number" min="2" max="15" value="6" style="width:64px;" title="Clip length in seconds (2-15).">
     <button class="btn primary" onclick="createManual(this)" title="Create the story (status: accepted). Uses the Elements picker, CTA and generator selectors from the toolbar above. Then press 🎬 to render with Kling — or copy the prompt to Flow and use ⬆ Upload own clip.">Create</button>
   </div>
+  <div id="statusStrip" style="padding:8px 24px;display:none;background:#fff;border-bottom:1px solid #e3dcc8;font-size:14px;" title="Production overview: what the machine is doing and what waits for you."></div>
   <div class="list" id="queueList"><div class="loading">Loading…</div></div>
 </div>
 
@@ -474,6 +483,80 @@ async function loadInsights(){
 }
 
 // ── Queue ───────────────────────────────────────────────────────────────────
+// ── Persisted production defaults (vs_*) ────────────────────────────────────
+let vsLoaded = false;
+async function loadVS(){
+  try{
+    const j = await api('/admin/api/video-settings');
+    const s = j.settings || {};
+    const map = { vs_tier:'vTier', vs_audio:'vAudio', vs_consistency:'vStart', vs_auto:'vAuto', vs_pause_frame:'vPause' };
+    for (const [k, id] of Object.entries(map)){
+      const el = document.getElementById(id);
+      if (el && s[k] && [...el.options].some(o=>o.value===s[k])) el.value = s[k];
+    }
+  }catch(e){ /* defaults stay */ }
+  vsLoaded = true;
+}
+async function saveVS(){
+  if (!vsLoaded) return;
+  try{
+    await api('/admin/api/video-settings', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        vs_tier: document.getElementById('vTier').value,
+        vs_audio: document.getElementById('vAudio').value,
+        vs_consistency: document.getElementById('vStart').value,
+        vs_auto: document.getElementById('vAuto').value,
+        vs_pause_frame: document.getElementById('vPause').value,
+      })});
+  }catch(e){ /* non-fatal */ }
+}
+
+function renderStatusStrip(stories){
+  const el = document.getElementById('statusStrip');
+  const n = {
+    producing: stories.filter(s => s.pipeline_status === 'running' || s.video_status === 'generating' || s.final_status === 'assembling').length,
+    pausedFrame: stories.filter(s => s.pipeline_status === 'paused_frame').length,
+    waitingClip: stories.filter(s => s.pipeline_status === 'waiting_clip').length,
+    ready: stories.filter(s => s.final_status === 'done' && !s.social_clip_id).length,
+    failed: stories.filter(s => s.pipeline_status === 'error' || s.video_status === 'error' || s.final_status === 'error').length,
+  };
+  const bits = [];
+  if (n.producing) bits.push('⚙ ' + n.producing + ' producing');
+  if (n.pausedFrame) bits.push('🖼 ' + n.pausedFrame + ' frame waiting for your OK');
+  if (n.waitingClip) bits.push('⏸ ' + n.waitingClip + ' waiting for your clip (Flow/Gemini)');
+  if (n.ready) bits.push('✅ ' + n.ready + ' ready for review');
+  if (n.failed) bits.push('⚠ ' + n.failed + ' failed');
+  el.style.display = bits.length ? '' : 'none';
+  el.innerHTML = bits.join(' &nbsp;·&nbsp; ');
+}
+
+function pipelineBanner(s){
+  if (s.status !== 'accepted') return '';
+  const ps = s.pipeline_status || 'idle';
+  if (ps === 'running') {
+    return `<div class="videobox generating" style="margin-bottom:8px;" title="The auto-production chain is working on this story (frame → video → assembly → texts). Auto-refreshing.">⚙ Auto-producing…</div>`;
+  }
+  if (ps === 'paused_frame') {
+    return `<div class="videobox generating" style="margin-bottom:8px;" title="The start frame is composed and waits for your judgement. Re-gen it if it's wrong, then press Continue — the rest (video → assembly → texts) runs by itself.">🖼 Frame ready — approve it:
+      <button class="btn small primary" onclick="resumePipeline(${s.id}, this)" title="Frame looks good — continue automatically with video, assembly and texts.">▶ Continue</button></div>`;
+  }
+  if (ps === 'waiting_clip') {
+    return `<div class="videobox generating" style="margin-bottom:8px;" title="This story is written for Flow/Gemini: copy the scene prompt, generate the clip in Google's app, download it and upload it below — the chain then finishes by itself (assembly → texts).">⏸ Waiting for your clip — copy the prompt, generate in Flow, upload below.</div>`;
+  }
+  if (ps === 'error') {
+    return `<div class="videobox error" style="margin-bottom:8px;" title="Auto-production stopped on an error (details on the failed stage below/right). Fix the cause if needed, then retry — finished stages are skipped.">⚠ Auto-production stopped.
+      <button class="btn small" onclick="resumePipeline(${s.id}, this)" title="Run the chain again from where it stopped.">▶ Retry</button></div>`;
+  }
+  return '';
+}
+
+async function resumePipeline(id, btn){
+  if (btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{ await api('/admin/api/stories/'+id+'/resume-pipeline', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); }
+  catch(e){ alert(e.message); }
+  setTimeout(loadQueue, 800);
+}
+
 let pollTimer = null;
 async function loadQueue(){
   const status = document.getElementById('fStatus').value;
@@ -487,7 +570,8 @@ async function loadQueue(){
     else { el.innerHTML = j.stories.map(storyCard).join(''); }
     // Auto-refresh every 15s while any video is rendering.
     clearTimeout(pollTimer);
-    if (j.stories.some(s => s.video_status === 'generating' || s.final_status === 'assembling')) {
+    renderStatusStrip(j.stories);
+    if (j.stories.some(s => s.video_status === 'generating' || s.final_status === 'assembling' || s.pipeline_status === 'running')) {
       pollTimer = setTimeout(loadQueue, 15000);
     }
   }catch(e){ el.innerHTML = '<div class="empty">Error: '+esc(e.message)+'</div>'; }
@@ -810,7 +894,7 @@ function storyCard(s){
     .map(e=>esc(e.name)+' ('+esc(e.kind)+')').join(' · ');
   const cost = s.llm_cost_usd ? '$'+Number(s.llm_cost_usd).toFixed(4) : '';
   const actions = s.status === 'pending_review' ? `
-      <button class="btn primary" onclick="act(${s.id},'accept')" title="Approve this story. Accepted stories unlock the 🎬 Make video button. Costs nothing.">✓ Accept</button>
+      <button class="btn primary" onclick="act(${s.id},'accept')" title="Approve this story. With Auto-produce ON (toolbar), accepting also STARTS PRODUCTION automatically: frame → video → assembly → texts (Kling ~$1; Flow stories park at 'waiting for your clip'). With Auto-produce OFF it just unlocks the manual buttons.">✓ Accept</button>
       <button class="btn danger" onclick="rejectStory(${s.id})" title="Discard this story (it stays in the Rejected list). You'll be asked for an optional reason — those reasons will later teach the generator what to avoid.">✗ Reject</button>
       <button class="btn" onclick="act(${s.id},'regenerate', this)" title="Keep the same situation, elements and CTA but let the LLM write a completely new story (~$0.001). Replaces the text on this card.">↺ Regenerate</button>`
     : `<button class="btn small" onclick="act(${s.id},'regenerate', this)" title="Write a new story text into this same card (~$0.001) and put it back into Pending review.">↺ Regenerate</button>`;
@@ -838,7 +922,7 @@ function storyCard(s){
       ${actions} ${deleteBtn}
     </div>
     </div>
-    <div class="vcol"><div class="colhead" title="Column 2: the AI-generated story clip (part 1), made from the scene prompts on the left.">🎬 Part 1 — video</div>${s.status==='accepted'?framesStrip(s):''}${videoCol(s)}</div>
+    <div class="vcol"><div class="colhead" title="Column 2: the AI-generated story clip (part 1), made from the scene prompts on the left.">🎬 Part 1 — video</div>${pipelineBanner(s)}${s.status==='accepted'?framesStrip(s):''}${videoCol(s)}</div>
     <div class="vcol"><div class="colhead" title="Column 3: the publishable video (part 1 + hook + end-card), its posting texts and the tracker status.">🎞 Final + texts</div>${finalCol(s)}</div>
     </div>
   </div>`;
@@ -1414,6 +1498,7 @@ async function uploadCtaFile(key, file){
   renderCtaGrid();
 }
 
+loadVS();
 loadPickers();
 loadQueue();
 </script>

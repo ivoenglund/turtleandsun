@@ -9601,6 +9601,14 @@ app.post('/admin/api/stories/:id(\\d+)/upload-video', requireRole('admin'), uplo
         video_error = NULL, video_completed_at = NOW(), updated_at = NOW()
       WHERE id = $1`, [req.params.id, r2.url, dur]);
     res.json({ ok: true, url: r2.url });
+    // The Flow/Gemini pipeline parks at 'waiting_clip' — the upload wakes it.
+    try {
+      const { rows: st } = await pool.query(
+        `SELECT pipeline_status FROM video_stories WHERE id = $1`, [req.params.id]);
+      if (st[0]?.pipeline_status === 'waiting_clip') {
+        runStoryPipeline(req.params.id).catch(e => console.error('[pipeline] crashed:', e.message));
+      }
+    } catch { /* manual flow unaffected */ }
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -9619,39 +9627,45 @@ function gatherElementRefs(els) {
   return refs;
 }
 
-// Compose a start or end frame for a story ($0.028, synchronous ~10-30s).
+// Compose a start or end frame for a story ($0.028). Shared by the manual
+// 🖼 button and the auto-production pipeline.
+async function generateFrameForStory(storyId, role, promptOverride) {
+  const { rows } = await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [storyId]);
+  if (!rows.length) throw new Error('Story not found');
+  const s = rows[0];
+  const scenes = Array.isArray(s.scenes) ? s.scenes : [];
+  let framePrompt = String(promptOverride || '').trim();
+  if (!framePrompt) {
+    framePrompt = (role === 'start'
+      ? scenes[0]?.video_prompt
+      : scenes[scenes.length - 1]?.video_prompt) || s.hook_text || '';
+  }
+  // Use the elements' CURRENT photos — the story's snapshot may predate them.
+  let frameEls = s.elements_snapshot;
+  if (Array.isArray(s.element_ids) && s.element_ids.length) {
+    const { rows: freshEls } = await pool.query(
+      `SELECT * FROM story_elements WHERE id = ANY($1::int[])`, [s.element_ids]);
+    if (freshEls.length) frameEls = freshEls;
+  }
+  const refs = gatherElementRefs(frameEls);
+  const out = await storyEngine.composeStartFrame({
+    scenePrompt: framePrompt,
+    referenceImageUrls: refs.map(r => r.url),
+    elementNames: refs.map(r => r.name),
+    role: role === 'end' ? 'closing' : 'opening',
+  });
+  const col = role === 'end' ? 'end_frame_url' : 'start_frame_url';
+  await pool.query(`
+    UPDATE video_stories SET ${col} = $2,
+      llm_cost_usd = COALESCE(llm_cost_usd, 0) + $3, updated_at = NOW()
+    WHERE id = $1`, [storyId, out.url, out.costUsd]);
+  return out;
+}
+
 app.post('/admin/api/stories/:id(\\d+)/generate-frame', requireRole('admin'), async (req, res) => {
   try {
-    const { rows } = await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    const s = rows[0];
     const role = req.body?.role === 'end' ? 'end' : 'start';
-    const scenes = Array.isArray(s.scenes) ? s.scenes : [];
-    let framePrompt = String(req.body?.prompt || '').trim();
-    if (!framePrompt) {
-      framePrompt = (role === 'start'
-        ? scenes[0]?.video_prompt
-        : scenes[scenes.length - 1]?.video_prompt) || s.hook_text || '';
-    }
-    // Use the elements' CURRENT photos — the story's snapshot may predate them.
-    let frameEls = s.elements_snapshot;
-    if (Array.isArray(s.element_ids) && s.element_ids.length) {
-      const { rows: freshEls } = await pool.query(
-        `SELECT * FROM story_elements WHERE id = ANY($1::int[])`, [s.element_ids]);
-      if (freshEls.length) frameEls = freshEls;
-    }
-    const refs = gatherElementRefs(frameEls);
-    const out = await storyEngine.composeStartFrame({
-      scenePrompt: framePrompt,
-      referenceImageUrls: refs.map(r => r.url),
-      elementNames: refs.map(r => r.name),
-      role: role === 'end' ? 'closing' : 'opening',
-    });
-    const col = role === 'end' ? 'end_frame_url' : 'start_frame_url';
-    await pool.query(`
-      UPDATE video_stories SET ${col} = $2,
-        llm_cost_usd = COALESCE(llm_cost_usd, 0) + $3, updated_at = NOW()
-      WHERE id = $1`, [s.id, out.url, out.costUsd]);
+    const out = await generateFrameForStory(req.params.id, role, req.body?.prompt);
     res.json({ ok: true, url: out.url, role });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -9824,6 +9838,13 @@ app.post('/admin/api/stories/:id(\\d+)/accept', requireRole('admin'), async (req
       WHERE id = $1 RETURNING *`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, story: rows[0] });
+    // Accept = start production (when the vs_auto default is on).
+    try {
+      const settings = await getVideoSettings();
+      if (settings.vs_auto === 'on') {
+        runStoryPipeline(rows[0].id).catch(e => console.error('[pipeline] crashed:', e.message));
+      }
+    } catch { /* manual mode still works */ }
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -10372,6 +10393,153 @@ app.post('/admin/api/stories/:id(\\d+)/generate-video', requireRole('admin'), as
       ? req.body.start_frame : 'elements';
     runStoryVideoJob(story, { tier, generateAudio, startFrame })
       .catch(err => console.error('[video-story] job crashed:', err.message));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Auto-production pipeline (accept → frame → video → assembly → texts) ───
+// Persisted defaults (system_settings, keys vs_*) — set once in the toolbar.
+
+const VS_DEFAULTS = {
+  vs_tier: 'standard',       // kling tier for auto runs
+  vs_audio: 'on',            // native audio
+  vs_consistency: 'elements',// elements | auto | off (start-frame mode)
+  vs_auto: 'on',             // accept starts production
+  vs_pause_frame: 'yes',     // pause after frame for approval
+};
+
+async function getVideoSettings() {
+  try {
+    const { rows } = await pool.query(`SELECT key, value FROM system_settings WHERE key LIKE 'vs_%'`);
+    const s = { ...VS_DEFAULTS };
+    for (const r of rows) if (r.key in VS_DEFAULTS && r.value) s[r.key] = r.value;
+    return s;
+  } catch { return { ...VS_DEFAULTS }; }
+}
+
+app.get('/admin/api/video-settings', requireRole('admin'), async (req, res) => {
+  res.json({ settings: await getVideoSettings() });
+});
+
+app.post('/admin/api/video-settings', requireRole('admin'), async (req, res) => {
+  try {
+    const body = req.body || {};
+    for (const key of Object.keys(VS_DEFAULTS)) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) {
+        await pool.query(`
+          INSERT INTO system_settings (key, value) VALUES ($1, $2)
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          [key, String(body[key])]);
+      }
+    }
+    res.json({ ok: true, settings: await getVideoSettings() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// CTA resolution + ffmpeg check + assembly, awaited (pipeline variant of the
+// /assemble endpoint — same rules, no HTTP response).
+async function assembleForPipeline(story) {
+  let ctaCard = null;
+  if (story.cta_card_id) {
+    const r = await pool.query(`SELECT * FROM cta_cards WHERE id = $1`, [story.cta_card_id]);
+    ctaCard = r.rows[0] || null;
+  }
+  if (!ctaCard) {
+    const r = await pool.query(`SELECT * FROM cta_cards WHERE active = TRUE ORDER BY random() LIMIT 1`);
+    ctaCard = r.rows[0] || null;
+    if (ctaCard) await pool.query(`UPDATE video_stories SET cta_card_id = $2 WHERE id = $1`, [story.id, ctaCard.id]);
+  }
+  if (!ctaCard) throw new Error('No CTA end-card exists — create one in the CTA end-cards tab.');
+  if (!ctaCard.video_url && !ctaCard.image_url) {
+    throw new Error(`CTA card "${ctaCard.label}" has no media yet — drop a video or picture on it.`);
+  }
+  const fs2 = require('fs');
+  const ffmpegBin = process.env.FFMPEG_PATH || '/tmp/ffmpeg';
+  if (!fs2.existsSync(ffmpegBin)) {
+    await new Promise((resolve) => {
+      require('child_process').execFile(
+        process.execPath, [path.join(__dirname, 'scripts/download-ffmpeg.js')],
+        { timeout: 180000 }, () => resolve());
+    });
+  }
+  if (!fs2.existsSync(ffmpegBin)) throw new Error('FFmpeg unavailable on the server.');
+  await pool.query(`
+    UPDATE video_stories SET final_status = 'assembling', final_error = NULL, updated_at = NOW()
+    WHERE id = $1`, [story.id]);
+  await runStoryAssemblyJob(story, ctaCard);
+}
+
+// The chain itself. Skips finished stages, so it doubles as "resume".
+async function runStoryPipeline(storyId) {
+  const setPS = (ps) => pool.query(
+    `UPDATE video_stories SET pipeline_status = $2, updated_at = NOW() WHERE id = $1`,
+    [storyId, ps]).catch(() => {});
+  const get = async () => (await pool.query(`SELECT * FROM video_stories WHERE id = $1`, [storyId])).rows[0];
+  try {
+    let story = await get();
+    if (!story || story.status !== 'accepted') return;
+    const settings = await getVideoSettings();
+    await setPS('running');
+
+    // 1. Start frame (composed; failure is non-fatal — video step falls back).
+    if (!story.start_frame_url && settings.vs_consistency !== 'off') {
+      try {
+        await generateFrameForStory(storyId, 'start', null);
+        story = await get();
+        if (settings.vs_pause_frame === 'yes' && story.start_frame_url) {
+          await setPS('paused_frame');
+          return;
+        }
+      } catch (err) {
+        console.warn('[pipeline] frame step failed (continuing):', err.message);
+      }
+    }
+
+    // 2. Part-1 video.
+    story = await get();
+    if (story.video_status !== 'done') {
+      if (story.generator === 'kling') {
+        await pool.query(`
+          UPDATE video_stories SET video_status = 'generating', video_error = NULL,
+            video_started_at = NOW(), updated_at = NOW() WHERE id = $1`, [storyId]);
+        await runStoryVideoJob(story, {
+          tier: settings.vs_tier,
+          generateAudio: settings.vs_audio !== 'off',
+          startFrame: settings.vs_consistency,
+        });
+        story = await get();
+        if (story.video_status !== 'done') { await setPS('error'); return; }
+      } else {
+        // Flow/Gemini: the human generates the clip — park here. The clip
+        // upload endpoint resumes the pipeline automatically.
+        await setPS('waiting_clip');
+        return;
+      }
+    }
+
+    // 3. Assembly (+ posting texts, written inside the assembly job).
+    story = await get();
+    if (story.final_status !== 'done') {
+      await assembleForPipeline(story);
+      story = await get();
+      if (story.final_status !== 'done') { await setPS('error'); return; }
+    }
+    await setPS('done');
+  } catch (err) {
+    console.error('[pipeline] story', storyId, ':', err.message);
+    await pool.query(`
+      UPDATE video_stories SET pipeline_status = 'error', final_error = COALESCE(final_error, $2),
+        updated_at = NOW() WHERE id = $1`, [storyId, String(err.message || '').slice(0, 2000)]).catch(() => {});
+  }
+}
+
+// Resume/retry from any parked or failed state (skips what's already done).
+app.post('/admin/api/stories/:id(\\d+)/resume-pipeline', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id, status FROM video_stories WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (rows[0].status !== 'accepted') return res.status(400).json({ error: 'Only accepted stories can be produced.' });
+    res.json({ ok: true });
+    runStoryPipeline(req.params.id).catch(e => console.error('[pipeline] crashed:', e.message));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

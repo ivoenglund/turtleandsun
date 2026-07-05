@@ -1185,6 +1185,11 @@ async function initDb() {
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS start_frame_url TEXT;
     ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS end_frame_url   TEXT;
 
+    -- 2026-07-04 (part 7): auto-production chain state. idle = manual mode,
+    -- running = machine working, paused_frame = waiting for frame approval,
+    -- waiting_clip = Flow/Gemini manual generation step, done / error.
+    ALTER TABLE video_stories ADD COLUMN IF NOT EXISTS pipeline_status TEXT NOT NULL DEFAULT 'idle';
+
     CREATE TABLE IF NOT EXISTS story_frames (
       id          SERIAL PRIMARY KEY,
       label       TEXT NOT NULL,
