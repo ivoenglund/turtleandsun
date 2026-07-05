@@ -1363,7 +1363,9 @@ const UTC_DAY_START = `date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 
 // these networks must not count as "humans". (GeoLite2-ASN org strings.)
 const DATACENTER_ASN_RE = 'amazon|^aws|ec2|^google$|google-cloud|microsoft|azure|digitalocean|hetzner|^ovh|alibaba|tencent|oracle|linode|vultr|choopa|m247|datacamp|leaseweb|contabo|fastly|cloudflare|akamai|hostinger|ionos|scaleway|upcloud|kamatera|softlayer|huawei';
 
-const BOT_UA_RE = 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget';
+const BOT_UA_RE = 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget'
+  + '|facebookexternalhit|meta-externalagent|externalhit|bytespider|bytedance|tiktok'
+  + '|snapchat|pinterest|telegram|whatsapp|discord|slack|skypeuripreview|vkshare|preview|embedly|quora link';
 
 // A visit that counts as a REAL link click (funnel numbers): browser-like UA,
 // not from a datacenter network, not flagged, not from an IP labeled 'me'.
