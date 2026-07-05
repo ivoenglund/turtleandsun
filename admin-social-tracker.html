@@ -810,17 +810,23 @@ async function fetchAll(btn) {
     // TikTok follower count via the extension (profile-page scrape) -> channel chart.
     btn.textContent = 'Fetching TikTok followers…';
     try {
-      const foll = await new Promise((resolve) => {
-        const t = setTimeout(() => resolve(null), 60000);
+      const follR = await new Promise((resolve) => {
+        const t = setTimeout(() => resolve({ timeout: true }), 60000);
         function fh(e) {
           if (e.data?.type !== 'TTS_FETCH_TIKTOK_FOLLOWERS_REPLY') return;
           window.removeEventListener('message', fh);
           clearTimeout(t);
-          resolve(e.data.ok ? e.data.followers : null);
+          resolve(e.data || {});
         }
         window.addEventListener('message', fh);
         window.postMessage({ type: 'TTS_FETCH_TIKTOK_FOLLOWERS' }, '*');
       });
+      const foll = follR.ok ? follR.followers : null;
+      if (foll === null || foll === undefined) {
+        fails.push('TT followers: ' + (follR.timeout
+          ? 'no reply from extension within 60s — reload it at chrome://extensions'
+          : (follR.error || 'unknown scrape failure')));
+      }
       if (foll !== null && foll !== undefined) {
         await fetch('/admin/api/tracker/tiktok-followers', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
