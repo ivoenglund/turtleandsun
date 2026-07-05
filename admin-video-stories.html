@@ -520,10 +520,11 @@ function renderStatusStrip(stories){
     ready: stories.filter(s => s.final_status === 'done' && !s.social_clip_id).length,
     failed: stories.filter(s => s.pipeline_status === 'error' || s.video_status === 'error' || s.final_status === 'error').length,
   };
+  const autoOn = (document.getElementById('vAuto')||{}).value === 'on';
   const bits = [];
   if (n.producing) bits.push('⚙ ' + n.producing + ' producing');
-  if (n.pausedFrame) bits.push('🖼 ' + n.pausedFrame + ' frame waiting for your OK');
-  if (n.waitingClip) bits.push('⏸ ' + n.waitingClip + ' waiting for your clip (Flow/Gemini)');
+  if (autoOn && n.pausedFrame) bits.push('🖼 ' + n.pausedFrame + ' frame waiting for your OK');
+  if (autoOn && n.waitingClip) bits.push('⏸ ' + n.waitingClip + ' waiting for your clip (Flow/Gemini)');
   if (n.ready) bits.push('✅ ' + n.ready + ' ready for review');
   if (n.failed) bits.push('⚠ ' + n.failed + ' failed');
   el.style.display = bits.length ? '' : 'none';
@@ -532,6 +533,8 @@ function renderStatusStrip(stories){
 
 function pipelineBanner(s){
   if (s.status !== 'accepted') return '';
+  // Auto-produce off = clean manual UI, no pipeline prompts.
+  if ((document.getElementById('vAuto')||{}).value !== 'on') return '';
   const ps = s.pipeline_status || 'idle';
   if (ps === 'running') {
     return `<div class="videobox generating" style="margin-bottom:8px;" title="The auto-production chain is working on this story (frame → video → assembly → texts). Auto-refreshing.">⚙ Auto-producing…</div>`;

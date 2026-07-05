@@ -10041,9 +10041,12 @@ function buildStoryElementsPayload(els) {
     .slice(0, 4);
   const payload = withRefs.map(e => {
     const imgs = e.reference_image_urls.filter(isImg);
-    const entry = { frontal_image_url: imgs[0] };
-    if (imgs.length > 1) entry.reference_image_urls = imgs.slice(1, 4);
-    return entry;
+    // fal requires BOTH frontal_image_url AND a non-empty reference_image_urls
+    // per element — with a single photo, it serves as both.
+    return {
+      frontal_image_url: imgs[0],
+      reference_image_urls: imgs.length > 1 ? imgs.slice(1, 4) : [imgs[0]],
+    };
   });
   const tags = withRefs.map((e, i) => `@Element${i + 1} (${e.name})`).join(', ');
   return { payload, tags };
@@ -10403,7 +10406,7 @@ const VS_DEFAULTS = {
   vs_tier: 'standard',       // kling tier for auto runs
   vs_audio: 'on',            // native audio
   vs_consistency: 'elements',// elements | auto | off (start-frame mode)
-  vs_auto: 'on',             // accept starts production
+  vs_auto: 'off',            // accept starts production (opt-in)
   vs_pause_frame: 'yes',     // pause after frame for approval
 };
 
