@@ -17,6 +17,28 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .btn-print-2x{background:#1a4a8a;}
 .btn-print-cal:hover{background:#1C0A00;}
 
+/* ── Poster (standing A2/A1 sheet of mini-months) ─────────────────────────── */
+.poster{width:1200px;height:1697px;background:#fff;display:flex;flex-direction:column;padding:24px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
+.poster-head{height:90px;display:flex;align-items:baseline;justify-content:space-between;flex-shrink:0;padding:0 6px 10px;}
+.poster-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:44px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
+.poster-range{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:600;color:rgba(28,10,0,0.5);}
+.poster-grid{flex:1;display:grid;gap:16px;align-content:space-evenly;justify-content:center;}
+.poster-cell{position:relative;overflow:hidden;}
+.poster-cell-inner{position:absolute;top:0;left:0;width:900px;transform-origin:top left;}
+.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;}
+.poster-cell .cal-page-footer{display:none;}
+.poster-foot{height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:600;color:rgba(28,10,0,0.4);letter-spacing:0.06em;}
+/* Preview chrome (screen only) */
+.poster-preview-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+.poster-note{font-size:12px;color:rgba(28,10,0,0.55);}
+.poster-scalebox{box-shadow:0 4px 28px rgba(0,0,0,0.13);border-radius:4px;overflow:hidden;background:#fff;}
+/* Tiled print pieces */
+.tile-page{position:relative;overflow:hidden;page-break-after:always;background:#fff;}
+.tile-guide{position:absolute;z-index:5;border:0;border-color:#3A6B20;opacity:0.65;}
+.tile-guide.v{border-left:1.5px dashed #3A6B20;top:0;bottom:0;width:0;}
+.tile-guide.h{border-top:1.5px dashed #3A6B20;left:0;right:0;height:0;}
+.tile-label{position:absolute;z-index:6;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;color:#3A6B20;background:#fff;padding:1px 4px;opacity:0.85;}
+
 /* ── Controls ─────────────────────────────────────────────────────────────── */
 .controls-bar{background:transparent;border-bottom:none;padding:10px 24px;display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;flex-shrink:0;}
 .ctrl{display:flex;flex-direction:column;gap:4px;}
@@ -259,6 +281,24 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   </div>
   <div style="margin-left:auto;display:flex;gap:8px;align-self:center;">
     <button class="btn-print-cal" onclick="window.print()">Print</button>
+  </div>
+  <div class="ctrl">
+    <span class="ctrl-lbl">Poster start</span>
+    <select id="posterStartSel" title="First month of the poster. 6-month poster = this month + the next five; 12-month = a full year from here."></select>
+  </div>
+  <div class="ctrl">
+    <span class="ctrl-lbl">12-mo sheet</span>
+    <select id="posterSizeSel" title="Sheet size for the 12-month poster. A2 (42×59 cm) fits a fridge door but has small text; A1 (59×84 cm) gives each month the same size as on the 6-month A2 — a wall calendar. The 6-month poster is always A2.">
+      <option value="a2">A2 (fridge, dense)</option>
+      <option value="a1">A1 (wall, comfy)</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <span class="ctrl-lbl">Poster</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-print-cal" onclick="openPoster(6)" title="Build a 6-month poster (2×3 months on one standing A2 sheet) and show it on screen. Uses everything set on this page: filters, groups, holidays, week start, colors. Nothing prints until you choose a print mode in the preview.">Poster 6 mo</button>
+      <button class="btn-print-cal btn-print-2x" onclick="openPoster(12)" title="Build a 12-month poster (3×4 months on one standing sheet, size per the 12-mo sheet selector) and show it on screen first.">Poster 12 mo</button>
+    </div>
     <button class="btn-print-cal btn-print-2x" onclick="printLarge()">Print 2×</button>
     <button class="btn-print-cal btn-print-2x" onclick="printNormal()">Print 1×</button>
   </div>
@@ -1091,6 +1131,181 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
     + '</div>';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Poster: 6 months (2×3) or 12 months (3×4) on one standing sheet.
+// Reuses renderMonthPage() so every filter, group, holiday, week-start,
+// design and color setting on this page applies to the poster too.
+// ═══════════════════════════════════════════════════════════════════════════
+const MM2PX = 96 / 25.4; // css px per mm
+const POSTER_W = 1200, POSTER_H = 1697; // design pixels, A-series ratio
+
+let _posterState = null;
+
+function populatePosterControls() {
+  const sel = document.getElementById('posterStartSel');
+  if (!sel || sel.options.length) return;
+  MONTHS_FULL.forEach((m, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = m;
+    sel.appendChild(o);
+  });
+  sel.value = '0';
+}
+
+// Additive holiday loading for posters spanning a year boundary
+// (loadHolidays() resets the map, so merge manually).
+async function ensureHolidaysForYears(years) {
+  const code = document.getElementById('countrySel')?.value;
+  if (!code || !document.getElementById('holidayCb')?.checked) return;
+  const merged = {};
+  for (const y of years) {
+    try {
+      const data = await fetch(`/api/holidays?year=${y}&country=${code}`).then(r => r.json());
+      data.forEach(h => {
+        if (!merged[h.date]) merged[h.date] = [];
+        merged[h.date].push(h.localName || h.name);
+      });
+    } catch (e) { /* keep going */ }
+  }
+  _holidays = merged;
+  _lastHolidayYear = null; // force renderCalendar to reload single-year later
+}
+
+function buildPosterHtml(startYear, startMonth, count) {
+  const cols = count === 6 ? 2 : 3;
+  const rows = count === 6 ? 3 : 4;
+  const GAP = 16, PAD = 24;
+  const gridW = POSTER_W - 2 * PAD;
+  const cellW = (gridW - (cols - 1) * GAP) / cols;
+  const scale = cellW / 900;
+  const cellH = (900 / 1.41421) * scale;
+
+  let cells = '';
+  for (let i = 0; i < count; i++) {
+    const y = startYear + Math.floor((startMonth + i) / 12);
+    const m = (startMonth + i) % 12;
+    cells += `<div class="poster-cell" style="width:${cellW.toFixed(1)}px;height:${cellH.toFixed(1)}px;">`
+      + `<div class="poster-cell-inner" style="transform:scale(${scale.toFixed(5)});">`
+      + renderMonthPage(y, m)
+      + `</div></div>`;
+  }
+
+  const endIdx = startMonth + count - 1;
+  const endYear = startYear + Math.floor(endIdx / 12);
+  const endMonth = endIdx % 12;
+  const range = (startYear === endYear)
+    ? `${MONTHS_FULL[startMonth]} – ${MONTHS_FULL[endMonth]} ${startYear}`
+    : `${MONTHS_FULL[startMonth]} ${startYear} – ${MONTHS_FULL[endMonth]} ${endYear}`;
+  const title = (startYear === endYear) ? String(startYear) : `${startYear}–${endYear}`;
+
+  return `<div class="poster poster-${count}">
+    <div class="poster-head"><span class="poster-title">${title}</span><span class="poster-range">${range}</span></div>
+    <div class="poster-grid" style="grid-template-columns:repeat(${cols},${cellW.toFixed(1)}px);">${cells}</div>
+    <div class="poster-foot">turtleandsun.com — remember to love</div>
+  </div>`;
+}
+
+async function openPoster(count) {
+  if (!_loaded) return alert('Still loading your data — try again in a moment.');
+  const startYear = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
+  const startMonth = parseInt(document.getElementById('posterStartSel').value) || 0;
+  const years = [...new Set([startYear, startYear + Math.floor((startMonth + count - 1) / 12)])];
+  await ensureHolidaysForYears(years);
+
+  const html = buildPosterHtml(startYear, startMonth, count);
+  _posterState = { html, count };
+
+  const s = Math.min(680, window.innerWidth - 80) / POSTER_W;
+  const size12 = document.getElementById('posterSizeSel').value;
+  const tiledDesc = count === 6
+    ? 'tiled = 4×A4 portrait, assembled ≈ 41×58 cm (A2 with 10 mm glue overlap)'
+    : (size12 === 'a1'
+        ? 'tiled = 8×A4 landscape, assembled ≈ 57×81 cm (A1 with 10 mm glue overlap)'
+        : 'tiled = 4×A4 portrait, assembled ≈ 41×58 cm (A2 with 10 mm glue overlap)');
+  document.getElementById('calArea').innerHTML = `
+    <div class="poster-preview-bar">
+      <button class="btn-print-cal" onclick="printPoster('a4')" title="Print the whole poster scaled onto ONE A4 page — the quick desk proof on your printer.">🖨 A4 proof</button>
+      <button class="btn-print-cal btn-print-2x" onclick="printPoster('tiled')" title="Print at full poster size split across A4 sheets with 10 mm overlaps and dashed green glue-guides. Tape the sheets together for the fridge test. ${esc(tiledDesc)}">🖨 Tiled full-size</button>
+      <button class="btn-print-cal" style="background:#888" onclick="renderCalendar()" title="Back to the normal month view.">← Back</button>
+      <span class="poster-note">${esc(tiledDesc)} · A4 proof = whole poster on one sheet</span>
+    </div>
+    <div class="poster-scalebox" style="width:${(POSTER_W * s).toFixed(0)}px;height:${(POSTER_H * s).toFixed(0)}px;">
+      <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div>
+    </div>`;
+  window.scrollTo(0, 0);
+}
+
+function collectPageCss() {
+  let css = '';
+  for (const sheet of document.styleSheets) {
+    try { for (const rule of sheet.cssRules) { css += rule.cssText + '\n'; } } catch (e) {}
+  }
+  return css;
+}
+
+function printPoster(mode) {
+  if (!_posterState) return;
+  const { html, count } = _posterState;
+  const size = (count === 12 && document.getElementById('posterSizeSel').value === 'a1') ? 'a1' : 'a2';
+  const css = collectPageCss();
+  const bodyClass = document.body.className;
+  let inner = '';
+  let pageRule = '';
+
+  if (mode === 'a4') {
+    const targetW = 194 * MM2PX;              // A4 minus 8mm margins
+    const s = targetW / POSTER_W;
+    pageRule = '@page{size:A4 portrait;margin:8mm;}';
+    inner = `<div style="width:${(POSTER_W * s).toFixed(0)}px;height:${(POSTER_H * s).toFixed(0)}px;overflow:hidden;">
+      <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div></div>`;
+  } else {
+    // Tiled: pieces overlap 10mm; dashed guides mark the glue line.
+    const OV = 10;
+    let cols, rows, pageWmm, pageHmm, s;
+    if (size === 'a2') {
+      cols = 2; rows = 2; pageWmm = 210; pageHmm = 297;
+      s = (410 * MM2PX) / POSTER_W;           // fit width: 2×210−10 = 410mm
+      pageRule = '@page{size:A4 portrait;margin:0;}';
+    } else {
+      cols = 2; rows = 4; pageWmm = 297; pageHmm = 210;
+      s = (810 * MM2PX) / POSTER_H;           // fit height: 4×210−3×10 = 810mm
+      pageRule = '@page{size:A4 landscape;margin:0;}';
+    }
+    const stepX = pageWmm - OV, stepY = pageHmm - OV;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const guides =
+          (c < cols - 1 ? `<div class="tile-guide v" style="right:${OV}mm;"></div><div class="tile-label" style="right:${OV + 1}mm;top:4mm;">glue →</div>` : '') +
+          (c > 0        ? `<div class="tile-guide v" style="left:${OV}mm;"></div>` : '') +
+          (r < rows - 1 ? `<div class="tile-guide h" style="bottom:${OV}mm;"></div><div class="tile-label" style="bottom:${OV + 1}mm;left:4mm;">glue ↓</div>` : '') +
+          (r > 0        ? `<div class="tile-guide h" style="top:${OV}mm;"></div>` : '');
+        inner += `<div class="tile-page" style="width:${pageWmm}mm;height:${pageHmm}mm;">
+          <div style="position:absolute;left:${(-c * stepX)}mm;top:${(-r * stepY)}mm;">
+            <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div>
+          </div>${guides}
+          <div class="tile-label" style="right:4mm;bottom:4mm;">sheet ${r * cols + c + 1}/${rows * cols} (row ${r + 1}, col ${c + 1})</div>
+        </div>`;
+      }
+    }
+  }
+
+  const w = window.open('', '_blank', 'width=900,height=1200');
+  if (!w) { alert('Please allow pop-ups for this site to print the poster'); return; }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Poster print</title>'
+    + '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    + '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">'
+    + '<style>\n' + css + '\n'
+    + 'html,body{margin:0;padding:0;background:#fff;}'
+    + '.tile-page{page-break-after:always;}'
+    + '.tile-page:last-child{page-break-after:avoid;}'
+    + '@media print{' + pageRule + 'body{margin:0!important;}}'
+    + '</style></head><body class="' + bodyClass + '">'
+    + inner + '</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(function () { w.print(); }, 900);
+}
+
 function printLarge() {
   const year     = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
   const month    = parseInt(document.getElementById('monthSel').value);
@@ -1179,6 +1394,8 @@ function printNormal() {
   w.focus();
   setTimeout(function(){ w.print(); }, 800);
 }
+
+populatePosterControls();
 </script>
 </body>
 </html>
