@@ -105,14 +105,39 @@ async function scrapeTikTokStudio() {
           row = row.parentElement;
         }
 
-        // Stats appear after "Alla" (Swedish for "All" = Public privacy setting)
+        // Stats appear after the privacy label. Be tolerant: any UI language,
+        // thousand separators ("1 651"), and compact counts ("1,2 tn", "1.2K").
+        const parseNum = (t) => {
+          t = String(t).replace(/ /g, ' ').trim();
+          const m = t.match(/^(\d+(?:[.,]\d+)?)\s*(k|m|tn|mn|md)?$/i);
+          if (m) {
+            const suf0 = (m[2] || '');
+            const frac = (m[1].match(/[.,](\d+)$/) || [])[1] || '';
+            // "1,651" with no suffix = thousands separator, not a decimal.
+            let n = (!suf0 && frac.length === 3)
+              ? Number(m[1].replace(/[.,]/g, ''))
+              : parseFloat(m[1].replace(',', '.'));
+            const suf = suf0.toLowerCase();
+            if (suf === 'k' || suf === 'tn') n *= 1e3;
+            if (suf === 'm' || suf === 'mn') n *= 1e6;
+            if (suf === 'md') n *= 1e9;
+            return Math.round(n);
+          }
+          const plain = t.replace(/[\s.,]/g, '');
+          return /^\d+$/.test(plain) && /^[\d\s.,]+$/.test(t) ? Number(plain) : null;
+        };
         const parts = (row?.innerText || '').split('\n').map(t => t.trim()).filter(Boolean);
-        const allaIdx = parts.findIndex(p => p === 'Alla' || p.startsWith('Alla '));
+        const ANCHORS = ['Alla', 'Everyone', 'Offentlig', 'Public', 'Vänner', 'Friends', 'Endast du', 'Only you', 'Privat', 'Private'];
+        const anchorIdx = parts.findIndex(p => ANCHORS.some(a => p === a || p.startsWith(a + ' ')));
         let views = 0, likes = 0, comments = 0;
-        if (allaIdx >= 0) {
-          const nums = parts.slice(allaIdx + 1).filter(t => /^\d+$/.test(t)).map(Number);
-          views = nums[0] || 0; likes = nums[1] || 0; comments = nums[2] || 0;
+        let nums;
+        if (anchorIdx >= 0) {
+          nums = parts.slice(anchorIdx + 1).map(parseNum).filter(n => n !== null);
+        } else {
+          // Layout changed? Fall back to the trailing numeric columns of the row.
+          nums = parts.map(parseNum).filter(n => n !== null).slice(-3);
         }
+        views = nums[0] || 0; likes = nums[1] || 0; comments = nums[2] || 0;
 
         videos.push({ url, videoId, views, likes, comments });
       }

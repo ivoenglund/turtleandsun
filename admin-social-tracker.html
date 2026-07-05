@@ -791,10 +791,21 @@ async function fetchAll(btn) {
     // TikTok: Chrome extension scrapes TikTok Studio; if it returns nothing
     // (extension missing / not logged in / layout change), fall back to the
     // Video Query API (works once the TikTok app is approved + connected).
-    btn.textContent = 'Fetching TikTok…';
+    btn.textContent = 'Fetching TikTok (Studio scrape, up to ~90s)…';
     const ttExt = await fetchTikTokViaExtension();
-    if (ttExt > 0) { parts.push('TT ' + ttExt + ' (ext)'); total += ttExt; }
-    else { total += await callFetch('/admin/api/tracker/fetch-tiktok-stats', 'TT'); }
+    if (ttExt.updated > 0) {
+      parts.push('TT ' + ttExt.updated + ' (ext)');
+      total += ttExt.updated;
+    } else {
+      if (ttExt.scraped === -1) {
+        fails.push('TT: no reply from the Chrome extension within 90s — check it is enabled and reload it at chrome://extensions');
+      } else if (ttExt.scraped > 0 && ttExt.zeros === ttExt.scraped) {
+        fails.push('TT: extension read ' + ttExt.scraped + ' videos in Studio but found no numbers — TikTok changed the Studio layout, the parser needs updating');
+      } else if (ttExt.scraped > 0) {
+        fails.push('TT: extension read ' + ttExt.scraped + ' videos in Studio but 0 matched your clips — paste each video\'s TikTok post URL on its clip row (TikTok ✎)');
+      }
+      total += await callFetch('/admin/api/tracker/fetch-tiktok-stats', 'TT');
+    }
 
     // Re-snapshot today's channel totals so the daily chart shows this fetch
     // immediately instead of waiting for the 09:00 UTC cron.
@@ -813,17 +824,21 @@ async function fetchAll(btn) {
 }
 
 async function fetchTikTokViaExtension() {
-  // Ask the extension to scrape TikTok Studio
+  // Ask the extension to scrape TikTok Studio.
+  // Returns { updated, scraped, zeros } — scraped -1 = extension never replied.
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(0), 30000); // 30s timeout
+    const timeout = setTimeout(() => resolve({ updated: 0, scraped: -1, zeros: 0 }), 90000);
     function handler(e) {
       if (e.data?.type !== 'TTS_FETCH_TIKTOK_STATS_REPLY') return;
       window.removeEventListener('message', handler);
       clearTimeout(timeout);
       const videos = e.data.videos || [];
-      if (!videos.length) { resolve(0); return; }
+      const zeros = videos.filter(v => !(v.views || v.likes || v.comments)).length;
+      if (!videos.length) { resolve({ updated: 0, scraped: 0, zeros: 0 }); return; }
       // Now update each clip in the DB by matching video ID to post_url
-      updateTikTokStats(videos).then(resolve).catch(() => resolve(0));
+      updateTikTokStats(videos)
+        .then(u => resolve({ updated: u, scraped: videos.length, zeros }))
+        .catch(() => resolve({ updated: 0, scraped: videos.length, zeros }));
     }
     window.addEventListener('message', handler);
     window.postMessage({ type: 'TTS_FETCH_TIKTOK_STATS' }, '*');
@@ -834,6 +849,8 @@ async function updateTikTokStats(videos) {
   const today = new Date().toISOString().slice(0, 10);
   let updated = 0;
   for (const v of videos) {
+    // Never overwrite existing numbers with an all-zero scrape (parser hiccup).
+    if (!(v.views || v.likes || v.comments)) continue;
     // Find clip with matching tiktok_post_url containing this video ID
     const clip = (clips||[]).find(c => c.tiktok_post_url && c.tiktok_post_url.includes(v.videoId));
     if (!clip) continue;
