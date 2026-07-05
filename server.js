@@ -8632,6 +8632,22 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
   }
 });
 
+// Diagnostic: the raw identity of every visit currently counted as a funnel
+// click — so suspicious survivors can be inspected instead of guessed at.
+app.get('/admin/api/tracker/ref-visits', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT v.created_at, v.ref, v.src, v.ip, v.country, v.city,
+             v.user_agent, v.asn_org, v.engaged, v.dwell_ms, v.path
+      FROM visits v
+      WHERE v.ref IS NOT NULL
+        AND ${HUMAN_CLICK_WHERE}
+      ORDER BY v.created_at DESC
+      LIMIT 100`);
+    res.json({ count: rows.length, visits: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /admin/api/tracker/clicks -- click counts per clip (loaded async by the UI)
 app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
   try {
