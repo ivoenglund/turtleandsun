@@ -9443,7 +9443,11 @@ app.get('/admin/api/tracker/channel-followers', requireRole('admin'), async (req
         headers: { 'Authorization': 'Bearer ' + ttRow.rows[0].access_token }
       });
       const d = await r.json();
-      if (d.data && d.data.user) result.tiktok = d.data.user.follower_count || 0;
+      // Only trust an actual number — with the basic scope the API answers
+      // with an empty user object, which must NOT become a phantom zero.
+      if (typeof d.data?.user?.follower_count === 'number') {
+        result.tiktok = d.data.user.follower_count;
+      }
     }
   } catch(e) { console.warn('[channel-followers] tiktok:', e.message); }
   // Fallback: the API needs the user.info.stats scope we don't have — use the

@@ -843,6 +843,7 @@ async function fetchAll(btn) {
 
     btn.textContent = '✓ ' + parts.join(' · ');
     if (fails.length) alert('Some platforms failed:\n' + fails.join('\n'));
+    await loadFollowers();  // header counts refresh with the new snapshot
     await load();
     if (selId) { await loadStats(selId); renderPanel(); }
     setTimeout(() => { btn.disabled=false; btn.textContent='↻ Fetch all stats'; }, 6000);
