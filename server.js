@@ -8637,6 +8637,23 @@ app.get('/admin/api/tracker/clips', requireRole('admin'), async (req, res) => {
   }
 });
 
+// TikTok follower count (scraped by the Chrome extension from the profile
+// page) -> channel_daily_stats, same table the YouTube channel cron feeds.
+app.post('/admin/api/tracker/tiktok-followers', requireRole('admin'), async (req, res) => {
+  try {
+    const followers = parseInt(req.body?.followers, 10);
+    if (!Number.isFinite(followers) || followers < 0) {
+      return res.status(400).json({ error: 'followers must be a non-negative number' });
+    }
+    await pool.query(`
+      INSERT INTO channel_daily_stats (platform, stat_date, subscribers)
+      VALUES ('tiktok', CURRENT_DATE, $1)
+      ON CONFLICT (platform, stat_date)
+      DO UPDATE SET subscribers = EXCLUDED.subscribers`, [followers]);
+    res.json({ ok: true, followers });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Diagnostic: the raw identity of every visit currently counted as a funnel
 // click — so suspicious survivors can be inspected instead of guessed at.
 app.get('/admin/api/tracker/ref-visits', requireRole('admin'), async (req, res) => {

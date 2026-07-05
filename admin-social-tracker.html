@@ -807,6 +807,29 @@ async function fetchAll(btn) {
       total += await callFetch('/admin/api/tracker/fetch-tiktok-stats', 'TT');
     }
 
+    // TikTok follower count via the extension (profile-page scrape) -> channel chart.
+    btn.textContent = 'Fetching TikTok followers…';
+    try {
+      const foll = await new Promise((resolve) => {
+        const t = setTimeout(() => resolve(null), 60000);
+        function fh(e) {
+          if (e.data?.type !== 'TTS_FETCH_TIKTOK_FOLLOWERS_REPLY') return;
+          window.removeEventListener('message', fh);
+          clearTimeout(t);
+          resolve(e.data.ok ? e.data.followers : null);
+        }
+        window.addEventListener('message', fh);
+        window.postMessage({ type: 'TTS_FETCH_TIKTOK_FOLLOWERS' }, '*');
+      });
+      if (foll !== null && foll !== undefined) {
+        await fetch('/admin/api/tracker/tiktok-followers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ followers: foll }),
+        });
+        parts.push('TT foll ' + foll);
+      }
+    } catch (e) { /* follower scrape is best-effort */ }
+
     // Re-snapshot today's channel totals so the daily chart shows this fetch
     // immediately instead of waiting for the 09:00 UTC cron.
     btn.textContent = 'Updating chart…';

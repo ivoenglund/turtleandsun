@@ -14,4 +14,10 @@ window.addEventListener('message', (event) => {
       window.postMessage({ type: 'TTS_FETCH_TIKTOK_STATS_REPLY', ...response }, '*');
     });
   }
+
+  if (event.data?.type === 'TTS_FETCH_TIKTOK_FOLLOWERS') {
+    chrome.runtime.sendMessage({ type: 'FETCH_TIKTOK_FOLLOWERS' }, (response) => {
+      window.postMessage({ type: 'TTS_FETCH_TIKTOK_FOLLOWERS_REPLY', ...response }, '*');
+    });
+  }
 });
