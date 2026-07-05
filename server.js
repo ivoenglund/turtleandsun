@@ -4012,7 +4012,7 @@ function tiktokOAuthUrl() {
   for (const [s, exp] of tiktokOAuthStates) if (exp < Date.now()) tiktokOAuthStates.delete(s); // prune
   const params = new URLSearchParams({
     client_key:    process.env.TIKTOK_CLIENT_KEY,
-    scope:         'video.upload,user.info.basic',
+    scope:         'video.upload,user.info.basic,video.list',
     response_type: 'code',
     redirect_uri:  base + '/auth/tiktok/callback',
     state,
