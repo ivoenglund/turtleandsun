@@ -425,6 +425,13 @@ function buildPostingKitPrompt({ story, situationText, ctaCard, links }) {
     'STYLE: no fluff. Cut filler adjectives ("stunning", "beautiful", "amazing")',
     'and generic marketing lines. Short sentences. Sound like a person, not a brand.',
     '',
+    'TRANSPARENCY (mandatory — this channel never hides that it is commercial):',
+    'YouTube description, Instagram caption and Facebook caption must each carry',
+    'this line (verbatim or lightly adapted): "From the makers of turtleandsun.com',
+    '— a place for love, connection and remembrance. Our calendars keep these',
+    'stories coming." On TikTok (short), at least "by turtleandsun.com".',
+    'Frame the offer as open support, never pressure: buying sustains the stories.',
+    '',
     'The video being posted (8-15s vertical, ends on an offer end-card):',
     `- Hook text on video: ${story.hook_text || story.hook || ''}`,
     `- Story: ${situationText || ''}`,
@@ -485,6 +492,13 @@ async function generatePostingKit({ story, situationText, ctaCard, links, model 
       for (const f of ['tiktok_caption', 'instagram_caption', 'yt_description', 'fb_caption']) {
         if (!/turtleandsun\.com/i.test(kit[f])) {
           kit[f] = kit[f].trim() + (f.endsWith('_caption') && f.startsWith('tik') ? ' · ' : '\n') + 'turtleandsun.com';
+        }
+      }
+      // Transparency line — enforced on the long-form fields.
+      const TLINE = 'From the makers of turtleandsun.com — a place for love, connection and remembrance. Our calendars keep these stories coming.';
+      for (const f of ['yt_description', 'instagram_caption', 'fb_caption']) {
+        if (!/makers of turtleandsun\.com/i.test(kit[f])) {
+          kit[f] = kit[f].trim() + '\n\n' + TLINE;
         }
       }
       if (kit.yt_title.length > 100) kit.yt_title = kit.yt_title.slice(0, 97) + '…';
