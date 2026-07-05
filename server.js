@@ -9443,6 +9443,16 @@ app.get('/admin/api/tracker/channel-followers', requireRole('admin'), async (req
       if (d.data && d.data.user) result.tiktok = d.data.user.follower_count || 0;
     }
   } catch(e) { console.warn('[channel-followers] tiktok:', e.message); }
+  // Fallback: the API needs the user.info.stats scope we don't have — use the
+  // latest snapshot scraped by the Chrome extension into channel_daily_stats.
+  if (result.tiktok == null) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT subscribers FROM channel_daily_stats
+         WHERE platform = 'tiktok' ORDER BY stat_date DESC LIMIT 1`);
+      if (rows.length) result.tiktok = rows[0].subscribers;
+    } catch (e) { console.warn('[channel-followers] tiktok fallback:', e.message); }
+  }
   res.json(result);
 });
 
