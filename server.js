@@ -1363,6 +1363,18 @@ const UTC_DAY_START = `date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 
 // these networks must not count as "humans". (GeoLite2-ASN org strings.)
 const DATACENTER_ASN_RE = 'amazon|^aws|ec2|^google$|google-cloud|microsoft|azure|digitalocean|hetzner|^ovh|alibaba|tencent|oracle|linode|vultr|choopa|m247|datacamp|leaseweb|contabo|fastly|cloudflare|akamai|hostinger|ionos|scaleway|upcloud|kamatera|softlayer|huawei';
 
+const BOT_UA_RE = 'bot|crawler|spider|scrape|headless|uptime|monitor|python-requests|curl|wget';
+
+// A visit that counts as a REAL link click (funnel numbers): browser-like UA,
+// not from a datacenter network, not flagged, not from an IP labeled 'me'.
+// Link-preview crawlers from YouTube/TikTok/Meta fetch every posted link —
+// without this filter the funnel counts them as customers.
+const HUMAN_CLICK_WHERE = `
+  COALESCE(v.user_agent,'') !~* '${BOT_UA_RE}'
+  AND COALESCE(v.asn_org,'') !~* '${DATACENTER_ASN_RE}'
+  AND v.flagged = FALSE
+  AND NOT EXISTS (SELECT 1 FROM ip_labels il WHERE il.ip = v.ip AND il.label ILIKE 'me')`;
+
 app.get('/admin/visits/data', requireRole('admin'), async (req, res) => {
   try {
     const { from, to, search, flagged_only } = req.query;
@@ -8631,6 +8643,7 @@ app.get('/admin/api/tracker/clicks', requireRole('admin'), async (req, res) => {
       FROM social_clips sc
       JOIN visits v ON v.ref = sc.ref_tag
       WHERE sc.ref_tag IS NOT NULL
+        AND ${HUMAN_CLICK_WHERE}
       GROUP BY sc.id
     `);
     const { rows: fe } = await pool.query(`
@@ -9462,7 +9475,7 @@ app.get('/admin/api/stories', requireRole('admin'), async (req, res) => {
              COALESCE(sc.tiktok_views,0)+COALESCE(sc.instagram_views,0)
                +COALESCE(sc.youtube_views,0)+COALESCE(sc.facebook_views,0) AS total_views,
              CASE WHEN sc.ref_tag IS NOT NULL
-               THEN (SELECT COUNT(*)::int FROM visits v WHERE v.ref = sc.ref_tag) ELSE 0 END AS link_clicks,
+               THEN (SELECT COUNT(*)::int FROM visits v WHERE v.ref = sc.ref_tag AND ${HUMAN_CLICK_WHERE}) ELSE 0 END AS link_clicks,
              CASE WHEN sc.ref_tag IS NOT NULL
                THEN (SELECT COUNT(*)::int FROM waitlist w WHERE w.ref = sc.ref_tag) ELSE 0 END AS emails,
              COUNT(*) OVER() AS total_count
@@ -10727,7 +10740,7 @@ app.get('/admin/api/stories/insights', requireRole('admin'), async (req, res) =>
           SELECT ${expr} AS key,
                  COALESCE(sc.tiktok_views,0)+COALESCE(sc.instagram_views,0)
                    +COALESCE(sc.youtube_views,0)+COALESCE(sc.facebook_views,0) AS views,
-                 (SELECT COUNT(*) FROM visits v WHERE v.ref = sc.ref_tag) AS clicks,
+                 (SELECT COUNT(*) FROM visits v WHERE v.ref = sc.ref_tag AND ${HUMAN_CLICK_WHERE}) AS clicks,
                  (SELECT COUNT(*) FROM waitlist w WHERE w.ref = sc.ref_tag) AS emails
           FROM video_stories vs
           JOIN social_clips sc ON sc.id = vs.social_clip_id
