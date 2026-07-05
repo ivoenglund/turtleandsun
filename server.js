@@ -9347,14 +9347,28 @@ async function fetchChannelDailyStats(overrideDate) {
           if (!d.error) subscribers = d.followers_count || d.fan_count || 0;
         } catch(e) { /* not connected */ }
       } else if (platform === 'tiktok') {
+        // The API only reports follower_count with the user.info.stats scope
+        // (which we don't have) — never coerce its empty answer to 0. When
+        // the API knows nothing, carry the last stored snapshot forward
+        // (the Chrome-extension scrape maintains it).
+        let got = null;
         const ttRow = await pool.query("SELECT access_token FROM platform_tokens WHERE platform='tiktok'");
         if (ttRow.rows.length && ttRow.rows[0].access_token) {
-          const r = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=follower_count', {
-            headers: { 'Authorization': 'Bearer ' + ttRow.rows[0].access_token }
-          });
-          const d = await r.json();
-          if (d.data && d.data.user) subscribers = d.data.user.follower_count || 0;
+          try {
+            const r = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=follower_count', {
+              headers: { 'Authorization': 'Bearer ' + ttRow.rows[0].access_token }
+            });
+            const d = await r.json();
+            if (typeof d.data?.user?.follower_count === 'number') got = d.data.user.follower_count;
+          } catch (e) { /* fall through to snapshot */ }
         }
+        if (got === null) {
+          const prev = await pool.query(
+            `SELECT subscribers FROM channel_daily_stats
+             WHERE platform = 'tiktok' ORDER BY stat_date DESC, subscribers DESC LIMIT 1`);
+          got = prev.rows.length ? prev.rows[0].subscribers : 0;
+        }
+        subscribers = got;
       }
       const sRow = await pool.query(
         `SELECT COALESCE(SUM(v.views), 0) AS tv, COALESCE(SUM(v.likes), 0) AS tl
