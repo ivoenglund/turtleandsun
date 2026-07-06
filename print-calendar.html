@@ -39,8 +39,8 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 /* Icons print as pixel mush at poster scale AND steal the text's width,
    forcing needless wraps — poster shows clean text only. */
 .poster-cell .ev-icon{display:none!important;}
-/* Texts start below the day-number band: full cell width, no collision. */
-.poster-cell .cal-events{margin-top:22px;}
+/* Texts and stickers sit at the TOP of the cell, on the day-number line. */
+.poster-cell .cal-events{margin-top:0;}
 .poster-cell .occasion-tile{font-size:12px;}
 /* Stickers flow over the grid lines (user's design choice): sticker cells sit
    above the grid svg (30), but with TRANSPARENT backgrounds so only the
@@ -117,7 +117,7 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
   body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
   body.poster-mode .poster-cell .cal-event{font-size:12px!important;line-height:1.2!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;}
   body.poster-mode .poster-cell .ev-icon{display:none!important;}
-  body.poster-mode .poster-cell .cal-events{margin-top:22px!important;}
+  body.poster-mode .poster-cell .cal-events{margin-top:0!important;}
   body.poster-mode .poster-cell .occasion-tile{font-size:12px!important;}
   body.poster-mode *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
 }
