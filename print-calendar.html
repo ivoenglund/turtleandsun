@@ -1501,6 +1501,10 @@ function printPoster(mode) {
     + '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">'
     + '<style>\n' + css + '\n'
     + 'html,body{margin:0;padding:0;background:#fff;}'
+    /* The copied page CSS makes body a 100vh flex column, which squashes the
+       tile pages into strips (flex-shrink). Neutralize it: plain document. */
+    + 'html,body{display:block!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;}'
+    + '.tile-page{flex:none!important;}'
     + '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}'
     + '.tile-page{page-break-after:always;break-inside:avoid;margin:0;}'
     + '.tile-page:last-child{page-break-after:avoid;}'
