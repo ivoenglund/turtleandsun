@@ -319,21 +319,21 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
       <option value="10">November</option><option value="11">December</option>
     </select>
   </div>
-  <div class="ctrl">
+  <div class="ctrl" style="display:none">
     <div class="ctrl-lbl">View</div>
     <select id="viewSel" onchange="onViewChange()">
       <option value="month">Month</option>
       <option value="year">Full year</option>
     </select>
   </div>
-  <div class="ctrl">
+  <div class="ctrl" style="display:none">
     <div class="ctrl-lbl">Paper</div>
     <select id="paperSel" onchange="applyPaper()">
       <option value="a4">A4</option>
       <option value="letter">US Letter</option>
     </select>
   </div>
-  <div class="ctrl">
+  <div class="ctrl" style="display:none">
     <div class="ctrl-lbl">Orientation</div>
     <select id="orientSel" onchange="applyOrientation()">
       <option value="landscape">Landscape</option>
@@ -347,7 +347,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
       <option value="0">Sunday</option>
     </select>
   </div>
-  <div class="ctrl">
+  <div class="ctrl" style="display:none">
     <div class="ctrl-lbl">Design</div>
     <select id="designSel" onchange="applyDesign()">
       <option value="1">Grid</option>
@@ -372,14 +372,16 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
     <input type="checkbox" id="holidayCb" checked onchange="renderCalendar()">
     <label for="holidayCb">Show</label>
   </div>
-  <div style="margin-left:auto;display:flex;gap:8px;align-self:center;">
-    <button class="btn-print-cal" onclick="window.print()">Print</button>
+  <div style="margin-left:auto;display:flex;gap:10px;align-self:center;">
+    <button class="btn-print-cal" onclick="window.print()" title="This month on one A4 sheet. In the print dialog you can also choose 'Save as PDF'.">Print 1 month</button>
+    <button class="btn-print-cal" onclick="openPoster(6)" title="6 months on one standing poster (2×3). Shows a preview first — print A4 at home or save the PDF for a poster-size print.">6-month poster</button>
+    <button class="btn-print-cal" onclick="openPoster(12)" title="12 months on one standing poster (3×4). Shows a preview first — print A4 at home or save the PDF for a poster-size print.">12-month poster</button>
   </div>
   <div class="ctrl">
     <span class="ctrl-lbl">Poster start</span>
     <select id="posterStartSel" title="First month of the poster. 6-month poster = this month + the next five; 12-month = a full year from here."></select>
   </div>
-  <div class="ctrl">
+  <div class="ctrl" style="display:none">
     <span class="ctrl-lbl">12-mo sheet</span>
     <select id="posterSizeSel" title="Sheet size for the 12-month poster. A2 (42×59 cm) fits a fridge door but has small text; A1 (59×84 cm) gives each month the same size as on the 6-month A2 — a wall calendar. The 6-month poster is always A2.">
       <option value="a2">A2 (fridge, dense)</option>
@@ -392,11 +394,7 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
       <label style="display:flex;align-items:center;gap:5px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;" title="Compact poster: no stickers at all — every event as a clean text line. Maximum information density for big families and clubs. Unchecked = playful stickers (the calendar's signature), with automatic text fallback on any day that would need more than 4 stickers.">
         <input type="checkbox" id="posterCompactCb" style="width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;">Compact
       </label>
-      <button class="btn-print-cal" onclick="openPoster(6)" title="Build a 6-month poster (2×3 months on one standing A2 sheet) and show it on screen. Uses everything set on this page: filters, groups, holidays, week start, colors. Nothing prints until you choose a print mode in the preview.">Poster 6 mo</button>
-      <button class="btn-print-cal btn-print-2x" onclick="openPoster(12)" title="Build a 12-month poster (3×4 months on one standing sheet, size per the 12-mo sheet selector) and show it on screen first.">Poster 12 mo</button>
     </div>
-    <button class="btn-print-cal btn-print-2x" onclick="printLarge()">Print 2×</button>
-    <button class="btn-print-cal btn-print-2x" onclick="printNormal()">Print 1×</button>
   </div>
 </div>
 
@@ -1401,8 +1399,8 @@ async function openPoster(count) {
         : 'tiled = 4×A4 portrait, assembled ≈ 41×58 cm (A2 with 10 mm glue overlap)');
   document.getElementById('calArea').innerHTML = `
     <div class="poster-preview-bar">
-      <button class="btn-print-cal" onclick="printPoster('a4')" title="Print the whole poster scaled onto ONE A4 page — the quick desk proof on your printer.">🖨 A4 proof</button>
-      <button class="btn-print-cal btn-print-2x" onclick="printPoster('tiled')" title="Print at full poster size split across A4 sheets with 10 mm overlaps and dashed green glue-guides. Tape the sheets together for the fridge test. ${esc(tiledDesc)}">🖨 Tiled full-size</button>
+      <button class="btn-print-cal" onclick="printPoster('a4')" title="Print on one A4 at home — or choose 'Save as PDF' in the print dialog. The PDF is vector: a print service can enlarge it to A3, A2 or A1 with perfect quality.">🖨 Print / Save PDF</button>
+      <button class="btn-print-cal btn-print-2x" style="display:none" onclick="printPoster('tiled')" title="Print at full poster size split across A4 sheets with 10 mm overlaps and dashed green glue-guides. Tape the sheets together for the fridge test. ${esc(tiledDesc)}">🖨 Tiled full-size</button>
       <button class="btn-print-cal" style="background:#888" onclick="renderCalendar()" title="Back to the normal month view.">← Back</button>
       <span class="poster-note">${esc(tiledDesc)} · A4 proof = whole poster on one sheet</span>
     </div>
