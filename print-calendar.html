@@ -172,7 +172,9 @@ body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
 body:not(.color-mode) .ev-icon{filter:grayscale(1);}
 .cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:20;}.tiles-overlay{display:block;overflow:visible;margin:0 -10px;height:0;}
-.tile-bday{background:#FFEE00!important;}.tile-occ{background:#FFBFA0!important;}.tile-mile{background:#FFEE00!important;}
+/* Sticker palette: one clear color per type — all print-safe with black text.
+   birthdays yellow · occasions peach · milestones light green */
+.tile-bday{background:#FFEE00!important;}.tile-occ{background:#FFBFA0!important;}.tile-mile{background:#C9E7A8!important;}
 body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;}body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);}.occasion-tile{display:inline-block;text-align:center;vertical-align:top;width:min-content;max-width:47%;margin:1px 1px 0 0;background:#FFE800;border-radius:0;padding:1px 2px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
@@ -353,7 +355,10 @@ body.design-2.no-weeknums .cal-grid{border-left:none;}
   </div>
   <div class="ctrl">
     <span class="ctrl-lbl">Poster</span>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <label style="display:flex;align-items:center;gap:5px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;" title="Compact poster: no stickers at all — every event as a clean text line. Maximum information density for big families and clubs. Unchecked = playful stickers (the calendar's signature), with automatic text fallback on any day that would need more than 4 stickers.">
+        <input type="checkbox" id="posterCompactCb" style="width:14px;height:14px;accent-color:#3A6B20;cursor:pointer;">Compact
+      </label>
       <button class="btn-print-cal" onclick="openPoster(6)" title="Build a 6-month poster (2×3 months on one standing A2 sheet) and show it on screen. Uses everything set on this page: filters, groups, holidays, week start, colors. Nothing prints until you choose a print mode in the preview.">Poster 6 mo</button>
       <button class="btn-print-cal btn-print-2x" onclick="openPoster(12)" title="Build a 12-month poster (3×4 months on one standing sheet, size per the 12-mo sheet selector) and show it on screen first.">Poster 12 mo</button>
     </div>
@@ -913,6 +918,12 @@ function holidayIcon(name) {
   return '📅';
 }
 
+// Stickers are the calendar's soul — but a crowded day drowns in them.
+// Hard limit: max 4 stickers per day; beyond that (or in Compact poster
+// mode) the day falls back to clean text lines for ALL its events.
+let _compactTiles = false;
+const TILE_LIMIT = 4;
+
 function renderMonthPage(year, month) {
   const byDay = getOccasionsForMonth(year, month);
   // Pre-compute tile HTML from byDay snapshot BEFORE the render loop can mutate anything
@@ -920,6 +931,7 @@ function renderMonthPage(year, month) {
   Object.keys(byDay).forEach(function(d) {
     const tileEvents = (byDay[d] || []).filter(function(e){ return e.type==='occasion'||e.type==='birthday'; });
     if (!tileEvents.length) return;
+    if (_compactTiles || tileEvents.length > TILE_LIMIT) return; // text fallback
     tileHtmlByDay[d] = tileEvents.map(function(e, i) {
       var lbl = e.label || '';
       var h = (i + 1) * 31;
@@ -965,11 +977,12 @@ function renderMonthPage(year, month) {
         const hKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
       }
-      const _hasTiles = events.some(e=>e.type==='occasion'||e.type==='birthday');
-      dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}${_hasTiles ? ' has-tiles' : ''}">`
+      const _tilesActive = cur && tileHtmlByDay[day] !== undefined;
+      dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}${_tilesActive ? ' has-tiles' : ''}">`
         + `<div class="cal-day-num">${day}</div>`
         + (()=>{
-          const otherEvents = events.filter(e=>e.type!=='occasion'&&e.type!=='birthday');
+          // Without active stickers, every event renders as a text line.
+          const otherEvents = _tilesActive ? events.filter(e=>e.type!=='occasion'&&e.type!=='birthday') : events;
           const evHtml = otherEvents.map(e=>'<div class="cal-event '+e.type+'">'+(e.html!==undefined?e.html:'<span class="ev-icon">'+eventIcon(e.type,e.label)+'</span>'+esc(e.label))+'</div>').join('');
           const tileHtml = cur ? (tileHtmlByDay[day] || '') : '';
           return '<div class="cal-events">'+evHtml+'</div>'+(tileHtml?'<div class="tiles-overlay">'+tileHtml+'</div>':'');
@@ -1274,7 +1287,9 @@ async function openPoster(count) {
   const years = [...new Set([startYear, startYear + Math.floor((startMonth + count - 1) / 12)])];
   await ensureHolidaysForYears(years);
 
+  _compactTiles = !!document.getElementById('posterCompactCb')?.checked;
   const html = buildPosterHtml(startYear, startMonth, count);
+  _compactTiles = false; // normal views keep stickers
   _posterState = { html, count };
 
   const s = Math.min(680, window.innerWidth - 80) / POSTER_W;
