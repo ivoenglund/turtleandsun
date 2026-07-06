@@ -57,10 +57,32 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
 .tile-guide.v{border-left:1.5px dashed #3A6B20;top:0;bottom:0;width:0;}
 .tile-guide.h{border-top:1.5px dashed #3A6B20;left:0;right:0;height:0;}
 .tile-label{position:absolute;z-index:6;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;color:#3A6B20;background:#fff;padding:1px 4px;opacity:0.85;}
-/* Printing the preview page directly must never print the chrome. */
+/* ── Printing the MAIN page while the poster preview is open ──────────────
+   The base @media print block above restyles .cal-page & friends for the
+   single-month layout; in poster mode every one of those rules must be
+   neutralized so paper matches the screen exactly. */
 @media print{
   .poster-preview-bar{display:none!important;}
   .poster-scalebox{box-shadow:none!important;border-radius:0!important;}
+  body.poster-mode .ts-nav-bar,body.poster-mode .controls-bar,body.poster-mode .filter-panel{display:none!important;}
+  body.poster-mode .cal-area{display:block!important;padding:0!important;overflow:visible!important;}
+  body.poster-mode .poster-scalebox{width:auto!important;height:auto!important;overflow:visible!important;}
+  body.poster-mode #posterScaleInner{transform:scale(var(--ps,0.66146))!important;}
+  body.poster-mode .poster-cell .cal-page{width:900px!important;height:var(--mh,636px)!important;padding:8px 10px 8px!important;flex:none!important;aspect-ratio:auto!important;page-break-after:auto!important;max-width:none!important;}
+  body.poster-mode .poster-cell .cal-page-header{height:40px!important;margin:0 0 12px 0!important;padding:0!important;}
+  body.poster-mode .poster-cell .cal-month-name{font-size:26px!important;}
+  body.poster-mode .poster-cell .cal-dow-row{height:26px!important;margin-bottom:4px!important;}
+  body.poster-mode .poster-cell .cal-dow-wk{width:20px!important;}
+  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 20px)/7)!important;font-size:15px!important;}
+  body.no-weeknums.poster-mode .poster-cell .cal-dow-cell{width:calc(100%/7)!important;}
+  body.poster-mode .poster-cell .cal-body{height:var(--mbody,528px)!important;flex:none!important;overflow:visible!important;}
+  body.poster-mode .poster-cell .cal-week-nums{width:20px!important;height:var(--mbody,528px)!important;}
+  body.poster-mode .poster-cell .cal-week-num{font-size:8px!important;padding-right:3px!important;}
+  body.poster-mode .poster-cell .cal-grid{width:calc(100% - 20px)!important;height:var(--mbody,528px)!important;flex:none!important;}
+  body.no-weeknums.poster-mode .poster-cell .cal-grid{width:100%!important;}
+  body.poster-mode .poster-cell .cal-day-num{font-size:13px!important;}
+  body.poster-mode .poster-cell .cal-event{font-size:9px!important;}
+  body.poster-mode .poster-cell .occasion-tile{font-size:9px!important;}
 }
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
@@ -961,6 +983,10 @@ function postProcessTiles() { /* styles baked into HTML */ }
 let _lastHolidayYear = null;
 function renderCalendar() {
   if (!_loaded) return;
+  // Leaving poster mode: restore normal print behaviour.
+  document.body.classList.remove('poster-mode');
+  const pst = document.getElementById('poster-page-style');
+  if (pst) pst.remove();
   const year  = parseInt(document.getElementById('yearInput').value) || new Date().getFullYear();
   const code = document.getElementById('countrySel')?.value;
   if (code && year !== _lastHolidayYear) {
@@ -1254,8 +1280,17 @@ async function openPoster(count) {
       <span class="poster-note">${esc(tiledDesc)} · A4 proof = whole poster on one sheet</span>
     </div>
     <div class="poster-scalebox" style="width:${(POSTER_W * s).toFixed(0)}px;height:${(POSTER_H * s).toFixed(0)}px;">
-      <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div>
+      <div id="posterScaleInner" style="--ps:${(Math.min((210 * MM2PX) / POSTER_W, (297 * MM2PX) / POSTER_H)).toFixed(5)};transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div>
     </div>`;
+  // Poster print mode: full-bleed page + neutralized base print rules.
+  document.body.classList.add('poster-mode');
+  let pst = document.getElementById('poster-page-style');
+  if (!pst) {
+    pst = document.createElement('style');
+    pst.id = 'poster-page-style';
+    document.head.appendChild(pst);
+  }
+  pst.textContent = '@media print{@page{size:A4 portrait;margin:0;}}';
   window.scrollTo(0, 0);
 }
 
