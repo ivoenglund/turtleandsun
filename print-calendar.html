@@ -35,7 +35,12 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-cell .cal-day-num{font-size:17px;}
 /* Event texts wrap ONLY when they truly don't fit — no forced breaks, no
    clipping, no hyphen-splitting inside words. */
-.poster-cell .cal-event{font-size:12px;white-space:normal;overflow-wrap:normal;word-break:normal;hyphens:none;}
+.poster-cell .cal-event{font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:normal;word-break:normal;hyphens:none;}
+/* Icons print as pixel mush at poster scale AND steal the text's width,
+   forcing needless wraps — poster shows clean text only. */
+.poster-cell .ev-icon{display:none!important;}
+/* Texts start below the day-number band: full cell width, no collision. */
+.poster-cell .cal-events{margin-top:22px;}
 .poster-cell .occasion-tile{font-size:12px;}
 /* Stickers flow over the grid lines (user's design choice): sticker cells sit
    above the grid svg (30), but with TRANSPARENT backgrounds so only the
@@ -110,7 +115,9 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
      rules must NOT override them or drift returns. */
   body.poster-mode .poster-cell .cal-grid{flex:none!important;}
   body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
-  body.poster-mode .poster-cell .cal-event{font-size:12px!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;}
+  body.poster-mode .poster-cell .cal-event{font-size:12px!important;line-height:1.2!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;}
+  body.poster-mode .poster-cell .ev-icon{display:none!important;}
+  body.poster-mode .poster-cell .cal-events{margin-top:22px!important;}
   body.poster-mode .poster-cell .occasion-tile{font-size:12px!important;}
   body.poster-mode *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
 }
