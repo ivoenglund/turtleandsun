@@ -29,18 +29,24 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-cell .cal-page-footer{display:none;}
 /* Chrome's print engine mangles flex/1fr sizing inside scaled content —
    every level gets an explicit height so nothing is left to negotiation. */
-.poster-cell .cal-page-header{height:40px;padding-bottom:0;margin-bottom:12px;flex:none;}
+.poster-cell .cal-page-header{height:48px;padding-bottom:0;margin-bottom:12px;flex:none;}
+/* Bigger poster typography — mini-months must read from fridge distance. */
+.poster-cell .cal-month-name{font-size:34px;}
+.poster-cell .cal-day-num{font-size:17px;}
+.poster-cell .cal-event{font-size:12px;}
+.poster-cell .occasion-tile{font-size:12px;}
+.poster-cell .cal-week-num{font-size:10px;}
 /* Poster lines: thicker AND solid black. The screen design's pale-gray
    15%-opacity hairlines dither into fuzz on paper — full black prints crisp. */
 .poster-cell .cal-cell{border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
 .poster-cell .cal-grid{border-top:2.5px solid #1C0A00;}
 body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00;}
 .poster-cell .cal-week-num{border-right:2.5px solid #1C0A00;}
-.poster-cell .cal-dow-row{height:26px;margin-bottom:4px;flex:none;}
+.poster-cell .cal-dow-row{height:30px;margin-bottom:4px;flex:none;}
 /* Day-name labels must share the grid's exact column math — flexible flex
    widths drift after scaling and put SUN over Saturday. */
 .poster-cell .cal-dow-wk{width:20px;flex:none;}
-.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 20px)/7);text-align:center;}
+.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 20px)/7);text-align:center;font-size:19px;}
 body.no-weeknums .poster-cell .cal-dow-cell{width:calc(100%/7);}
 .poster-cell .cal-body{flex:none;height:var(--mbody,528px);}
 .poster-cell .cal-week-nums{height:var(--mbody,528px);}
@@ -69,20 +75,21 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
   body.poster-mode .poster-scalebox{width:auto!important;height:auto!important;overflow:visible!important;}
   body.poster-mode #posterScaleInner{transform:scale(var(--ps,0.66146))!important;}
   body.poster-mode .poster-cell .cal-page{width:900px!important;height:var(--mh,636px)!important;padding:8px 10px 8px!important;flex:none!important;aspect-ratio:auto!important;page-break-after:auto!important;max-width:none!important;}
-  body.poster-mode .poster-cell .cal-page-header{height:40px!important;margin:0 0 12px 0!important;padding:0!important;}
-  body.poster-mode .poster-cell .cal-month-name{font-size:26px!important;}
-  body.poster-mode .poster-cell .cal-dow-row{height:26px!important;margin-bottom:4px!important;}
+  body.poster-mode .poster-cell .cal-page-header{height:48px!important;margin:0 0 12px 0!important;padding:0!important;}
+  body.poster-mode .poster-cell .cal-month-name{font-size:34px!important;}
+  body.poster-mode .poster-cell .cal-dow-row{height:30px!important;margin-bottom:4px!important;}
   body.poster-mode .poster-cell .cal-dow-wk{width:20px!important;}
-  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 20px)/7)!important;font-size:15px!important;}
+  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 20px)/7)!important;font-size:19px!important;}
   body.no-weeknums.poster-mode .poster-cell .cal-dow-cell{width:calc(100%/7)!important;}
   body.poster-mode .poster-cell .cal-body{height:var(--mbody,528px)!important;flex:none!important;overflow:visible!important;}
   body.poster-mode .poster-cell .cal-week-nums{width:20px!important;height:var(--mbody,528px)!important;}
   body.poster-mode .poster-cell .cal-week-num{font-size:8px!important;padding-right:3px!important;}
   body.poster-mode .poster-cell .cal-grid{width:calc(100% - 20px)!important;height:var(--mbody,528px)!important;flex:none!important;}
   body.no-weeknums.poster-mode .poster-cell .cal-grid{width:100%!important;}
-  body.poster-mode .poster-cell .cal-day-num{font-size:13px!important;}
-  body.poster-mode .poster-cell .cal-event{font-size:9px!important;}
-  body.poster-mode .poster-cell .occasion-tile{font-size:9px!important;}
+  body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
+  body.poster-mode .poster-cell .cal-event{font-size:12px!important;}
+  body.poster-mode .poster-cell .occasion-tile{font-size:12px!important;}
+  body.poster-mode *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
 }
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
@@ -1227,7 +1234,7 @@ function buildPosterHtml(startYear, startMonth, count) {
   // cells, minimal margins (PAD) and gaps (GAP).
   const cols = count === 6 ? 2 : 3;
   const rows = count === 6 ? 3 : 4;
-  const GAP = 4, PAD = 4;
+  const GAP = 4, PAD = 18; // PAD keeps outer grid lines clear of the printer's unprintable edge
   const gridW = POSTER_W - 2 * PAD;
   const gridH = POSTER_H - 2 * PAD;
   const cellW = (gridW - (cols - 1) * GAP) / cols;
@@ -1236,9 +1243,9 @@ function buildPosterHtml(startYear, startMonth, count) {
   // Month rendered at 900px wide and a custom design height so that after
   // scaling it fills the cell exactly (day rows grow, text size unchanged).
   const mh = cellH / scale;                 // design height of .cal-page
-  // chrome inside a poster month: pad 8+8, header 40+12, dow 26+4 = 98,
+  // chrome inside a poster month: pad 8+8, header 48+12, dow 30+4 = 110,
   // plus 3px slack so scaling round-off never clips the bottom grid line.
-  const mbody = Math.floor(mh - 101);
+  const mbody = Math.floor(mh - 113);
 
   let cells = '';
   for (let i = 0; i < count; i++) {
@@ -1366,6 +1373,7 @@ function printPoster(mode) {
     + '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">'
     + '<style>\n' + css + '\n'
     + 'html,body{margin:0;padding:0;background:#fff;}'
+    + '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}'
     + '.tile-page{page-break-after:always;}'
     + '.tile-page:last-child{page-break-after:avoid;}'
     + '@media print{' + pageRule + 'body{margin:0!important;}}'
