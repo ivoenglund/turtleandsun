@@ -36,8 +36,8 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-cell .cal-event{font-size:12px;}
 .poster-cell .occasion-tile{font-size:12px;}
 .poster-cell .cal-week-num{font-size:17px;font-weight:700;}
-.poster-cell .cal-week-nums{width:34px;}
-.poster-cell .cal-dow-wk{width:34px;}
+.poster-cell .cal-week-nums{width:40px;}
+.poster-cell .cal-dow-wk{width:40px;}
 .poster-cell .cal-grid{width:calc(100% - 34px);}
 /* THE GRID IS DRAWN IN EXACTLY ONE PLACE: a single SVG overlay per month
    (vector lines — identical stroke width by construction, crisp in print).
@@ -52,12 +52,17 @@ body.design-2 .poster-cell .cal-grid{
   gap:0!important;border:0!important;padding:0!important;background:transparent!important;
 }
 .poster-cell .cal-week-num{border:0!important;}
-.pgrid{pointer-events:none;z-index:0;}
+/* Grid paints ON TOP of everything — .cal-cell.has-tiles carries z-index:20,
+   so the grid must sit above that or stickers erase line segments. */
+.pgrid{pointer-events:none;z-index:30;position:relative;}
+/* Day numbers are drawn INSIDE the grid SVG (same coordinates as the lines);
+   the HTML ones must not double-print. */
+.poster-cell .cal-day-num{display:none!important;}
 .poster-cell .cal-dow-row{height:30px;margin-bottom:4px;flex:none;}
 /* Day-name labels must share the grid's exact column math — flexible flex
    widths drift after scaling and put SUN over Saturday. */
-.poster-cell .cal-dow-wk{width:34px;flex:none;}
-.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 34px)/7);text-align:center;font-size:19px;}
+.poster-cell .cal-dow-wk{width:40px;flex:none;}
+.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 40px)/7);text-align:center;font-size:19px;}
 body.no-weeknums .poster-cell .cal-dow-cell{width:calc(100%/7);}
 .poster-cell .cal-body{flex:none;height:var(--mbody,528px);}
 .poster-cell .cal-week-nums{height:var(--mbody,528px);}
@@ -89,14 +94,15 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
   body.poster-mode .poster-cell .cal-page-header{height:48px!important;margin:0 0 12px 0!important;padding:0!important;}
   body.poster-mode .poster-cell .cal-month-name{font-size:34px!important;}
   body.poster-mode .poster-cell .cal-dow-row{height:30px!important;margin-bottom:4px!important;}
-  body.poster-mode .poster-cell .cal-dow-wk{width:34px!important;}
-  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 34px)/7)!important;font-size:19px!important;}
+  body.poster-mode .poster-cell .cal-dow-wk{width:40px!important;}
+  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 40px)/7)!important;font-size:19px!important;}
   body.no-weeknums.poster-mode .poster-cell .cal-dow-cell{width:calc(100%/7)!important;}
   body.poster-mode .poster-cell .cal-body{height:var(--mbody,528px)!important;flex:none!important;overflow:visible!important;}
-  body.poster-mode .poster-cell .cal-week-nums{width:34px!important;height:var(--mbody,528px)!important;}
+  body.poster-mode .poster-cell .cal-week-nums{width:40px!important;}
   body.poster-mode .poster-cell .cal-week-num{font-size:17px!important;font-weight:700!important;padding-right:3px!important;}
-  body.poster-mode .poster-cell .cal-grid{width:calc(100% - 34px)!important;height:var(--mbody,528px)!important;flex:none!important;padding-right:3px!important;padding-bottom:3px!important;}
-  body.no-weeknums.poster-mode .poster-cell .cal-grid{width:100%!important;}
+  /* width/height/rows/cols come from the inline integer geometry — print
+     rules must NOT override them or drift returns. */
+  body.poster-mode .poster-cell .cal-grid{flex:none!important;}
   body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
   body.poster-mode .poster-cell .cal-event{font-size:12px!important;}
   body.poster-mode .poster-cell .occasion-tile{font-size:12px!important;}
@@ -1021,24 +1027,48 @@ function renderMonthPage(year, month) {
   }
 
   // Poster mode: the grid as ONE vector drawing — the only line source.
+  // INTEGER GEOMETRY: cell columns/rows and SVG lines are computed from the
+  // exact same whole-pixel numbers, so day numbers can never drift off the
+  // lines (fractional 1fr widths accumulated rounding to the right before).
   let gridSvg = '';
   let bodyStyle = '';
+  let gridStyle = '';
+  let wkStyle = '';
   if (_posterSvg) {
     const noWk = document.body.classList.contains('no-weeknums');
-    const gw = noWk ? 880 : 846;
-    const gh = _posterSvg.h;
+    const colW = noWk ? 125 : 120;
+    const gw = colW * 7;
+    const rh = Math.floor(_posterSvg.h / totalRows);
+    const gh = rh * totalRows;
     const sw = 2.5, off = sw / 2;
     let lines = '';
     for (let i = 0; i <= 7; i++) {
-      const x = Math.min(Math.max(i * gw / 7, off), gw - off);
-      lines += `<line x1="${x.toFixed(2)}" y1="0" x2="${x.toFixed(2)}" y2="${gh}"/>`;
+      const x = Math.min(Math.max(i * colW, off), gw - off);
+      lines += `<line x1="${x}" y1="0" x2="${x}" y2="${gh}"/>`;
     }
     for (let r = 0; r <= totalRows; r++) {
-      const y = Math.min(Math.max(r * gh / totalRows, off), gh - off);
-      lines += `<line x1="0" y1="${y.toFixed(2)}" x2="${gw}" y2="${y.toFixed(2)}"/>`;
+      const y = Math.min(Math.max(r * rh, off), gh - off);
+      lines += `<line x1="0" y1="${y}" x2="${gw}" y2="${y}"/>`;
     }
-    gridSvg = `<svg class="pgrid" viewBox="0 0 ${gw} ${gh}" style="position:absolute;left:${noWk ? 0 : 34}px;top:0;width:${gw}px;height:${gh}px;" stroke="#1C0A00" stroke-width="${sw}" xmlns="http://www.w3.org/2000/svg">${lines}</svg>`;
+    // Day numbers live in the SAME svg, computed from the SAME integers as
+    // the lines — one coordinate system, disagreement impossible.
+    let nums = '';
+    for (let r2 = 0; r2 < totalRows; r2++) {
+      for (let c2 = 0; c2 < 7; c2++) {
+        const o2 = r2 * 7 + c2 - firstDow;
+        let d2, in2;
+        if (o2 < 0)                 { d2 = daysInPrevMonth + o2 + 1; in2 = false; }
+        else if (o2 >= daysInMonth) { d2 = o2 - daysInMonth + 1;     in2 = false; }
+        else                        { d2 = o2 + 1;                    in2 = true;  }
+        nums += `<text x="${(c2 + 1) * colW - 6}" y="${r2 * rh + 21}" text-anchor="end" fill="${in2 ? '#000' : 'rgba(28,10,0,0.35)'}">${d2}</text>`;
+      }
+    }
+    gridSvg = `<svg class="pgrid" viewBox="0 0 ${gw} ${gh}" style="position:absolute;left:${noWk ? 0 : 40}px;top:0;width:${gw}px;height:${gh}px;" xmlns="http://www.w3.org/2000/svg">`
+      + `<g stroke="#1C0A00" stroke-width="${sw}">${lines}</g>`
+      + `<g font-family="'Plus Jakarta Sans',sans-serif" font-size="17" font-weight="700">${nums}</g></svg>`;
     bodyStyle = 'position:relative;';
+    gridStyle = `width:${gw}px;height:${gh}px;grid-template-columns:repeat(7,${colW}px);grid-template-rows:repeat(${totalRows},${rh}px);flex:none;`;
+    wkStyle = `width:40px;height:${gh}px;`;
   }
 
   return `<div class="cal-page">
@@ -1047,8 +1077,8 @@ function renderMonthPage(year, month) {
   </div>
   <div class="cal-dow-row">${dowHtml}</div>
   <div class="cal-body" style="${bodyStyle}">
-    <div class="cal-week-nums">${weekNums}</div>
-    <div class="cal-grid" style="--rows:${totalRows}">${dayCells}</div>
+    <div class="cal-week-nums" style="${wkStyle}">${weekNums}</div>
+    <div class="cal-grid" style="--rows:${totalRows};${gridStyle}">${dayCells}</div>
     ${gridSvg}
   </div>
   <div class="cal-page-footer">turtleandsun.com</div>
@@ -1303,8 +1333,10 @@ function buildPosterHtml(startYear, startMonth, count) {
   // cells, minimal margins (PAD) and gaps (GAP).
   const cols = count === 6 ? 2 : 3;
   const rows = count === 6 ? 3 : 4;
-  const GAP = 4, PAD = 26; // PAD keeps outer grid lines clear of the printer's unprintable edge (~4.5mm on A4)
-  const gridW = POSTER_W - 2 * PAD;
+  // PADL: slimmer left margin (user request, ~2.8mm); PAD elsewhere keeps
+  // outer lines clear of the printer's unprintable edge (~4.5mm on A4).
+  const GAP = 4, PAD = 26, PADL = 16;
+  const gridW = POSTER_W - PADL - PAD;
   const gridH = POSTER_H - 2 * PAD;
   const cellW = (gridW - (cols - 1) * GAP) / cols;
   const cellH = (gridH - (rows - 1) * GAP) / rows;
@@ -1331,7 +1363,7 @@ function buildPosterHtml(startYear, startMonth, count) {
   _posterSvg = null;
 
   return `<div class="poster poster-${count}" style="--mh:${mh.toFixed(1)}px;--mbody:${mbody.toFixed(1)}px;">
-    <div class="poster-grid" style="grid-template-columns:repeat(${cols},${cellW.toFixed(1)}px);grid-template-rows:repeat(${rows},${cellH.toFixed(1)}px);">${cells}</div>
+    <div class="poster-grid" style="grid-template-columns:repeat(${cols},${cellW.toFixed(1)}px);grid-template-rows:repeat(${rows},${cellH.toFixed(1)}px);justify-content:start;margin-left:${PADL - 8}px;">${cells}</div>
   </div>`;
 }
 
