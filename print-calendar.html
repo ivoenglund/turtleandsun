@@ -42,8 +42,14 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 /* Poster lines: thicker AND solid black. The screen design's pale-gray
    15%-opacity hairlines dither into fuzz on paper — full black prints crisp. */
 .poster-cell .cal-cell{border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
-/* Out-of-month squares: same full-thickness lines, no dithering background. */
-.poster-cell .cal-cell.other-month{background:#fff;border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
+/* Out-of-month squares: gone entirely — no lines, no numbers, white space.
+   The month's frame is drawn along its true edge via edge-top/edge-left. */
+.poster-cell .cal-cell.other-month{background:#fff;border:none;}
+.poster-cell .cal-cell.other-month .cal-day-num{display:none;}
+.poster-cell .cal-grid{border-top:none;}
+body.no-weeknums .poster-cell .cal-grid{border-left:none;}
+.poster-cell .cal-cell.edge-top{border-top:2.5px solid #1C0A00;}
+.poster-cell .cal-cell.edge-left{border-left:2.5px solid #1C0A00;}
 .poster-cell .cal-grid{border-top:2.5px solid #1C0A00;}
 body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00;}
 .poster-cell .cal-week-num{border-right:2.5px solid #1C0A00;}
@@ -998,7 +1004,10 @@ function renderMonthPage(year, month) {
         (_holidays[hKey] || []).forEach(h => events.push({ type: 'holiday', label: h }));
       }
       const _tilesActive = cur && tileHtmlByDay[day] !== undefined;
-      dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}${_tilesActive ? ' has-tiles' : ''}">`
+      // Staircase frame: current-month cells on the month's boundary carry
+      // the top/left border themselves (out-of-month cells have none).
+      const _edges = cur ? `${off < 7 ? ' edge-top' : ''}${(col === 0 || off === 0) ? ' edge-left' : ''}` : '';
+      dayCells += `<div class="cal-cell${cur ? '' : ' other-month'}${_tilesActive ? ' has-tiles' : ''}${_edges}">`
         + `<div class="cal-day-num">${day}</div>`
         + (()=>{
           // Without active stickers, every event renders as a text line.
@@ -1277,7 +1286,9 @@ function buildPosterHtml(startYear, startMonth, count) {
   const gridH = POSTER_H - 2 * PAD;
   const cellW = (gridW - (cols - 1) * GAP) / cols;
   const cellH = (gridH - (rows - 1) * GAP) / rows;
-  const scale = cellW / 900;
+  // 1px slack: rounding must never push the month's right border outside
+  // its clipped cell (the recurring "lost right line").
+  const scale = (cellW - 1) / 900;
   // Month rendered at 900px wide and a custom design height so that after
   // scaling it fills the cell exactly (day rows grow, text size unchanged).
   const mh = cellH / scale;                 // design height of .cal-page
