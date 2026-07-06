@@ -35,18 +35,23 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-cell .cal-day-num{font-size:17px;}
 .poster-cell .cal-event{font-size:12px;}
 .poster-cell .occasion-tile{font-size:12px;}
-.poster-cell .cal-week-num{font-size:10px;}
+.poster-cell .cal-week-num{font-size:17px;font-weight:700;}
+.poster-cell .cal-week-nums{width:34px;}
+.poster-cell .cal-dow-wk{width:34px;}
+.poster-cell .cal-grid{width:calc(100% - 34px);}
 /* Poster lines: thicker AND solid black. The screen design's pale-gray
    15%-opacity hairlines dither into fuzz on paper — full black prints crisp. */
 .poster-cell .cal-cell{border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
+/* Out-of-month squares: same full-thickness lines, no dithering background. */
+.poster-cell .cal-cell.other-month{background:#fff;border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
 .poster-cell .cal-grid{border-top:2.5px solid #1C0A00;}
 body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00;}
 .poster-cell .cal-week-num{border-right:2.5px solid #1C0A00;}
 .poster-cell .cal-dow-row{height:30px;margin-bottom:4px;flex:none;}
 /* Day-name labels must share the grid's exact column math — flexible flex
    widths drift after scaling and put SUN over Saturday. */
-.poster-cell .cal-dow-wk{width:20px;flex:none;}
-.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 20px)/7);text-align:center;font-size:19px;}
+.poster-cell .cal-dow-wk{width:34px;flex:none;}
+.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 34px)/7);text-align:center;font-size:19px;}
 body.no-weeknums .poster-cell .cal-dow-cell{width:calc(100%/7);}
 .poster-cell .cal-body{flex:none;height:var(--mbody,528px);}
 .poster-cell .cal-week-nums{height:var(--mbody,528px);}
@@ -78,13 +83,13 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
   body.poster-mode .poster-cell .cal-page-header{height:48px!important;margin:0 0 12px 0!important;padding:0!important;}
   body.poster-mode .poster-cell .cal-month-name{font-size:34px!important;}
   body.poster-mode .poster-cell .cal-dow-row{height:30px!important;margin-bottom:4px!important;}
-  body.poster-mode .poster-cell .cal-dow-wk{width:20px!important;}
-  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 20px)/7)!important;font-size:19px!important;}
+  body.poster-mode .poster-cell .cal-dow-wk{width:34px!important;}
+  body.poster-mode .poster-cell .cal-dow-cell{flex:none!important;width:calc((100% - 34px)/7)!important;font-size:19px!important;}
   body.no-weeknums.poster-mode .poster-cell .cal-dow-cell{width:calc(100%/7)!important;}
   body.poster-mode .poster-cell .cal-body{height:var(--mbody,528px)!important;flex:none!important;overflow:visible!important;}
-  body.poster-mode .poster-cell .cal-week-nums{width:20px!important;height:var(--mbody,528px)!important;}
-  body.poster-mode .poster-cell .cal-week-num{font-size:8px!important;padding-right:3px!important;}
-  body.poster-mode .poster-cell .cal-grid{width:calc(100% - 20px)!important;height:var(--mbody,528px)!important;flex:none!important;}
+  body.poster-mode .poster-cell .cal-week-nums{width:34px!important;height:var(--mbody,528px)!important;}
+  body.poster-mode .poster-cell .cal-week-num{font-size:17px!important;font-weight:700!important;padding-right:3px!important;}
+  body.poster-mode .poster-cell .cal-grid{width:calc(100% - 34px)!important;height:var(--mbody,528px)!important;flex:none!important;}
   body.no-weeknums.poster-mode .poster-cell .cal-grid{width:100%!important;}
   body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
   body.poster-mode .poster-cell .cal-event{font-size:12px!important;}
