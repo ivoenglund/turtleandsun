@@ -1441,7 +1441,8 @@ function collectPageCss(skipPrintRules) {
 function printPoster(mode) {
   if (!_posterState) return;
   const { html, count } = _posterState;
-  const size = (count === 12 && document.getElementById('posterSizeSel').value === 'a1') ? 'a1' : 'a2';
+  // A1 works for both 6 and 12 months — the poster canvas is the same size.
+  const size = document.getElementById('posterSizeSel').value === 'a1' ? 'a1' : 'a2';
   const css = collectPageCss(true);
   const bodyClass = document.body.className;
   let inner = '';
@@ -1476,7 +1477,10 @@ function printPoster(mode) {
           (c > 0        ? `<div class="tile-guide v" style="left:${OV}mm;"></div>` : '') +
           (r < rows - 1 ? `<div class="tile-guide h" style="bottom:${OV}mm;"></div><div class="tile-label" style="bottom:${OV + 1}mm;left:4mm;">glue ↓</div>` : '') +
           (r > 0        ? `<div class="tile-guide h" style="top:${OV}mm;"></div>` : '');
-        inner += `<div class="tile-page" style="width:${pageWmm}mm;height:${pageHmm}mm;">
+        // 1mm shorter than the paper: an exactly-page-height div plus a forced
+        // break makes Chrome spill a hairline onto an extra blank page and
+        // shifts every following sheet. The 10mm glue overlap absorbs it.
+        inner += `<div class="tile-page" style="width:${pageWmm}mm;height:${pageHmm - 1}mm;">
           <div style="position:absolute;left:${(-c * stepX)}mm;top:${(-r * stepY)}mm;">
             <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div>
           </div>${guides}
@@ -1494,7 +1498,7 @@ function printPoster(mode) {
     + '<style>\n' + css + '\n'
     + 'html,body{margin:0;padding:0;background:#fff;}'
     + '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}'
-    + '.tile-page{page-break-after:always;}'
+    + '.tile-page{page-break-after:always;break-inside:avoid;margin:0;}'
     + '.tile-page:last-child{page-break-after:avoid;}'
     + '@media print{' + pageRule + 'body{margin:0!important;}}'
     + '</style></head><body class="' + bodyClass + '">'
