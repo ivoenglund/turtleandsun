@@ -39,30 +39,20 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-cell .cal-week-nums{width:34px;}
 .poster-cell .cal-dow-wk{width:34px;}
 .poster-cell .cal-grid{width:calc(100% - 34px);}
-/* ONE uniform border system for poster months — overrides every design
-   mode (incl. design-2 "Tiles" which adds its own pale rounded borders and
-   gaps). Every line: 2.5px solid #1C0A00, no exceptions, no gray shading. */
+/* THE GRID IS DRAWN IN EXACTLY ONE PLACE: a single SVG overlay per month
+   (vector lines — identical stroke width by construction, crisp in print).
+   All CSS borders inside poster months are dead, in every design mode. */
 .poster-cell .cal-cell,
 .poster-cell .cal-cell.other-month,
 body.design-2 .poster-cell .cal-cell{
-  border:0!important;
-  border-right:2.5px solid #1C0A00!important;
-  border-bottom:2.5px solid #1C0A00!important;
-  border-radius:0!important;
-  background:#fff!important;
+  border:0!important;border-radius:0!important;background:#fff!important;
 }
 .poster-cell .cal-grid,
 body.design-2 .poster-cell .cal-grid{
-  gap:0!important;
-  border:0!important;
-  border-top:2.5px solid #1C0A00!important;
-  background:transparent!important;
-  /* keep last column/row borders off the container edge (Chrome print bug) */
-  padding-right:3px!important;
-  padding-bottom:3px!important;
+  gap:0!important;border:0!important;padding:0!important;background:transparent!important;
 }
-body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00!important;}
-.poster-cell .cal-week-num{border-right:2.5px solid #1C0A00!important;}
+.poster-cell .cal-week-num{border:0!important;}
+.pgrid{pointer-events:none;z-index:0;}
 .poster-cell .cal-dow-row{height:30px;margin-bottom:4px;flex:none;}
 /* Day-name labels must share the grid's exact column math — flexible flex
    widths drift after scaling and put SUN over Saturday. */
@@ -959,6 +949,9 @@ function holidayIcon(name) {
 // mode) the day falls back to clean text lines for ALL its events.
 let _compactTiles = false;
 const TILE_LIMIT = 4;
+// When set ({h: gridHeightPx}), renderMonthPage draws the month grid as ONE
+// SVG overlay instead of per-cell CSS borders (poster mode only).
+let _posterSvg = null;
 
 function renderMonthPage(year, month) {
   const byDay = getOccasionsForMonth(year, month);
@@ -1027,14 +1020,36 @@ function renderMonthPage(year, month) {
     }
   }
 
+  // Poster mode: the grid as ONE vector drawing — the only line source.
+  let gridSvg = '';
+  let bodyStyle = '';
+  if (_posterSvg) {
+    const noWk = document.body.classList.contains('no-weeknums');
+    const gw = noWk ? 880 : 846;
+    const gh = _posterSvg.h;
+    const sw = 2.5, off = sw / 2;
+    let lines = '';
+    for (let i = 0; i <= 7; i++) {
+      const x = Math.min(Math.max(i * gw / 7, off), gw - off);
+      lines += `<line x1="${x.toFixed(2)}" y1="0" x2="${x.toFixed(2)}" y2="${gh}"/>`;
+    }
+    for (let r = 0; r <= totalRows; r++) {
+      const y = Math.min(Math.max(r * gh / totalRows, off), gh - off);
+      lines += `<line x1="0" y1="${y.toFixed(2)}" x2="${gw}" y2="${y.toFixed(2)}"/>`;
+    }
+    gridSvg = `<svg class="pgrid" viewBox="0 0 ${gw} ${gh}" style="position:absolute;left:${noWk ? 0 : 34}px;top:0;width:${gw}px;height:${gh}px;" stroke="#1C0A00" stroke-width="${sw}" xmlns="http://www.w3.org/2000/svg">${lines}</svg>`;
+    bodyStyle = 'position:relative;';
+  }
+
   return `<div class="cal-page">
   <div class="cal-page-header">
     <span class="cal-month-name">${MONTHS_FULL[month]} ${year}</span>
   </div>
   <div class="cal-dow-row">${dowHtml}</div>
-  <div class="cal-body">
+  <div class="cal-body" style="${bodyStyle}">
     <div class="cal-week-nums">${weekNums}</div>
     <div class="cal-grid" style="--rows:${totalRows}">${dayCells}</div>
+    ${gridSvg}
   </div>
   <div class="cal-page-footer">turtleandsun.com</div>
 </div>`;
@@ -1304,6 +1319,7 @@ function buildPosterHtml(startYear, startMonth, count) {
   const mbody = Math.floor(mh - 113);
 
   let cells = '';
+  _posterSvg = { h: mbody };
   for (let i = 0; i < count; i++) {
     const y = startYear + Math.floor((startMonth + i) / 12);
     const m = (startMonth + i) % 12;
@@ -1312,6 +1328,7 @@ function buildPosterHtml(startYear, startMonth, count) {
       + renderMonthPage(y, m)
       + `</div></div>`;
   }
+  _posterSvg = null;
 
   return `<div class="poster poster-${count}" style="--mh:${mh.toFixed(1)}px;--mbody:${mbody.toFixed(1)}px;">
     <div class="poster-grid" style="grid-template-columns:repeat(${cols},${cellW.toFixed(1)}px);grid-template-rows:repeat(${rows},${cellH.toFixed(1)}px);">${cells}</div>
