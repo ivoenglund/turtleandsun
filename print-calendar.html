@@ -39,19 +39,30 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-cell .cal-week-nums{width:34px;}
 .poster-cell .cal-dow-wk{width:34px;}
 .poster-cell .cal-grid{width:calc(100% - 34px);}
-/* Poster lines: thicker AND solid black. The screen design's pale-gray
-   15%-opacity hairlines dither into fuzz on paper — full black prints crisp. */
-.poster-cell .cal-cell{border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
-/* Out-of-month squares: same box, same line thickness as every other cell —
-   only the gray background shading is removed. Full uniform grid. */
-.poster-cell .cal-cell.other-month{background:#fff;border-right:2.5px solid #1C0A00;border-bottom:2.5px solid #1C0A00;}
-.poster-cell .cal-grid{border-top:2.5px solid #1C0A00;}
-/* Chrome's print engine shaves borders that sit exactly on the grid's edge —
-   keep the last column/row borders strictly inside the container. */
-.poster-cell .cal-grid{padding-right:3px;padding-bottom:3px;}
-.poster-cell .cal-grid{border-top:2.5px solid #1C0A00;}
-body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00;}
-.poster-cell .cal-week-num{border-right:2.5px solid #1C0A00;}
+/* ONE uniform border system for poster months — overrides every design
+   mode (incl. design-2 "Tiles" which adds its own pale rounded borders and
+   gaps). Every line: 2.5px solid #1C0A00, no exceptions, no gray shading. */
+.poster-cell .cal-cell,
+.poster-cell .cal-cell.other-month,
+body.design-2 .poster-cell .cal-cell{
+  border:0!important;
+  border-right:2.5px solid #1C0A00!important;
+  border-bottom:2.5px solid #1C0A00!important;
+  border-radius:0!important;
+  background:#fff!important;
+}
+.poster-cell .cal-grid,
+body.design-2 .poster-cell .cal-grid{
+  gap:0!important;
+  border:0!important;
+  border-top:2.5px solid #1C0A00!important;
+  background:transparent!important;
+  /* keep last column/row borders off the container edge (Chrome print bug) */
+  padding-right:3px!important;
+  padding-bottom:3px!important;
+}
+body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00!important;}
+.poster-cell .cal-week-num{border-right:2.5px solid #1C0A00!important;}
 .poster-cell .cal-dow-row{height:30px;margin-bottom:4px;flex:none;}
 /* Day-name labels must share the grid's exact column math — flexible flex
    widths drift after scaling and put SUN over Saturday. */
@@ -1277,7 +1288,7 @@ function buildPosterHtml(startYear, startMonth, count) {
   // cells, minimal margins (PAD) and gaps (GAP).
   const cols = count === 6 ? 2 : 3;
   const rows = count === 6 ? 3 : 4;
-  const GAP = 4, PAD = 18; // PAD keeps outer grid lines clear of the printer's unprintable edge
+  const GAP = 4, PAD = 26; // PAD keeps outer grid lines clear of the printer's unprintable edge (~4.5mm on A4)
   const gridW = POSTER_W - 2 * PAD;
   const gridH = POSTER_H - 2 * PAD;
   const cellW = (gridW - (cols - 1) * GAP) / cols;
