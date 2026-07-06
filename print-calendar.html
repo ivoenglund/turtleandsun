@@ -30,6 +30,12 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 /* Chrome's print engine mangles flex/1fr sizing inside scaled content —
    every level gets an explicit height so nothing is left to negotiation. */
 .poster-cell .cal-page-header{height:40px;padding-bottom:0;margin-bottom:4px;flex:none;}
+/* Hairlines vanish to ~0.4px after double scaling — thicken so they print
+   as clean ~1px lines at poster scale. */
+.poster-cell .cal-cell{border-right-width:2.5px;border-bottom-width:2.5px;}
+.poster-cell .cal-grid{border-top-width:2.5px;}
+body.no-weeknums .poster-cell .cal-grid{border-left-width:2.5px;}
+.poster-cell .cal-week-num{border-right-width:2.5px;}
 .poster-cell .cal-dow-row{height:26px;margin-bottom:4px;flex:none;}
 .poster-cell .cal-body{flex:none;height:528px;}
 .poster-cell .cal-week-nums{height:528px;}
