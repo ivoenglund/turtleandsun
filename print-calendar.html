@@ -33,8 +33,13 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 /* Bigger poster typography — mini-months must read from fridge distance. */
 .poster-cell .cal-month-name{font-size:34px;}
 .poster-cell .cal-day-num{font-size:17px;}
-.poster-cell .cal-event{font-size:12px;}
+/* One line per event text — never wrap; too-long texts get clipped with … */
+.poster-cell .cal-event{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .poster-cell .occasion-tile{font-size:12px;}
+/* Stickers stay INSIDE their own square: no bleed margin, and the cell clips
+   any overflow — so grid lines and stickers can never cross each other. */
+.poster-cell .tiles-overlay{margin:0!important;}
+.poster-cell .cal-cell{overflow:hidden!important;}
 .poster-cell .cal-week-num{font-size:17px;font-weight:700;}
 .poster-cell .cal-week-nums{width:40px;}
 .poster-cell .cal-dow-wk{width:40px;}
@@ -104,8 +109,10 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
      rules must NOT override them or drift returns. */
   body.poster-mode .poster-cell .cal-grid{flex:none!important;}
   body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
-  body.poster-mode .poster-cell .cal-event{font-size:12px!important;}
+  body.poster-mode .poster-cell .cal-event{font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
   body.poster-mode .poster-cell .occasion-tile{font-size:12px!important;}
+  body.poster-mode .poster-cell .tiles-overlay{margin:0!important;}
+  body.poster-mode .poster-cell .cal-cell{overflow:hidden!important;}
   body.poster-mode *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
 }
 
