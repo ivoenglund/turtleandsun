@@ -18,14 +18,14 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .btn-print-cal:hover{background:#1C0A00;}
 
 /* ── Poster (standing A2/A1 sheet of mini-months) ─────────────────────────── */
-.poster{width:1200px;height:1697px;background:#fff;display:flex;flex-direction:column;padding:24px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
+.poster{width:1200px;height:1697px;background:#fff;display:flex;flex-direction:column;padding:8px;box-sizing:border-box;font-family:'DM Sans',sans-serif;}
 .poster-head{height:90px;display:flex;align-items:baseline;justify-content:space-between;flex-shrink:0;padding:0 6px 10px;}
 .poster-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:44px;font-weight:800;color:#1C0A00;letter-spacing:-0.02em;}
 .poster-range{font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:600;color:rgba(28,10,0,0.5);}
-.poster-grid{flex:1;display:grid;gap:16px;align-content:space-evenly;justify-content:center;}
+.poster-grid{flex:1;display:grid;gap:8px;align-content:start;justify-content:center;}
 .poster-cell{position:relative;overflow:hidden;}
 .poster-cell-inner{position:absolute;top:0;left:0;width:900px;transform-origin:top left;}
-.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;height:636px;aspect-ratio:auto;padding:20px 24px 14px;}
+.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;height:var(--mh,636px);aspect-ratio:auto;padding:20px 24px 14px;}
 .poster-cell .cal-page-footer{display:none;}
 /* Chrome's print engine mangles flex/1fr sizing inside scaled content —
    every level gets an explicit height so nothing is left to negotiation. */
@@ -37,9 +37,9 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 body.no-weeknums .poster-cell .cal-grid{border-left-width:2.5px;}
 .poster-cell .cal-week-num{border-right-width:2.5px;}
 .poster-cell .cal-dow-row{height:26px;margin-bottom:4px;flex:none;}
-.poster-cell .cal-body{flex:none;height:528px;}
-.poster-cell .cal-week-nums{height:528px;}
-.poster-cell .cal-grid{height:528px;flex:none;width:calc(100% - 20px);}
+.poster-cell .cal-body{flex:none;height:var(--mbody,528px);}
+.poster-cell .cal-week-nums{height:var(--mbody,528px);}
+.poster-cell .cal-grid{height:var(--mbody,528px);flex:none;width:calc(100% - 20px);}
 body.no-weeknums .poster-cell .cal-grid{width:100%;}
 .poster-foot{height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:600;color:rgba(28,10,0,0.4);letter-spacing:0.06em;}
 /* Preview chrome (screen only) */
@@ -1191,13 +1191,21 @@ async function ensureHolidaysForYears(years) {
 }
 
 function buildPosterHtml(startYear, startMonth, count) {
+  // No poster header/footer — every month already carries name + year.
+  // Months are stretched vertically to fill the whole sheet: taller day
+  // cells, minimal margins (PAD) and gaps (GAP).
   const cols = count === 6 ? 2 : 3;
   const rows = count === 6 ? 3 : 4;
-  const GAP = 16, PAD = 24;
+  const GAP = 8, PAD = 8;
   const gridW = POSTER_W - 2 * PAD;
+  const gridH = POSTER_H - 2 * PAD;
   const cellW = (gridW - (cols - 1) * GAP) / cols;
+  const cellH = (gridH - (rows - 1) * GAP) / rows;
   const scale = cellW / 900;
-  const cellH = (900 / 1.41421) * scale;
+  // Month rendered at 900px wide and a custom design height so that after
+  // scaling it fills the cell exactly (day rows grow, text size unchanged).
+  const mh = cellH / scale;                 // design height of .cal-page
+  const mbody = mh - 108;                   // minus padding+header+dow chrome
 
   let cells = '';
   for (let i = 0; i < count; i++) {
@@ -1209,18 +1217,8 @@ function buildPosterHtml(startYear, startMonth, count) {
       + `</div></div>`;
   }
 
-  const endIdx = startMonth + count - 1;
-  const endYear = startYear + Math.floor(endIdx / 12);
-  const endMonth = endIdx % 12;
-  const range = (startYear === endYear)
-    ? `${MONTHS_FULL[startMonth]} – ${MONTHS_FULL[endMonth]} ${startYear}`
-    : `${MONTHS_FULL[startMonth]} ${startYear} – ${MONTHS_FULL[endMonth]} ${endYear}`;
-  const title = (startYear === endYear) ? String(startYear) : `${startYear}–${endYear}`;
-
-  return `<div class="poster poster-${count}">
-    <div class="poster-head"><span class="poster-title">${title}</span><span class="poster-range">${range}</span></div>
-    <div class="poster-grid" style="grid-template-columns:repeat(${cols},${cellW.toFixed(1)}px);">${cells}</div>
-    <div class="poster-foot">turtleandsun.com — remember to love</div>
+  return `<div class="poster poster-${count}" style="--mh:${mh.toFixed(1)}px;--mbody:${mbody.toFixed(1)}px;">
+    <div class="poster-grid" style="grid-template-columns:repeat(${cols},${cellW.toFixed(1)}px);grid-template-rows:repeat(${rows},${cellH.toFixed(1)}px);">${cells}</div>
   </div>`;
 }
 
