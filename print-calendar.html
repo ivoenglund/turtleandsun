@@ -1259,10 +1259,19 @@ async function openPoster(count) {
   window.scrollTo(0, 0);
 }
 
-function collectPageCss() {
+function collectPageCss(skipPrintRules) {
+  // skipPrintRules: the page's own @media print rules are written for the
+  // single-month layout — inside the poster popup they hijack the mini-months
+  // at print time (shrunken months, dead right/bottom bands, scrambled
+  // day labels). The poster popup defines its own print rules instead.
   let css = '';
   for (const sheet of document.styleSheets) {
-    try { for (const rule of sheet.cssRules) { css += rule.cssText + '\n'; } } catch (e) {}
+    try {
+      for (const rule of sheet.cssRules) {
+        if (skipPrintRules && rule.media && /print/i.test(rule.media.mediaText)) continue;
+        css += rule.cssText + '\n';
+      }
+    } catch (e) {}
   }
   return css;
 }
@@ -1271,7 +1280,7 @@ function printPoster(mode) {
   if (!_posterState) return;
   const { html, count } = _posterState;
   const size = (count === 12 && document.getElementById('posterSizeSel').value === 'a1') ? 'a1' : 'a2';
-  const css = collectPageCss();
+  const css = collectPageCss(true);
   const bodyClass = document.body.className;
   let inner = '';
   let pageRule = '';
