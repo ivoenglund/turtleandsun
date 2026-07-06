@@ -172,9 +172,17 @@ body.color-mode .cal-event.holiday{color:#1a5276;}
 body:not(.color-mode) .cal-event.holiday::before{content:'◉ ';font-size:7px;vertical-align:middle;}
 body:not(.color-mode) .ev-icon{filter:grayscale(1);}
 .cal-event.birthday{display:flex;align-items:center;gap:3px;}.cal-event.occasion,.cal-event.birthday{display:block;padding:0;background:none!important;overflow:visible;}.cal-cell.has-tiles{z-index:20;}.tiles-overlay{display:block;overflow:visible;margin:0 -10px;height:0;}
-/* Sticker palette: one clear color per type — all print-safe with black text.
-   birthdays yellow · occasions peach · milestones light green */
+/* Sticker palette: one clear color per KIND — all print-safe with black text.
+   birthdays yellow · milestones light green · occasions colored by kind
+   (love pink · new-life aqua · faith lavender · seasonal blue ·
+    family days apricot · name days mint · other peach) */
 .tile-bday{background:#FFEE00!important;}.tile-occ{background:#FFBFA0!important;}.tile-mile{background:#C9E7A8!important;}
+.tile-occ-love{background:#F6C1D8!important;}
+.tile-occ-baby{background:#BFE6E2!important;}
+.tile-occ-faith{background:#D9CCF2!important;}
+.tile-occ-season{background:#BCD9F5!important;}
+.tile-occ-family{background:#FFD9A8!important;}
+.tile-occ-name{background:#C4E8D4!important;}
 body:not(.color-mode) .tile-bday,body:not(.color-mode) .tile-occ,body:not(.color-mode) .tile-mile{background:#e0e0e0!important;}body:not(.color-mode) .occasion-tile{background:#e0e0e0!important;filter:grayscale(1);}.occasion-tile{display:inline-block;text-align:center;vertical-align:top;width:min-content;max-width:47%;margin:1px 1px 0 0;background:#FFE800;border-radius:0;padding:1px 2px;font-size:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:#1C0A00!important;box-shadow:2px 3px 6px rgba(130,130,130,0.45);word-break:normal;overflow-wrap:break-word;line-height:1.4;}
 
 #loading-msg{text-align:center;padding:60px;color:rgba(28,10,0,0.35);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;}
@@ -700,6 +708,18 @@ function milestoneIcon(label) {
   return '⭐';
 }
 
+// Color class per occasion KIND — same keyword taxonomy as the icons.
+function occasionColorClass(name) {
+  const n = (name || '').toLowerCase();
+  if (/engag|wedding|marriage|married|anniversary|valentin|first date|met |together|dating/.test(n)) return ' tile-occ-love';
+  if (/baby|newborn|birth of|adopt|born|birth/.test(n))                                             return ' tile-occ-baby';
+  if (/baptis|christen|confirmation|communion|mitzvah/.test(n))                                     return ' tile-occ-faith';
+  if (/christmas|jul|easter|påsk|midsommar|midsummer|new year|nyår|lucia|advent|halloween|valborg/.test(n)) return ' tile-occ-season';
+  if (/mother|father|mors dag|fars dag|grandma|grandpa|mormor|farmor|morfar|farfar/.test(n))        return ' tile-occ-family';
+  if (/name ?day|namnsdag/.test(n))                                                                 return ' tile-occ-name';
+  return '';
+}
+
 function occasionIcon(name) {
   const n = (name || '').toLowerCase();
   // Relationships
@@ -939,7 +959,7 @@ function renderMonthPage(year, month) {
       var angle = (h % 30) - 15;
       var ml = ((h >> 8) % 10) - 3;
       var st = 'transform:rotate('+angle+'deg);transform-origin:center center;';
-      var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ':e.type==='milestone'?' tile-mile':'');
+      var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ'+occasionColorClass(e.label):e.type==='milestone'?' tile-mile':'');
       return '<div class="'+tc+'" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/\.\s*$/,'').replace(/[;:]\s*/g,'<br>').replace(/[,.]\s*/g,' ').replace(/ {2,}/g,' ').trim())+'</div>';
     }).join('');
   });
@@ -1139,7 +1159,7 @@ function renderHalfMonthPage(year, month, startDay, colIndices, opts) {
       for (var j = 0; j < lbl.length; j++) h = (h * 37 + lbl.charCodeAt(j)) & 0xFFFF;
       var angle = (h % 30) - 15;
       var st = 'transform:rotate('+angle+'deg);transform-origin:center center;';
-      var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ':e.type==='milestone'?' tile-mile':'');
+      var tc='occasion-tile'+(e.type==='birthday'?' tile-bday':e.type==='occasion'?' tile-occ'+occasionColorClass(e.label):e.type==='milestone'?' tile-mile':'');
       return '<div class="'+tc+'" style="'+st+'">'+(e.html!==undefined?e.html:esc(e.label).replace(/\.\s*$/,'').replace(/[;:]\s*/g,'<br>').replace(/[,.]\s*/g,' ').replace(/ {2,}/g,' ').trim())+'</div>';
     }).join('');
   });
