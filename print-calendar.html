@@ -1210,8 +1210,9 @@ function buildPosterHtml(startYear, startMonth, count) {
   // Month rendered at 900px wide and a custom design height so that after
   // scaling it fills the cell exactly (day rows grow, text size unchanged).
   const mh = cellH / scale;                 // design height of .cal-page
-  // chrome inside a poster month: pad 8+8, header 40+12, dow 26+4 = 98
-  const mbody = mh - 98;
+  // chrome inside a poster month: pad 8+8, header 40+12, dow 26+4 = 98,
+  // plus 3px slack so scaling round-off never clips the bottom grid line.
+  const mbody = Math.floor(mh - 101);
 
   let cells = '';
   for (let i = 0; i < count; i++) {
@@ -1276,11 +1277,12 @@ function printPoster(mode) {
   let pageRule = '';
 
   if (mode === 'a4') {
-    // Fill the printable area in whichever direction limits first.
-    const targetW = 200 * MM2PX, targetH = 287 * MM2PX;  // A4 minus 5mm margins
-    const s = Math.min(targetW / POSTER_W, targetH / POSTER_H);
-    pageRule = '@page{size:A4 portrait;margin:5mm;}';
-    inner = `<div style="width:${(POSTER_W * s).toFixed(0)}px;height:${(POSTER_H * s).toFixed(0)}px;overflow:hidden;">
+    // A4 and the poster share the A-series ratio — full bleed, zero waste.
+    // The printer's own hardware margin may clip 2-3mm at the edges unless
+    // borderless printing is enabled; the 4px poster padding absorbs most.
+    const s = Math.min((210 * MM2PX) / POSTER_W, (297 * MM2PX) / POSTER_H);
+    pageRule = '@page{size:A4 portrait;margin:0;}';
+    inner = `<div style="width:${Math.floor(POSTER_W * s)}px;height:${Math.floor(POSTER_H * s)}px;overflow:hidden;">
       <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div></div>`;
   } else {
     // Tiled: pieces overlap 10mm; dashed guides mark the glue line.
