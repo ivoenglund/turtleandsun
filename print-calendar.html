@@ -25,8 +25,16 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-grid{flex:1;display:grid;gap:16px;align-content:space-evenly;justify-content:center;}
 .poster-cell{position:relative;overflow:hidden;}
 .poster-cell-inner{position:absolute;top:0;left:0;width:900px;transform-origin:top left;}
-.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;height:636px;aspect-ratio:auto;}
+.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;height:636px;aspect-ratio:auto;padding:20px 24px 14px;}
 .poster-cell .cal-page-footer{display:none;}
+/* Chrome's print engine mangles flex/1fr sizing inside scaled content —
+   every level gets an explicit height so nothing is left to negotiation. */
+.poster-cell .cal-page-header{height:40px;padding-bottom:0;margin-bottom:4px;flex:none;}
+.poster-cell .cal-dow-row{height:26px;margin-bottom:4px;flex:none;}
+.poster-cell .cal-body{flex:none;height:528px;}
+.poster-cell .cal-week-nums{height:528px;}
+.poster-cell .cal-grid{height:528px;flex:none;width:calc(100% - 20px);}
+body.no-weeknums .poster-cell .cal-grid{width:100%;}
 .poster-foot{height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:600;color:rgba(28,10,0,0.4);letter-spacing:0.06em;}
 /* Preview chrome (screen only) */
 .poster-preview-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
