@@ -25,7 +25,7 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .poster-grid{flex:1;display:grid;gap:16px;align-content:space-evenly;justify-content:center;}
 .poster-cell{position:relative;overflow:hidden;}
 .poster-cell-inner{position:absolute;top:0;left:0;width:900px;transform-origin:top left;}
-.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;}
+.poster-cell .cal-page{box-shadow:none;border:1px solid rgba(28,10,0,0.12);border-radius:2px;width:900px;height:636px;aspect-ratio:auto;}
 .poster-cell .cal-page-footer{display:none;}
 .poster-foot{height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:600;color:rgba(28,10,0,0.4);letter-spacing:0.06em;}
 /* Preview chrome (screen only) */
@@ -38,6 +38,11 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 .tile-guide.v{border-left:1.5px dashed #3A6B20;top:0;bottom:0;width:0;}
 .tile-guide.h{border-top:1.5px dashed #3A6B20;left:0;right:0;height:0;}
 .tile-label{position:absolute;z-index:6;font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;color:#3A6B20;background:#fff;padding:1px 4px;opacity:0.85;}
+/* Printing the preview page directly must never print the chrome. */
+@media print{
+  .poster-preview-bar{display:none!important;}
+  .poster-scalebox{box-shadow:none!important;border-radius:0!important;}
+}
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
 .controls-bar{background:transparent;border-bottom:none;padding:10px 24px;display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;flex-shrink:0;}
