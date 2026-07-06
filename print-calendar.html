@@ -50,6 +50,9 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 body.no-weeknums .poster-cell .cal-grid{border-left:none;}
 .poster-cell .cal-cell.edge-top{border-top:2.5px solid #1C0A00;}
 .poster-cell .cal-cell.edge-left{border-left:2.5px solid #1C0A00;}
+/* Chrome's print engine shaves borders that sit exactly on the grid's edge —
+   keep the last column/row borders strictly inside the container. */
+.poster-cell .cal-grid{padding-right:3px;padding-bottom:3px;}
 .poster-cell .cal-grid{border-top:2.5px solid #1C0A00;}
 body.no-weeknums .poster-cell .cal-grid{border-left:2.5px solid #1C0A00;}
 .poster-cell .cal-week-num{border-right:2.5px solid #1C0A00;}
@@ -95,7 +98,7 @@ body.no-weeknums .poster-cell .cal-grid{width:100%;}
   body.poster-mode .poster-cell .cal-body{height:var(--mbody,528px)!important;flex:none!important;overflow:visible!important;}
   body.poster-mode .poster-cell .cal-week-nums{width:34px!important;height:var(--mbody,528px)!important;}
   body.poster-mode .poster-cell .cal-week-num{font-size:17px!important;font-weight:700!important;padding-right:3px!important;}
-  body.poster-mode .poster-cell .cal-grid{width:calc(100% - 34px)!important;height:var(--mbody,528px)!important;flex:none!important;}
+  body.poster-mode .poster-cell .cal-grid{width:calc(100% - 34px)!important;height:var(--mbody,528px)!important;flex:none!important;padding-right:3px!important;padding-bottom:3px!important;}
   body.no-weeknums.poster-mode .poster-cell .cal-grid{width:100%!important;}
   body.poster-mode .poster-cell .cal-day-num{font-size:17px!important;}
   body.poster-mode .poster-cell .cal-event{font-size:12px!important;}
