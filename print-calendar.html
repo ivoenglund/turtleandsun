@@ -37,6 +37,11 @@ html{background:#fff!important;}.ts-bg,.sun{display:none!important;}body{font-fa
 body.no-weeknums .poster-cell .cal-grid{border-left-width:2.5px;}
 .poster-cell .cal-week-num{border-right-width:2.5px;}
 .poster-cell .cal-dow-row{height:26px;margin-bottom:4px;flex:none;}
+/* Day-name labels must share the grid's exact column math — flexible flex
+   widths drift after scaling and put SUN over Saturday. */
+.poster-cell .cal-dow-wk{width:20px;flex:none;}
+.poster-cell .cal-dow-cell{flex:none;width:calc((100% - 20px)/7);text-align:center;}
+body.no-weeknums .poster-cell .cal-dow-cell{width:calc(100%/7);}
 .poster-cell .cal-body{flex:none;height:var(--mbody,528px);}
 .poster-cell .cal-week-nums{height:var(--mbody,528px);}
 .poster-cell .cal-grid{height:var(--mbody,528px);flex:none;width:calc(100% - 20px);}
@@ -1196,7 +1201,7 @@ function buildPosterHtml(startYear, startMonth, count) {
   // cells, minimal margins (PAD) and gaps (GAP).
   const cols = count === 6 ? 2 : 3;
   const rows = count === 6 ? 3 : 4;
-  const GAP = 8, PAD = 8;
+  const GAP = 4, PAD = 4;
   const gridW = POSTER_W - 2 * PAD;
   const gridH = POSTER_H - 2 * PAD;
   const cellW = (gridW - (cols - 1) * GAP) / cols;
@@ -1270,9 +1275,10 @@ function printPoster(mode) {
   let pageRule = '';
 
   if (mode === 'a4') {
-    const targetW = 194 * MM2PX;              // A4 minus 8mm margins
-    const s = targetW / POSTER_W;
-    pageRule = '@page{size:A4 portrait;margin:8mm;}';
+    // Fill the printable area in whichever direction limits first.
+    const targetW = 200 * MM2PX, targetH = 287 * MM2PX;  // A4 minus 5mm margins
+    const s = Math.min(targetW / POSTER_W, targetH / POSTER_H);
+    pageRule = '@page{size:A4 portrait;margin:5mm;}';
     inner = `<div style="width:${(POSTER_W * s).toFixed(0)}px;height:${(POSTER_H * s).toFixed(0)}px;overflow:hidden;">
       <div style="transform:scale(${s.toFixed(5)});transform-origin:top left;">${html}</div></div>`;
   } else {
