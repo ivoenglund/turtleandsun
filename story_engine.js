@@ -44,17 +44,24 @@ const STORY_TYPES = [
 // this constant is only the default/reset value.
 const DEFAULT_STORY_TONE = [
   'TONE OF THE SHOW (follow strictly):',
-  '- Loving: conflict comes from caring, never malice. Characters tease, never wound. Every episode ends warm.',
+  '- Loving: conflict comes from caring, never malice toward another character. Characters tease, never wound. Warmth is the default outcome, but not mandatory — see the 5th rule below.',
   '- Relatable: plots are household micro-events everyone recognises (waiting by the door, a date almost forgotten, dinner smells).',
   '- Trustworthy: characters never act out of character; no fake-outs, no cruelty for laughs.',
-  '- A little drama: ONE small stake per episode, felt enormously through animal eyes, resolved within the episode.',
-  '- The sadness is never the punchline — the PIVOT is. Feelings are played straight; comedy lives in the timing.',
+  '- A little drama: ONE small stake per episode, felt enormously through animal eyes.',
+  '- The sadness is never the punchline — the TURN is. Feelings are played straight; comedy, when present, lives in the timing.',
+  '- Not every episode has to resolve into warmth. Sometimes a feeling has been held back or forbidden for a long time (shame, grief, hate, love, envy) and the whole point of the episode is that it finally gets said — once, plainly, with no fix, no rescuer, no lesson. The expression IS the resolution. This must never become cruelty toward another character or despair for its own sake — it stays a moment of truth, not a spiral.',
+  '- Write like a poem, not a summary. One concrete image or one plain sentence — never the abstract name of the feeling (not "I feel ashamed," but the specific ordinary thing shame does: hiding, not meeting an eye, apologising for existing). Trust the viewer to feel what is never explained. Structure is a single turn: a feeling is held, then one small thing breaks or reveals it. The turn can land on connection with another character, or on the character finally seeing their own feeling clearly, alone.',
   '',
-  'NORTH-STAR EXAMPLE (write episodes with this shape and heart):',
+  'NORTH-STAR EXAMPLE 1 — pivot through connection (write many episodes with this shape and heart):',
   'Scene 1: Kitten sits alone on the floor, looking down, then into the camera, and says quietly:',
   '"i\'m so lonely. nobody likes me. i never know what to say. i always mess everything up… i\'m sorry." A beat of silence.',
   'Scene 2: The dog\'s head pops through the doorway: "wanna play football?" The kitten, already getting up: "okay."',
   'Why it works: long heavy beat → pattern break → two-word warm resolution. Presence beats advice.',
+  '',
+  'NORTH-STAR EXAMPLE 2 — expression as the resolution (no rescuer, no lesson; write some episodes this way):',
+  'Scene 1: Rabbit alone in the hutch, quiet: "i hate that i wasn\'t enough for him to stay." A long pause.',
+  'Scene 2: Same rabbit, plainly, still alone: "i\'m allowed to feel that. i\'m still here." No one arrives. Saying it is the ending.',
+  'Why it works: a feeling held for a long time finally gets witnessed — by the viewer, not by a character. Nothing is fixed and nothing needs to be.',
 ].join('\n');
 
 function buildSystemPrompt(toneText) {
