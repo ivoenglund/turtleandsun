@@ -1390,7 +1390,7 @@ async function renderTimeline(){
     } else {
       const c=contactsPool.find(x=>x.id===it.cid);
       const photo=c&&c.photo_url?'<img src="'+esc(c.photo_url)+'">':'🎂';
-      html+=`<div class="occitem">${photo}<b>${esc(it.who)}</b> ${esc(it.what)}${it.age?' <span class="muted">('+it.age+')</span>':''}<span class="muted" style="margin-left:auto;">${ds}</span></div>`;
+      html+=`<div class="occitem" data-cid="${it.cid}" title="Edit ${esc(it.who)}">${photo}<b>${esc(it.who)}</b> ${esc(it.what)}${it.age?' <span class="muted">('+it.age+')</span>':''}<span class="muted" style="margin-left:auto;">${ds}</span></div>`;
     }
   });
   $('#tidFeed').innerHTML=html;
@@ -1398,6 +1398,10 @@ async function renderTimeline(){
   $('#tidFeed').querySelectorAll('.pEdit').forEach(b=>b.onclick=(e)=>{
     const pid=+e.target.closest('.postcard').dataset.pid;
     openPostModal((blogCache||[]).find(p=>p.id===pid));
+  });
+  $('#tidFeed').querySelectorAll('.occitem[data-cid]').forEach(el=>{
+    el.style.cursor='pointer';
+    el.onclick=()=>openContactModal(+el.dataset.cid);
   });
 }
 ['tfPosts','tfOcc','tfBday'].forEach(id=>{ document.getElementById(id).onchange=()=>renderTimeline(); });
