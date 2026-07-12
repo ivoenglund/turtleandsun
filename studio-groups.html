@@ -495,7 +495,14 @@ function makeResizable(panelSel, tableKey){
     h.addEventListener('mousedown',e=>{
       e.preventDefault(); e.stopPropagation();
       const startX=e.pageX, startW=store.w[key];
-      const move=ev=>{ store.w[key]=Math.max(36, startW+ev.pageX-startX); apply(); };
+      const startTotal=parseInt(table.style.width,10)||table.offsetWidth;
+      const move=ev=>{
+        // touch ONLY the dragged column + total table width — nothing else
+        const w=Math.max(36, startW+ev.pageX-startX);
+        th.style.width=w+'px';
+        table.style.width=(startTotal-startW+w)+'px';
+        store.w[key]=w;
+      };
       const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
