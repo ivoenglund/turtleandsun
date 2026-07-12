@@ -92,6 +92,16 @@
   .galitem.sel{border-color:var(--green2);}
   .galitem .galck{position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:4px;background:rgba(255,255,255,0.9);border:1.5px solid rgba(28,10,0,0.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--green2);font-weight:800;}
   .galitem .galused{position:absolute;bottom:5px;left:5px;background:rgba(28,42,20,0.8);color:#fff;font-size:10px;border-radius:6px;padding:1px 6px;}
+  .galitem video{width:100%;height:90px;object-fit:cover;border-radius:7px;display:block;background:#000;}
+  .galitem .galvid{position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.65);color:#fff;font-size:10px;border-radius:6px;padding:1px 6px;}
+  .pright video{width:100%;height:64px;object-fit:cover;border-radius:8px;display:block;background:#000;cursor:pointer;}
+  .pright.single video{height:90px;}
+  .ytwrap{position:relative;cursor:pointer;}
+  .ytwrap .ytplay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,0.7);}
+  .vlb{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:5000;display:none;align-items:center;justify-content:center;}
+  .vlb.open{display:flex;}
+  .vlb .vlbinner{width:min(90vw,960px);aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;}
+  .vlb iframe,.vlb video{width:100%;height:100%;border:0;display:block;}
   .occitem{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,0.55);border:1px solid var(--line);border-radius:9px;padding:4px 10px;margin-bottom:4px;font-size:12.5px;}
   .occitem img{width:22px;height:22px;border-radius:50%;object-fit:cover;}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1C2A14;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;z-index:4000;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.3);}
@@ -273,6 +283,9 @@
 </div>
 
 <!-- Gallery picker modal -->
+<!-- Video lightbox -->
+<div class="vlb" id="vidLightbox"><div class="vlbinner" id="vlbInner"></div></div>
+
 <div class="modal-bg" id="galModalBg">
   <div class="modal" style="max-width:720px;">
     <h3>Add pictures from your gallery to the timeline</h3>
@@ -301,6 +314,7 @@
         <div class="postphotos" id="pf_photos"></div>
         <input type="file" id="pf_file" accept="image/*" multiple style="display:none;">
         <button class="btn sm gray" id="pf_upload">＋ Add photos</button>
+        <button class="btn sm gray" id="pf_link">＋ Add video link</button>
         <span class="muted" id="pf_upstat" style="font-size:12px;"></span>
       </div>
     </div>
@@ -1247,6 +1261,32 @@ $('#dupRow').onclick=()=>{
   renderDuplicates();
 };
 
+// ── Media helpers: images, video files, YouTube/external links ──
+function isVideoFile(u){ return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u); }
+function ytId(u){
+  const m = String(u).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  return m ? m[1] : null;
+}
+function openVideoLightbox(html){
+  $('#vlbInner').innerHTML=html;
+  $('#vidLightbox').classList.add('open');
+}
+$('#vidLightbox') && ($('#vidLightbox').onclick=()=>{ $('#vidLightbox').classList.remove('open'); $('#vlbInner').innerHTML=''; });
+function mediaHtml(u){
+  const y=ytId(u);
+  if(y) return '<span class="ytwrap" data-yt="'+esc(y)+'"><img src="https://img.youtube.com/vi/'+esc(y)+'/hqdefault.jpg" loading="lazy"><span class="ytplay">▶</span></span>';
+  if(isVideoFile(u)) return '<video src="'+esc(u)+'" preload="metadata" muted data-vf="'+esc(u)+'"></video>';
+  if(/^https?:\/\//i.test(u) && !/\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(u) && !u.includes('cloudinary') && !u.includes('r2.dev'))
+    return '<a href="'+esc(u)+'" target="_blank" rel="noopener" class="tag alt" style="align-self:start;">🔗 link</a>';
+  return '<img src="'+esc(u)+'" loading="lazy" onclick="window.open(\''+esc(u)+'\',\'_blank\')">';
+}
+function wireMedia(container){
+  container.querySelectorAll('.ytwrap').forEach(el=>el.onclick=()=>openVideoLightbox(
+    '<iframe src="https://www.youtube.com/embed/'+esc(el.dataset.yt)+'?autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe>'));
+  container.querySelectorAll('video[data-vf]').forEach(el=>el.onclick=()=>openVideoLightbox(
+    '<video src="'+esc(el.dataset.vf)+'" controls autoplay></video>'));
+}
+
 // ── Timeline: blog posts + occasion instances, year-grouped, tag include/exclude ──
 let blogCache = null;
 let tagState = {}; // tag → 'inc' | 'exc'
@@ -1344,7 +1384,7 @@ async function renderTimeline(){
             ${p.body?'<div class="pbody">'+esc(p.body)+'</div>':''}
             <div style="margin-top:8px;"><button class="btn sm gray pEdit">Edit</button></div>
           </div>
-          ${ph.length?'<div class="pright'+(ph.length===1?' single':'')+'">'+ph.map(u=>'<img src="'+esc(u)+'" loading="lazy" onclick="window.open(\''+esc(u)+'\',\'_blank\')">').join('')+'</div>':''}
+          ${ph.length?'<div class="pright'+(ph.length===1?' single':'')+'">'+ph.map(mediaHtml).join('')+'</div>':''}
         </div>
       </div>`;
     } else {
@@ -1354,6 +1394,7 @@ async function renderTimeline(){
     }
   });
   $('#tidFeed').innerHTML=html;
+  wireMedia($('#tidFeed'));
   $('#tidFeed').querySelectorAll('.pEdit').forEach(b=>b.onclick=(e)=>{
     const pid=+e.target.closest('.postcard').dataset.pid;
     openPostModal((blogCache||[]).find(p=>p.id===pid));
@@ -1374,14 +1415,17 @@ $('#galAddBtn').onclick=async()=>{
     const used = new Set();
     (blogCache||[]).forEach(p=>(p.photos||[]).forEach(u=>used.add(u)));
     const seen = new Set();
-    const imgs = (data.orders||[]).map(o=>({
-      url: o.output_asset_url || o.result_url || o.input_asset_url,
-      date: d10(o.created_at)
-    })).filter(x=>x.url && !/\.(mp4|webm|mov)(\?|$)/i.test(x.url) && !seen.has(x.url) && seen.add(x.url));
-    if(!imgs.length){ $('#galGrid').innerHTML='<div class="empty">No pictures in your gallery yet.</div>'; return; }
-    $('#galGrid').innerHTML = imgs.map((im,i)=>`
+    const media = [];
+    (data.orders||[]).forEach(o=>{
+      const img = o.output_asset_url || o.result_url || o.input_asset_url;
+      const vid = o.output_video_asset_url || o.result_video_url;
+      if(img && !isVideoFile(img) && !seen.has(img)){ seen.add(img); media.push({url:img, date:d10(o.created_at), video:false}); }
+      if(vid && !seen.has(vid)){ seen.add(vid); media.push({url:vid, date:d10(o.created_at), video:true}); }
+    });
+    if(!media.length){ $('#galGrid').innerHTML='<div class="empty">No pictures or videos in your gallery yet.</div>'; return; }
+    $('#galGrid').innerHTML = media.map(im=>`
       <div class="galitem" data-url="${esc(im.url)}" data-date="${im.date}">
-        <img src="${esc(im.url)}" loading="lazy">
+        ${im.video?'<video src="'+esc(im.url)+'" preload="metadata" muted></video><span class="galvid">▶ video</span>':'<img src="'+esc(im.url)+'" loading="lazy">'}
         <span class="galck"></span>
         ${used.has(im.url)?'<span class="galused">in timeline</span>':''}
       </div>`).join('');
@@ -1416,11 +1460,19 @@ $('#galAdd').onclick=async()=>{
 let editingPost=null;
 let pfPhotos=[];
 function renderPfPhotos(){
-  $('#pf_photos').innerHTML=pfPhotos.map((u,i)=>
-    `<span style="position:relative;display:inline-block;"><img src="${esc(u)}" style="height:84px;border-radius:8px;">
-     <button data-i="${i}" class="pfRm" style="position:absolute;top:-6px;right:-6px;border:none;background:#a12a1a;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;">✕</button></span>`).join('');
+  $('#pf_photos').innerHTML=pfPhotos.map((u,i)=>{
+    const y=ytId(u);
+    const inner = y ? `<img src="https://img.youtube.com/vi/${esc(y)}/hqdefault.jpg" style="height:84px;border-radius:8px;">`
+      : isVideoFile(u) ? `<video src="${esc(u)}" preload="metadata" muted style="height:84px;border-radius:8px;background:#000;"></video>`
+      : /^https?:\/\//i.test(u)&&!/\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(u)&&!u.includes('cloudinary')&&!u.includes('r2.dev')
+        ? `<span class="tag alt" style="display:inline-block;padding:8px 12px;">🔗 ${esc(u.slice(0,40))}…</span>`
+        : `<img src="${esc(u)}" style="height:84px;border-radius:8px;">`;
+    return `<span style="position:relative;display:inline-block;">${inner}
+     <button data-i="${i}" class="pfRm" style="position:absolute;top:-6px;right:-6px;border:none;background:#a12a1a;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;">✕</button></span>`;
+  }).join('');
   $('#pf_photos').querySelectorAll('.pfRm').forEach(b=>b.onclick=()=>{ pfPhotos.splice(+b.dataset.i,1); renderPfPhotos(); });
 }
+
 function openPostModal(p){
   editingPost=p||null;
   $('#postModalTitle').textContent=p?'Edit post':'New post';
@@ -1439,6 +1491,12 @@ $('#postAddBtn').onclick=()=>openPostModal(null);
 $('#pfCancel').onclick=()=>$('#postModalBg').classList.remove('open');
 $('#postModalBg').onclick=(e)=>{ if(e.target===$('#postModalBg')) $('#postModalBg').classList.remove('open'); };
 $('#pf_upload').onclick=()=>$('#pf_file').click();
+$('#pf_link').onclick=()=>{
+  const u=prompt('Video or media URL (YouTube, or a direct .mp4 link):');
+  if(!u) return;
+  if(!/^https?:\/\//i.test(u.trim())){ alert('Needs to be a full URL starting with http(s)://'); return; }
+  pfPhotos.push(u.trim()); renderPfPhotos();
+};
 $('#pf_file').onchange=async(e)=>{
   const files=[...e.target.files]; e.target.value='';
   for(let i=0;i<files.length;i++){
