@@ -278,6 +278,15 @@
           <option value="A2 landscape">A2 landscape</option>
           <option value="A2 portrait">A2 portrait</option>
         </select>
+        <span style="position:relative;display:inline-block;">
+          <button class="btn gray" id="trePrintOptsBtn">Print options ▾</button>
+          <div class="coldd hide" id="trePrintOptsDD" style="left:0;right:auto;">
+            <label class="colopt"><input type="checkbox" id="po_info" checked> Info card</label>
+            <label class="colopt"><input type="checkbox" id="po_pets" checked> Pets</label>
+            <label class="colopt"><input type="checkbox" id="po_photos" checked> Photos</label>
+            <label class="colopt"><input type="checkbox" id="po_footer" checked> Footer</label>
+          </div>
+        </span>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
       <div style="display:flex;gap:10px;align-items:stretch;">
@@ -1803,11 +1812,15 @@ function openTreeMenu(anchor, cid){
 // Pets (and adoptees) can have BOTH biological parents and owners; a node can hang
 // under only one family per chart, so the choice is contextual: inside its own
 // biological island the pedigree wins, seen from the owner's family it hangs there.
-function buildTopolaData(focus){
-  const bio=famLinks.filter(l=>l.role!=='pet');
-  const petL=famLinks.filter(l=>l.role==='pet');
+function buildTopolaData(focus, o){
+  o=o||{};
+  const isPetC=id=>{ const c=contactsPool.find(x=>x.id===id); return !!(c&&c.is_pet); };
+  // Print can exclude pets entirely: drop pet-links AND anything touching a pet contact
+  const L = o.noPets ? famLinks.filter(l=>l.role!=='pet' && !isPetC(l.parent_id) && !isPetC(l.child_id)) : famLinks;
+  const bio=L.filter(l=>l.role!=='pet');
+  const petL=L.filter(l=>l.role==='pet');
   const ids=new Set(focus?[focus]:[]);
-  famLinks.forEach(l=>{ ids.add(l.parent_id); ids.add(l.child_id); });
+  L.forEach(l=>{ ids.add(l.parent_id); ids.add(l.child_id); });
   // biological island of the focus person
   const island=new Set();
   if(focus){
@@ -1868,12 +1881,26 @@ function buildTopolaData(focus){
     const by=personYear(id);
     if(by) indi.birth={date:{year:+by}};
     if(c.died_on) indi.death={date:{year:+String(c.died_on).slice(0,4)}, confirmed:true};
-    if(c.photo_url) indi.images=[{url:c.photo_url}];
+    if(c.photo_url && !o.noPhotos) indi.images=[{url:c.photo_url}];
     if(childFam[id]) indi.famc=childFam[id];
     if(spouseFams[id]) indi.fams=spouseFams[id];
     return indi;
   });
   return {indis, fams:[...famMap.values()]};
+}
+function topolaChartType(){
+  const CT={ kin:topola.KinshipChart, rel:topola.RelativesChart, hour:topola.HourglassChart, anc:topola.AncestorChart, desc:topola.DescendantChart };
+  return CT[$('#treChart').value]||topola.KinshipChart;
+}
+// Print options (persisted)
+function getPrintOpts(){
+  let o={info:true,pets:true,photos:true,footer:true};
+  try{
+    const s=JSON.parse(localStorage.getItem('ts_tree_printopts')||'null');
+    if(s) o=Object.assign(o,s);
+    else if(localStorage.getItem('ts_tree_infoprint')==='0') o.info=false; // migrate old toggle
+  }catch(e){}
+  return o;
 }
 function renderFamilyTree(){
   const sel=$('#treFocus');
@@ -1892,8 +1919,7 @@ function renderFamilyTree(){
     panel.innerHTML='<div class="empty">'+esc(personName(focus))+' has no family links yet — use “＋ Add relation”.</div>';
     return;
   }
-  const CT={ kin:topola.KinshipChart, rel:topola.RelativesChart, hour:topola.HourglassChart, anc:topola.AncestorChart, desc:topola.DescendantChart };
-  const chartType=CT[$('#treChart').value]||topola.KinshipChart;
+  const chartType=topolaChartType();
   panel.innerHTML='<svg id="treeSvg"></svg>';
   try{
     topola.createChart({
@@ -1976,15 +2002,11 @@ function renderTreeInfo(focus){
   const box=$('#treInfo');
   const c=contactsPool.find(x=>x.id===focus);
   if(!c){ box.innerHTML='<div class="muted">No person selected.</div>'; return; }
-  let printOn=true;
-  try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
   box.innerHTML =
     '<div style="font-weight:800;font-size:15px;text-align:center;">'+esc(c.name||'(unnamed)')+(c.is_pet?' 🐾':'')+'</div>'
     +'<div style="text-align:center;margin:6px 0 10px;"><button class="btn sm gray" id="treInfoEdit">✎ Edit</button></div>'
-    +treInfoFields(c).map(([l,v])=>'<div style="margin-bottom:6px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);">'+esc(l)+'</div><div style="white-space:pre-wrap;">'+esc(v)+'</div></div>').join('')
-    +'<label class="flt" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;"><input type="checkbox" id="treInfoPrint"'+(printOn?' checked':'')+'> Include on print</label>';
+    +treInfoFields(c).map(([l,v])=>'<div style="margin-bottom:6px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);">'+esc(l)+'</div><div style="white-space:pre-wrap;">'+esc(v)+'</div></div>').join('');
   $('#treInfoEdit').onclick=()=>openContactModal(focus);
-  $('#treInfoPrint').onchange=(e)=>{ try{ localStorage.setItem('ts_tree_infoprint', e.target.checked?'1':'0'); }catch(err){} };
 }
 // Toolbar actions operate on the person in the "Tree of" box
 $('#treAddBtn').onclick=(e)=>{ e.stopPropagation(); const f=+$('#treFocus').value; if(f) openTreeMenu($('#treAddBtn'), f); };
@@ -2012,19 +2034,50 @@ $('#linksClose').onclick=()=>$('#linksModalBg').classList.remove('open');
 $('#linksModalBg').onclick=(e)=>{ if(e.target===$('#linksModalBg')) $('#linksModalBg').classList.remove('open'); };
 $('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tree_focus',$('#treFocus').value);}catch(e){} renderFamilyTree(); });
 $('#treChart') && ($('#treChart').onchange=()=>renderFamilyTree());
+// Print options menu
+(function(){
+  const btn=$('#trePrintOptsBtn'), dd=$('#trePrintOptsDD');
+  if(!btn) return;
+  const o=getPrintOpts();
+  $('#po_info').checked=o.info; $('#po_pets').checked=o.pets;
+  $('#po_photos').checked=o.photos; $('#po_footer').checked=o.footer;
+  const save=()=>{ try{ localStorage.setItem('ts_tree_printopts',JSON.stringify({
+    info:$('#po_info').checked, pets:$('#po_pets').checked,
+    photos:$('#po_photos').checked, footer:$('#po_footer').checked })); }catch(e){} };
+  ['po_info','po_pets','po_photos','po_footer'].forEach(id=>{ document.getElementById(id).onchange=save; });
+  btn.onclick=(e)=>{ e.stopPropagation(); dd.classList.toggle('hide'); };
+  document.addEventListener('click',(e)=>{ if(!dd.contains(e.target)) dd.classList.add('hide'); });
+})();
 
 // Print the tree: the rendered SVG itself, scaled to A4 landscape
 $('#trePrintBtn').onclick=()=>{
   const focus=+$('#treFocus').value;
   const focusName=personName(focus);
-  const svgEl=document.querySelector('#treePanel svg');
-  if(!svgEl || !svgEl.getAttribute('width')){ alert('Nothing to print yet — render a tree first.'); return; }
+  const po=getPrintOpts();
+  // Render a print-specific chart honoring the options (pets/photos), offscreen.
+  let svgEl=null, host=null;
+  try{
+    host=document.createElement('div');
+    host.style.cssText='position:fixed;left:-13000px;top:0;';
+    host.innerHTML='<svg id="printSvg"></svg>';
+    document.body.appendChild(host);
+    topola.createChart({
+      json: buildTopolaData(focus, {noPets:!po.pets, noPhotos:!po.photos}),
+      chartType: topolaChartType(),
+      renderer: topola.DetailedRenderer,
+      svgSelector: '#printSvg',
+      animate: false,
+      updateSvgSize: true
+    }).render({startIndi:'I'+focus});
+    svgEl=host.querySelector('svg');
+  }catch(e){
+    svgEl=document.querySelector('#treePanel svg'); // fall back to what's on screen
+  }
+  if(!svgEl || !svgEl.getAttribute('width')){ if(host) host.remove(); alert('Nothing to print yet — render a tree first.'); return; }
   // Optional info block about the selected person
   let infoHtml='';
-  let printOn=true;
-  try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
   const c=contactsPool.find(x=>x.id===focus);
-  if(printOn && c){
+  if(po.info && c){
     const f=famSummary(c.id);
     const blk=(label,lines)=>{
       lines=(lines||[]).filter(Boolean);
@@ -2051,6 +2104,7 @@ $('#trePrintBtn').onclick=()=>{
   }
   const w0=+svgEl.getAttribute('width')||1000, h0=+svgEl.getAttribute('height')||600;
   const clone=svgEl.cloneNode(true);
+  if(host) host.remove();
   clone.setAttribute('viewBox','0 0 '+w0+' '+h0);
   clone.setAttribute('width','100%');
   clone.removeAttribute('height');
@@ -2083,7 +2137,7 @@ $('#trePrintBtn').onclick=()=>{
    +'<div class="chartbox">'+clone.outerHTML+'</div>'
    +infoHtml
    +'</div>'
-   +'<div class="foot">Family tree — '+esc(focusName)+' · turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +(po.footer?'<div class="foot">Family tree — '+esc(focusName)+' · turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>':'')
    +'</div>'
    +'<scr'+'ipt>setTimeout(function(){window.print();},600);</scr'+'ipt></body></html>');
   w.document.close();
