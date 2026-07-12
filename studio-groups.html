@@ -493,14 +493,24 @@ function makeResizable(panelSel, tableKey){
     th.appendChild(h);
     h.addEventListener('mousedown',e=>{
       e.preventDefault(); e.stopPropagation();
-      const startX=e.pageX, startW=store.w[key];
-      const move=ev=>{
-        // ONE style write: the dragged column. Nothing else moves.
-        const w=Math.max(36, startW+ev.pageX-startX);
-        th.style.width=w+'px';
+      // During the drag NOTHING is resized. A guide line follows the mouse
+      // (one position update, no table layout). Width is applied ONCE on release.
+      const startX=e.clientX, startW=store.w[key];
+      const panel=table.closest('.panel');
+      const rect=panel.getBoundingClientRect();
+      const minX=startX-(startW-36);
+      const line=document.createElement('div');
+      line.style.cssText='position:fixed;top:'+rect.top+'px;height:'+rect.height+'px;width:2px;background:var(--green2);z-index:5000;pointer-events:none;left:'+startX+'px;';
+      document.body.appendChild(line);
+      document.body.style.cursor='col-resize';
+      const move=ev=>{ line.style.left=Math.max(minX,ev.clientX)+'px'; };
+      const up=ev=>{
+        document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
+        line.remove(); document.body.style.cursor='';
+        const w=Math.max(36, startW+(ev.clientX-startX));
         store.w[key]=w;
+        th.style.width=w+'px'; // applied once, now that you're done
       };
-      const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
     h.addEventListener('dblclick',e=>{
