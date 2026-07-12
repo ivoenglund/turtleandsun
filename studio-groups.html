@@ -2116,7 +2116,7 @@ $('#trePrintBtn').onclick=()=>{
   const PAGE_H={'A4 landscape':186,'A4 portrait':273,'A3 landscape':273,'A3 portrait':396,'A2 landscape':396,'A2 portrait':570};
   const PAGE_W={'A4 landscape':273,'A4 portrait':186,'A3 landscape':396,'A3 portrait':273,'A2 landscape':570,'A2 portrait':396};
   const usable=PAGE_H[paper]||186;
-  const usableW=(PAGE_W[paper]||273)-4;
+  const usableW=(PAGE_W[paper]||273)-4+25; // calibrated on real prints 2026-07-12: -4 left ~30mm dead space on the right
   const w=window.open('','_blank');
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
