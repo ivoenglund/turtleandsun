@@ -26,10 +26,14 @@
   /* Grid panels use the vertical space: scroll inside, header stays visible.
      border-collapse:collapse breaks sticky headers (rows bleed through above them),
      so these tables use separate borders: each cell draws right+bottom, table draws the frame. */
-  #conPanel,#memPanel{max-height:max(300px, calc(100vh - 185px));overflow:auto;}
-  #conPanel table.grid,#memPanel table.grid{border-collapse:separate;border-spacing:0;}
+  #conPanel,#memPanel{max-height:max(300px, calc(100vh - 185px));overflow:auto;
+    padding:0;border-radius:0;border:1px solid var(--gridline);background:#fff;box-shadow:none;}
+  #conPanel table.grid,#memPanel table.grid{border-collapse:separate;border-spacing:0;border:0;}
   #conPanel .grid th,#conPanel .grid td,#memPanel .grid th,#memPanel .grid td{border-width:0 1px 1px 0;}
   #conPanel .grid th,#memPanel .grid th{position:sticky;top:0;z-index:20;}
+  /* Row trace: discreet tint along the active cell's row (the strong outline stays on the cell) */
+  .grid tr.rowActive td{background:#F6F1DC!important;}
+  .grid tr.rowActive td.cellActive{background:#F5FAF0!important;}
   .lbl{font-size:10.5px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:8px 10px 4px;}
   .row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
   .row:hover{background:#F4F1E6;}
@@ -851,9 +855,11 @@ function conActiveTd(){
 function setConActive(cid, field){
   conActive = {cid, field};
   document.querySelectorAll('#conPanel .cellActive').forEach(x=>x.classList.remove('cellActive'));
+  document.querySelectorAll('#conPanel .rowActive').forEach(x=>x.classList.remove('rowActive'));
   const td=conActiveTd();
   if(td){
     td.classList.add('cellActive');
+    td.closest('tr').classList.add('rowActive');
     td.scrollIntoView({block:'nearest',inline:'nearest'});
     // On the first column, scroll all the way left so the ✎/checkbox columns come back
     if(conEditKeys.indexOf(field)===0) $('#conPanel').scrollLeft=0;
