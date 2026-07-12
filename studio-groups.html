@@ -469,6 +469,9 @@ function makeResizable(panelSel, tableKey){
   if(!table) return;
   const ths=[...table.querySelectorAll('tr:first-child th')];
   const sig = ths.map(th=>th.dataset.k||'').join(',');
+  // A hidden table measures 0 — never fit while invisible. The render that
+  // reveals the grid (showTab/applyAnomaly) measures for real.
+  if(table.offsetWidth===0) return;
   let store;
   function measure(){
     // fresh perfect fit from content
