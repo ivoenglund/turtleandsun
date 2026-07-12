@@ -175,7 +175,7 @@
         <button class="btn sm gray" id="bulkClear" style="margin-left:auto;">Clear selection</button>
       </div>
       <div class="panel" id="conPanel"></div>
-      <div class="help">Click a cell to edit (Enter = save &amp; next row, Tab = next cell, Esc = cancel). Click a header to sort. ✎ opens the full editor.</div>
+      <div class="help">Click selects a cell · arrows/Tab move · type, Enter or double-click to edit (Esc cancels) · click a header to sort · ✎ opens the full editor.</div>
     </div>
 
     <!-- MAP -->
@@ -237,9 +237,13 @@
 <!-- Contact editor modal -->
 <div class="modal-bg" id="conModalBg">
   <div class="modal">
-    <div style="display:flex;gap:14px;align-items:flex-start;">
+    <div style="display:flex;gap:14px;align-items:center;">
       <h3 id="conModalTitle" style="flex:1;">Edit contact</h3>
-      <img id="cf_photo" class="hide" style="width:64px;height:64px;border-radius:50%;object-fit:cover;cursor:pointer;border:2px solid var(--line);" title="Click to view large">
+      <div style="text-align:center;">
+        <img id="cf_photo" class="hide" style="width:64px;height:64px;border-radius:50%;object-fit:cover;cursor:pointer;border:2px solid var(--line);display:block;margin:0 auto 4px;" title="Click to view large">
+        <button class="btn sm gray" id="cf_photo_btn">📷 Photo</button>
+        <input type="file" id="cf_photo_file" accept="image/*" style="display:none;">
+      </div>
     </div>
     <div class="grid2">
       <div><label>Name</label><input id="cf_name" autocomplete="off"></div>
@@ -493,43 +497,6 @@ function makeResizable(panelSel, tableKey){
     });
   });
   autofit();
-}
-
-// ── Inline cell editing (Enter=save+down, Tab=save+next, Esc=cancel) ──
-function makeEditable(td, opts){
-  td.classList.add('ed');
-  td.onclick = ()=>{
-    if(td.querySelector('input,select')) return;
-    const old = td.innerHTML;
-    let ctl;
-    if(opts.type==='select'){
-      ctl=document.createElement('select');
-      opts.options.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; ctl.appendChild(op); });
-      ctl.value = opts.value()||opts.options[0];
-    } else {
-      ctl=document.createElement('input');
-      ctl.type=opts.type||'text';
-      ctl.value=opts.value()||'';
-      ctl.autocomplete='off';
-      if(opts.type!=='date') ctl.style.width='100%';
-    }
-    td.innerHTML=''; td.appendChild(ctl); ctl.focus();
-    if(ctl.select) try{ ctl.select(); }catch(e){}
-    let done=false;
-    const finish=async(save)=>{
-      if(done) return false; done=true;
-      if(!save){ td.innerHTML=old; return false; }
-      try{ await opts.onSave(ctl.value); return true; }
-      catch(e){ alert('Save failed: '+e.message); td.innerHTML=old; return false; }
-    };
-    ctl.addEventListener('keydown',async e=>{
-      if(e.key==='Enter'){ e.preventDefault(); if(await finish(true) && opts.onNav) opts.onNav('down'); }
-      else if(e.key==='Tab'){ e.preventDefault(); const dir=e.shiftKey?'left':'right'; if(await finish(true) && opts.onNav) opts.onNav(dir); }
-      else if(e.key==='Escape'){ finish(false); }
-    });
-    ctl.addEventListener('blur',()=>finish(true));
-    if(opts.type==='select') ctl.addEventListener('change',()=>finish(true));
-  };
 }
 
 // Contact save with one field changed; shows undo toast unless silent
@@ -857,6 +824,16 @@ const CON_COLS = [
   {key:'photo',      label:'Photo',    type:null},
 ];
 const CON_DEFAULT = ['name','email','phone','city','birthday'];
+// Cell display for the contacts grid (used at render AND for in-place updates after a save)
+function conCellHtml(c,col){
+  const raw = col.type==='date' ? d10(c[col.key]) : (c[col.key]||'');
+  if(col.key==='name'){
+    return '<b>'+ (esc(raw)||'<span class="muted">(unnamed)</span>') +'</b>'
+      + (c.is_me?' <span class="self">me</span>':'') + (c.is_pet?' 🐾':'') + (c.died_on?' <span class="muted">✝</span>':'');
+  }
+  return esc(raw)||'<span class="muted">—</span>';
+}
+
 // ── Active cell (Excel-style selection) + keyboard navigation ──
 let conActive = null; // {cid, field}
 function conActiveTd(){
@@ -869,50 +846,108 @@ function setConActive(cid, field){
   const td=conActiveTd();
   if(td){ td.classList.add('cellActive'); td.scrollIntoView({block:'nearest',inline:'nearest'}); }
 }
-function conNav(cid, field, dir){
-  let r = conListIds.indexOf(cid), c = conEditKeys.indexOf(field);
+function moveActive(dr,dc){
+  if(!conActive) return;
+  let r=conListIds.indexOf(conActive.cid), c=conEditKeys.indexOf(conActive.field);
   if(r<0||c<0) return;
-  if(dir==='right'){ c++; if(c>=conEditKeys.length){ c=0; r++; } }
-  else if(dir==='left'){ c--; if(c<0){ c=conEditKeys.length-1; r--; } }
-  else if(dir==='down'){ r++; }
+  r+=dr; c+=dc;
+  if(c>=conEditKeys.length){ c=0; r++; }
+  if(c<0){ c=conEditKeys.length-1; r--; }
   if(r<0||r>=conListIds.length) return;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    setConActive(conListIds[r], conEditKeys[c]);
-    const td=conActiveTd();
-    if(td) td.click();
-  }));
+  setConActive(conListIds[r], conEditKeys[c]);
 }
-// Browse-mode keys in the contacts grid: arrows move, Tab hops cells, Enter edits.
+// Open the editor in a cell. Excel semantics: click selects, this edits.
+// initial = typed character that starts the edit (replaces content, like Excel).
+function startEditCell(td, initial){
+  if(!td || td.querySelector('input')) return;
+  const tr=td.closest('tr[data-cid]'); if(!tr) return;
+  const cid=+tr.dataset.cid, f=td.dataset.f;
+  const col=CON_COLS.find(x=>x.key===f);
+  if(!col||!col.type) return;
+  const c=contactsPool.find(x=>x.id===cid); if(!c) return;
+  const cur = col.type==='date' ? d10(c[f]) : (c[f]||'');
+  const inp=document.createElement('input');
+  inp.type=col.type; inp.autocomplete='off';
+  inp.value = (initial!=null && col.type!=='date') ? initial : cur;
+  if(col.type!=='date') inp.style.width='100%';
+  td.innerHTML=''; td.appendChild(inp); inp.focus();
+  if(initial==null && inp.select){ try{ inp.select(); }catch(e){} }
+  let done=false;
+  const redraw=()=>{ const cc=contactsPool.find(x=>x.id===cid); td.innerHTML=conCellHtml(cc,col); };
+  const cancel=()=>{ if(done) return; done=true; redraw(); };
+  const commit=async(move)=>{
+    if(done) return; done=true;
+    const v=inp.value;
+    if(v!==cur){
+      try{ await saveContactField(cid,f,v); }
+      catch(err){ alert('Save failed: '+err.message); }
+      updateSideCounts();
+    }
+    redraw(); // in-place — no full table rebuild, keeps it fast
+    if(anomaly && v!==cur) renderContactsTable(); // fixed rows leave the anomaly view
+    if(move) moveActive(move==='down'?1:0, move==='right'?1:move==='left'?-1:0);
+  };
+  inp.addEventListener('keydown',ev=>{
+    ev.stopPropagation();
+    if(ev.key==='Enter'){ ev.preventDefault(); commit('down'); }
+    else if(ev.key==='Tab'){ ev.preventDefault(); commit(ev.shiftKey?'left':'right'); }
+    else if(ev.key==='Escape'){ ev.preventDefault(); cancel(); }
+  });
+  inp.addEventListener('blur',()=>commit(null));
+}
+// Delegated grid events — attached ONCE, survive every re-render.
+(function(){
+  const panel=document.getElementById('conPanel');
+  panel.addEventListener('click',(e)=>{
+    const pencil=e.target.closest('.conPencil');
+    if(pencil){ openContactModal(+pencil.closest('tr').dataset.cid); return; }
+    if(e.target.classList.contains('selChk')||e.target.id==='selAll') return;
+    if(e.target.classList.contains('thumb')){ openVideoLightbox('<img src="'+esc(e.target.src)+'" style="width:100%;height:100%;object-fit:contain;">'); return; }
+    const td=e.target.closest('td[data-f]');
+    if(td && td.closest('tr[data-cid]') && !td.querySelector('input')){
+      setConActive(+td.closest('tr').dataset.cid, td.dataset.f); // select only — no editor
+    }
+  });
+  panel.addEventListener('dblclick',(e)=>{
+    const td=e.target.closest('td[data-f]');
+    if(td) startEditCell(td);
+  });
+  panel.addEventListener('change',(e)=>{
+    if(e.target.id==='selAll'){
+      if(e.target.checked) conListIds.forEach(id=>bulkSel.add(id)); else conListIds.forEach(id=>bulkSel.delete(id));
+      renderContactsTable();
+      return;
+    }
+    if(e.target.classList.contains('selChk')){
+      const cid=+e.target.closest('tr').dataset.cid;
+      if(e.target.checked) bulkSel.add(cid); else bulkSel.delete(cid);
+      updateBulkBar();
+    }
+  });
+})();
+// Browse-mode keys: arrows/Tab move the selection, Enter or typing opens the editor.
 document.addEventListener('keydown',(e)=>{
   if($('#kon').classList.contains('hide')) return;
   if(document.querySelector('.modal-bg.open')) return;
   const ae=document.activeElement;
-  if(ae && (ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA')) return; // editing or searching
-  const keys=['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Tab','Enter'];
-  if(!keys.includes(e.key)) return;
+  if(ae && (ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA')) return; // typing somewhere else
   if(!conListIds.length||!conEditKeys.length) return;
+  const nav=['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Tab','Enter','F2'];
+  const typed = e.key.length===1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+  if(!nav.includes(e.key) && !typed) return;
   if(!conActive || conListIds.indexOf(conActive.cid)<0){
     setConActive(conListIds[0], conEditKeys[0]);
     e.preventDefault();
     return;
   }
-  let r=conListIds.indexOf(conActive.cid), c=conEditKeys.indexOf(conActive.field);
-  if(c<0) c=0;
-  const clamp=(nr,nc)=>{ if(nr>=0&&nr<conListIds.length&&nc>=0&&nc<conEditKeys.length) setConActive(conListIds[nr],conEditKeys[nc]); };
+  if(typed){ e.preventDefault(); startEditCell(conActiveTd(), e.key); return; }
   switch(e.key){
-    case 'ArrowDown': e.preventDefault(); clamp(r+1,c); break;
-    case 'ArrowUp': e.preventDefault(); clamp(r-1,c); break;
-    case 'ArrowLeft': e.preventDefault(); clamp(r,c-1); break;
-    case 'ArrowRight': e.preventDefault(); clamp(r,c+1); break;
-    case 'Tab': {
-      e.preventDefault();
-      let nc=c+(e.shiftKey?-1:1), nr=r;
-      if(nc>=conEditKeys.length){ nc=0; nr=r+1; }
-      if(nc<0){ nc=conEditKeys.length-1; nr=r-1; }
-      clamp(nr,nc);
-      break;
-    }
-    case 'Enter': { e.preventDefault(); const td=conActiveTd(); if(td) td.click(); break; }
+    case 'ArrowDown': e.preventDefault(); moveActive(1,0); break;
+    case 'ArrowUp': e.preventDefault(); moveActive(-1,0); break;
+    case 'ArrowLeft': e.preventDefault(); moveActive(0,-1); break;
+    case 'ArrowRight': e.preventDefault(); moveActive(0,1); break;
+    case 'Tab': e.preventDefault(); moveActive(0, e.shiftKey?-1:1); break;
+    case 'Enter': case 'F2': e.preventDefault(); startEditCell(conActiveTd()); break;
   }
 });
 function renderContactsTable(){
@@ -945,11 +980,7 @@ function renderContactsTable(){
       <td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>
       ${cols.map(col=>{
         if(col.key==='photo') return `<td>${photoCell(c.photo_url)}</td>`;
-        const raw = col.type==='date' ? d10(c[col.key]) : (c[col.key]||'');
-        let disp = esc(raw)||'<span class="muted">—</span>';
-        if(col.key==='name') disp = '<b>'+ (esc(raw)||'<span class="muted">(unnamed)</span>') +'</b>'
-          + (c.is_me?' <span class="self">me</span>':'') + (c.is_pet?' 🐾':'') + (c.died_on?' <span class="muted">✝</span>':'');
-        return `<td data-f="${col.key}">${disp}</td>`;
+        return `<td data-f="${col.key}" class="ed">${conCellHtml(c,col)}</td>`;
       }).join('')}
     </tr>`;
   });
@@ -957,31 +988,6 @@ function renderContactsTable(){
   $('#conPanel').innerHTML = html;
   makeResizable('#conPanel','contacts');
   wireSort('#conPanel','contacts',cols.map(c=>c.key),renderContactsTable);
-  const selAll=$('#selAll');
-  if(selAll) selAll.onchange=()=>{
-    if(selAll.checked) list.forEach(c=>bulkSel.add(c.id)); else list.forEach(c=>bulkSel.delete(c.id));
-    renderContactsTable();
-  };
-  $('#conPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
-    const cid = +tr.dataset.cid;
-    tr.querySelector('.conPencil').onclick=()=>openContactModal(cid);
-    tr.querySelector('.selChk').onchange=(e)=>{
-      if(e.target.checked) bulkSel.add(cid); else bulkSel.delete(cid);
-      updateBulkBar();
-    };
-    cols.forEach(col=>{
-      if(!col.type) return;
-      const td = tr.querySelector(`td[data-f="${col.key}"]`);
-      if(!td) return;
-      td.addEventListener('mousedown',()=>setConActive(cid,col.key));
-      makeEditable(td,{
-        type: col.type,
-        value: ()=>{ const c=contactsPool.find(x=>x.id===cid); return col.type==='date'?d10(c[col.key]):(c[col.key]||''); },
-        onSave: async(v)=>{ await saveContactField(cid,col.key,v); renderContactsTable(); },
-        onNav: (dir)=>conNav(cid,col.key,dir)
-      });
-    });
-  });
   if(conActive) setConActive(conActive.cid, conActive.field); // restore selection after re-render
   updateBulkBar();
 }
@@ -1033,6 +1039,7 @@ async function openContactModal(cid){
   const ph=$('#cf_photo');
   if(c.photo_url){ ph.src=c.photo_url; ph.classList.remove('hide'); ph.onclick=()=>openVideoLightbox('<img src="'+esc(c.photo_url)+'" style="width:100%;height:100%;object-fit:contain;">'); }
   else ph.classList.add('hide');
+  $('#cf_photo_btn').textContent = c.photo_url ? '📷 Change' : '📷 Add photo';
   await renderConOccList(cid);
   $('#of_name').value=''; $('#of_date').value=''; $('#of_freq').value='yearly';
   $('#conModalBg').classList.add('open');
@@ -1072,6 +1079,39 @@ $('#of_add').onclick=async()=>{
   })});
   $('#of_name').value=''; $('#of_date').value='';
   await renderConOccList(editingContactId); refreshTimeline();
+};
+// Photo upload from the contact popup
+async function saveContactPhoto(cid, url){
+  const c=contactsPool.find(x=>x.id===cid);
+  if(!c) throw new Error('Contact not in cache');
+  const body={
+    name:c.name, email:c.email, phone:c.phone, company:c.company,
+    street:c.street, street_2:c.street_2, city:c.city, region:c.region,
+    country:c.country, postal_code:c.postal_code, about:c.about||null,
+    birthday:d10(c.birthday)||null, died_on:d10(c.died_on)||null, is_pet:!!c.is_pet,
+    photo_url:url
+  };
+  await api('/api/contacts/'+cid,{method:'PUT',body:JSON.stringify(body)});
+  c.photo_url=url;
+}
+$('#cf_photo_btn').onclick=()=>$('#cf_photo_file').click();
+$('#cf_photo_file').onchange=async(e)=>{
+  const file=e.target.files[0]; e.target.value='';
+  if(!file) return;
+  $('#cf_photo_btn').textContent='Uploading…'; $('#cf_photo_btn').disabled=true;
+  try{
+    const fd=new FormData(); fd.append('image',file);
+    const r=await fetch('/upload',{method:'POST',body:fd});
+    const data=await r.json();
+    if(!r.ok||!data.url) throw new Error(data.error||('HTTP '+r.status));
+    await saveContactPhoto(editingContactId, data.url);
+    const ph=$('#cf_photo');
+    ph.src=data.url; ph.classList.remove('hide');
+    ph.onclick=()=>openVideoLightbox('<img src="'+esc(data.url)+'" style="width:100%;height:100%;object-fit:contain;">');
+    renderContactsTable();
+    showToast('Photo saved');
+  }catch(err){ alert('Photo upload failed: '+err.message); }
+  $('#cf_photo_btn').textContent='📷 Change'; $('#cf_photo_btn').disabled=false;
 };
 $('#conCancel').onclick=()=>$('#conModalBg').classList.remove('open');
 $('#conModalBg').onclick=(e)=>{ if(e.target===$('#conModalBg')) $('#conModalBg').classList.remove('open'); };

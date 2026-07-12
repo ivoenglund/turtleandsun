@@ -2303,12 +2303,15 @@ app.get('/api/contacts/:id', requireAuth, async (req, res) => {
 });
 
 app.put('/api/contacts/:id', requireAuth, async (req, res) => {
-  const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet, about } = req.body;
+  const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet, about, photo_url } = req.body;
+  // photo_url only changes when the key is present in the body (older callers don't send it)
+  const hasPhoto = Object.prototype.hasOwnProperty.call(req.body, 'photo_url');
   try {
     await pool.query(
-      `UPDATE contacts SET name=$1, email=$2, phone=$3, company=$4, street=$5, street_2=$6, city=$7, region=$8, country=$9, postal_code=$10, birthday=$11, died_on=$12, is_pet=$13, about=$14
-       WHERE id=$15 AND user_id=$16`,
-      [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, about || null, req.params.id, req.user.id]
+      `UPDATE contacts SET name=$1, email=$2, phone=$3, company=$4, street=$5, street_2=$6, city=$7, region=$8, country=$9, postal_code=$10, birthday=$11, died_on=$12, is_pet=$13, about=$14,
+         photo_url = CASE WHEN $15::boolean THEN $16 ELSE photo_url END
+       WHERE id=$17 AND user_id=$18`,
+      [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, about || null, hasPhoto, photo_url || null, req.params.id, req.user.id]
     );
     res.json({ ok: true });
 
