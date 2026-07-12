@@ -140,7 +140,6 @@
   <div class="main">
     <div class="tabs" id="tabbar">
       <div class="tab active" data-t="med">Members</div>
-      <div class="tab" data-t="occ">Occasions</div>
       <div class="tab" data-t="kar">Map</div>
       <div class="tab" data-t="tid">Timeline</div>
       <div class="tab" data-t="bok">Yearbook</div>
@@ -178,17 +177,6 @@
       <div class="help">Click a cell to edit (Enter = save &amp; next row, Tab = next cell, Esc = cancel). Click a header to sort. ✎ opens the full editor.</div>
     </div>
 
-    <!-- OCCASIONS -->
-    <div id="occ" class="hide">
-      <div class="tools">
-        <button class="btn gray" id="occAddBtn">＋ Add occasion</button>
-        <input class="search" id="occSearch" type="text" placeholder="Search…" autocomplete="off" style="max-width:180px;">
-        <span id="occColsHost"></span>
-      </div>
-      <div class="panel" id="occPanel"><div class="empty">Loading…</div></div>
-      <div class="help">Occasions and birthdays for the chosen selection. Click a cell to edit in place; click a header to sort; ✎ opens the full editor.</div>
-    </div>
-
     <!-- MAP -->
     <div id="kar" class="hide">
       <div class="panel">
@@ -202,6 +190,7 @@
       <div class="tools">
         <button class="btn pub" id="postAddBtn">＋ New post</button>
         <button class="btn gray" id="galAddBtn">＋ From gallery</button>
+        <button class="btn gray" id="occAddBtn">＋ Add occasion</button>
         <label class="flt"><input type="checkbox" id="tfPosts" checked> Posts</label>
         <label class="flt"><input type="checkbox" id="tfOcc" checked> Occasions</label>
         <label class="flt"><input type="checkbox" id="tfBday" checked> Birthdays</label>
@@ -558,7 +547,6 @@ async function saveContactField(cid, field, value, silent){
 function rerenderAll(){
   renderContactsTable();
   if(current){ renderMembers(); renderMap(); }
-  if(!$('#occ').classList.contains('hide')) loadOccasions();
   if(!$('#tid').classList.contains('hide')) renderTimeline();
   updateSideCounts();
 }
@@ -958,9 +946,9 @@ async function renderConOccList(cid){
       await api('/api/contacts/'+cid+'/occasions',{method:'POST',body:JSON.stringify({
         name:o.name, start_date:d10(o.start_date), frequency:o.frequency, notes:o.notes||null })});
       if($('#conModalBg').classList.contains('open')) renderConOccList(cid);
-      loadOccasions();
+      refreshTimeline();
     });
-    await renderConOccList(cid); loadOccasions();
+    await renderConOccList(cid); refreshTimeline();
   });
   $('#conOccList').querySelectorAll('.occEdit').forEach(b=>b.onclick=(e)=>{
     const oid=+e.target.closest('.occrow').dataset.oid;
@@ -975,7 +963,7 @@ $('#of_add').onclick=async()=>{
     name, start_date:date, frequency:$('#of_freq').value
   })});
   $('#of_name').value=''; $('#of_date').value='';
-  await renderConOccList(editingContactId); loadOccasions();
+  await renderConOccList(editingContactId); refreshTimeline();
 };
 $('#conCancel').onclick=()=>$('#conModalBg').classList.remove('open');
 $('#conModalBg').onclick=(e)=>{ if(e.target===$('#conModalBg')) $('#conModalBg').classList.remove('open'); };
@@ -989,7 +977,7 @@ $('#conSave').onclick=async()=>{
   $('#conModalBg').classList.remove('open');
   await loadAll();
   if(selected){ current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap(); }
-  loadOccasions();
+  refreshTimeline();
 };
 $('#conDelete').onclick=async()=>{
   const c=contactsPool.find(x=>x.id===editingContactId);
@@ -998,114 +986,12 @@ $('#conDelete').onclick=async()=>{
   $('#conModalBg').classList.remove('open');
   await loadAll();
   if(selected){ current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap(); }
-  loadOccasions();
+  refreshTimeline();
 };
 
-// ── Occasions grid ──
-function nextYearly(dateStr, today){
-  const d=new Date(dateStr); if(isNaN(d)) return null;
-  const n=new Date(today.getFullYear(), d.getMonth(), d.getDate());
-  if(n<today) n.setFullYear(n.getFullYear()+1);
-  return n;
-}
-const OCC_COLS = [
-  {key:'next',   label:'Next'},
-  {key:'in',     label:'In'},
-  {key:'who',    label:'Who'},
-  {key:'what',   label:'What'},
-  {key:'freq',   label:'Repeats'},
-  {key:'since',  label:'Since'},
-  {key:'notes',  label:'Notes'},
-];
-const OCC_DEFAULT = ['next','in','who','what','freq','since'];
-const OCC_SORT_ACC = {
-  next:it=>it.next?it.next.getTime():null, in:it=>it.next?it.next.getTime():null,
-  who:it=>it.who, what:it=>it.what, freq:it=>it.frequency||'once',
-  since:it=>d10(it.start_date)||null, notes:it=>it.notes||null
-};
-let occItemsCache=[];
-async function loadOccasions(){
-  buildColPicker('occColsHost','occasions',OCC_COLS,OCC_DEFAULT,loadOccasions);
-  const cols = activeCols('occasions',OCC_COLS,OCC_DEFAULT);
-  let data;
-  try { data = await api('/api/occasions/upcoming'); }
-  catch(e){ $('#occPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; return; }
-  const today=new Date(); today.setHours(0,0,0,0);
-  const items=[];
-  (data.occasions||[]).forEach(o=>{
-    const next = (o.frequency==='yearly'||o.frequency==='milestone') ? nextYearly(o.start_date,today)
-               : (new Date(o.start_date)>=today ? new Date(o.start_date) : null);
-    items.push({kind:'occasion', id:o.id, contact_id:o.contact_id, who:o.contact_name, what:o.name,
-      start_date:o.start_date, frequency:o.frequency, notes:o.notes, next});
-  });
-  (data.contacts||[]).forEach(c=>{
-    if(!c.birthday) return;
-    items.push({kind:'birthday', contact_id:c.id, who:c.name, what:(c.died_on?'Memorial birthday':'Birthday'),
-      start_date:c.birthday, frequency:'yearly', next:nextYearly(c.birthday,today)});
-  });
-  const ids = chosenIds();
-  const q=($('#occSearch').value||'').toLowerCase();
-  let visible = items.filter(it=>ids.has(it.contact_id)
-    && (!q || ((it.who||'')+' '+(it.what||'')).toLowerCase().includes(q)));
-  const s=getSort('occasions',{key:'next',dir:1});
-  const acc=OCC_SORT_ACC[s.key]||OCC_SORT_ACC.next;
-  visible.sort((a,b)=>s.dir*cmpVals(acc(a),acc(b)));
-  occItemsCache=visible;
-  if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Nothing to show for '+esc(chosenLabel())+' with the current filters/search.':'No occasions or birthdays yet.')+'</div>'; return; }
-  let html=`<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+sortIndicator('occasions',c.key)+'</th>').join('')}</tr>`;
-  visible.forEach((it,i)=>{
-    const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
-    const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
-    const years = it.next&&it.start_date ? it.next.getFullYear()-new Date(it.start_date).getFullYear() : null;
-    const cells = cols.map(c=>{
-      if(c.key==='next') return `<td>${it.next?fmtD(it.next):'<span class="muted">—</span>'}</td>`;
-      if(c.key==='in') return `<td>${badge}</td>`;
-      if(c.key==='who') return `<td style="font-weight:600;">${esc(it.who)}</td>`;
-      if(c.key==='what') return `<td data-f="what">${esc(it.what)}${years&&it.frequency==='yearly'?` <span class="muted">(${years})</span>`:''}</td>`;
-      if(c.key==='freq') return `<td data-f="freq">${esc(it.frequency||'once')}</td>`;
-      if(c.key==='since') return `<td data-f="since">${d10(it.start_date)}</td>`;
-      if(c.key==='notes') return `<td data-f="notes">${esc(it.notes||'')||'<span class="muted">—</span>'}</td>`;
-      return '<td></td>';
-    }).join('');
-    html+=`<tr data-i="${i}"><td><span class="pencil rowPencil" title="Open editor">✎</span></td>${cells}</tr>`;
-  });
-  html+='</table>';
-  $('#occPanel').innerHTML=html;
-  makeResizable('#occPanel','occasions');
-  wireSort('#occPanel','occasions',cols.map(c=>c.key),loadOccasions);
-  $('#occPanel').querySelectorAll('tr[data-i]').forEach(tr=>{
-    const it=occItemsCache[+tr.dataset.i];
-    tr.querySelector('.rowPencil').onclick=()=>{
-      if(it.kind==='birthday') openContactModal(it.contact_id);
-      else openOccasionModal(it);
-    };
-    const saveOcc = async(patch)=>{
-      const prev={ name:it.what, start_date:d10(it.start_date), frequency:it.frequency||'once', notes:it.notes||null };
-      const body=Object.assign({},prev,patch);
-      await api('/api/occasions/'+it.id,{method:'PUT',body:JSON.stringify(body)});
-      showToast('Saved '+(it.who||'')+' · '+body.name, async()=>{
-        await api('/api/occasions/'+it.id,{method:'PUT',body:JSON.stringify(prev)});
-        loadOccasions();
-      });
-      loadOccasions();
-    };
-    const tdWhat=tr.querySelector('td[data-f="what"]');
-    const tdFreq=tr.querySelector('td[data-f="freq"]');
-    const tdSince=tr.querySelector('td[data-f="since"]');
-    const tdNotes=tr.querySelector('td[data-f="notes"]');
-    if(it.kind==='occasion'){
-      if(tdWhat) makeEditable(tdWhat, {type:'text', value:()=>it.what, onSave:v=>saveOcc({name:v})});
-      if(tdFreq) makeEditable(tdFreq, {type:'select', options:['yearly','milestone','once'], value:()=>it.frequency||'once', onSave:v=>saveOcc({frequency:v})});
-      if(tdSince) makeEditable(tdSince,{type:'date', value:()=>d10(it.start_date), onSave:v=>saveOcc({start_date:v})});
-      if(tdNotes) makeEditable(tdNotes,{type:'text', value:()=>it.notes||'', onSave:v=>saveOcc({notes:v||null})});
-    } else if(tdSince){
-      makeEditable(tdSince,{type:'date', value:()=>d10(it.start_date), onSave:async v=>{
-        await saveContactField(it.contact_id,'birthday',v||null); loadOccasions(); renderContactsTable();
-      }});
-    }
-  });
-}
-$('#occSearch').oninput=()=>loadOccasions();
+// Occasions grid removed 2026-07-12 — the Timeline covers occasions.
+// refreshTimeline() is the replacement hook for everything that used to refresh the grid.
+function refreshTimeline(){ if(!$('#tid').classList.contains('hide')) renderTimeline(); }
 
 // ── Occasion modal: edit + create ──
 function openOccasionModal(o){
@@ -1148,7 +1034,7 @@ $('#oeSave').onclick=async()=>{
     })});
   }
   $('#occModalBg').classList.remove('open');
-  loadOccasions();
+  refreshTimeline();
   if($('#conModalBg').classList.contains('open') && editingContactId) renderConOccList(editingContactId);
 };
 $('#oeDelete').onclick=async()=>{
@@ -1159,9 +1045,9 @@ $('#oeDelete').onclick=async()=>{
   if(o.contact_id) showToast('Occasion deleted', async()=>{
     await api('/api/contacts/'+o.contact_id+'/occasions',{method:'POST',body:JSON.stringify({
       name:o.what||o.name, start_date:d10(o.start_date), frequency:o.frequency, notes:o.notes||null })});
-    loadOccasions();
+    refreshTimeline();
   });
-  loadOccasions();
+  refreshTimeline();
   if($('#conModalBg').classList.contains('open') && editingContactId) renderConOccList(editingContactId);
 };
 
@@ -1590,20 +1476,24 @@ async function renderMap(){
     const rows = current.members.filter(m=>passesFilterId(m.contact_id));
     totalChosen = rows.length;
     pts = rows.filter(m=>m.latitude!=null && m.longitude!=null)
-              .map(m=>({lat:m.latitude,lng:m.longitude,name:m.name,city:m.city}));
+              .map(m=>({lat:m.latitude,lng:m.longitude,name:m.name,city:m.city,cid:m.contact_id}));
   } else {
     await ensureCoords();
     const rows = contactsPool.filter(passesFilterC);
     totalChosen = rows.length;
     pts = rows.filter(c=>coordsCache[c.id])
-              .map(c=>({lat:coordsCache[c.id].lat,lng:coordsCache[c.id].lng,name:c.name,city:coordsCache[c.id].city||c.city}));
+              .map(c=>({lat:coordsCache[c.id].lat,lng:coordsCache[c.id].lng,name:c.name,city:coordsCache[c.id].city||c.city,cid:c.id}));
   }
   if(!mapObj){ mapObj = L.map('map').setView([62,15],4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapObj);
   }
   if(mapObj._layerGroup) mapObj.removeLayer(mapObj._layerGroup);
   const lg = L.layerGroup().addTo(mapObj); mapObj._layerGroup=lg;
-  pts.forEach(p=>L.marker([p.lat,p.lng]).addTo(lg).bindPopup(esc(p.name||'')+(p.city?'<br>'+esc(p.city):'')));
+  pts.forEach(p=>{
+    const mk=L.marker([p.lat,p.lng]).addTo(lg)
+      .bindPopup(esc(p.name||'')+(p.city?'<br>'+esc(p.city):'')+'<br><span style="font-size:11px;color:#888;">double-click to edit</span>');
+    mk.on('dblclick',()=>openContactModal(p.cid));
+  });
   if(pts.length){ mapObj.fitBounds(pts.map(p=>[p.lat,p.lng]),{padding:[40,40],maxZoom:11}); }
   $('#mapHelp').textContent = pts.length
     ? `${chosenLabel()}: ${pts.length} of ${totalChosen} have coordinates.`
@@ -1644,14 +1534,13 @@ $('#printCalBtn').onclick=()=>{
 };
 
 // ── Tabs ──
-const ids=['med','kon','occ','kar','tid','bok','exp','dup'];
+const ids=['med','kon','kar','tid','bok','exp','dup'];
 function showTab(t){
   const showId = (t==='med' && !selected) ? 'kon' : t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
   $('#dupRow').classList.remove('active');
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==showId));
   if(showId==='kar') setTimeout(renderMap,80);
-  if(showId==='occ') loadOccasions();
   if(showId==='kon') renderContactsTable();
   if(showId==='tid') renderTimeline();
   if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
