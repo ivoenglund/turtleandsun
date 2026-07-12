@@ -520,6 +520,16 @@ async function load() {
     });
     console.log('[load] 6 buildGroupFilters');
     buildGroupFilters();
+    // Studio handoff: /print/calendar?groups=1,2 pre-selects those groups only
+    const _gp = new URLSearchParams(window.location.search).get('groups');
+    if (_gp) {
+      const want = new Set(_gp.split(',').map(Number).filter(n=>!isNaN(n)));
+      const allCb = document.getElementById('grp-all');
+      if (allCb) allCb.checked = false;
+      document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(cb => {
+        cb.checked = want.has(parseInt(cb.id.replace('grp-',''), 10));
+      });
+    }
     _loaded = true;
     console.log('[load] 7 DOM updates');
     document.getElementById('yearInput').value = _initYear;

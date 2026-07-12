@@ -2190,7 +2190,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
 app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
+      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url
        FROM contacts WHERE user_id = $1 ORDER BY is_me DESC NULLS LAST, name ASC NULLS LAST`,
       [req.user.id]
     );

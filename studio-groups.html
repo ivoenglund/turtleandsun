@@ -25,8 +25,6 @@
   .arr{width:14px;display:inline-block;color:var(--mut);font-size:11px;}
   .addg{color:var(--green2);font-weight:700;padding:7px 10px;cursor:pointer;font-size:13.5px;}
   .main{flex:1;min-width:0;}
-  .crumb{font-size:12.5px;color:rgba(28,10,0,0.55);margin-bottom:1px;}
-  h1{font-size:19px;margin:0 0 8px;}
   .tabs{display:flex;gap:4px;border-bottom:1px solid rgba(28,10,0,0.15);margin-bottom:12px;flex-wrap:wrap;}
   .tab{padding:7px 12px;font-size:13.5px;cursor:pointer;color:#4a553f;border-bottom:3px solid transparent;}
   .tab.active{color:var(--green2);font-weight:700;border-bottom-color:var(--green2);}
@@ -34,7 +32,8 @@
   /* Excel-style grid */
   table.grid{width:100%;border-collapse:collapse;font-size:13px;border:1px solid var(--gridline);}
   .grid th,.grid td{text-align:left;padding:1px 6px;border:1px solid var(--gridline);vertical-align:middle;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .grid th{color:#5d5747;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;background:#F4F1E6;padding-top:3px;padding-bottom:3px;position:relative;}
+  .grid th{color:#5d5747;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;background:#F4F1E6;padding-top:3px;padding-bottom:3px;position:relative;user-select:none;}
+  .grid th.sortable{cursor:pointer;}
   .rsz{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:5;}
   .grid tr:nth-child(even) td{background:#FDFCF7;}
   .grid td.ed{cursor:text;}
@@ -42,6 +41,7 @@
   td input,td select{font-size:12.5px;padding:2px 5px;}
   .pencil{cursor:pointer;opacity:.45;font-size:13px;padding:0 3px;}
   .pencil:hover{opacity:1;}
+  .thumb{width:20px;height:20px;border-radius:50%;object-fit:cover;display:block;}
   .tools{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
   .colwrap{position:relative;display:inline-flex;gap:6px;align-items:center;margin-left:auto;}
   .coldd{position:absolute;right:0;top:calc(100% + 5px);background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px;z-index:900;box-shadow:0 8px 30px rgba(0,0,0,0.16);min-width:170px;}
@@ -68,6 +68,10 @@
   .search{max-width:300px;padding:6px 11px;border-radius:9px;}
   .flt{font-size:12.5px;display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;}
   .flt input{width:auto;margin:0;}
+  .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:6px 10px;margin-bottom:8px;font-size:13px;}
+  .dupblock{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:12px;}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1C2A14;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;z-index:4000;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.3);}
+  .toast button{background:none;border:none;color:var(--yellow);font-weight:700;cursor:pointer;font-size:13.5px;padding:0;}
   /* Modal */
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:3000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;}
   .modal-bg.open{display:flex;}
@@ -79,11 +83,6 @@
   .modal input,.modal select{width:100%;}
   .modal .foot{display:flex;gap:10px;margin-top:16px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
   .modal .foot .left{margin-right:auto;}
-  .picklist{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px;}
-  .pickrow{display:flex;align-items:center;gap:10px;padding:5px 11px;border-bottom:1px solid #f2eee2;cursor:pointer;font-size:13.5px;}
-  .pickrow:hover{background:#FBF9F0;}
-  .pickrow input{width:auto;}
-  .pickrow .sub2{font-size:12px;color:var(--mut);margin-left:auto;}
   .occrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f2eee2;font-size:13px;flex-wrap:wrap;}
   @media(max-width:800px){.wrap{flex-direction:column;}.side{width:100%;}.modal .grid2{grid-template-columns:1fr;}}
 </style></head>
@@ -92,6 +91,7 @@
   <div class="side">
     <div class="lbl">Pool</div>
     <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
+    <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
@@ -100,6 +100,7 @@
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fDead" checked> Deceased</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPeople" checked> People</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
+    <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fNoBday"> Missing birthday <span class="ct" id="noBdayCount"></span></label>
   </div>
 
   <div class="main">
@@ -116,6 +117,7 @@
       <div class="tools">
         <button class="btn pub" id="shareBtn">🔗 Share fill-in link</button>
         <button class="btn gray" id="addMemberBtn">＋ Add from pool</button>
+        <input class="search" id="medSearch" type="text" placeholder="Search…" autocomplete="off" style="max-width:180px;">
         <span id="medColsHost"></span>
       </div>
       <div class="selbox hide" id="shareBox"></div>
@@ -128,18 +130,28 @@
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
         <span id="konColsHost"></span>
       </div>
+      <div class="bulkbar hide" id="bulkBar">
+        <b><span id="bulkCount">0</span> selected:</b>
+        <select id="bulkGroupSel" style="max-width:160px;"></select>
+        <button class="btn sm gray" id="bulkAddGroup">Add to group</button>
+        <button class="btn sm gray" id="bulkCity">Set city…</button>
+        <button class="btn sm gray" id="bulkCountry">Set country…</button>
+        <button class="btn sm danger" id="bulkDelete">Delete</button>
+        <button class="btn sm gray" id="bulkClear" style="margin-left:auto;">Clear selection</button>
+      </div>
       <div class="panel" id="conPanel"></div>
-      <div class="help">Click a cell to edit it in place (Enter saves, Esc cancels). ✎ opens the full editor. ⚙ chooses columns.</div>
+      <div class="help">Click a cell to edit (Enter = save &amp; next row, Tab = next cell, Esc = cancel). Click a header to sort. ✎ opens the full editor.</div>
     </div>
 
     <!-- OCCASIONS -->
     <div id="occ" class="hide">
       <div class="tools">
-        <span class="muted" style="font-size:13px;">All occasions &amp; birthdays by next date</span>
+        <button class="btn gray" id="occAddBtn">＋ Add occasion</button>
+        <input class="search" id="occSearch" type="text" placeholder="Search…" autocomplete="off" style="max-width:180px;">
         <span id="occColsHost"></span>
       </div>
       <div class="panel" id="occPanel"><div class="empty">Loading…</div></div>
-      <div class="help">Click a cell to edit in place; ✎ opens the full editor. ⚙ chooses columns.</div>
+      <div class="help">Occasions and birthdays for the chosen selection. Click a cell to edit in place; click a header to sort; ✎ opens the full editor.</div>
     </div>
 
     <!-- MAP -->
@@ -164,12 +176,21 @@
     <div id="exp" class="hide">
       <div class="panel" style="max-width:520px;padding:16px 18px;">
         <h3 style="margin-top:0">Export &amp; share</h3>
-        <div class="help" style="margin-top:0">Exports the members shown in the selected group — with real data.</div>
+        <div class="help" style="margin-top:0">Exports the chosen selection — group members or all contacts, with the sidebar filters applied.</div>
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
           <button class="btn gray" id="expCsv">⬇︎ Excel / attendee list (CSV)</button>
           <button class="btn gray" id="expVcf">⬇︎ vCard (phone)</button>
+          <button class="btn pub" id="printCalBtn">🖨 Open print calendar</button>
         </div>
+        <div class="help">The print calendar opens with this group pre-selected (its own filters can change it there).</div>
       </div>
+    </div>
+
+    <!-- DUPLICATES -->
+    <div id="dup" class="hide">
+      <div class="tools"><b style="font-size:14px;">Possible duplicates</b><span class="muted" style="font-size:12.5px;">— same name or same email</span></div>
+      <div id="dupPanel"></div>
+      <div class="help">“Keep” merges the others into that contact: missing fields fill in, occasions and group memberships move over, then the duplicates are deleted. This cannot be undone.</div>
     </div>
   </div>
 </div>
@@ -211,11 +232,12 @@
   </div>
 </div>
 
-<!-- Occasion editor modal -->
+<!-- Occasion editor modal (edit + create) -->
 <div class="modal-bg" id="occModalBg">
   <div class="modal" style="max-width:440px;">
-    <h3>Edit occasion</h3>
+    <h3 id="occModalTitle">Edit occasion</h3>
     <div class="grid2">
+      <div class="full hide" id="oe_contact_row"><label>Contact</label><select id="oe_contact"></select></div>
       <div class="full"><label>Occasion</label><input id="oe_name" autocomplete="off"></div>
       <div><label>Date</label><input id="oe_date" type="date" autocomplete="off"></div>
       <div><label>Repeats</label><select id="oe_freq"><option value="yearly">Yearly</option><option value="milestone">Milestone</option><option value="once">One-time</option></select></div>
@@ -242,6 +264,11 @@ let current = null;
 let mapObj = null;
 let editingContactId = null;
 let editingOccasion = null;
+let occCreateMode = false;
+let memEdit = false;
+let bulkSel = new Set();
+let conListIds = [];   // row order of last contacts render (for keyboard nav)
+let conEditKeys = [];  // editable column keys of last contacts render
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
@@ -251,40 +278,61 @@ async function api(path, opts){
   return data;
 }
 
-// ── Column preferences (persisted in this browser) ──
+// ── Toast with optional Undo ──
+let toastTimer=null, toastEl=null;
+function showToast(msg, undoFn){
+  if(toastEl) toastEl.remove();
+  clearTimeout(toastTimer);
+  toastEl=document.createElement('div');
+  toastEl.className='toast';
+  toastEl.innerHTML='<span>'+esc(msg)+'</span>';
+  if(undoFn){
+    const b=document.createElement('button'); b.textContent='Undo';
+    b.onclick=async()=>{ toastEl.remove(); toastEl=null; try{ await undoFn(); }catch(e){ alert('Undo failed: '+e.message); } };
+    toastEl.appendChild(b);
+  }
+  document.body.appendChild(toastEl);
+  toastTimer=setTimeout(()=>{ if(toastEl){ toastEl.remove(); toastEl=null; } },6000);
+}
+
+// ── Column prefs + sorting (persisted in this browser) ──
 let COLPREFS = {};
 try { COLPREFS = JSON.parse(localStorage.getItem('ts_studio_cols')||'{}'); } catch(e){ COLPREFS={}; }
 function savePrefs(){ try{ localStorage.setItem('ts_studio_cols',JSON.stringify(COLPREFS)); }catch(e){} }
 function activeCols(tableKey, cols, defaults){
   if(COLPREFS[tableKey+'::all']) return cols;
   const saved = COLPREFS[tableKey];
-  const act = new Set(Array.isArray(saved) && saved.length ? saved : defaults); // empty selection → defaults, never a blank grid
+  const act = new Set(Array.isArray(saved) && saved.length ? saved : defaults);
   return cols.filter(c=>act.has(c.key));
 }
-// ── Global filters (sidebar): apply to every view ──
-function passesFilterC(c){
-  const dead = !!c.died_on, pet = !!c.is_pet;
-  if(dead && !$('#fDead').checked) return false;
-  if(!dead && !$('#fLiving').checked) return false;
-  if(pet && !$('#fPets').checked) return false;
-  if(!pet && !$('#fPeople').checked) return false;
-  return true;
+function getSort(tableKey, def){ return COLPREFS[tableKey+'::sort'] || def || null; }
+function setSort(tableKey, s){ COLPREFS[tableKey+'::sort']=s; savePrefs(); }
+function cmpVals(a,b){
+  if(a==null&&b==null) return 0; if(a==null) return 1; if(b==null) return -1;
+  if(typeof a==='number'&&typeof b==='number') return a-b;
+  return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:'base'});
 }
-function passesFilterId(cid){
-  const c = contactsPool.find(x=>x.id===cid);
-  return c ? passesFilterC(c) : true;
+function sortIndicator(tableKey, colKey){
+  const s=getSort(tableKey);
+  return (s&&s.key===colKey) ? (s.dir>0?' ▲':' ▼') : '';
 }
-// ── The chosen set: sidebar selection (group or All contacts) + filters. Drives every tab. ──
-function chosenIds(){
-  if(selected && current) return new Set(current.members.filter(m=>passesFilterId(m.contact_id)).map(m=>m.contact_id));
-  return new Set(contactsPool.filter(passesFilterC).map(c=>c.id));
+function wireSort(panelSel, tableKey, sortableKeys, rerender){
+  document.querySelectorAll(panelSel+' table.grid tr:first-child th').forEach(th=>{
+    const k=th.dataset.k;
+    if(!k || !sortableKeys.includes(k)) return;
+    th.classList.add('sortable');
+    th.addEventListener('click',e=>{
+      if(e.target.classList.contains('rsz')) return;
+      const s=getSort(tableKey);
+      setSort(tableKey, (s&&s.key===k) ? {key:k,dir:-s.dir} : {key:k,dir:1});
+      rerender();
+    });
+  });
 }
-function chosenLabel(){ return selected ? selected.name : 'All contacts'; }
 function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   const host = document.getElementById(hostId);
   if(host.dataset.built) return; host.dataset.built='1';
   host.className='colwrap';
-  // Toggle: my selection ⇄ all columns
   const allBtn=document.createElement('button');
   allBtn.className='btn sm gray';
   const allLbl=()=>{ allBtn.textContent = COLPREFS[tableKey+'::all'] ? '▣ My columns' : '▦ All columns'; };
@@ -294,19 +342,18 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
     COLPREFS[tableKey+'::all']=!COLPREFS[tableKey+'::all'];
     savePrefs(); allLbl(); rerender();
   };
-  // Column chooser dropdown
   const btn=document.createElement('button');
   btn.className='btn sm gray'; btn.textContent='⚙ Columns';
   const dd=document.createElement('div'); dd.className='coldd hide';
   const saved = COLPREFS[tableKey];
-  const act = new Set(Array.isArray(saved) ? saved : defaults);
+  const act = new Set(Array.isArray(saved)&&saved.length ? saved : defaults);
   cols.forEach(c=>{
     const l=document.createElement('label'); l.className='colopt';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=act.has(c.key);
     cb.onchange=()=>{
       if(cb.checked) act.add(c.key); else act.delete(c.key);
       COLPREFS[tableKey]=[...act];
-      COLPREFS[tableKey+'::all']=false; // editing the set returns to "my columns" view
+      COLPREFS[tableKey+'::all']=false;
       savePrefs(); allLbl(); rerender();
     };
     l.appendChild(cb); l.appendChild(document.createTextNode(c.label));
@@ -317,15 +364,13 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   host.appendChild(allBtn); host.appendChild(btn); host.appendChild(dd);
 }
 
-// ── Resizable columns: auto-fit to content on render; drag header edge to override
-//    (persisted); double-click the divider to reset a column to auto-fit. ──
+// ── Resizable columns: auto-fit on render, drag to override, dblclick divider resets ──
 function makeResizable(panelSel, tableKey){
   const table = document.querySelector(panelSel+' table.grid');
   if(!table) return;
   const ths=[...table.querySelectorAll('tr:first-child th')];
   const widths = COLPREFS[tableKey+'::w'] || {};
   function autofit(){
-    // Let the browser lay out by content, measure, then lock the widths.
     table.style.tableLayout='auto'; table.style.width='auto';
     ths.forEach(th=>{ const k=th.dataset.k||''; th.style.width = widths[k] ? widths[k]+'px' : ''; });
     const measured = ths.map(th=>Math.max(28, Math.min(360, th.offsetWidth+2)));
@@ -333,7 +378,7 @@ function makeResizable(panelSel, tableKey){
     table.style.width='100%'; table.style.tableLayout='fixed';
   }
   ths.forEach((th,idx)=>{
-    if(idx===0) return; // pencil/checkbox column: auto-fit only
+    if(idx===0) return;
     const key = th.dataset.k || ('c'+idx);
     const h=document.createElement('span'); h.className='rsz';
     th.appendChild(h);
@@ -356,7 +401,7 @@ function makeResizable(panelSel, tableKey){
   autofit();
 }
 
-// ── Inline cell editing ──
+// ── Inline cell editing (Enter=save+down, Tab=save+next, Esc=cancel) ──
 function makeEditable(td, opts){
   td.classList.add('ed');
   td.onclick = ()=>{
@@ -378,13 +423,14 @@ function makeEditable(td, opts){
     if(ctl.select) try{ ctl.select(); }catch(e){}
     let done=false;
     const finish=async(save)=>{
-      if(done) return; done=true;
-      if(!save){ td.innerHTML=old; return; }
-      try{ await opts.onSave(ctl.value); }
-      catch(e){ alert('Save failed: '+e.message); td.innerHTML=old; }
+      if(done) return false; done=true;
+      if(!save){ td.innerHTML=old; return false; }
+      try{ await opts.onSave(ctl.value); return true; }
+      catch(e){ alert('Save failed: '+e.message); td.innerHTML=old; return false; }
     };
-    ctl.addEventListener('keydown',e=>{
-      if(e.key==='Enter'){ e.preventDefault(); finish(true); }
+    ctl.addEventListener('keydown',async e=>{
+      if(e.key==='Enter'){ e.preventDefault(); if(await finish(true) && opts.onNav) opts.onNav('down'); }
+      else if(e.key==='Tab'){ e.preventDefault(); const dir=e.shiftKey?'left':'right'; if(await finish(true) && opts.onNav) opts.onNav(dir); }
       else if(e.key==='Escape'){ finish(false); }
     });
     ctl.addEventListener('blur',()=>finish(true));
@@ -392,9 +438,11 @@ function makeEditable(td, opts){
   };
 }
 
-async function saveContactField(cid, field, value){
+// Contact save with one field changed; shows undo toast unless silent
+async function saveContactField(cid, field, value, silent){
   const c = contactsPool.find(x=>x.id===cid);
   if(!c) throw new Error('Contact not in cache');
+  const prev = c[field] ?? null;
   const body = {
     name:c.name, email:c.email, phone:c.phone, company:c.company,
     street:c.street, street_2:c.street_2, city:c.city, region:c.region,
@@ -404,12 +452,54 @@ async function saveContactField(cid, field, value){
   body[field] = value===''?null:value;
   await api('/api/contacts/'+cid,{method:'PUT',body:JSON.stringify(body)});
   c[field] = body[field];
+  if(!silent){
+    const label = (c.name||'contact')+' · '+field.replace('_',' ');
+    showToast('Saved '+label, async()=>{
+      await saveContactField(cid, field, (field==='birthday'||field==='died_on')?d10(prev):(prev==null?'':prev), true);
+      rerenderAll();
+    });
+  }
+}
+function rerenderAll(){
+  renderContactsTable();
+  if(current){ renderMembers(); renderMap(); }
+  if(!$('#occ').classList.contains('hide')) loadOccasions();
+  updateSideCounts();
+}
+
+// ── Global filters ──
+function passesFilterC(c){
+  const dead = !!c.died_on, pet = !!c.is_pet;
+  if(dead && !$('#fDead').checked) return false;
+  if(!dead && !$('#fLiving').checked) return false;
+  if(pet && !$('#fPets').checked) return false;
+  if(!pet && !$('#fPeople').checked) return false;
+  if($('#fNoBday').checked && c.birthday) return false;
+  return true;
+}
+function passesFilterId(cid){
+  const c = contactsPool.find(x=>x.id===cid);
+  return c ? passesFilterC(c) : true;
+}
+function chosenIds(){
+  if(selected && current) return new Set(current.members.filter(m=>passesFilterId(m.contact_id)).map(m=>m.contact_id));
+  return new Set(contactsPool.filter(passesFilterC).map(c=>c.id));
+}
+function chosenLabel(){ return selected ? selected.name : 'All contacts'; }
+function chosenContacts(){
+  const ids = chosenIds();
+  return contactsPool.filter(c=>ids.has(c.id));
 }
 
 function countFor(node){
   const direct = memberships.filter(m=>m.group_id===node.id).length;
   const kids = (node.subgroups||[]).reduce((s,c)=>s+countFor(c),0);
   return direct + kids;
+}
+function flatGroups(){
+  const out=[];
+  (function walk(list,depth){ list.forEach(g=>{ out.push({id:g.id,name:' '.repeat(depth*2)+g.name}); walk(g.subgroups||[],depth+1); }); })(groups,0);
+  return out;
 }
 
 function renderTree(){
@@ -426,14 +516,20 @@ function renderTree(){
   groups.forEach(g=>row(g,0));
 }
 
+function updateSideCounts(){
+  $('#poolCount').textContent = contactsPool.length;
+  $('#noBdayCount').textContent = '('+contactsPool.filter(c=>!c.birthday).length+')';
+  $('#dupCount').textContent = computeDupClusters().length;
+}
+
 async function loadAll(){
   $('#poolCount').textContent='…';
   const [g, ms, cs] = await Promise.all([
     api('/api/groups'), api('/api/group-memberships'), api('/api/contacts')
   ]);
   groups=g||[]; memberships=ms||[]; contactsPool=cs||[];
-  $('#poolCount').textContent = contactsPool.length;
   renderTree();
+  updateSideCounts();
   renderContactsTable();
 }
 
@@ -442,6 +538,7 @@ async function selectGroup(node){
   memEdit = false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
   $('#poolRow').classList.remove('active');
+  $('#dupRow').classList.remove('active');
   $('#shareBox').classList.add('hide');
   $('#bokSrc').textContent = 'Source: '+node.name;
   current = await api('/api/groups/'+node.id+'/members');
@@ -461,6 +558,9 @@ function statusBadge(s){
   const map={active:['st-active','active'],invited:['st-invited','invited'],ended:['st-ended','ended']};
   const [c,l]=map[s]||map.active; return `<span class="stbadge ${c}">${l}</span>`;
 }
+function photoCell(url){
+  return url ? '<img class="thumb" src="'+esc(url)+'" loading="lazy">' : '<span class="dot no"></span>';
+}
 
 // ── Members grid ──
 const MED_COLS = [
@@ -472,14 +572,22 @@ const MED_COLS = [
   {key:'photo',   label:'Photo'},
 ];
 const MED_DEFAULT = ['name','subgroup','range','alsoin','status','photo'];
+const MED_SORT_ACC = {
+  name:m=>m.name, subgroup:m=>m.subgroup_name, range:m=>d10(m.from_date)||null,
+  alsoin:m=>(m.also_in||[]).map(g=>g.name).join(','), status:m=>m.status, photo:m=>m.photo_url?0:1
+};
 function renderMembers(){
   if(!current){ return; }
   if(memEdit && selected){ renderMemberEdit(); return; }
   buildColPicker('medColsHost','members',MED_COLS,MED_DEFAULT,renderMembers);
   const cols = activeCols('members',MED_COLS,MED_DEFAULT);
-  const rows = current.members.filter(m=>passesFilterId(m.contact_id));
-  if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">'+(current.members.length?'All members are hidden by the sidebar filters.':'No members yet. Use “Add from pool” or share a fill-in link.')+'</div>'; return; }
-  let html = `<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}<th data-k="act"></th></tr>`;
+  const q=($('#medSearch').value||'').toLowerCase();
+  let rows = current.members.filter(m=>passesFilterId(m.contact_id)
+    && (!q || ((m.name||'')+' '+(m.subgroup_name||'')).toLowerCase().includes(q)));
+  const s=getSort('members');
+  if(s && MED_SORT_ACC[s.key]) rows=[...rows].sort((a,b)=>s.dir*cmpVals(MED_SORT_ACC[s.key](a),MED_SORT_ACC[s.key](b)));
+  if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">'+(current.members.length?'Nothing matches the filters/search.':'No members yet. Use “Add from pool” or share a fill-in link.')+'</div>'; return; }
+  let html = `<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+sortIndicator('members',c.key)+'</th>').join('')}<th data-k="act"></th></tr>`;
   rows.forEach(m=>{
     const cells = cols.map(c=>{
       if(c.key==='name') return `<td style="font-weight:600;">${esc(m.name)||'(unnamed)'}${m.self_managed?' <span class="self">✓</span>':''}</td>`;
@@ -487,7 +595,7 @@ function renderMembers(){
       if(c.key==='range') return `<td class="rng">${fmtRange(m)}</td>`;
       if(c.key==='alsoin') return `<td>${(m.also_in||[]).map(g=>`<span class="tag alt">${esc(g.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>`;
       if(c.key==='status') return `<td>${statusBadge(m.status)}</td>`;
-      if(c.key==='photo') return `<td><span class="dot ${m.photo_url?'ok':'no'}"></span></td>`;
+      if(c.key==='photo') return `<td>${photoCell(m.photo_url)}</td>`;
       return '<td></td>';
     }).join('');
     html += `<tr data-cid="${m.contact_id}" data-gid="${m.subgroup_id||current.group.id}">
@@ -499,9 +607,11 @@ function renderMembers(){
   html+='</table>';
   $('#memPanel').innerHTML=html;
   makeResizable('#memPanel','members');
+  wireSort('#memPanel','members',cols.map(c=>c.key),renderMembers);
   $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
   $('#memPanel').querySelectorAll('.conPencil').forEach(p=>p.onclick=()=>openContactModal(+p.dataset.cid));
 }
+$('#medSearch').oninput=()=>renderMembers();
 
 function openEdit(e){
   const tr = e.target.closest('tr');
@@ -509,7 +619,7 @@ function openEdit(e){
   const m = current.members.find(x=>x.contact_id===cid && ((x.subgroup_id||current.group.id)===gid));
   const f = d10(m.from_date), t = d10(m.to_date);
   let cell = tr.querySelector('.rng');
-  if(!cell){ cell = tr.querySelector('td:nth-child(2)'); } // range column hidden → use name cell area
+  if(!cell){ cell = tr.cells[1]; }
   cell.innerHTML = `<input type="date" class="ef" value="${f}"> – <input type="date" class="et" value="${t}">
     <select class="es"><option value="active"${m.status==='active'?' selected':''}>active</option>
     <option value="invited"${m.status==='invited'?' selected':''}>invited</option>
@@ -528,8 +638,62 @@ function openEdit(e){
   cell.querySelector('.rmB').onclick=async()=>{
     if(!confirm('Remove '+(m.name||'this member')+' from this group? (The person stays in the pool.)')) return;
     await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
-    await loadAll(); current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
+    memberships = await api('/api/group-memberships'); renderTree();
+    current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
   };
+}
+
+// ── Add from pool: inline grid with Member checkbox column ──
+$('#addMemberBtn').onclick=async()=>{
+  if(!selected){ alert('Select a group first.'); return; }
+  memEdit = !memEdit;
+  $('#addMemberBtn').textContent = memEdit ? '✓ Done' : '＋ Add from pool';
+  if(memEdit){ renderMemberEdit(); }
+  else {
+    memberships = await api('/api/group-memberships'); renderTree();
+    current = await api('/api/groups/'+selected.id+'/members');
+    renderMembers(); renderMap();
+  }
+};
+function renderMemberEdit(){
+  const inGroup = new Map();
+  (current?current.members:[]).forEach(m=>inGroup.set(m.contact_id, m.subgroup_id||selected.id));
+  const q=($('#medSearch').value||'').toLowerCase();
+  const list = contactsPool.filter(c=>passesFilterC(c)
+    && (!q || ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q)));
+  let html = `<table class="grid"><tr><th data-k="chk" style="width:64px;">Member</th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="city">City</th><th data-k="birthday">Birthday</th></tr>`;
+  list.forEach(c=>{
+    html += `<tr data-cid="${c.id}">
+      <td style="text-align:center;"><input type="checkbox" class="memChk"${inGroup.has(c.id)?' checked':''}></td>
+      <td><b>${esc(c.name)||'(unnamed)'}</b>${c.is_pet?' 🐾':''}${c.died_on?' <span class="muted">✝</span>':''}</td>
+      <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
+      <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
+      <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
+    </tr>`;
+  });
+  html += '</table><div class="help">Tick to add to “'+esc(selected.name)+'”, untick to remove (the person stays in the pool). Click “✓ Done” above when finished.</div>';
+  $('#memPanel').innerHTML = html;
+  makeResizable('#memPanel','memedit');
+  $('#memPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
+    const cid=+tr.dataset.cid;
+    tr.querySelector('.memChk').onchange=async(e)=>{
+      const cb=e.target; cb.disabled=true;
+      try{
+        if(cb.checked){
+          await api('/api/memberships',{method:'PUT',body:JSON.stringify({
+            contact_id:cid, group_id:selected.id, from_date:new Date().toISOString().slice(0,10), status:'active'
+          })});
+          inGroup.set(cid, selected.id);
+        } else {
+          const gid = inGroup.get(cid) || selected.id;
+          await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
+          inGroup.delete(cid);
+        }
+        current = await api('/api/groups/'+selected.id+'/members');
+      }catch(err){ alert('Failed: '+err.message); cb.checked=!cb.checked; }
+      cb.disabled=false;
+    };
+  });
 }
 
 // ── All contacts grid ──
@@ -546,23 +710,46 @@ const CON_COLS = [
   {key:'country',    label:'Country',  type:'text'},
   {key:'birthday',   label:'Birthday', type:'date'},
   {key:'died_on',    label:'Died on',  type:'date'},
+  {key:'photo',      label:'Photo',    type:null},
 ];
 const CON_DEFAULT = ['name','email','phone','city','birthday'];
+function conNav(cid, field, dir){
+  let r = conListIds.indexOf(cid), c = conEditKeys.indexOf(field);
+  if(r<0||c<0) return;
+  if(dir==='right'){ c++; if(c>=conEditKeys.length){ c=0; r++; } }
+  else if(dir==='left'){ c--; if(c<0){ c=conEditKeys.length-1; r--; } }
+  else if(dir==='down'){ r++; }
+  if(r<0||r>=conListIds.length) return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const tr=document.querySelector('#conPanel tr[data-cid="'+conListIds[r]+'"]');
+    const td=tr&&tr.querySelector('td[data-f="'+conEditKeys[c]+'"]');
+    if(td) td.click();
+  }));
+}
 function renderContactsTable(){
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   const cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
   const q = ($('#conSearch').value||'').toLowerCase();
-  const list = contactsPool.filter(c=>{
+  let list = contactsPool.filter(c=>{
     if(!passesFilterC(c)) return false;
     if(!q) return true;
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
-  if(!list.length){ $('#conPanel').innerHTML='<div class="empty">No contacts'+(q?' match your search':' yet')+'.</div>'; return; }
-  let html = `<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}</tr>`;
+  const s=getSort('contacts');
+  if(s) list=[...list].sort((a,b)=>s.dir*cmpVals(
+    s.key==='photo' ? (a.photo_url?0:1) : (s.key==='birthday'||s.key==='died_on') ? d10(a[s.key])||null : a[s.key],
+    s.key==='photo' ? (b.photo_url?0:1) : (s.key==='birthday'||s.key==='died_on') ? d10(b[s.key])||null : b[s.key]
+  ));
+  conListIds = list.map(c=>c.id);
+  conEditKeys = cols.filter(c=>c.type).map(c=>c.key);
+  if(!list.length){ $('#conPanel').innerHTML='<div class="empty">No contacts'+(q?' match your search':' match the filters')+'.</div>'; updateBulkBar(); return; }
+  let html = `<table class="grid"><tr><th data-k="pin"></th><th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+sortIndicator('contacts',c.key)+'</th>').join('')}</tr>`;
   list.forEach(c=>{
     html += `<tr data-cid="${c.id}">
       <td><span class="pencil conPencil" title="Full editor (all fields, occasions)">✎</span></td>
+      <td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>
       ${cols.map(col=>{
+        if(col.key==='photo') return `<td>${photoCell(c.photo_url)}</td>`;
         const raw = col.type==='date' ? d10(c[col.key]) : (c[col.key]||'');
         let disp = esc(raw)||'<span class="muted">—</span>';
         if(col.key==='name') disp = '<b>'+ (esc(raw)||'<span class="muted">(unnamed)</span>') +'</b>'
@@ -574,38 +761,74 @@ function renderContactsTable(){
   html += '</table>';
   $('#conPanel').innerHTML = html;
   makeResizable('#conPanel','contacts');
+  wireSort('#conPanel','contacts',cols.map(c=>c.key),renderContactsTable);
+  const selAll=$('#selAll');
+  if(selAll) selAll.onchange=()=>{
+    if(selAll.checked) list.forEach(c=>bulkSel.add(c.id)); else list.forEach(c=>bulkSel.delete(c.id));
+    renderContactsTable();
+  };
   $('#conPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
     const cid = +tr.dataset.cid;
     tr.querySelector('.conPencil').onclick=()=>openContactModal(cid);
+    tr.querySelector('.selChk').onchange=(e)=>{
+      if(e.target.checked) bulkSel.add(cid); else bulkSel.delete(cid);
+      updateBulkBar();
+    };
     cols.forEach(col=>{
+      if(!col.type) return;
       const td = tr.querySelector(`td[data-f="${col.key}"]`);
+      if(!td) return;
       makeEditable(td,{
         type: col.type,
         value: ()=>{ const c=contactsPool.find(x=>x.id===cid); return col.type==='date'?d10(c[col.key]):(c[col.key]||''); },
-        onSave: async(v)=>{ await saveContactField(cid,col.key,v); renderContactsTable(); }
+        onSave: async(v)=>{ await saveContactField(cid,col.key,v); renderContactsTable(); },
+        onNav: (dir)=>conNav(cid,col.key,dir)
       });
     });
   });
+  updateBulkBar();
 }
 $('#conSearch').oninput = renderContactsTable;
-// Sidebar filter checkboxes: restore saved state, save on change, re-render every view
-(function(){
-  let saved={};
-  try{ saved=JSON.parse(localStorage.getItem('ts_studio_filters')||'{}'); }catch(e){}
-  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets'};
-  Object.entries(boxes).forEach(([id,key])=>{
-    const cb=document.getElementById(id);
-    if(typeof saved[key]==='boolean') cb.checked=saved[key];
-    cb.onchange=()=>{
-      const out={};
-      Object.entries(boxes).forEach(([i2,k2])=>out[k2]=document.getElementById(i2).checked);
-      try{ localStorage.setItem('ts_studio_filters',JSON.stringify(out)); }catch(e){}
-      renderContactsTable();
-      if(current){ renderMembers(); renderMap(); }
-      if(!document.getElementById('occ').classList.contains('hide')) loadOccasions();
-    };
-  });
-})();
+
+// ── Bulk actions ──
+function updateBulkBar(){
+  const bar=$('#bulkBar');
+  if(!bulkSel.size){ bar.classList.add('hide'); return; }
+  bar.classList.remove('hide');
+  $('#bulkCount').textContent=bulkSel.size;
+  const sel=$('#bulkGroupSel'); sel.innerHTML='';
+  flatGroups().forEach(g=>{ const o=document.createElement('option'); o.value=g.id; o.textContent=g.name; sel.appendChild(o); });
+}
+$('#bulkClear').onclick=()=>{ bulkSel.clear(); renderContactsTable(); };
+$('#bulkAddGroup').onclick=async()=>{
+  const gid=+$('#bulkGroupSel').value;
+  if(!gid){ alert('No group selected.'); return; }
+  const today=new Date().toISOString().slice(0,10);
+  for(const cid of bulkSel){
+    await api('/api/memberships',{method:'PUT',body:JSON.stringify({contact_id:cid,group_id:gid,from_date:today,status:'active'})});
+  }
+  memberships = await api('/api/group-memberships'); renderTree();
+  if(selected){ current = await api('/api/groups/'+selected.id+'/members'); }
+  showToast(bulkSel.size+' added to group');
+  bulkSel.clear(); renderContactsTable();
+};
+async function bulkSetField(field, label){
+  const v=prompt(label+' for '+bulkSel.size+' contacts (empty clears):');
+  if(v===null) return;
+  for(const cid of bulkSel) await saveContactField(cid, field, v.trim(), true);
+  showToast(field+' set on '+bulkSel.size+' contacts (no undo for bulk)');
+  bulkSel.clear(); rerenderAll();
+}
+$('#bulkCity').onclick=()=>bulkSetField('city','City');
+$('#bulkCountry').onclick=()=>bulkSetField('country','Country');
+$('#bulkDelete').onclick=async()=>{
+  if(!confirm('Delete '+bulkSel.size+' contacts completely? Removes group memberships and occasions too. Cannot be undone.')) return;
+  for(const cid of bulkSel) await api('/api/contacts/'+cid,{method:'DELETE'});
+  bulkSel.clear();
+  await loadAll();
+  if(selected){ current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap(); }
+  showToast('Deleted');
+};
 
 // ── Contact editor modal ──
 const CF = ['name','email','phone','company','street','street_2','city','region','country','postal_code'];
@@ -631,8 +854,15 @@ async function renderConOccList(cid){
     </div>`).join('') : '<div class="muted" style="padding:6px 0;font-size:13px;">No occasions yet (birthday counts automatically if set above).</div>';
   $('#conOccList').querySelectorAll('.occDel').forEach(b=>b.onclick=async(e)=>{
     const oid=+e.target.closest('.occrow').dataset.oid;
+    const o=occs.find(x=>x.id===oid);
     if(!confirm('Delete this occasion?')) return;
     await api('/api/occasions/'+oid,{method:'DELETE'});
+    showToast('Occasion deleted', async()=>{
+      await api('/api/contacts/'+cid+'/occasions',{method:'POST',body:JSON.stringify({
+        name:o.name, start_date:d10(o.start_date), frequency:o.frequency, notes:o.notes||null })});
+      if($('#conModalBg').classList.contains('open')) renderConOccList(cid);
+      loadOccasions();
+    });
     await renderConOccList(cid); loadOccasions();
   });
   $('#conOccList').querySelectorAll('.occEdit').forEach(b=>b.onclick=(e)=>{
@@ -691,6 +921,11 @@ const OCC_COLS = [
   {key:'notes',  label:'Notes'},
 ];
 const OCC_DEFAULT = ['next','in','who','what','freq','since'];
+const OCC_SORT_ACC = {
+  next:it=>it.next?it.next.getTime():null, in:it=>it.next?it.next.getTime():null,
+  who:it=>it.who, what:it=>it.what, freq:it=>it.frequency||'once',
+  since:it=>d10(it.start_date)||null, notes:it=>it.notes||null
+};
 let occItemsCache=[];
 async function loadOccasions(){
   buildColPicker('occColsHost','occasions',OCC_COLS,OCC_DEFAULT,loadOccasions);
@@ -712,14 +947,15 @@ async function loadOccasions(){
       start_date:c.birthday, frequency:'yearly', next:nextYearly(c.birthday,today)});
   });
   const ids = chosenIds();
-  const visible = items.filter(it=>ids.has(it.contact_id));
-  visible.sort((a,b)=>{
-    if(!a.next&&!b.next) return 0; if(!a.next) return 1; if(!b.next) return -1;
-    return a.next-b.next;
-  });
+  const q=($('#occSearch').value||'').toLowerCase();
+  let visible = items.filter(it=>ids.has(it.contact_id)
+    && (!q || ((it.who||'')+' '+(it.what||'')).toLowerCase().includes(q)));
+  const s=getSort('occasions',{key:'next',dir:1});
+  const acc=OCC_SORT_ACC[s.key]||OCC_SORT_ACC.next;
+  visible.sort((a,b)=>s.dir*cmpVals(acc(a),acc(b)));
   occItemsCache=visible;
-  if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Nothing to show for '+esc(chosenLabel())+' with the current filters.':'No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.')+'</div>'; return; }
-  let html=`<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}</tr>`;
+  if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Nothing to show for '+esc(chosenLabel())+' with the current filters/search.':'No occasions or birthdays yet.')+'</div>'; return; }
+  let html=`<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+sortIndicator('occasions',c.key)+'</th>').join('')}</tr>`;
   visible.forEach((it,i)=>{
     const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
     const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
@@ -739,6 +975,7 @@ async function loadOccasions(){
   html+='</table>';
   $('#occPanel').innerHTML=html;
   makeResizable('#occPanel','occasions');
+  wireSort('#occPanel','occasions',cols.map(c=>c.key),loadOccasions);
   $('#occPanel').querySelectorAll('tr[data-i]').forEach(tr=>{
     const it=occItemsCache[+tr.dataset.i];
     tr.querySelector('.rowPencil').onclick=()=>{
@@ -746,9 +983,13 @@ async function loadOccasions(){
       else openOccasionModal(it);
     };
     const saveOcc = async(patch)=>{
-      const body={ name:it.what, start_date:d10(it.start_date), frequency:it.frequency||'once', notes:it.notes||null };
-      Object.assign(body,patch);
+      const prev={ name:it.what, start_date:d10(it.start_date), frequency:it.frequency||'once', notes:it.notes||null };
+      const body=Object.assign({},prev,patch);
       await api('/api/occasions/'+it.id,{method:'PUT',body:JSON.stringify(body)});
+      showToast('Saved '+(it.who||'')+' · '+body.name, async()=>{
+        await api('/api/occasions/'+it.id,{method:'PUT',body:JSON.stringify(prev)});
+        loadOccasions();
+      });
       loadOccasions();
     };
     const tdWhat=tr.querySelector('td[data-f="what"]');
@@ -767,35 +1008,144 @@ async function loadOccasions(){
     }
   });
 }
+$('#occSearch').oninput=()=>loadOccasions();
 
-// ── Occasion editor modal ──
+// ── Occasion modal: edit + create ──
 function openOccasionModal(o){
-  editingOccasion=o;
+  occCreateMode=false; editingOccasion=o;
+  $('#occModalTitle').textContent='Edit occasion';
+  $('#oe_contact_row').classList.add('hide');
+  $('#oeDelete').classList.remove('hide');
   $('#oe_name').value=o.what||o.name||'';
   $('#oe_date').value=d10(o.start_date);
   $('#oe_freq').value=o.frequency||'once';
   $('#oe_notes').value=o.notes||'';
   $('#occModalBg').classList.add('open');
 }
+$('#occAddBtn').onclick=()=>{
+  occCreateMode=true; editingOccasion=null;
+  $('#occModalTitle').textContent='Add occasion';
+  const sel=$('#oe_contact'); sel.innerHTML='';
+  chosenContacts().sort((a,b)=>cmpVals(a.name,b.name)).forEach(c=>{
+    const op=document.createElement('option'); op.value=c.id; op.textContent=c.name||'(unnamed)'; sel.appendChild(op);
+  });
+  $('#oe_contact_row').classList.remove('hide');
+  $('#oeDelete').classList.add('hide');
+  $('#oe_name').value=''; $('#oe_date').value=''; $('#oe_freq').value='yearly'; $('#oe_notes').value='';
+  $('#occModalBg').classList.add('open');
+};
 $('#oeCancel').onclick=()=>$('#occModalBg').classList.remove('open');
 $('#occModalBg').onclick=(e)=>{ if(e.target===$('#occModalBg')) $('#occModalBg').classList.remove('open'); };
 $('#oeSave').onclick=async()=>{
-  await api('/api/occasions/'+editingOccasion.id,{method:'PUT',body:JSON.stringify({
-    name:$('#oe_name').value.trim(),
-    start_date:$('#oe_date').value,
-    frequency:$('#oe_freq').value,
-    notes:$('#oe_notes').value.trim()||null
-  })});
+  const name=$('#oe_name').value.trim(), date=$('#oe_date').value;
+  if(!name||!date){ alert('Occasion name and date are required.'); return; }
+  if(occCreateMode){
+    const cid=+$('#oe_contact').value;
+    if(!cid){ alert('Pick a contact.'); return; }
+    await api('/api/contacts/'+cid+'/occasions',{method:'POST',body:JSON.stringify({
+      name, start_date:date, frequency:$('#oe_freq').value, notes:$('#oe_notes').value.trim()||null
+    })});
+  } else {
+    await api('/api/occasions/'+editingOccasion.id,{method:'PUT',body:JSON.stringify({
+      name, start_date:date, frequency:$('#oe_freq').value, notes:$('#oe_notes').value.trim()||null
+    })});
+  }
   $('#occModalBg').classList.remove('open');
   loadOccasions();
   if($('#conModalBg').classList.contains('open') && editingContactId) renderConOccList(editingContactId);
 };
 $('#oeDelete').onclick=async()=>{
   if(!confirm('Delete this occasion?')) return;
-  await api('/api/occasions/'+editingOccasion.id,{method:'DELETE'});
+  const o=editingOccasion;
+  await api('/api/occasions/'+o.id,{method:'DELETE'});
   $('#occModalBg').classList.remove('open');
+  if(o.contact_id) showToast('Occasion deleted', async()=>{
+    await api('/api/contacts/'+o.contact_id+'/occasions',{method:'POST',body:JSON.stringify({
+      name:o.what||o.name, start_date:d10(o.start_date), frequency:o.frequency, notes:o.notes||null })});
+    loadOccasions();
+  });
   loadOccasions();
   if($('#conModalBg').classList.contains('open') && editingContactId) renderConOccList(editingContactId);
+};
+
+// ── Duplicates ──
+function computeDupClusters(){
+  const parent={};
+  const find=x=>{ while(parent[x]!==x) x=parent[x]=parent[parent[x]]; return x; };
+  const uni=(a,b)=>{ parent[find(a)]=find(b); };
+  contactsPool.forEach(c=>parent[c.id]=c.id);
+  const byKey={};
+  contactsPool.forEach(c=>{
+    const nk=(c.name||'').trim().toLowerCase();
+    if(nk){ if(byKey['n:'+nk]!=null) uni(c.id,byKey['n:'+nk]); else byKey['n:'+nk]=c.id; }
+    const ek=(c.email||'').trim().toLowerCase();
+    if(ek){ if(byKey['e:'+ek]!=null) uni(c.id,byKey['e:'+ek]); else byKey['e:'+ek]=c.id; }
+  });
+  const cl={};
+  contactsPool.forEach(c=>{ const r=find(c.id); (cl[r]=cl[r]||[]).push(c); });
+  return Object.values(cl).filter(a=>a.length>1);
+}
+function renderDuplicates(){
+  const clusters=computeDupClusters();
+  if(!clusters.length){ $('#dupPanel').innerHTML='<div class="panel"><div class="empty">No duplicates found 🎉</div></div>'; return; }
+  $('#dupPanel').innerHTML = clusters.map((cl,ci)=>`
+    <div class="dupblock panel">
+      <table class="grid"><tr><th></th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="phone">Phone</th><th data-k="city">City</th><th data-k="birthday">Birthday</th><th data-k="src">Source</th></tr>
+      ${cl.map(c=>`<tr>
+        <td><button class="btn sm pub keepBtn" data-ci="${ci}" data-cid="${c.id}">Keep</button></td>
+        <td><b>${esc(c.name)||'(unnamed)'}</b>${c.is_pet?' 🐾':''}</td>
+        <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
+        <td>${esc(c.phone)||'<span class="muted">—</span>'}</td>
+        <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
+        <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
+        <td>${c.google_id?'Google':'manual'}</td>
+      </tr>`).join('')}
+      </table>
+    </div>`).join('');
+  $('#dupPanel').querySelectorAll('.keepBtn').forEach(b=>b.onclick=()=>{
+    const cl=clusters[+b.dataset.ci];
+    const keeper=+b.dataset.cid;
+    const others=cl.filter(c=>c.id!==keeper);
+    mergeInto(keeper, others);
+  });
+}
+async function mergeInto(keeperId, others){
+  const keeper=contactsPool.find(c=>c.id===keeperId);
+  const names=others.map(o=>o.name||'(unnamed)').join(', ');
+  if(!confirm('Merge '+names+' into '+(keeper.name||'(unnamed)')+'?\n\nMissing fields fill in, occasions and group memberships move over, then the duplicate'+(others.length>1?'s are':' is')+' deleted. Cannot be undone.')) return;
+  try{
+    for(const o of others){
+      const [kFull, dFull] = await Promise.all([api('/api/contacts/'+keeperId), api('/api/contacts/'+o.id)]);
+      const fields=['name','email','phone','company','street','street_2','city','region','country','postal_code'];
+      const body={};
+      fields.forEach(f=>body[f]= kFull[f] || dFull[f] || null);
+      body.birthday = d10(kFull.birthday) || d10(dFull.birthday) || null;
+      body.died_on  = d10(kFull.died_on)  || d10(dFull.died_on)  || null;
+      body.is_pet   = !!(kFull.is_pet || dFull.is_pet);
+      await api('/api/contacts/'+keeperId,{method:'PUT',body:JSON.stringify(body)});
+      const occs = await api('/api/contacts/'+o.id+'/occasions');
+      for(const oc of occs){
+        await api('/api/contacts/'+keeperId+'/occasions',{method:'POST',body:JSON.stringify({
+          name:oc.name, start_date:d10(oc.start_date), frequency:oc.frequency, notes:oc.notes||null })});
+      }
+      const dGroups = memberships.filter(m=>m.contact_id===o.id);
+      for(const m of dGroups){
+        await api('/api/memberships',{method:'PUT',body:JSON.stringify({contact_id:keeperId, group_id:m.group_id, status:'active'})});
+      }
+      await api('/api/contacts/'+o.id,{method:'DELETE'});
+    }
+    await loadAll();
+    if(selected){ current = await api('/api/groups/'+selected.id+'/members'); }
+    renderDuplicates();
+    showToast('Merged '+others.length+' duplicate'+(others.length>1?'s':''));
+  }catch(e){ alert('Merge failed: '+e.message+'\nNothing more was changed — check the duplicates list.'); await loadAll(); renderDuplicates(); }
+}
+$('#dupRow').onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  $('#poolRow').classList.remove('active');
+  $('#dupRow').classList.add('active');
+  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
+  renderDuplicates();
 };
 
 // ── Share link ──
@@ -808,58 +1158,6 @@ $('#shareBtn').onclick=async()=>{
   $('#copyShare').onclick=()=>{ navigator.clipboard.writeText(r.url); $('#copyShare').textContent='Copied ✓'; };
 };
 
-// ── Add from pool: inline grid of all contacts with a "Member" checkbox column ──
-let memEdit = false;
-$('#addMemberBtn').onclick=async()=>{
-  if(!selected){ alert('Select a group first.'); return; }
-  memEdit = !memEdit;
-  $('#addMemberBtn').textContent = memEdit ? '✓ Done' : '＋ Add from pool';
-  if(memEdit){ renderMemberEdit(); }
-  else {
-    memberships = await api('/api/group-memberships'); renderTree();
-    current = await api('/api/groups/'+selected.id+'/members');
-    renderMembers(); renderMap();
-  }
-};
-function renderMemberEdit(){
-  const inGroup = new Map(); // contact_id → group_id it belongs through (for removal)
-  (current?current.members:[]).forEach(m=>inGroup.set(m.contact_id, m.subgroup_id||selected.id));
-  const list = contactsPool.filter(passesFilterC);
-  let html = `<table class="grid"><tr><th data-k="chk" style="width:64px;">Member</th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="city">City</th><th data-k="birthday">Birthday</th></tr>`;
-  list.forEach(c=>{
-    html += `<tr data-cid="${c.id}">
-      <td style="text-align:center;"><input type="checkbox" class="memChk"${inGroup.has(c.id)?' checked':''}></td>
-      <td><b>${esc(c.name)||'(unnamed)'}</b>${c.is_pet?' 🐾':''}${c.died_on?' <span class="muted">✝</span>':''}</td>
-      <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
-      <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
-      <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
-    </tr>`;
-  });
-  html += '</table><div class="help">Tick to add to “'+esc(selected.name)+'”, untick to remove (the person stays in the pool). Click “✓ Done” above when finished.</div>';
-  $('#memPanel').innerHTML = html;
-  makeResizable('#memPanel','memedit');
-  $('#memPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
-    const cid=+tr.dataset.cid;
-    tr.querySelector('.memChk').onchange=async(e)=>{
-      const cb=e.target; cb.disabled=true;
-      try{
-        if(cb.checked){
-          await api('/api/memberships',{method:'PUT',body:JSON.stringify({
-            contact_id:cid, group_id:selected.id, from_date:new Date().toISOString().slice(0,10), status:'active'
-          })});
-          inGroup.set(cid, selected.id);
-        } else {
-          const gid = inGroup.get(cid) || selected.id;
-          await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
-          inGroup.delete(cid);
-        }
-        current = await api('/api/groups/'+selected.id+'/members');
-      }catch(err){ alert('Failed: '+err.message); cb.checked=!cb.checked; }
-      cb.disabled=false;
-    };
-  });
-}
-
 // ── New group ──
 $('#addGroupBtn').onclick=async()=>{
   const name = prompt('Name of new group:'); if(!name) return;
@@ -869,25 +1167,26 @@ $('#addGroupBtn').onclick=async()=>{
   await loadAll();
 };
 
-// ── Pool row → chosen set becomes all contacts; current tab re-renders for it ──
+// ── Pool row ──
 $('#poolRow').onclick=()=>{
   selected=null;
   memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
   $('#poolRow').classList.add('active');
+  $('#dupRow').classList.remove('active');
   const active=document.querySelector('.tab.active');
   showTab(active?active.dataset.t:'med');
 };
 
-// ── Map — shows the chosen set (group members or all contacts) ──
-let coordsCache = null; // contact_id → {lat,lng,city}; /api/contacts has no coordinates, /api/network does
+// ── Map ──
+let coordsCache = null;
 async function ensureCoords(){
   if(coordsCache) return;
   coordsCache = {};
   try{
     const net = await api('/api/network');
     (net.contacts||[]).forEach(c=>{ if(c.latitude!=null && c.longitude!=null) coordsCache[c.id]={lat:c.latitude,lng:c.longitude,city:c.city}; });
-  }catch(e){ /* map just shows fewer points */ }
+  }catch(e){ /* map shows fewer points */ }
 }
 async function renderMap(){
   let pts, totalChosen;
@@ -911,22 +1210,21 @@ async function renderMap(){
   pts.forEach(p=>L.marker([p.lat,p.lng]).addTo(lg).bindPopup(esc(p.name||'')+(p.city?'<br>'+esc(p.city):'')));
   if(pts.length){ mapObj.fitBounds(pts.map(p=>[p.lat,p.lng]),{padding:[40,40],maxZoom:11}); }
   $('#mapHelp').textContent = pts.length
-    ? `${chosenLabel()}: ${pts.length} of ${totalChosen} have coordinates. Useful for mailings, carpooling and “who lives nearby”.`
+    ? `${chosenLabel()}: ${pts.length} of ${totalChosen} have coordinates.`
     : chosenLabel()+': no one has coordinates yet — add an address/city and they are geocoded automatically.';
   setTimeout(()=>mapObj.invalidateSize(),100);
 }
 
-// ── Export ──
-function dl(name, text, type){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click();
-}
-// Export the chosen set: group members (filtered) or all contacts (filtered)
+// ── Export + print calendar ──
 function chosenPeople(){
   if(selected && current) return current.members.filter(m=>passesFilterId(m.contact_id));
   return contactsPool.filter(passesFilterC);
 }
 function exportName(){ return (selected ? (selected.name||'group') : 'all-contacts'); }
+function dl(name, text, type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click();
+}
 $('#expCsv').onclick=()=>{
   const people = chosenPeople();
   if(!people.length){ alert('Nothing to export for '+chosenLabel()+' with the current filters.'); return; }
@@ -945,13 +1243,16 @@ $('#expVcf').onclick=()=>{
     .filter(Boolean).join('\r\n')).join('\r\n');
   dl(exportName()+'.vcf',vcf,'text/vcard');
 };
+$('#printCalBtn').onclick=()=>{
+  window.open('/print/calendar'+(selected?'?groups='+selected.id:''),'_blank');
+};
 
 // ── Tabs ──
-const ids=['med','kon','occ','kar','bok','exp'];
+const ids=['med','kon','occ','kar','bok','exp','dup'];
 function showTab(t){
-  // "Members" of the whole pool = the All contacts grid
   const showId = (t==='med' && !selected) ? 'kon' : t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
+  $('#dupRow').classList.remove('active');
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==showId));
   if(showId==='kar') setTimeout(renderMap,80);
   if(showId==='occ') loadOccasions();
@@ -959,6 +1260,23 @@ function showTab(t){
   if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
 }
 document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));
+
+// Sidebar filter checkboxes: restore, persist, re-render every view
+(function(){
+  let saved={};
+  try{ saved=JSON.parse(localStorage.getItem('ts_studio_filters')||'{}'); }catch(e){}
+  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets',fNoBday:'nobday'};
+  Object.entries(boxes).forEach(([id,key])=>{
+    const cb=document.getElementById(id);
+    if(typeof saved[key]==='boolean') cb.checked=saved[key];
+    cb.onchange=()=>{
+      const out={};
+      Object.entries(boxes).forEach(([i2,k2])=>out[k2]=document.getElementById(i2).checked);
+      try{ localStorage.setItem('ts_studio_filters',JSON.stringify(out)); }catch(e){}
+      rerenderAll();
+    };
+  });
+})();
 
 NavBar.init({ requireAuth: true }).then(()=>{
   loadAll().catch(e=>{ $('#memPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
