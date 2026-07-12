@@ -289,6 +289,12 @@ function passesFilterId(cid){
   const c = contactsPool.find(x=>x.id===cid);
   return c ? passesFilterC(c) : true;
 }
+// ── The chosen set: sidebar selection (group or All contacts) + filters. Drives every tab. ──
+function chosenIds(){
+  if(selected && current) return new Set(current.members.filter(m=>passesFilterId(m.contact_id)).map(m=>m.contact_id));
+  return new Set(contactsPool.filter(passesFilterC).map(c=>c.id));
+}
+function chosenLabel(){ return selected ? selected.name : 'All contacts'; }
 function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   const host = document.getElementById(hostId);
   if(host.dataset.built) return; host.dataset.built='1';
@@ -417,8 +423,9 @@ async function selectGroup(node){
   $('#title').innerHTML = `${esc(node.name)} <span style="font-size:13px;color:var(--mut);font-weight:400;">· ${total} members${subN?` · ${subN} subgroups`:''}</span>`;
   $('#shareBox').classList.add('hide');
   $('#bokSrc').textContent = 'Source: '+node.name;
-  showTab('med');
   current = await api('/api/groups/'+node.id+'/members');
+  const active=document.querySelector('.tab.active');
+  showTab(active?active.dataset.t:'med');
   renderMembers();
   renderMap();
 }
@@ -680,13 +687,14 @@ async function loadOccasions(){
     items.push({kind:'birthday', contact_id:c.id, who:c.name, what:(c.died_on?'Memorial birthday':'Birthday'),
       start_date:c.birthday, frequency:'yearly', next:nextYearly(c.birthday,today)});
   });
-  const visible = items.filter(it=>passesFilterId(it.contact_id));
+  const ids = chosenIds();
+  const visible = items.filter(it=>ids.has(it.contact_id));
   visible.sort((a,b)=>{
     if(!a.next&&!b.next) return 0; if(!a.next) return 1; if(!b.next) return -1;
     return a.next-b.next;
   });
   occItemsCache=visible;
-  if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Everything is hidden by the sidebar filters.':'No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.')+'</div>'; return; }
+  if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Nothing to show for '+esc(chosenLabel())+' with the current filters.':'No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.')+'</div>'; return; }
   let html=`<table class="grid"><tr><th></th>${cols.map(c=>'<th>'+c.label+'</th>').join('')}</tr>`;
   visible.forEach((it,i)=>{
     const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
@@ -825,30 +833,51 @@ $('#addGroupBtn').onclick=async()=>{
   await loadAll();
 };
 
-// ── Pool row → All contacts view (no tab; sidebar drives it) ──
+// ── Pool row → chosen set becomes all contacts; current tab re-renders for it ──
 $('#poolRow').onclick=()=>{
   selected=null;
   renderTree();
   $('#poolRow').classList.add('active');
   $('#crumb').textContent='Pool';
   $('#title').textContent='All contacts';
-  showTab('kon');
+  const active=document.querySelector('.tab.active');
+  showTab(active?active.dataset.t:'med');
 };
 
-// ── Map ──
-function renderMap(){
-  if(!current) return;
-  const pts = current.members.filter(m=>m.latitude!=null && m.longitude!=null && passesFilterId(m.contact_id));
+// ── Map — shows the chosen set (group members or all contacts) ──
+let coordsCache = null; // contact_id → {lat,lng,city}; /api/contacts has no coordinates, /api/network does
+async function ensureCoords(){
+  if(coordsCache) return;
+  coordsCache = {};
+  try{
+    const net = await api('/api/network');
+    (net.contacts||[]).forEach(c=>{ if(c.latitude!=null && c.longitude!=null) coordsCache[c.id]={lat:c.latitude,lng:c.longitude,city:c.city}; });
+  }catch(e){ /* map just shows fewer points */ }
+}
+async function renderMap(){
+  let pts, totalChosen;
+  if(selected && current){
+    const rows = current.members.filter(m=>passesFilterId(m.contact_id));
+    totalChosen = rows.length;
+    pts = rows.filter(m=>m.latitude!=null && m.longitude!=null)
+              .map(m=>({lat:m.latitude,lng:m.longitude,name:m.name,city:m.city}));
+  } else {
+    await ensureCoords();
+    const rows = contactsPool.filter(passesFilterC);
+    totalChosen = rows.length;
+    pts = rows.filter(c=>coordsCache[c.id])
+              .map(c=>({lat:coordsCache[c.id].lat,lng:coordsCache[c.id].lng,name:c.name,city:coordsCache[c.id].city||c.city}));
+  }
   if(!mapObj){ mapObj = L.map('map').setView([62,15],4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapObj);
   }
   if(mapObj._layerGroup) mapObj.removeLayer(mapObj._layerGroup);
   const lg = L.layerGroup().addTo(mapObj); mapObj._layerGroup=lg;
-  pts.forEach(m=>L.marker([m.latitude,m.longitude]).addTo(lg).bindPopup(esc(m.name||'')+(m.city?'<br>'+esc(m.city):'')));
-  if(pts.length){ mapObj.fitBounds(pts.map(m=>[m.latitude,m.longitude]),{padding:[40,40],maxZoom:11}); }
+  pts.forEach(p=>L.marker([p.lat,p.lng]).addTo(lg).bindPopup(esc(p.name||'')+(p.city?'<br>'+esc(p.city):'')));
+  if(pts.length){ mapObj.fitBounds(pts.map(p=>[p.lat,p.lng]),{padding:[40,40],maxZoom:11}); }
   $('#mapHelp').textContent = pts.length
-    ? `${pts.length} of ${current.members.length} members have coordinates. Useful for mailings, carpooling and “who lives nearby”.`
-    : 'No members have coordinates yet — add an address/city to the contacts and they are geocoded automatically.';
+    ? `${chosenLabel()}: ${pts.length} of ${totalChosen} have coordinates. Useful for mailings, carpooling and “who lives nearby”.`
+    : chosenLabel()+': no one has coordinates yet — add an address/city and they are geocoded automatically.';
   setTimeout(()=>mapObj.invalidateSize(),100);
 }
 
@@ -857,31 +886,42 @@ function dl(name, text, type){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click();
 }
+// Export the chosen set: group members (filtered) or all contacts (filtered)
+function chosenPeople(){
+  if(selected && current) return current.members.filter(m=>passesFilterId(m.contact_id));
+  return contactsPool.filter(passesFilterC);
+}
+function exportName(){ return (selected ? (selected.name||'group') : 'all-contacts'); }
 $('#expCsv').onclick=()=>{
-  if(!current||!current.members.length){ alert('No members to export.'); return; }
+  const people = chosenPeople();
+  if(!people.length){ alert('Nothing to export for '+chosenLabel()+' with the current filters.'); return; }
   const head=['Name','Email','Phone','City','Country','Birthday','Subgroup','From','To','Status'];
-  const rows=current.members.map(m=>[m.name,m.email,m.phone,m.city,m.country,m.birthday,m.subgroup_name,
-    d10(m.from_date),d10(m.to_date),m.status]
+  const rows=people.map(m=>[m.name,m.email,m.phone,m.city,m.country,d10(m.birthday),m.subgroup_name||'',
+    d10(m.from_date),d10(m.to_date),m.status||'']
     .map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','));
-  dl((selected.name||'group')+'.csv','﻿'+[head.join(','),...rows].join('\r\n'),'text/csv');
+  dl(exportName()+'.csv','﻿'+[head.join(','),...rows].join('\r\n'),'text/csv');
 };
 $('#expVcf').onclick=()=>{
-  if(!current||!current.members.length){ alert('No members to export.'); return; }
-  const vcf=current.members.map(m=>['BEGIN:VCARD','VERSION:3.0','FN:'+(m.name||''),
+  const people = chosenPeople();
+  if(!people.length){ alert('Nothing to export for '+chosenLabel()+' with the current filters.'); return; }
+  const vcf=people.map(m=>['BEGIN:VCARD','VERSION:3.0','FN:'+(m.name||''),
     m.email?'EMAIL:'+m.email:'',m.phone?'TEL:'+m.phone:'',
     (m.city||m.country)?'ADR;TYPE=home:;;;'+(m.city||'')+';;;'+(m.country||''):'','END:VCARD']
     .filter(Boolean).join('\r\n')).join('\r\n');
-  dl((selected.name||'group')+'.vcf',vcf,'text/vcard');
+  dl(exportName()+'.vcf',vcf,'text/vcard');
 };
 
 // ── Tabs ──
 const ids=['med','kon','occ','kar','bok','exp'];
 function showTab(t){
+  // "Members" of the whole pool = the All contacts grid
+  const showId = (t==='med' && !selected) ? 'kon' : t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
-  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==t));
-  if(t==='kar') setTimeout(renderMap,80);
-  if(t==='occ') loadOccasions();
-  if(t==='kon') renderContactsTable();
+  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==showId));
+  if(showId==='kar') setTimeout(renderMap,80);
+  if(showId==='occ') loadOccasions();
+  if(showId==='kon') renderContactsTable();
+  if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
 }
 document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));
 
