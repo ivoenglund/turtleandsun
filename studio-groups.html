@@ -270,6 +270,14 @@
           <option value="anc">Ancestors</option>
           <option value="desc">Descendants</option>
         </select>
+        <select id="trePaper" style="max-width:130px;">
+          <option value="A4 landscape">A4 lying</option>
+          <option value="A4 portrait">A4 standing</option>
+          <option value="A3 landscape">A3 lying</option>
+          <option value="A3 portrait">A3 standing</option>
+          <option value="A2 landscape">A2 lying</option>
+          <option value="A2 portrait">A2 standing</option>
+        </select>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
       <div style="display:flex;gap:10px;align-items:stretch;">
@@ -1983,20 +1991,33 @@ $('#trePrintBtn').onclick=()=>{
   clone.setAttribute('viewBox','0 0 '+w0+' '+h0);
   clone.setAttribute('width','100%');
   clone.removeAttribute('height');
+  // Paper + orientation, remembered
+  const paper=$('#trePaper').value||'A4 landscape';
+  try{ localStorage.setItem('ts_tree_paper',paper); }catch(e){}
+  // Usable page height in mm (page minus 2×12mm margin) so EVERYTHING fits one page:
+  const PAGE_H={'A4 landscape':186,'A4 portrait':273,'A3 landscape':273,'A3 portrait':396,'A2 landscape':396,'A2 portrait':570};
+  const usable=PAGE_H[paper]||186;
   const w=window.open('','_blank');
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
-   +'body{font-family:Arial,sans-serif;color:#000;margin:16px;background:#fff;}'
-   +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:14px;}'
-   +'svg{max-width:100%;height:auto;}'
-   +'@page{size:A4 landscape;margin:12mm;}'
+   +'body{font-family:Arial,sans-serif;color:#000;margin:0;background:#fff;}'
+   +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:10px;}'
+   +'.fitpage{height:'+usable+'mm;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
+   +'.chartbox{flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:center;}'
+   +'.chartbox svg{max-width:100%;max-height:100%;width:auto;height:auto;display:block;}'
+   +'@page{size:'+paper+';margin:12mm;}'
+   +'@media screen{body{margin:16px;}}'
    +'</style></head><body>'
+   +'<div class="fitpage">'
    +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
    +infoHtml
-   +clone.outerHTML
-   +'<scr'+'ipt>setTimeout(function(){window.print();},400);</scr'+'ipt></body></html>');
+   +'<div class="chartbox">'+clone.outerHTML+'</div>'
+   +'</div>'
+   +'<scr'+'ipt>setTimeout(function(){window.print();},600);</scr'+'ipt></body></html>');
   w.document.close();
 };
+// restore last paper choice
+try{ const p=localStorage.getItem('ts_tree_paper'); if(p && $('#trePaper')) $('#trePaper').value=p; }catch(e){}
 
 // ── Share link ──
 $('#shareBtn').onclick=async()=>{
