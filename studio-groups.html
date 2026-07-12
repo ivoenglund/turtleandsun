@@ -264,6 +264,7 @@
         <button class="btn gray" id="treAddBtn">＋ Add relation</button>
         <button class="btn gray" id="treEditBtn">✎ Edit person</button>
         <button class="btn gray" id="treLinksBtn">🔗 Links</button>
+        <label class="flt"><input type="checkbox" id="treWhole"> Whole family</label>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
       <div class="treeWrap f3" id="treePanel" style="height:max(300px, calc(100vh - 185px));padding:0;"><div class="empty">Loading…</div></div>
@@ -1948,10 +1949,31 @@ function renderFamilyTree(){
   if(!focus){ panel.innerHTML='<div class="empty">No contacts yet.</div>'; return; }
   if(!window.f3 || !window.d3){ panel.innerHTML='<div class="empty">Tree library missing — deploy the vendor files and hard-refresh.</div>'; return; }
   panel.innerHTML='';
+  // "Whole family": center the chart on the oldest root ancestor of this person's
+  // family island — everyone descended from there (uncles, cousins, all partners) shows.
+  let mainId=focus;
+  if($('#treWhole').checked){
+    const seen=new Set();
+    const roots=new Set();
+    (function climb(id){
+      if(seen.has(id)) return; seen.add(id);
+      const ps=parentsOf(id);
+      if(!ps.length){ roots.add(id); return; }
+      ps.forEach(l=>climb(l.parent_id));
+    })(focus);
+    // pick the root with the most descendants (widest picture)
+    let best=focus, bestN=-1;
+    roots.forEach(r=>{
+      let n=0; const st=[r]; const v=new Set();
+      while(st.length){ const x=st.pop(); if(v.has(x)) continue; v.add(x); n++; childrenOf(x).forEach(l=>st.push(l.child_id)); }
+      if(n>bestN){ bestN=n; best=r; }
+    });
+    mainId=best;
+  }
   try{
     const chart=f3.createChart('#treePanel', buildF3Data(focus));
     chart.setCardHtml().setCardDisplay([["label"],["sub"]]);
-    if(typeof chart.updateMainId==='function') chart.updateMainId(String(focus));
+    if(typeof chart.updateMainId==='function') chart.updateMainId(String(mainId));
     chart.updateTree({initial:true});
   }catch(e){
     panel.innerHTML='<div class="empty">Tree render failed: '+esc(e.message)+'</div>';
@@ -2010,6 +2032,7 @@ function drawTreeLines(root){
   root.insertBefore(svg, root.firstChild);
 }
 $('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tree_focus',$('#treFocus').value);}catch(e){} renderFamilyTree(); });
+$('#treWhole') && ($('#treWhole').onchange=()=>renderFamilyTree());
 
 // Print the tree: clean B/W copy, auto-scaled to A4 landscape, browser print → paper or PDF
 $('#trePrintBtn').onclick=()=>{
