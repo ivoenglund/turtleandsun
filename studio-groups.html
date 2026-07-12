@@ -458,11 +458,12 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
 
 // ── Resizable columns: auto-fit on render, drag to override, dblclick divider resets ──
 const AUTOFIT_CACHE = {}; // tableKey+colsSignature → measured widths (in-memory; avoids double layout on every render)
+const SESSION_W = {};     // manual drag widths — this session only; every fresh visit starts with a perfect content fit
 function makeResizable(panelSel, tableKey){
   const table = document.querySelector(panelSel+' table.grid');
   if(!table) return;
   const ths=[...table.querySelectorAll('tr:first-child th')];
-  const widths = COLPREFS[tableKey+'::w'] || {};
+  const widths = SESSION_W[tableKey] = SESSION_W[tableKey] || {};
   const sig = tableKey+'::'+ths.map(th=>th.dataset.k||'').join(',');
   function autofit(force){
     let measured = !force && AUTOFIT_CACHE[sig];
@@ -486,13 +487,13 @@ function makeResizable(panelSel, tableKey){
       const move=ev=>{ th.style.width=Math.max(40,startW+ev.pageX-startX)+'px'; };
       const up=()=>{
         document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
-        widths[key]=th.offsetWidth; COLPREFS[tableKey+'::w']=widths; savePrefs();
+        widths[key]=th.offsetWidth; // session only — next visit auto-fits fresh
       };
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
     h.addEventListener('dblclick',e=>{
       e.preventDefault(); e.stopPropagation();
-      delete widths[key]; COLPREFS[tableKey+'::w']=widths; savePrefs();
+      delete widths[key];
       autofit(true); // re-measure fresh
     });
   });
@@ -1697,7 +1698,9 @@ document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.
 })();
 
 NavBar.init({ requireAuth: true }).then(()=>{
-  loadAll().catch(e=>{ $('#memPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
+  loadAll()
+    .then(()=>{ showTab('med'); }) // no group selected on load → shows the populated All contacts grid
+    .catch(e=>{ $('#memPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
 });
 </script>
 </body></html>
