@@ -1847,20 +1847,39 @@ function renderFamilyTree(){
   ancCol.appendChild(row);
   ancCol.appendChild(vline());
   root.appendChild(ancCol);
-  // focus node + siblings (other children of the same parents) as chips beside it
-  const focusRow=document.createElement('div'); focusRow.style.cssText='display:flex;gap:10px;align-items:center;justify-content:center;';
+  // Focus generation: focus + all siblings (incl. half-siblings) as real tree cards.
+  // A sibling with a different second parent shows that parent on the card (clickable).
+  const focusRow=document.createElement('div'); focusRow.className='trow'; focusRow.style.alignItems='flex-start';
+  const focusParentIds=new Set(ps.map(l=>l.parent_id));
   const sibIds=new Set();
   ps.forEach(l=>childrenOf(l.parent_id).forEach(k=>{ if(k.child_id!==focus) sibIds.add(k.child_id); }));
-  focusRow.appendChild(treeNode(focus,{focus:true}));
-  if(sibIds.size){
-    const sb=document.createElement('div'); sb.style.cssText='display:flex;gap:5px;flex-wrap:wrap;max-width:300px;';
-    sibIds.forEach(sid=>{
-      const chip=document.createElement('span'); chip.className='sibchip'; chip.textContent=personName(sid);
-      chip.title='Sibling — click to center'; chip.onclick=()=>{ sel.value=sid; renderFamilyTree(); };
-      sb.appendChild(chip);
+  const sibArr=[...sibIds].sort((a,b)=>cmpVals(personYear(a)||'9999', personYear(b)||'9999'));
+  const focusYear=personYear(focus)||'9999';
+  let placedFocus=false;
+  const cells=[];
+  sibArr.forEach(sid=>{
+    if(!placedFocus && (personYear(sid)||'9999')>=focusYear){ cells.push({focus:true}); placedFocus=true; }
+    cells.push({sid});
+  });
+  if(!placedFocus) cells.push({focus:true});
+  cells.forEach(cell=>{
+    if(cell.focus){ focusRow.appendChild(treeNode(focus,{focus:true})); return; }
+    const sid=cell.sid;
+    const col=document.createElement('div'); col.className='tcol';
+    const node=treeNode(sid,{});
+    // other parent(s) not shared with focus → show on the card (this is where the
+    // half-sibling's mother/father becomes visible)
+    parentsOf(sid).filter(l=>!focusParentIds.has(l.parent_id)).forEach(l=>{
+      const via=document.createElement('span'); via.className='ty';
+      via.style.cssText='cursor:pointer;text-decoration:underline dotted;';
+      via.textContent=(l.role==='mother'?'mother: ':'father: ')+personName(l.parent_id);
+      via.title='Click to center the tree on '+personName(l.parent_id);
+      via.onclick=()=>{ sel.value=l.parent_id; try{localStorage.setItem('ts_tree_focus',l.parent_id);}catch(e){} renderFamilyTree(); };
+      node.insertBefore(via, node.querySelector('.tbtns'));
     });
-    focusRow.appendChild(sb);
-  }
+    col.appendChild(node);
+    focusRow.appendChild(col);
+  });
   root.appendChild(focusRow);
   // descendants below
   const kids=childrenOf(focus);
