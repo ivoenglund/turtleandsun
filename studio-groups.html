@@ -6,7 +6,7 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   :root{--cream:#FBF6EC;--green:#243A17;--green2:#2E4A1E;--leaf:#7FB36F;--leaf2:#4E944F;
-        --yellow:#FFE800;--ink:#1C2A14;--line:rgba(28,10,0,0.1);--mut:#6b7560;--gridline:#dcd6c4;}
+        --yellow:#FFE800;--ink:#1C2A14;--line:rgba(28,10,0,0.1);--mut:#6b7560;--gridline:rgba(28,20,0,0.75);}
   *{box-sizing:border-box;font-family:'Plus Jakarta Sans',-apple-system,"Segoe UI",Roboto,Arial,sans-serif;}
   body{margin:0;min-height:100vh;color:var(--ink);}
   .btn{border:none;border-radius:8px;padding:7px 13px;font-size:13.5px;font-weight:700;cursor:pointer;}
@@ -42,7 +42,7 @@
   .pencil{cursor:pointer;opacity:.45;font-size:13px;padding:0 3px;}
   .pencil:hover{opacity:1;}
   .tools{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
-  .colwrap{position:relative;display:inline-block;margin-left:auto;}
+  .colwrap{position:relative;display:inline-flex;gap:6px;align-items:center;margin-left:auto;}
   .coldd{position:absolute;right:0;top:calc(100% + 5px);background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px;z-index:900;box-shadow:0 8px 30px rgba(0,0,0,0.16);min-width:170px;}
   .colopt{display:flex;align-items:center;gap:7px;font-size:13px;padding:2px 0;cursor:pointer;white-space:nowrap;}
   .colopt input{width:auto;}
@@ -268,7 +268,9 @@ async function api(path, opts){
 // ── Column preferences (persisted in this browser) ──
 let COLPREFS = {};
 try { COLPREFS = JSON.parse(localStorage.getItem('ts_studio_cols')||'{}'); } catch(e){ COLPREFS={}; }
+function savePrefs(){ try{ localStorage.setItem('ts_studio_cols',JSON.stringify(COLPREFS)); }catch(e){} }
 function activeCols(tableKey, cols, defaults){
+  if(COLPREFS[tableKey+'::all']) return cols;
   const saved = COLPREFS[tableKey];
   const act = new Set(Array.isArray(saved) ? saved : defaults);
   return cols.filter(c=>act.has(c.key));
@@ -277,6 +279,17 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   const host = document.getElementById(hostId);
   if(host.dataset.built) return; host.dataset.built='1';
   host.className='colwrap';
+  // Toggle: my selection ⇄ all columns
+  const allBtn=document.createElement('button');
+  allBtn.className='btn sm gray';
+  const allLbl=()=>{ allBtn.textContent = COLPREFS[tableKey+'::all'] ? '▣ My columns' : '▦ All columns'; };
+  allLbl();
+  allBtn.onclick=(e)=>{
+    e.stopPropagation();
+    COLPREFS[tableKey+'::all']=!COLPREFS[tableKey+'::all'];
+    savePrefs(); allLbl(); rerender();
+  };
+  // Column chooser dropdown
   const btn=document.createElement('button');
   btn.className='btn sm gray'; btn.textContent='⚙ Columns';
   const dd=document.createElement('div'); dd.className='coldd hide';
@@ -288,15 +301,15 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
     cb.onchange=()=>{
       if(cb.checked) act.add(c.key); else act.delete(c.key);
       COLPREFS[tableKey]=[...act];
-      try{ localStorage.setItem('ts_studio_cols',JSON.stringify(COLPREFS)); }catch(e){}
-      rerender();
+      COLPREFS[tableKey+'::all']=false; // editing the set returns to "my columns" view
+      savePrefs(); allLbl(); rerender();
     };
     l.appendChild(cb); l.appendChild(document.createTextNode(c.label));
     dd.appendChild(l);
   });
   btn.onclick=(e)=>{ e.stopPropagation(); dd.classList.toggle('hide'); };
   document.addEventListener('click',(e)=>{ if(!dd.contains(e.target)) dd.classList.add('hide'); });
-  host.appendChild(btn); host.appendChild(dd);
+  host.appendChild(allBtn); host.appendChild(btn); host.appendChild(dd);
 }
 
 // ── Inline cell editing ──
