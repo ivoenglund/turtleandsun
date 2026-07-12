@@ -2111,16 +2111,19 @@ $('#trePrintBtn').onclick=()=>{
   // Paper + orientation, remembered
   const paper=$('#trePaper').value||'A4 landscape';
   try{ localStorage.setItem('ts_tree_paper',paper); }catch(e){}
-  // Usable page height in mm (page minus 2×12mm margin) so EVERYTHING fits one page:
+  // Usable page box in mm (page minus 2×12mm margin). Width gets 4mm slack so the
+  // card's right border can NEVER touch the printable boundary.
   const PAGE_H={'A4 landscape':186,'A4 portrait':273,'A3 landscape':273,'A3 portrait':396,'A2 landscape':396,'A2 portrait':570};
+  const PAGE_W={'A4 landscape':273,'A4 portrait':186,'A3 landscape':396,'A3 portrait':273,'A2 landscape':570,'A2 portrait':396};
   const usable=PAGE_H[paper]||186;
+  const usableW=(PAGE_W[paper]||273)-4;
   const w=window.open('','_blank');
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
    +'*{box-sizing:border-box;}' // padding/borders count INSIDE widths — keeps the card on the page
    +'body{font-family:Arial,sans-serif;color:#000;margin:0;background:#fff;}'
    +'.foot{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#555;}' // overlaid — takes no space from the chart
-   +'.fitpage{height:'+usable+'mm;position:relative;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
+   +'.fitpage{width:'+usableW+'mm;height:'+usable+'mm;position:relative;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
    +'.pagerow{flex:1;min-height:0;display:flex;gap:5mm;align-items:center;padding-right:1.5mm;}' // right inset: print rounding must not shave the card border
    +'.infocard{width:40mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:3mm;}'
    +'.infoimg{width:100%;height:auto;display:block;margin-bottom:2mm;}' // natural aspect ratio, above the text
