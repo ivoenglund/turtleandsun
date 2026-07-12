@@ -2067,8 +2067,8 @@ $('#trePrintBtn').onclick=()=>{
    +'body{font-family:Arial,sans-serif;color:#000;margin:0;background:#fff;}'
    +'.foot{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#555;}' // overlaid — takes no space from the chart
    +'.fitpage{height:'+usable+'mm;position:relative;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
-   +'.pagerow{flex:1;min-height:0;display:flex;gap:6mm;align-items:center;}' // info card vertically centered
-   +'.infocard{width:36mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:3mm;}'
+   +'.pagerow{flex:1;min-height:0;display:flex;gap:5mm;align-items:center;padding-right:1.5mm;}' // right inset: print rounding must not shave the card border
+   +'.infocard{width:40mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:3mm;}'
    +'.infoimg{width:100%;height:auto;display:block;margin-bottom:2mm;}' // natural aspect ratio, above the text
    +'.iname{font-weight:800;font-size:12.5px;margin-bottom:1mm;}'
    +'.il{font-size:8px;text-transform:uppercase;letter-spacing:.4px;color:#555;margin-top:2mm;}'
