@@ -813,7 +813,12 @@ function setConActive(cid, field){
   conActive = {cid, field};
   document.querySelectorAll('#conPanel .cellActive').forEach(x=>x.classList.remove('cellActive'));
   const td=conActiveTd();
-  if(td){ td.classList.add('cellActive'); td.scrollIntoView({block:'nearest',inline:'nearest'}); }
+  if(td){
+    td.classList.add('cellActive');
+    td.scrollIntoView({block:'nearest',inline:'nearest'});
+    // On the first column, scroll all the way left so the ✎/checkbox columns come back
+    if(conEditKeys.indexOf(field)===0) $('#conPanel').scrollLeft=0;
+  }
 }
 function moveActive(dr,dc){
   if(!conActive) return;
