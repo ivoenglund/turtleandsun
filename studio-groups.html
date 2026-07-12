@@ -272,7 +272,10 @@
         </select>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
-      <div class="treeWrap" id="treePanel" style="height:max(300px, calc(100vh - 185px));padding:10px;"><div class="empty">Loading…</div></div>
+      <div style="display:flex;gap:10px;align-items:stretch;">
+        <div class="treeWrap" id="treePanel" style="flex:1;min-width:0;height:max(300px, calc(100vh - 185px));padding:10px;"><div class="empty">Loading…</div></div>
+        <div id="treInfo" style="width:250px;flex-shrink:0;background:#fff;border:1px solid var(--gridline);padding:12px;overflow-y:auto;height:max(300px, calc(100vh - 185px));font-size:13px;"></div>
+      </div>
       <div class="help">＋ Add relation adds a father/mother/child to the person in the box · 🔗 Links lists their family links for removal · click a person in the chart to re-center on them · "Kinship (everyone)" shows all relatives at once: grandparents, siblings, half-siblings, uncles, cousins.</div>
     </div>
 
@@ -1859,6 +1862,38 @@ function renderFamilyTree(){
   }catch(e){
     panel.innerHTML='<div class="empty">Tree render failed: '+esc(e.message)+'</div>';
   }
+  renderTreeInfo(focus);
+}
+// Info panel: everything about the selected person, with a print-include toggle
+function treInfoFields(c){
+  const rows=[];
+  const add=(label,val)=>{ if(val) rows.push([label,val]); };
+  add('Born', d10(c.birthday));
+  add('Died', d10(c.died_on));
+  add('Company', c.company);
+  add('Email', c.email);
+  add('Phone', c.phone);
+  add('Street', [c.street,c.street_2].filter(Boolean).join(', '));
+  add('City', [c.postal_code,c.city].filter(Boolean).join(' '));
+  add('Region', c.region);
+  add('Country', c.country);
+  add('About', c.about);
+  return rows;
+}
+function renderTreeInfo(focus){
+  const box=$('#treInfo');
+  const c=contactsPool.find(x=>x.id===focus);
+  if(!c){ box.innerHTML='<div class="muted">No person selected.</div>'; return; }
+  let printOn=true;
+  try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
+  box.innerHTML =
+    (c.photo_url?'<img src="'+esc(c.photo_url)+'" style="width:84px;height:84px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px;border:2px solid var(--line);">':'')
+    +'<div style="font-weight:800;font-size:15px;text-align:center;">'+esc(c.name||'(unnamed)')+(c.is_pet?' 🐾':'')+'</div>'
+    +'<div style="text-align:center;margin:6px 0 10px;"><button class="btn sm gray" id="treInfoEdit">✎ Edit</button></div>'
+    +treInfoFields(c).map(([l,v])=>'<div style="margin-bottom:6px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);">'+esc(l)+'</div><div style="white-space:pre-wrap;">'+esc(v)+'</div></div>').join('')
+    +'<label class="flt" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;"><input type="checkbox" id="treInfoPrint"'+(printOn?' checked':'')+'> Include on print</label>';
+  $('#treInfoEdit').onclick=()=>openContactModal(focus);
+  $('#treInfoPrint').onchange=(e)=>{ try{ localStorage.setItem('ts_tree_infoprint', e.target.checked?'1':'0'); }catch(err){} };
 }
 // Toolbar actions operate on the person in the "Tree of" box
 $('#treAddBtn').onclick=(e)=>{ e.stopPropagation(); const f=+$('#treFocus').value; if(f) openTreeMenu($('#treAddBtn'), f); };
@@ -1889,9 +1924,22 @@ $('#treChart') && ($('#treChart').onchange=()=>renderFamilyTree());
 
 // Print the tree: the rendered SVG itself, scaled to A4 landscape
 $('#trePrintBtn').onclick=()=>{
-  const focusName=personName(+$('#treFocus').value);
+  const focus=+$('#treFocus').value;
+  const focusName=personName(focus);
   const svgEl=document.querySelector('#treePanel svg');
   if(!svgEl || !svgEl.getAttribute('width')){ alert('Nothing to print yet — render a tree first.'); return; }
+  // Optional info block about the selected person
+  let infoHtml='';
+  let printOn=true;
+  try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
+  const c=contactsPool.find(x=>x.id===focus);
+  if(printOn && c){
+    infoHtml='<div style="display:flex;gap:14px;align-items:flex-start;border:1px solid #000;border-radius:8px;padding:10px 14px;margin-bottom:14px;max-width:640px;">'
+      +(c.photo_url?'<img src="'+esc(c.photo_url)+'" style="width:70px;height:70px;border-radius:50%;object-fit:cover;">':'')
+      +'<div style="font-size:12px;line-height:1.5;"><b style="font-size:14px;">'+esc(c.name||'')+'</b><br>'
+      +treInfoFields(c).map(([l,v])=>'<b>'+esc(l)+':</b> '+esc(v)).join('<br>')
+      +'</div></div>';
+  }
   const w0=+svgEl.getAttribute('width')||1000, h0=+svgEl.getAttribute('height')||600;
   const clone=svgEl.cloneNode(true);
   clone.setAttribute('viewBox','0 0 '+w0+' '+h0);
@@ -1906,6 +1954,7 @@ $('#trePrintBtn').onclick=()=>{
    +'@page{size:A4 landscape;margin:12mm;}'
    +'</style></head><body>'
    +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +infoHtml
    +clone.outerHTML
    +'<scr'+'ipt>setTimeout(function(){window.print();},400);</scr'+'ipt></body></html>');
   w.document.close();
