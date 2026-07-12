@@ -2018,15 +2018,15 @@ $('#trePrintBtn').onclick=()=>{
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
    +'body{font-family:Arial,sans-serif;color:#000;margin:0;background:#fff;}'
-   +'.foot{text-align:center;font-size:9px;color:#555;padding-top:2mm;}'
-   +'.fitpage{height:'+usable+'mm;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
-   +'.pagerow{flex:1;min-height:0;display:flex;gap:6mm;align-items:flex-start;}'
+   +'.foot{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#555;}' // overlaid — takes no space from the chart
+   +'.fitpage{height:'+usable+'mm;position:relative;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
+   +'.pagerow{flex:1;min-height:0;display:flex;gap:6mm;align-items:center;}' // info card vertically centered
    +'.infocard{width:36mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:3mm;}'
    +'.infoimg{width:100%;height:auto;display:block;margin-bottom:2mm;}' // natural aspect ratio, above the text
    +'.iname{font-weight:800;font-size:12.5px;margin-bottom:1mm;}'
    +'.il{font-size:8px;text-transform:uppercase;letter-spacing:.4px;color:#555;margin-top:2mm;}'
    +'.iv{font-size:10px;line-height:1.45;}'
-   +'.chartbox{flex:1;min-width:0;height:100%;display:flex;align-items:flex-start;justify-content:center;}'
+   +'.chartbox{flex:1;min-width:0;height:100%;display:flex;align-items:center;justify-content:center;}' // chart centered, equal space all around
    +'.chartbox svg{max-width:100%;max-height:100%;width:auto;height:auto;display:block;}'
    +'@page{size:'+paper+';margin:12mm;}'
    +'@media screen{body{margin:16px;}}'
