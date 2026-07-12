@@ -38,6 +38,7 @@
   .grid tr:nth-child(even) td{background:#FDFCF7;}
   .grid td.ed{cursor:text;}
   .grid td.ed:hover{background:#FBF7E8!important;box-shadow:inset 0 0 0 1.5px #c9be9a;}
+  .grid td.cellActive{box-shadow:inset 0 0 0 2px var(--green2)!important;background:#F5FAF0!important;}
   td input,td select{font-size:12.5px;padding:2px 5px;}
   .pencil{cursor:pointer;opacity:.45;font-size:13px;padding:0 3px;}
   .pencil:hover{opacity:1;}
@@ -170,8 +171,6 @@
         <b><span id="bulkCount">0</span> selected:</b>
         <select id="bulkGroupSel" style="max-width:160px;"></select>
         <button class="btn sm gray" id="bulkAddGroup">Add to group</button>
-        <button class="btn sm gray" id="bulkCity">Set city…</button>
-        <button class="btn sm gray" id="bulkCountry">Set country…</button>
         <button class="btn sm danger" id="bulkDelete">Delete</button>
         <button class="btn sm gray" id="bulkClear" style="margin-left:auto;">Clear selection</button>
       </div>
@@ -850,6 +849,18 @@ const CON_COLS = [
   {key:'photo',      label:'Photo',    type:null},
 ];
 const CON_DEFAULT = ['name','email','phone','city','birthday'];
+// ── Active cell (Excel-style selection) + keyboard navigation ──
+let conActive = null; // {cid, field}
+function conActiveTd(){
+  if(!conActive) return null;
+  return document.querySelector('#conPanel tr[data-cid="'+conActive.cid+'"] td[data-f="'+conActive.field+'"]');
+}
+function setConActive(cid, field){
+  conActive = {cid, field};
+  document.querySelectorAll('#conPanel .cellActive').forEach(x=>x.classList.remove('cellActive'));
+  const td=conActiveTd();
+  if(td){ td.classList.add('cellActive'); td.scrollIntoView({block:'nearest',inline:'nearest'}); }
+}
 function conNav(cid, field, dir){
   let r = conListIds.indexOf(cid), c = conEditKeys.indexOf(field);
   if(r<0||c<0) return;
@@ -858,11 +869,44 @@ function conNav(cid, field, dir){
   else if(dir==='down'){ r++; }
   if(r<0||r>=conListIds.length) return;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const tr=document.querySelector('#conPanel tr[data-cid="'+conListIds[r]+'"]');
-    const td=tr&&tr.querySelector('td[data-f="'+conEditKeys[c]+'"]');
+    setConActive(conListIds[r], conEditKeys[c]);
+    const td=conActiveTd();
     if(td) td.click();
   }));
 }
+// Browse-mode keys in the contacts grid: arrows move, Tab hops cells, Enter edits.
+document.addEventListener('keydown',(e)=>{
+  if($('#kon').classList.contains('hide')) return;
+  if(document.querySelector('.modal-bg.open')) return;
+  const ae=document.activeElement;
+  if(ae && (ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA')) return; // editing or searching
+  const keys=['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Tab','Enter'];
+  if(!keys.includes(e.key)) return;
+  if(!conListIds.length||!conEditKeys.length) return;
+  if(!conActive || conListIds.indexOf(conActive.cid)<0){
+    setConActive(conListIds[0], conEditKeys[0]);
+    e.preventDefault();
+    return;
+  }
+  let r=conListIds.indexOf(conActive.cid), c=conEditKeys.indexOf(conActive.field);
+  if(c<0) c=0;
+  const clamp=(nr,nc)=>{ if(nr>=0&&nr<conListIds.length&&nc>=0&&nc<conEditKeys.length) setConActive(conListIds[nr],conEditKeys[nc]); };
+  switch(e.key){
+    case 'ArrowDown': e.preventDefault(); clamp(r+1,c); break;
+    case 'ArrowUp': e.preventDefault(); clamp(r-1,c); break;
+    case 'ArrowLeft': e.preventDefault(); clamp(r,c-1); break;
+    case 'ArrowRight': e.preventDefault(); clamp(r,c+1); break;
+    case 'Tab': {
+      e.preventDefault();
+      let nc=c+(e.shiftKey?-1:1), nr=r;
+      if(nc>=conEditKeys.length){ nc=0; nr=r+1; }
+      if(nc<0){ nc=conEditKeys.length-1; nr=r-1; }
+      clamp(nr,nc);
+      break;
+    }
+    case 'Enter': { e.preventDefault(); const td=conActiveTd(); if(td) td.click(); break; }
+  }
+});
 function renderContactsTable(){
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   let cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
@@ -921,6 +965,7 @@ function renderContactsTable(){
       if(!col.type) return;
       const td = tr.querySelector(`td[data-f="${col.key}"]`);
       if(!td) return;
+      td.addEventListener('mousedown',()=>setConActive(cid,col.key));
       makeEditable(td,{
         type: col.type,
         value: ()=>{ const c=contactsPool.find(x=>x.id===cid); return col.type==='date'?d10(c[col.key]):(c[col.key]||''); },
@@ -929,6 +974,7 @@ function renderContactsTable(){
       });
     });
   });
+  if(conActive) setConActive(conActive.cid, conActive.field); // restore selection after re-render
   updateBulkBar();
 }
 $('#conSearch').oninput = renderContactsTable;
@@ -955,15 +1001,6 @@ $('#bulkAddGroup').onclick=async()=>{
   showToast(bulkSel.size+' added to group');
   bulkSel.clear(); renderContactsTable();
 };
-async function bulkSetField(field, label){
-  const v=prompt(label+' for '+bulkSel.size+' contacts (empty clears):');
-  if(v===null) return;
-  for(const cid of bulkSel) await saveContactField(cid, field, v.trim(), true);
-  showToast(field+' set on '+bulkSel.size+' contacts (no undo for bulk)');
-  bulkSel.clear(); rerenderAll();
-}
-$('#bulkCity').onclick=()=>bulkSetField('city','City');
-$('#bulkCountry').onclick=()=>bulkSetField('country','Country');
 $('#bulkDelete').onclick=async()=>{
   if(!confirm('Delete '+bulkSel.size+' contacts completely? Removes group memberships and occasions too. Cannot be undone.')) return;
   for(const cid of bulkSel) await api('/api/contacts/'+cid,{method:'DELETE'});
