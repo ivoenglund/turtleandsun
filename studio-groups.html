@@ -146,7 +146,8 @@
   .trole{position:absolute;top:-9px;left:8px;background:#F4F1E6;border:1px solid var(--line);border-radius:8px;font-size:9.5px;padding:0 6px;color:var(--mut);}
   .tslot{border:1.5px dashed rgba(28,10,0,0.3);color:var(--mut);background:transparent;border-radius:9px;padding:8px 12px;font-size:11.5px;cursor:pointer;white-space:nowrap;}
   .tslot:hover{border-color:var(--green2);color:var(--green2);}
-  .vline{width:1.5px;height:16px;background:var(--gridline);}
+  .vline{width:1.5px;height:18px;background:transparent;} /* spacing only — SVG draws the real lines */
+  .tnode{z-index:1;}
   .tmenu{position:absolute;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 30px rgba(0,0,0,0.18);z-index:1200;padding:5px 0;font-size:13px;}
   .tmenu div{padding:5px 16px;cursor:pointer;white-space:nowrap;}
   .tmenu div:hover{background:#F4F1E6;}
@@ -261,7 +262,7 @@
         <span class="muted" style="font-size:12px;">— click a name in the tree to re-center on that person</span>
       </div>
       <div class="treeWrap" id="treePanel"><div class="empty">Loading…</div></div>
-      <div class="help">＋ on a card adds a father, mother or child. ✕ removes that link (the person stays in your contacts). ✎ opens the contact.</div>
+      <div class="help">＋ on a card adds a father, mother or child · ✕ removes that link (the person stays in your contacts) · ✎ opens the contact · <b>solid line = father, dashed = mother</b>.</div>
     </div>
 
     <!-- YEARBOOK -->
@@ -1766,6 +1767,7 @@ function treeNode(cid, opts){
   // opts: {focus, roleTag, linkId}
   const el=document.createElement('div');
   el.className='tnode'+(opts&&opts.focus?' focus':'');
+  el.dataset.cid=cid;
   if(opts&&opts.roleTag){ const t=document.createElement('span'); t.className='trole'; t.textContent=opts.roleTag; el.appendChild(t); }
   const n=document.createElement('span'); n.className='tn'; n.textContent=personName(cid);
   if(!(opts&&opts.focus)) n.onclick=()=>{ $('#treFocus').value=cid; try{localStorage.setItem('ts_tree_focus',cid);}catch(e){} renderFamilyTree(); };
@@ -1895,6 +1897,35 @@ function renderFamilyTree(){
     root.appendChild(s);
   }
   panel.appendChild(root);
+  drawTreeLines(root);
+}
+// Right-angle genealogy connectors: one line per parent→child link on screen.
+// Solid = father, dashed = mother.
+function drawTreeLines(root){
+  const old=root.querySelector('svg.tlines'); if(old) old.remove();
+  root.style.position='relative';
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','tlines');
+  svg.setAttribute('width',root.scrollWidth); svg.setAttribute('height',root.scrollHeight);
+  svg.style.cssText='position:absolute;left:0;top:0;pointer-events:none;z-index:0;';
+  const rRect=root.getBoundingClientRect();
+  const pos=el=>{ const r=el.getBoundingClientRect(); return {x:r.left-rRect.left, y:r.top-rRect.top, w:r.width, h:r.height}; };
+  famLinks.forEach(l=>{
+    const pe=root.querySelector('.tnode[data-cid="'+l.parent_id+'"]');
+    const ce=root.querySelector('.tnode[data-cid="'+l.child_id+'"]');
+    if(!pe||!ce) return;
+    const p=pos(pe), c=pos(ce);
+    const x1=p.x+p.w/2, y1=p.y+p.h, x2=c.x+c.w/2, y2=c.y;
+    const midY=y2-12;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d','M'+x1+' '+y1+' L'+x1+' '+midY+' L'+x2+' '+midY+' L'+x2+' '+y2);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','#1C2A14');
+    path.setAttribute('stroke-width','1.5');
+    if(l.role==='mother') path.setAttribute('stroke-dasharray','5 3');
+    svg.appendChild(path);
+  });
+  root.insertBefore(svg, root.firstChild);
 }
 $('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tree_focus',$('#treFocus').value);}catch(e){} renderFamilyTree(); });
 
@@ -1919,15 +1950,41 @@ $('#trePrintBtn').onclick=()=>{
    +'#scaler{transform-origin:top left;width:max-content;}'
    +'@page{size:A4 landscape;margin:12mm;}'
    +'</style></head><body>'
-   +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+' · solid line = father, dashed = mother</div>'
    +'<div id="scaler">'+$('#treePanel').innerHTML+'</div>'
    +'<scr'+'ipt>'
-   +'const s=document.getElementById("scaler");'
+   +'var LINKS='+JSON.stringify(famLinks||[])+';'
+   +'var s=document.getElementById("scaler");'
+   +'function redraw(){'
+   +'  var root=s.firstElementChild; if(!root) return;'
+   +'  var old=root.querySelector("svg.tlines"); if(old) old.remove();'
+   +'  root.style.position="relative";'
+   +'  var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");'
+   +'  svg.setAttribute("class","tlines");'
+   +'  svg.setAttribute("width",root.scrollWidth); svg.setAttribute("height",root.scrollHeight);'
+   +'  svg.style.cssText="position:absolute;left:0;top:0;pointer-events:none;z-index:0;";'
+   +'  var rr=root.getBoundingClientRect();'
+   +'  LINKS.forEach(function(l){'
+   +'    var pe=root.querySelector(".tnode[data-cid=\\""+l.parent_id+"\\"]");'
+   +'    var ce=root.querySelector(".tnode[data-cid=\\""+l.child_id+"\\"]");'
+   +'    if(!pe||!ce) return;'
+   +'    var pr=pe.getBoundingClientRect(), cr=ce.getBoundingClientRect();'
+   +'    var x1=pr.left-rr.left+pr.width/2, y1=pr.bottom-rr.top;'
+   +'    var x2=cr.left-rr.left+cr.width/2, y2=cr.top-rr.top, midY=y2-12;'
+   +'    var path=document.createElementNS("http://www.w3.org/2000/svg","path");'
+   +'    path.setAttribute("d","M"+x1+" "+y1+" L"+x1+" "+midY+" L"+x2+" "+midY+" L"+x2+" "+y2);'
+   +'    path.setAttribute("fill","none"); path.setAttribute("stroke","#000"); path.setAttribute("stroke-width","1.5");'
+   +'    if(l.role==="mother") path.setAttribute("stroke-dasharray","5 3");'
+   +'    svg.appendChild(path);'
+   +'  });'
+   +'  root.insertBefore(svg, root.firstChild);'
+   +'}'
    +'setTimeout(function(){'
+   +'  redraw();'
    +'  var avail=document.body.clientWidth, w0=s.scrollWidth;'
    +'  if(w0>avail) s.style.transform="scale("+(avail/w0)+")";'
    +'  setTimeout(function(){window.print();},250);'
-   +'},250);'
+   +'},300);'
    +'</scr'+'ipt></body></html>');
   w.document.close();
 };
