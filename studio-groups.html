@@ -94,6 +94,11 @@
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
+    <div class="lbl">Filters (all views)</div>
+    <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fLiving" checked> Living</label>
+    <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fDead" checked> Deceased</label>
+    <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPeople" checked> People</label>
+    <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
   </div>
 
   <div class="main">
@@ -122,10 +127,6 @@
     <div id="kon" class="hide">
       <div class="tools">
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
-        <label class="flt"><input type="checkbox" id="fLiving" checked> Living</label>
-        <label class="flt"><input type="checkbox" id="fDead" checked> Deceased</label>
-        <label class="flt"><input type="checkbox" id="fPeople" checked> People</label>
-        <label class="flt"><input type="checkbox" id="fPets" checked> Pets</label>
         <span id="konColsHost"></span>
       </div>
       <div class="panel" id="conPanel"></div>
@@ -272,8 +273,21 @@ function savePrefs(){ try{ localStorage.setItem('ts_studio_cols',JSON.stringify(
 function activeCols(tableKey, cols, defaults){
   if(COLPREFS[tableKey+'::all']) return cols;
   const saved = COLPREFS[tableKey];
-  const act = new Set(Array.isArray(saved) ? saved : defaults);
+  const act = new Set(Array.isArray(saved) && saved.length ? saved : defaults); // empty selection → defaults, never a blank grid
   return cols.filter(c=>act.has(c.key));
+}
+// ── Global filters (sidebar): apply to every view ──
+function passesFilterC(c){
+  const dead = !!c.died_on, pet = !!c.is_pet;
+  if(dead && !$('#fDead').checked) return false;
+  if(!dead && !$('#fLiving').checked) return false;
+  if(pet && !$('#fPets').checked) return false;
+  if(!pet && !$('#fPeople').checked) return false;
+  return true;
+}
+function passesFilterId(cid){
+  const c = contactsPool.find(x=>x.id===cid);
+  return c ? passesFilterC(c) : true;
 }
 function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   const host = document.getElementById(hostId);
@@ -434,8 +448,8 @@ function renderMembers(){
   if(!current){ return; }
   buildColPicker('medColsHost','members',MED_COLS,MED_DEFAULT,renderMembers);
   const cols = activeCols('members',MED_COLS,MED_DEFAULT);
-  const rows = current.members;
-  if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">No members yet. Use “Add from pool” or share a fill-in link.</div>'; return; }
+  const rows = current.members.filter(m=>passesFilterId(m.contact_id));
+  if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">'+(current.members.length?'All members are hidden by the sidebar filters.':'No members yet. Use “Add from pool” or share a fill-in link.')+'</div>'; return; }
   let html = `<table class="grid"><tr><th></th>${cols.map(c=>'<th>'+c.label+'</th>').join('')}<th></th></tr>`;
   rows.forEach(m=>{
     const cells = cols.map(c=>{
@@ -508,13 +522,8 @@ function renderContactsTable(){
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   const cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
   const q = ($('#conSearch').value||'').toLowerCase();
-  const fL=$('#fLiving').checked, fD=$('#fDead').checked, fP=$('#fPeople').checked, fPet=$('#fPets').checked;
   const list = contactsPool.filter(c=>{
-    const dead = !!c.died_on, pet = !!c.is_pet;
-    if(dead && !fD) return false;
-    if(!dead && !fL) return false;
-    if(pet && !fPet) return false;
-    if(!pet && !fP) return false;
+    if(!passesFilterC(c)) return false;
     if(!q) return true;
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
@@ -548,7 +557,7 @@ function renderContactsTable(){
   });
 }
 $('#conSearch').oninput = renderContactsTable;
-// Filter checkboxes: restore saved state, save on change, re-render
+// Sidebar filter checkboxes: restore saved state, save on change, re-render every view
 (function(){
   let saved={};
   try{ saved=JSON.parse(localStorage.getItem('ts_studio_filters')||'{}'); }catch(e){}
@@ -561,6 +570,8 @@ $('#conSearch').oninput = renderContactsTable;
       Object.entries(boxes).forEach(([i2,k2])=>out[k2]=document.getElementById(i2).checked);
       try{ localStorage.setItem('ts_studio_filters',JSON.stringify(out)); }catch(e){}
       renderContactsTable();
+      if(current){ renderMembers(); renderMap(); }
+      if(!document.getElementById('occ').classList.contains('hide')) loadOccasions();
     };
   });
 })();
@@ -669,14 +680,15 @@ async function loadOccasions(){
     items.push({kind:'birthday', contact_id:c.id, who:c.name, what:(c.died_on?'Memorial birthday':'Birthday'),
       start_date:c.birthday, frequency:'yearly', next:nextYearly(c.birthday,today)});
   });
-  items.sort((a,b)=>{
+  const visible = items.filter(it=>passesFilterId(it.contact_id));
+  visible.sort((a,b)=>{
     if(!a.next&&!b.next) return 0; if(!a.next) return 1; if(!b.next) return -1;
     return a.next-b.next;
   });
-  occItemsCache=items;
-  if(!items.length){ $('#occPanel').innerHTML='<div class="empty">No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.</div>'; return; }
+  occItemsCache=visible;
+  if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Everything is hidden by the sidebar filters.':'No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.')+'</div>'; return; }
   let html=`<table class="grid"><tr><th></th>${cols.map(c=>'<th>'+c.label+'</th>').join('')}</tr>`;
-  items.forEach((it,i)=>{
+  visible.forEach((it,i)=>{
     const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
     const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
     const years = it.next&&it.start_date ? it.next.getFullYear()-new Date(it.start_date).getFullYear() : null;
@@ -826,7 +838,7 @@ $('#poolRow').onclick=()=>{
 // ── Map ──
 function renderMap(){
   if(!current) return;
-  const pts = current.members.filter(m=>m.latitude!=null && m.longitude!=null);
+  const pts = current.members.filter(m=>m.latitude!=null && m.longitude!=null && passesFilterId(m.contact_id));
   if(!mapObj){ mapObj = L.map('map').setView([62,15],4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapObj);
   }
