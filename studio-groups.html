@@ -32,9 +32,10 @@
   .tab.active{color:var(--green2);font-weight:700;border-bottom-color:var(--green2);}
   .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;box-shadow:0 2px 12px rgba(0,0,0,0.06);overflow-x:auto;}
   /* Excel-style grid */
-  table.grid{width:100%;border-collapse:collapse;font-size:13px;border:1px solid var(--gridline);}
-  .grid th,.grid td{text-align:left;padding:3px 7px;border:1px solid var(--gridline);vertical-align:middle;line-height:1.35;}
-  .grid th{color:#5d5747;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;background:#F4F1E6;padding-top:5px;padding-bottom:5px;white-space:nowrap;}
+  table.grid{width:100%;border-collapse:collapse;font-size:13px;border:1px solid var(--gridline);table-layout:fixed;}
+  .grid th,.grid td{text-align:left;padding:1px 6px;border:1px solid var(--gridline);vertical-align:middle;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .grid th{color:#5d5747;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;background:#F4F1E6;padding-top:3px;padding-bottom:3px;position:relative;}
+  .rsz{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:5;}
   .grid tr:nth-child(even) td{background:#FDFCF7;}
   .grid td.ed{cursor:text;}
   .grid td.ed:hover{background:#FBF7E8!important;box-shadow:inset 0 0 0 1.5px #c9be9a;}
@@ -102,8 +103,6 @@
   </div>
 
   <div class="main">
-    <div class="crumb" id="crumb">Groups</div>
-    <h1 id="title">Select a group</h1>
     <div class="tabs" id="tabbar">
       <div class="tab active" data-t="med">Members</div>
       <div class="tab" data-t="occ">Occasions</div>
@@ -208,20 +207,6 @@
       <button class="btn sm danger left" id="conDelete">Delete contact</button>
       <button class="btn sm gray" id="conCancel">Close</button>
       <button class="btn sm pub" id="conSave">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Add-from-pool modal -->
-<div class="modal-bg" id="pickModalBg">
-  <div class="modal">
-    <h3>Add members to <span id="pickGroupName"></span></h3>
-    <input class="search" id="pickSearch" type="text" placeholder="Search…" style="max-width:none;width:100%;" autocomplete="off">
-    <div class="picklist" id="pickList"></div>
-    <div class="foot">
-      <span class="left muted" id="pickCount" style="font-size:13px;">0 selected</span>
-      <button class="btn sm gray" id="pickCancel">Cancel</button>
-      <button class="btn sm pub" id="pickAdd">Add selected</button>
     </div>
   </div>
 </div>
@@ -332,6 +317,31 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   host.appendChild(allBtn); host.appendChild(btn); host.appendChild(dd);
 }
 
+// ── Resizable columns: drag the right edge of a header. Widths persist per grid. ──
+function makeResizable(panelSel, tableKey){
+  const table = document.querySelector(panelSel+' table.grid');
+  if(!table) return;
+  const ths=[...table.querySelectorAll('tr:first-child th')];
+  const widths = COLPREFS[tableKey+'::w'] || {};
+  ths.forEach((th,idx)=>{
+    const key = th.dataset.k || ('c'+idx);
+    if(idx===0){ th.style.width=(widths[key]||30)+'px'; return; } // pencil column
+    if(widths[key]) th.style.width=widths[key]+'px';
+    const h=document.createElement('span'); h.className='rsz';
+    th.appendChild(h);
+    h.addEventListener('mousedown',e=>{
+      e.preventDefault(); e.stopPropagation();
+      const startX=e.pageX, startW=th.offsetWidth;
+      const move=ev=>{ th.style.width=Math.max(40,startW+ev.pageX-startX)+'px'; };
+      const up=()=>{
+        document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
+        widths[key]=th.offsetWidth; COLPREFS[tableKey+'::w']=widths; savePrefs();
+      };
+      document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+    });
+  });
+}
+
 // ── Inline cell editing ──
 function makeEditable(td, opts){
   td.classList.add('ed');
@@ -415,12 +425,9 @@ async function loadAll(){
 
 async function selectGroup(node){
   selected = node;
+  memEdit = false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
   $('#poolRow').classList.remove('active');
-  $('#crumb').textContent = 'Groups › '+node.name;
-  const total = countFor(node);
-  const subN = (node.subgroups||[]).length;
-  $('#title').innerHTML = `${esc(node.name)} <span style="font-size:13px;color:var(--mut);font-weight:400;">· ${total} members${subN?` · ${subN} subgroups`:''}</span>`;
   $('#shareBox').classList.add('hide');
   $('#bokSrc').textContent = 'Source: '+node.name;
   current = await api('/api/groups/'+node.id+'/members');
@@ -453,11 +460,12 @@ const MED_COLS = [
 const MED_DEFAULT = ['name','subgroup','range','alsoin','status','photo'];
 function renderMembers(){
   if(!current){ return; }
+  if(memEdit && selected){ renderMemberEdit(); return; }
   buildColPicker('medColsHost','members',MED_COLS,MED_DEFAULT,renderMembers);
   const cols = activeCols('members',MED_COLS,MED_DEFAULT);
   const rows = current.members.filter(m=>passesFilterId(m.contact_id));
   if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">'+(current.members.length?'All members are hidden by the sidebar filters.':'No members yet. Use “Add from pool” or share a fill-in link.')+'</div>'; return; }
-  let html = `<table class="grid"><tr><th></th>${cols.map(c=>'<th>'+c.label+'</th>').join('')}<th></th></tr>`;
+  let html = `<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}<th data-k="act"></th></tr>`;
   rows.forEach(m=>{
     const cells = cols.map(c=>{
       if(c.key==='name') return `<td style="font-weight:600;">${esc(m.name)||'(unnamed)'}${m.self_managed?' <span class="self">✓</span>':''}</td>`;
@@ -476,6 +484,7 @@ function renderMembers(){
   });
   html+='</table>';
   $('#memPanel').innerHTML=html;
+  makeResizable('#memPanel','members');
   $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
   $('#memPanel').querySelectorAll('.conPencil').forEach(p=>p.onclick=()=>openContactModal(+p.dataset.cid));
 }
@@ -535,7 +544,7 @@ function renderContactsTable(){
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
   if(!list.length){ $('#conPanel').innerHTML='<div class="empty">No contacts'+(q?' match your search':' yet')+'.</div>'; return; }
-  let html = `<table class="grid"><tr><th></th>${cols.map(c=>'<th>'+c.label+'</th>').join('')}</tr>`;
+  let html = `<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}</tr>`;
   list.forEach(c=>{
     html += `<tr data-cid="${c.id}">
       <td><span class="pencil conPencil" title="Full editor (all fields, occasions)">✎</span></td>
@@ -550,6 +559,7 @@ function renderContactsTable(){
   });
   html += '</table>';
   $('#conPanel').innerHTML = html;
+  makeResizable('#conPanel','contacts');
   $('#conPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
     const cid = +tr.dataset.cid;
     tr.querySelector('.conPencil').onclick=()=>openContactModal(cid);
@@ -695,7 +705,7 @@ async function loadOccasions(){
   });
   occItemsCache=visible;
   if(!visible.length){ $('#occPanel').innerHTML='<div class="empty">'+(items.length?'Nothing to show for '+esc(chosenLabel())+' with the current filters.':'No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.')+'</div>'; return; }
-  let html=`<table class="grid"><tr><th></th>${cols.map(c=>'<th>'+c.label+'</th>').join('')}</tr>`;
+  let html=`<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}</tr>`;
   visible.forEach((it,i)=>{
     const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
     const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
@@ -714,6 +724,7 @@ async function loadOccasions(){
   });
   html+='</table>';
   $('#occPanel').innerHTML=html;
+  makeResizable('#occPanel','occasions');
   $('#occPanel').querySelectorAll('tr[data-i]').forEach(tr=>{
     const it=occItemsCache[+tr.dataset.i];
     tr.querySelector('.rowPencil').onclick=()=>{
@@ -783,46 +794,57 @@ $('#shareBtn').onclick=async()=>{
   $('#copyShare').onclick=()=>{ navigator.clipboard.writeText(r.url); $('#copyShare').textContent='Copied ✓'; };
 };
 
-// ── Add from pool (picker modal) ──
-let pickSelection = new Set();
-$('#addMemberBtn').onclick=()=>{
+// ── Add from pool: inline grid of all contacts with a "Member" checkbox column ──
+let memEdit = false;
+$('#addMemberBtn').onclick=async()=>{
   if(!selected){ alert('Select a group first.'); return; }
-  pickSelection = new Set();
-  $('#pickGroupName').textContent = selected.name;
-  $('#pickSearch').value='';
-  renderPickList();
-  $('#pickModalBg').classList.add('open');
-};
-function renderPickList(){
-  const inGroup = new Set((current?current.members:[]).map(m=>m.contact_id));
-  const q = ($('#pickSearch').value||'').toLowerCase();
-  const avail = contactsPool.filter(c=>!inGroup.has(c.id) && (!q || ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q)));
-  $('#pickList').innerHTML = avail.length ? avail.map(c=>`
-    <label class="pickrow"><input type="checkbox" data-cid="${c.id}"${pickSelection.has(c.id)?' checked':''}>
-      <span>${esc(c.name)||'(unnamed)'}${c.is_pet?' 🐾':''}</span>
-      <span class="sub2">${esc(c.city||c.email||'')}</span>
-    </label>`).join('') : '<div class="empty" style="padding:18px;">Everyone is already a member'+(q?' (or no match)':'')+'.</div>';
-  $('#pickList').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.onchange=()=>{
-    const id=+cb.dataset.cid;
-    if(cb.checked) pickSelection.add(id); else pickSelection.delete(id);
-    $('#pickCount').textContent = pickSelection.size+' selected';
-  });
-  $('#pickCount').textContent = pickSelection.size+' selected';
-}
-$('#pickSearch').oninput=renderPickList;
-$('#pickCancel').onclick=()=>$('#pickModalBg').classList.remove('open');
-$('#pickModalBg').onclick=(e)=>{ if(e.target===$('#pickModalBg')) $('#pickModalBg').classList.remove('open'); };
-$('#pickAdd').onclick=async()=>{
-  if(!pickSelection.size){ alert('Select at least one contact.'); return; }
-  const today=new Date().toISOString().slice(0,10);
-  for(const cid of pickSelection){
-    await api('/api/memberships',{method:'PUT',body:JSON.stringify({
-      contact_id:cid, group_id:selected.id, from_date:today, status:'active'
-    })});
+  memEdit = !memEdit;
+  $('#addMemberBtn').textContent = memEdit ? '✓ Done' : '＋ Add from pool';
+  if(memEdit){ renderMemberEdit(); }
+  else {
+    memberships = await api('/api/group-memberships'); renderTree();
+    current = await api('/api/groups/'+selected.id+'/members');
+    renderMembers(); renderMap();
   }
-  $('#pickModalBg').classList.remove('open');
-  await loadAll(); current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
 };
+function renderMemberEdit(){
+  const inGroup = new Map(); // contact_id → group_id it belongs through (for removal)
+  (current?current.members:[]).forEach(m=>inGroup.set(m.contact_id, m.subgroup_id||selected.id));
+  const list = contactsPool.filter(passesFilterC);
+  let html = `<table class="grid"><tr><th data-k="chk" style="width:64px;">Member</th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="city">City</th><th data-k="birthday">Birthday</th></tr>`;
+  list.forEach(c=>{
+    html += `<tr data-cid="${c.id}">
+      <td style="text-align:center;"><input type="checkbox" class="memChk"${inGroup.has(c.id)?' checked':''}></td>
+      <td><b>${esc(c.name)||'(unnamed)'}</b>${c.is_pet?' 🐾':''}${c.died_on?' <span class="muted">✝</span>':''}</td>
+      <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
+      <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
+      <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
+    </tr>`;
+  });
+  html += '</table><div class="help">Tick to add to “'+esc(selected.name)+'”, untick to remove (the person stays in the pool). Click “✓ Done” above when finished.</div>';
+  $('#memPanel').innerHTML = html;
+  makeResizable('#memPanel','memedit');
+  $('#memPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
+    const cid=+tr.dataset.cid;
+    tr.querySelector('.memChk').onchange=async(e)=>{
+      const cb=e.target; cb.disabled=true;
+      try{
+        if(cb.checked){
+          await api('/api/memberships',{method:'PUT',body:JSON.stringify({
+            contact_id:cid, group_id:selected.id, from_date:new Date().toISOString().slice(0,10), status:'active'
+          })});
+          inGroup.set(cid, selected.id);
+        } else {
+          const gid = inGroup.get(cid) || selected.id;
+          await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
+          inGroup.delete(cid);
+        }
+        current = await api('/api/groups/'+selected.id+'/members');
+      }catch(err){ alert('Failed: '+err.message); cb.checked=!cb.checked; }
+      cb.disabled=false;
+    };
+  });
+}
 
 // ── New group ──
 $('#addGroupBtn').onclick=async()=>{
@@ -836,10 +858,9 @@ $('#addGroupBtn').onclick=async()=>{
 // ── Pool row → chosen set becomes all contacts; current tab re-renders for it ──
 $('#poolRow').onclick=()=>{
   selected=null;
+  memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
   $('#poolRow').classList.add('active');
-  $('#crumb').textContent='Pool';
-  $('#title').textContent='All contacts';
   const active=document.querySelector('.tab.active');
   showTab(active?active.dataset.t:'med');
 };
