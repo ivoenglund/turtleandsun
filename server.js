@@ -4826,49 +4826,6 @@ app.post('/admin/api/social-clips/:id(\\d+)/publish-youtube', requireRole('admin
 });
 
 
-// ── Social Calendar ─────────────────────────────────────────────────────────
-app.get('/admin/social-calendar', requireRole('admin'), (req, res) => {
-  res.sendFile(require('path').join(__dirname, 'admin-social-calendar.html'));
-});
-
-app.get('/admin/api/social-calendar', requireRole('admin'), async (req, res) => {
-  try {
-    const { week } = req.query; // ISO date string of any day in the target week
-    const ref = week ? new Date(week) : new Date();
-    // Find Monday of that week
-    const day = ref.getDay();
-    const monday = new Date(ref);
-    monday.setDate(ref.getDate() - ((day === 0 ? 7 : day) - 1));
-    monday.setHours(0, 0, 0, 0);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    const { rows } = await pool.query(`
-      SELECT id, concept_name, clip_style, subject, subject_name,
-        tiktok_posted_at, instagram_posted_at, yt_posted_at, fb_posted_at,
-        yt_scheduled_at,
-        published_tiktok, published_instagram, published_youtube, published_facebook,
-        output_url
-      FROM social_clips
-      WHERE
-        tiktok_posted_at    BETWEEN $1 AND $2 OR
-        instagram_posted_at BETWEEN $1 AND $2 OR
-        yt_posted_at        BETWEEN $1 AND $2 OR
-        fb_posted_at        BETWEEN $1 AND $2 OR
-        yt_scheduled_at::date BETWEEN $1 AND $2
-      ORDER BY LEAST(
-        COALESCE(tiktok_posted_at,    '9999-12-31'),
-        COALESCE(instagram_posted_at, '9999-12-31'),
-        COALESCE(yt_posted_at,        '9999-12-31'),
-        COALESCE(fb_posted_at,        '9999-12-31')
-      )`,
-      [monday.toISOString().slice(0,10), sunday.toISOString().slice(0,10)]
-    );
-    res.json({ rows, week_start: monday.toISOString().slice(0,10) });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── Clip stats (daily views per platform) ──────────────────────────────────────
 app.get('/admin/api/social-clips/:id(\d+)/stats', requireRole('admin'), async (req, res) => {
   try {
