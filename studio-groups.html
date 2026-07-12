@@ -1980,9 +1980,9 @@ $('#trePrintBtn').onclick=()=>{
   try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
   const c=contactsPool.find(x=>x.id===focus);
   if(printOn && c){
-    infoHtml='<div style="display:flex;gap:14px;align-items:flex-start;border:1px solid #000;border-radius:8px;padding:10px 14px;margin-bottom:14px;max-width:640px;">'
-      +(c.photo_url?'<img src="'+esc(c.photo_url)+'" style="width:70px;height:70px;border-radius:50%;object-fit:cover;">':'')
-      +'<div style="font-size:12px;line-height:1.5;"><b style="font-size:14px;">'+esc(c.name||'')+'</b><br>'
+    infoHtml='<div class="infocard">'
+      +(c.photo_url?'<img class="infoimg" src="'+esc(c.photo_url)+'">':'')
+      +'<div><b style="font-size:13px;">'+esc(c.name||'')+'</b><br>'
       +treInfoFields(c).map(([l,v])=>'<b>'+esc(l)+':</b> '+esc(v)).join('<br>')
       +'</div></div>';
   }
@@ -2003,16 +2003,20 @@ $('#trePrintBtn').onclick=()=>{
    +'body{font-family:Arial,sans-serif;color:#000;margin:0;background:#fff;}'
    +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:10px;}'
    +'.fitpage{height:'+usable+'mm;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
-   +'.chartbox{flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:center;}'
+   +'.pagerow{flex:1;min-height:0;display:flex;gap:6mm;align-items:flex-start;}'
+   +'.infocard{width:50mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:4mm;font-size:11px;line-height:1.55;}'
+   +'.infoimg{width:100%;height:auto;display:block;margin-bottom:3mm;}' // natural aspect ratio, above the text
+   +'.chartbox{flex:1;min-width:0;height:100%;display:flex;align-items:flex-start;justify-content:center;}'
    +'.chartbox svg{max-width:100%;max-height:100%;width:auto;height:auto;display:block;}'
    +'@page{size:'+paper+';margin:12mm;}'
    +'@media screen{body{margin:16px;}}'
    +'</style></head><body>'
    +'<div class="fitpage">'
    +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +'<div class="pagerow">'
    +infoHtml
    +'<div class="chartbox">'+clone.outerHTML+'</div>'
-   +'</div>'
+   +'</div></div>'
    +'<scr'+'ipt>setTimeout(function(){window.print();},600);</scr'+'ipt></body></html>');
   w.document.close();
 };
