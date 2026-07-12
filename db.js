@@ -283,6 +283,24 @@ async function initDb() {
     ALTER TABLE concept_media ADD COLUMN IF NOT EXISTS source_url TEXT;
     ALTER TABLE visits ADD COLUMN IF NOT EXISTS engaged BOOLEAN NOT NULL DEFAULT FALSE;
 
+    -- 2026-07-12: Studio — free-text "About" per contact (yearbook portrait text)
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS about TEXT;
+
+    -- 2026-07-12: Studio timeline blog — posts with photos and free-form tags.
+    -- Tags double as filters: include/exclude sets in the timeline and yearbook
+    -- (e.g. print everything except tag "private").
+    CREATE TABLE IF NOT EXISTS blog_posts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      title TEXT,
+      body TEXT,
+      post_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      photos JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_blog_posts_user ON blog_posts(user_id, post_date);
+
     -- 2026-06-30: Turtle Studio groups — dated, status-aware memberships.
     -- A membership now carries a from/to date range (so the same model handles
     -- ongoing groups, ended memberships, and historical/dated groups like school

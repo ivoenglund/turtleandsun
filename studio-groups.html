@@ -70,6 +70,18 @@
   .flt input{width:auto;margin:0;}
   .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:6px 10px;margin-bottom:8px;font-size:13px;}
   .dupblock{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:12px;}
+  .tagchip{display:inline-block;border:1px solid rgba(28,10,0,0.25);border-radius:20px;padding:2px 11px;font-size:12px;cursor:pointer;background:#fff;user-select:none;}
+  .tagchip.inc{background:#EAF3E2;border-color:var(--leaf2);color:var(--green2);font-weight:700;}
+  .tagchip.exc{background:#fbeee9;border-color:#c98;color:#9a4a3a;font-weight:700;text-decoration:line-through;}
+  .yearhdr{font-size:15px;font-weight:800;margin:16px 0 6px;color:var(--green2);}
+  .postcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+  .postcard h4{margin:0 0 2px;font-size:14.5px;}
+  .postcard .pdate{font-size:11.5px;color:var(--mut);margin-bottom:6px;}
+  .postcard .pbody{font-size:13px;white-space:pre-wrap;line-height:1.45;}
+  .postphotos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;}
+  .postphotos img{height:84px;border-radius:8px;object-fit:cover;cursor:pointer;}
+  .occitem{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,0.55);border:1px solid var(--line);border-radius:9px;padding:4px 10px;margin-bottom:4px;font-size:12.5px;}
+  .occitem img{width:22px;height:22px;border-radius:50%;object-fit:cover;}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1C2A14;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;z-index:4000;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.3);}
   .toast button{background:none;border:none;color:var(--yellow);font-weight:700;cursor:pointer;font-size:13.5px;padding:0;}
   /* Modal */
@@ -108,6 +120,7 @@
       <div class="tab active" data-t="med">Members</div>
       <div class="tab" data-t="occ">Occasions</div>
       <div class="tab" data-t="kar">Map</div>
+      <div class="tab" data-t="tid">Timeline</div>
       <div class="tab" data-t="bok">Yearbook</div>
       <div class="tab" data-t="exp">Export</div>
     </div>
@@ -162,6 +175,19 @@
       </div>
     </div>
 
+    <!-- TIMELINE -->
+    <div id="tid" class="hide">
+      <div class="tools">
+        <button class="btn pub" id="postAddBtn">＋ New post</button>
+        <label class="flt"><input type="checkbox" id="tfPosts" checked> Posts</label>
+        <label class="flt"><input type="checkbox" id="tfOcc" checked> Occasions</label>
+        <label class="flt"><input type="checkbox" id="tfBday" checked> Birthdays</label>
+      </div>
+      <div class="tools" id="tagBar" style="margin-top:-2px;"></div>
+      <div id="tidFeed"></div>
+      <div class="help">Tags: click once to <b>show only</b> (green), twice to <b>hide</b> (red), a third time to reset. No green tags = all posts (minus the red ones). The sidebar selection scopes whose occasions appear, and posts tagged with the group's name follow it.</div>
+    </div>
+
     <!-- YEARBOOK -->
     <div id="bok" class="hide">
       <div class="panel" style="max-width:520px;padding:16px 18px;">
@@ -188,7 +214,7 @@
 
     <!-- DUPLICATES -->
     <div id="dup" class="hide">
-      <div class="tools"><b style="font-size:14px;">Possible duplicates</b><span class="muted" style="font-size:12.5px;">— same name or same email</span></div>
+      <div class="tools"><b style="font-size:14px;">Possible duplicates</b><span class="muted" style="font-size:12.5px;">— same name or same email</span><span id="dupColsHost"></span></div>
       <div id="dupPanel"></div>
       <div class="help">“Keep” merges the others into that contact: missing fields fill in, occasions and group memberships move over, then the duplicates are deleted. This cannot be undone.</div>
     </div>
@@ -213,6 +239,7 @@
       <div><label>Country</label><input id="cf_country" autocomplete="off"></div>
       <div><label>Died on (memorial)</label><input id="cf_died_on" type="date" autocomplete="off"></div>
       <div style="display:flex;align-items:end;padding-bottom:6px;"><label style="display:flex;align-items:center;gap:7px;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);margin:0;"><input type="checkbox" id="cf_is_pet" style="width:auto;"> This is a pet</label></div>
+      <div class="full"><label>About (free text — used in the yearbook)</label><textarea id="cf_about" rows="3" style="width:100%;resize:vertical;" autocomplete="off"></textarea></div>
     </div>
     <div style="margin-top:14px;">
       <label style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;">Occasions for this contact</label>
@@ -228,6 +255,32 @@
       <button class="btn sm danger left" id="conDelete">Delete contact</button>
       <button class="btn sm gray" id="conCancel">Close</button>
       <button class="btn sm pub" id="conSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Blog post editor modal -->
+<div class="modal-bg" id="postModalBg">
+  <div class="modal">
+    <h3 id="postModalTitle">New post</h3>
+    <div class="grid2">
+      <div><label>Date</label><input id="pf_date" type="date" autocomplete="off"></div>
+      <div><label>Tags (comma separated)</label><input id="pf_tags" list="tagList" autocomplete="off" placeholder="Family, Midsummer, private…"></div>
+      <datalist id="tagList"></datalist>
+      <div class="full"><label>Title</label><input id="pf_title" autocomplete="off"></div>
+      <div class="full"><label>Text</label><textarea id="pf_body" rows="6" style="width:100%;resize:vertical;"></textarea></div>
+      <div class="full">
+        <label>Photos</label>
+        <div class="postphotos" id="pf_photos"></div>
+        <input type="file" id="pf_file" accept="image/*" multiple style="display:none;">
+        <button class="btn sm gray" id="pf_upload">＋ Add photos</button>
+        <span class="muted" id="pf_upstat" style="font-size:12px;"></span>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn sm danger left hide" id="pfDelete">Delete post</button>
+      <button class="btn sm gray" id="pfCancel">Cancel</button>
+      <button class="btn sm pub" id="pfSave">Save</button>
     </div>
   </div>
 </div>
@@ -256,6 +309,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const d10 = v => v ? String(v).slice(0,10) : '';
+const fmtD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 let groups = [];
 let memberships = [];
 let contactsPool = [];
@@ -446,7 +500,7 @@ async function saveContactField(cid, field, value, silent){
   const body = {
     name:c.name, email:c.email, phone:c.phone, company:c.company,
     street:c.street, street_2:c.street_2, city:c.city, region:c.region,
-    country:c.country, postal_code:c.postal_code,
+    country:c.country, postal_code:c.postal_code, about:c.about||null,
     birthday:d10(c.birthday)||null, died_on:d10(c.died_on)||null, is_pet:!!c.is_pet
   };
   body[field] = value===''?null:value;
@@ -464,6 +518,7 @@ function rerenderAll(){
   renderContactsTable();
   if(current){ renderMembers(); renderMap(); }
   if(!$('#occ').classList.contains('hide')) loadOccasions();
+  if(!$('#tid').classList.contains('hide')) renderTimeline();
   updateSideCounts();
 }
 
@@ -710,6 +765,7 @@ const CON_COLS = [
   {key:'country',    label:'Country',  type:'text'},
   {key:'birthday',   label:'Birthday', type:'date'},
   {key:'died_on',    label:'Died on',  type:'date'},
+  {key:'about',      label:'About',    type:'text'},
   {key:'photo',      label:'Photo',    type:null},
 ];
 const CON_DEFAULT = ['name','email','phone','city','birthday'];
@@ -831,7 +887,7 @@ $('#bulkDelete').onclick=async()=>{
 };
 
 // ── Contact editor modal ──
-const CF = ['name','email','phone','company','street','street_2','city','region','country','postal_code'];
+const CF = ['name','email','phone','company','street','street_2','city','region','country','postal_code','about'];
 async function openContactModal(cid){
   editingContactId = cid;
   const c = await api('/api/contacts/'+cid);
@@ -961,7 +1017,7 @@ async function loadOccasions(){
     const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
     const years = it.next&&it.start_date ? it.next.getFullYear()-new Date(it.start_date).getFullYear() : null;
     const cells = cols.map(c=>{
-      if(c.key==='next') return `<td>${it.next?it.next.toISOString().slice(0,10):'<span class="muted">—</span>'}</td>`;
+      if(c.key==='next') return `<td>${it.next?fmtD(it.next):'<span class="muted">—</span>'}</td>`;
       if(c.key==='in') return `<td>${badge}</td>`;
       if(c.key==='who') return `<td style="font-weight:600;">${esc(it.who)}</td>`;
       if(c.key==='what') return `<td data-f="what">${esc(it.what)}${years&&it.frequency==='yearly'?` <span class="muted">(${years})</span>`:''}</td>`;
@@ -1085,20 +1141,36 @@ function computeDupClusters(){
   contactsPool.forEach(c=>{ const r=find(c.id); (cl[r]=cl[r]||[]).push(c); });
   return Object.values(cl).filter(a=>a.length>1);
 }
+const DUP_COLS = [
+  {key:'name',    label:'Name'},
+  {key:'email',   label:'Email'},
+  {key:'phone',   label:'Phone'},
+  {key:'company', label:'Company'},
+  {key:'street',  label:'Street'},
+  {key:'city',    label:'City'},
+  {key:'country', label:'Country'},
+  {key:'birthday',label:'Birthday'},
+  {key:'about',   label:'About'},
+  {key:'src',     label:'Source'},
+];
+const DUP_DEFAULT = ['name','email','phone','city','birthday','src'];
 function renderDuplicates(){
+  buildColPicker('dupColsHost','dups',DUP_COLS,DUP_DEFAULT,renderDuplicates);
+  const cols = activeCols('dups',DUP_COLS,DUP_DEFAULT);
   const clusters=computeDupClusters();
   if(!clusters.length){ $('#dupPanel').innerHTML='<div class="panel"><div class="empty">No duplicates found 🎉</div></div>'; return; }
+  const cell=(c,k)=>{
+    if(k==='name') return '<b>'+(esc(c.name)||'(unnamed)')+'</b>'+(c.is_pet?' 🐾':'');
+    if(k==='birthday') return d10(c.birthday)||'<span class="muted">—</span>';
+    if(k==='src') return c.google_id?'Google':'manual';
+    return esc(c[k])||'<span class="muted">—</span>';
+  };
   $('#dupPanel').innerHTML = clusters.map((cl,ci)=>`
     <div class="dupblock panel">
-      <table class="grid"><tr><th></th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="phone">Phone</th><th data-k="city">City</th><th data-k="birthday">Birthday</th><th data-k="src">Source</th></tr>
+      <table class="grid"><tr><th></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+'</th>').join('')}</tr>
       ${cl.map(c=>`<tr>
         <td><button class="btn sm pub keepBtn" data-ci="${ci}" data-cid="${c.id}">Keep</button></td>
-        <td><b>${esc(c.name)||'(unnamed)'}</b>${c.is_pet?' 🐾':''}</td>
-        <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
-        <td>${esc(c.phone)||'<span class="muted">—</span>'}</td>
-        <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
-        <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
-        <td>${c.google_id?'Google':'manual'}</td>
+        ${cols.map(col=>'<td>'+cell(c,col.key)+'</td>').join('')}
       </tr>`).join('')}
       </table>
     </div>`).join('');
@@ -1116,7 +1188,7 @@ async function mergeInto(keeperId, others){
   try{
     for(const o of others){
       const [kFull, dFull] = await Promise.all([api('/api/contacts/'+keeperId), api('/api/contacts/'+o.id)]);
-      const fields=['name','email','phone','company','street','street_2','city','region','country','postal_code'];
+      const fields=['name','email','phone','company','street','street_2','city','region','country','postal_code','about'];
       const body={};
       fields.forEach(f=>body[f]= kFull[f] || dFull[f] || null);
       body.birthday = d10(kFull.birthday) || d10(dFull.birthday) || null;
@@ -1146,6 +1218,185 @@ $('#dupRow').onclick=()=>{
   $('#dupRow').classList.add('active');
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
   renderDuplicates();
+};
+
+// ── Timeline: blog posts + occasion instances, year-grouped, tag include/exclude ──
+let blogCache = null;
+let tagState = {}; // tag → 'inc' | 'exc'
+async function ensureBlog(force){
+  if(blogCache && !force) return;
+  blogCache = await api('/api/blog-posts') || [];
+}
+function allTags(){
+  const s=new Set();
+  (blogCache||[]).forEach(p=>(p.tags||[]).forEach(t=>s.add(t)));
+  return [...s].sort((a,b)=>cmpVals(a,b));
+}
+function postVisible(p){
+  const tags=(p.tags||[]).map(t=>String(t).toLowerCase());
+  // group scoping: tagged posts follow their group; untagged show everywhere
+  if(selected && tags.length && !tags.includes(selected.name.toLowerCase())){
+    // tagged with only non-group tags is fine — hide only if tagged with ANOTHER group's name
+    const groupNames = new Set(flatGroups().map(g=>g.name.trim().toLowerCase()));
+    if(tags.some(t=>groupNames.has(t))) return false;
+  }
+  const inc=Object.keys(tagState).filter(t=>tagState[t]==='inc').map(t=>t.toLowerCase());
+  const exc=Object.keys(tagState).filter(t=>tagState[t]==='exc').map(t=>t.toLowerCase());
+  if(exc.some(t=>tags.includes(t))) return false;
+  if(inc.length && !inc.some(t=>tags.includes(t))) return false;
+  return true;
+}
+function renderTagBar(){
+  const bar=$('#tagBar');
+  const tags=allTags();
+  bar.innerHTML = tags.length ? '' : '<span class="muted" style="font-size:12px;">No tags yet — add tags on posts to filter.</span>';
+  tags.forEach(t=>{
+    const chip=document.createElement('span');
+    chip.className='tagchip'+(tagState[t]==='inc'?' inc':tagState[t]==='exc'?' exc':'');
+    chip.textContent=t;
+    chip.onclick=()=>{
+      tagState[t] = tagState[t]==='inc' ? 'exc' : tagState[t]==='exc' ? undefined : 'inc';
+      if(!tagState[t]) delete tagState[t];
+      renderTimeline();
+    };
+    bar.appendChild(chip);
+  });
+}
+async function renderTimeline(){
+  try{ await ensureBlog(); }catch(e){ $('#tidFeed').innerHTML='<div class="empty">Could not load posts: '+esc(e.message)+'</div>'; return; }
+  renderTagBar();
+  const showPosts=$('#tfPosts').checked, showOcc=$('#tfOcc').checked, showBday=$('#tfBday').checked;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const cy=today.getFullYear();
+  const posts=(blogCache||[]).filter(p=>showPosts&&postVisible(p));
+  // years shown: post years ∪ current-1..current+1
+  const years=new Set([cy-1,cy,cy+1]);
+  posts.forEach(p=>years.add(new Date(p.post_date).getFullYear()));
+  // occasion instances per shown year, scoped to the chosen selection
+  let occData=null;
+  if(showOcc||showBday){
+    try{ occData=await api('/api/occasions/upcoming'); }catch(e){ occData=null; }
+  }
+  const ids2=chosenIds();
+  const items=[]; // {date:Date, kind:'post'|'occ'|'bday', ...}
+  posts.forEach(p=>items.push({date:new Date(p.post_date), kind:'post', p}));
+  if(occData){
+    const pool_=contactsPool;
+    const pushInst=(baseDate, year, kind, who, what, cid)=>{
+      const b=new Date(baseDate); if(isNaN(b)||year<b.getFullYear()) return;
+      items.push({date:new Date(year,b.getMonth(),b.getDate()), kind, who, what,
+        age:year-b.getFullYear(), cid});
+    };
+    years.forEach(y=>{
+      if(showOcc) (occData.occasions||[]).forEach(o=>{
+        if(!ids2.has(o.contact_id)) return;
+        if(o.frequency==='yearly'||o.frequency==='milestone') pushInst(o.start_date,y,'occ',o.contact_name,o.name,o.contact_id);
+        else if(new Date(o.start_date).getFullYear()===y) items.push({date:new Date(o.start_date),kind:'occ',who:o.contact_name,what:o.name,cid:o.contact_id});
+      });
+      if(showBday) (occData.contacts||[]).forEach(c=>{
+        if(!c.birthday||!ids2.has(c.id)) return;
+        pushInst(c.birthday,y,'bday',c.name,(c.died_on?'Memorial birthday':'Birthday'),c.id);
+      });
+    });
+  }
+  items.sort((a,b)=>b.date-a.date); // newest first, future on top
+  if(!items.length){ $('#tidFeed').innerHTML='<div class="empty">Nothing on the timeline yet — write the first post!</div>'; return; }
+  let html='', lastYear=null;
+  items.forEach(it=>{
+    const y=it.date.getFullYear();
+    if(y!==lastYear){ html+='<div class="yearhdr">'+y+(y===cy?' — this year':'')+'</div>'; lastYear=y; }
+    const ds=fmtD(it.date);
+    if(it.kind==='post'){
+      const p=it.p;
+      html+=`<div class="postcard" data-pid="${p.id}">
+        <h4>${esc(p.title)||'<span class="muted">(untitled)</span>'}</h4>
+        <div class="pdate">${ds}${(p.tags||[]).map(t=>' <span class="tag">'+esc(t)+'</span>').join('')}</div>
+        ${(p.photos||[]).length?'<div class="postphotos">'+(p.photos||[]).map(u=>'<img src="'+esc(u)+'" loading="lazy" onclick="window.open(\''+esc(u)+'\',\'_blank\')">').join('')+'</div>':''}
+        ${p.body?'<div class="pbody">'+esc(p.body)+'</div>':''}
+        <div style="margin-top:8px;"><button class="btn sm gray pEdit">Edit</button></div>
+      </div>`;
+    } else {
+      const c=contactsPool.find(x=>x.id===it.cid);
+      const photo=c&&c.photo_url?'<img src="'+esc(c.photo_url)+'">':'🎂';
+      html+=`<div class="occitem">${photo}<b>${esc(it.who)}</b> ${esc(it.what)}${it.age?' <span class="muted">('+it.age+')</span>':''}<span class="muted" style="margin-left:auto;">${ds}</span></div>`;
+    }
+  });
+  $('#tidFeed').innerHTML=html;
+  $('#tidFeed').querySelectorAll('.pEdit').forEach(b=>b.onclick=(e)=>{
+    const pid=+e.target.closest('.postcard').dataset.pid;
+    openPostModal((blogCache||[]).find(p=>p.id===pid));
+  });
+}
+['tfPosts','tfOcc','tfBday'].forEach(id=>{ document.getElementById(id).onchange=()=>renderTimeline(); });
+
+// ── Post editor modal ──
+let editingPost=null;
+let pfPhotos=[];
+function renderPfPhotos(){
+  $('#pf_photos').innerHTML=pfPhotos.map((u,i)=>
+    `<span style="position:relative;display:inline-block;"><img src="${esc(u)}" style="height:84px;border-radius:8px;">
+     <button data-i="${i}" class="pfRm" style="position:absolute;top:-6px;right:-6px;border:none;background:#a12a1a;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;">✕</button></span>`).join('');
+  $('#pf_photos').querySelectorAll('.pfRm').forEach(b=>b.onclick=()=>{ pfPhotos.splice(+b.dataset.i,1); renderPfPhotos(); });
+}
+function openPostModal(p){
+  editingPost=p||null;
+  $('#postModalTitle').textContent=p?'Edit post':'New post';
+  $('#pf_date').value=p?d10(p.post_date):new Date().toISOString().slice(0,10);
+  $('#pf_title').value=p?(p.title||''):'';
+  $('#pf_body').value=p?(p.body||''):'';
+  $('#pf_tags').value=p?(p.tags||[]).join(', '):(selected?selected.name:'');
+  pfPhotos=p?[...(p.photos||[])]:[];
+  renderPfPhotos();
+  $('#pfDelete').classList.toggle('hide',!p);
+  $('#pf_upstat').textContent='';
+  const dl2=$('#tagList'); dl2.innerHTML=''; allTags().forEach(t=>{ const o=document.createElement('option'); o.value=t; dl2.appendChild(o); });
+  $('#postModalBg').classList.add('open');
+}
+$('#postAddBtn').onclick=()=>openPostModal(null);
+$('#pfCancel').onclick=()=>$('#postModalBg').classList.remove('open');
+$('#postModalBg').onclick=(e)=>{ if(e.target===$('#postModalBg')) $('#postModalBg').classList.remove('open'); };
+$('#pf_upload').onclick=()=>$('#pf_file').click();
+$('#pf_file').onchange=async(e)=>{
+  const files=[...e.target.files]; e.target.value='';
+  for(let i=0;i<files.length;i++){
+    $('#pf_upstat').textContent='Uploading '+(i+1)+'/'+files.length+'…';
+    const fd=new FormData(); fd.append('image',files[i]);
+    try{
+      const r=await fetch('/upload',{method:'POST',body:fd});
+      const data=await r.json();
+      if(!r.ok) throw new Error(data.error||('HTTP '+r.status));
+      pfPhotos.push(data.url); renderPfPhotos();
+    }catch(err){ alert('Upload failed: '+err.message); break; }
+  }
+  $('#pf_upstat').textContent='';
+};
+$('#pfSave').onclick=async()=>{
+  const body={
+    title:$('#pf_title').value.trim()||null,
+    body:$('#pf_body').value.trim()||null,
+    post_date:$('#pf_date').value||new Date().toISOString().slice(0,10),
+    tags:$('#pf_tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+    photos:pfPhotos
+  };
+  if(editingPost) await api('/api/blog-posts/'+editingPost.id,{method:'PUT',body:JSON.stringify(body)});
+  else await api('/api/blog-posts',{method:'POST',body:JSON.stringify(body)});
+  $('#postModalBg').classList.remove('open');
+  await ensureBlog(true);
+  renderTimeline();
+};
+$('#pfDelete').onclick=async()=>{
+  if(!editingPost) return;
+  if(!confirm('Delete this post?')) return;
+  const p=editingPost;
+  await api('/api/blog-posts/'+p.id,{method:'DELETE'});
+  $('#postModalBg').classList.remove('open');
+  showToast('Post deleted', async()=>{
+    await api('/api/blog-posts',{method:'POST',body:JSON.stringify({
+      title:p.title, body:p.body, post_date:d10(p.post_date), tags:p.tags||[], photos:p.photos||[] })});
+    await ensureBlog(true); renderTimeline();
+  });
+  await ensureBlog(true);
+  renderTimeline();
 };
 
 // ── Share link ──
@@ -1248,7 +1499,7 @@ $('#printCalBtn').onclick=()=>{
 };
 
 // ── Tabs ──
-const ids=['med','kon','occ','kar','bok','exp','dup'];
+const ids=['med','kon','occ','kar','tid','bok','exp','dup'];
 function showTab(t){
   const showId = (t==='med' && !selected) ? 'kon' : t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
@@ -1257,6 +1508,7 @@ function showTab(t){
   if(showId==='kar') setTimeout(renderMap,80);
   if(showId==='occ') loadOccasions();
   if(showId==='kon') renderContactsTable();
+  if(showId==='tid') renderTimeline();
   if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
 }
 document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));

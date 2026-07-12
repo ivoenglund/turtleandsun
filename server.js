@@ -2134,6 +2134,53 @@ app.delete('/api/occasions/:id', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Timeline blog posts (Studio) ──────────────────────────────────────────────
+app.get('/api/blog-posts', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, body, post_date, tags, photos, created_at
+       FROM blog_posts WHERE user_id = $1 ORDER BY post_date DESC, id DESC`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/blog-posts', requireAuth, async (req, res) => {
+  const { title, body, post_date, tags, photos } = req.body || {};
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO blog_posts (user_id, title, body, post_date, tags, photos)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [req.user.id, title || null, body || null, post_date || new Date().toISOString().slice(0,10),
+       JSON.stringify(Array.isArray(tags)?tags:[]), JSON.stringify(Array.isArray(photos)?photos:[])]
+    );
+    res.json({ ok: true, post: rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/blog-posts/:id(\\d+)', requireAuth, async (req, res) => {
+  const { title, body, post_date, tags, photos } = req.body || {};
+  try {
+    const { rows } = await pool.query(
+      `UPDATE blog_posts SET title=$1, body=$2, post_date=$3, tags=$4, photos=$5
+       WHERE id=$6 AND user_id=$7 RETURNING *`,
+      [title || null, body || null, post_date || new Date().toISOString().slice(0,10),
+       JSON.stringify(Array.isArray(tags)?tags:[]), JSON.stringify(Array.isArray(photos)?photos:[]),
+       req.params.id, req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, post: rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/blog-posts/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM blog_posts WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/occasions/upcoming', requireAuth, async (req, res) => {
   try {
     const [occasions, contacts] = await Promise.all([
@@ -2190,7 +2237,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
 app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url
+      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url, about
        FROM contacts WHERE user_id = $1 ORDER BY is_me DESC NULLS LAST, name ASC NULLS LAST`,
       [req.user.id]
     );
@@ -2229,7 +2276,7 @@ app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
 app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(
-      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me
+      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url, about
        FROM contacts WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]
     );
@@ -2256,12 +2303,12 @@ app.get('/api/contacts/:id', requireAuth, async (req, res) => {
 });
 
 app.put('/api/contacts/:id', requireAuth, async (req, res) => {
-  const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet } = req.body;
+  const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet, about } = req.body;
   try {
     await pool.query(
-      `UPDATE contacts SET name=$1, email=$2, phone=$3, company=$4, street=$5, street_2=$6, city=$7, region=$8, country=$9, postal_code=$10, birthday=$11, died_on=$12, is_pet=$13
-       WHERE id=$14 AND user_id=$15`,
-      [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, req.params.id, req.user.id]
+      `UPDATE contacts SET name=$1, email=$2, phone=$3, company=$4, street=$5, street_2=$6, city=$7, region=$8, country=$9, postal_code=$10, birthday=$11, died_on=$12, is_pet=$13, about=$14
+       WHERE id=$15 AND user_id=$16`,
+      [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, about || null, req.params.id, req.user.id]
     );
     res.json({ ok: true });
 
