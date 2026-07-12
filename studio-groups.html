@@ -457,24 +457,33 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
 }
 
 // ── Resizable columns: auto-fit on render, drag to override, dblclick divider resets ──
-const AUTOFIT_CACHE = {}; // tableKey+colsSignature → measured widths (in-memory; avoids double layout on every render)
-const SESSION_W = {};     // manual drag widths — this session only; every fresh visit starts with a perfect content fit
+// Column widths, the simple way:
+// 1. Entering a grid (or changing the selection) → measure content once, set every
+//    column to its perfect fit. Table width = sum of columns; too wide → sideways scroll.
+// 2. After that, NOTHING touches the widths except the user dragging a header edge —
+//    and a drag moves that one column only. Double-click a divider = fresh fit.
+const GRID_W = {}; // tableKey → {sig, w:{colKey:px}} — survives re-renders, cleared on selection change
+function resetGridWidths(){ delete GRID_W['contacts']; delete GRID_W['members']; delete GRID_W['memedit']; }
 function makeResizable(panelSel, tableKey){
   const table = document.querySelector(panelSel+' table.grid');
   if(!table) return;
   const ths=[...table.querySelectorAll('tr:first-child th')];
-  const widths = SESSION_W[tableKey] = SESSION_W[tableKey] || {};
-  const sig = tableKey+'::'+ths.map(th=>th.dataset.k||'').join(',');
-  function autofit(force){
-    let measured = !force && AUTOFIT_CACHE[sig];
-    if(!measured){
-      table.style.tableLayout='auto'; table.style.width='auto';
-      ths.forEach(th=>{ const k=th.dataset.k||''; th.style.width = widths[k] ? widths[k]+'px' : ''; });
-      measured = ths.map(th=>Math.max(28, Math.min(360, th.offsetWidth+2)));
-      AUTOFIT_CACHE[sig]=measured;
-    }
-    ths.forEach((th,i)=>{ const k=th.dataset.k||('c'+i); th.style.width=(widths[k]||measured[i])+'px'; });
-    table.style.width='100%'; table.style.tableLayout='fixed';
+  const sig = ths.map(th=>th.dataset.k||'').join(',');
+  let store;
+  function measure(){
+    // fresh perfect fit from content
+    table.style.tableLayout='auto'; table.style.width='max-content';
+    ths.forEach(th=>{ th.style.width=''; });
+    store = GRID_W[tableKey] = { sig, w:{} };
+    ths.forEach((th,i)=>{ store.w[th.dataset.k||('c'+i)] = Math.max(26, th.offsetWidth+2); });
+  }
+  store = GRID_W[tableKey];
+  if(!store || store.sig!==sig) measure();
+  function apply(){
+    let total=0;
+    ths.forEach((th,i)=>{ const px=store.w[th.dataset.k||('c'+i)]||60; th.style.width=px+'px'; total+=px; });
+    table.style.tableLayout='fixed';
+    table.style.width=total+'px'; // exact sum — no redistribution, scroll sideways if wide
   }
   ths.forEach((th,idx)=>{
     if(idx===0) return;
@@ -483,21 +492,17 @@ function makeResizable(panelSel, tableKey){
     th.appendChild(h);
     h.addEventListener('mousedown',e=>{
       e.preventDefault(); e.stopPropagation();
-      const startX=e.pageX, startW=th.offsetWidth;
-      const move=ev=>{ th.style.width=Math.max(40,startW+ev.pageX-startX)+'px'; };
-      const up=()=>{
-        document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
-        widths[key]=th.offsetWidth; // session only — next visit auto-fits fresh
-      };
+      const startX=e.pageX, startW=store.w[key];
+      const move=ev=>{ store.w[key]=Math.max(36, startW+ev.pageX-startX); apply(); };
+      const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
     h.addEventListener('dblclick',e=>{
       e.preventDefault(); e.stopPropagation();
-      delete widths[key];
-      autofit(true); // re-measure fresh
+      measure(); apply(); // full fresh fit, no re-wiring
     });
   });
-  autofit();
+  apply();
 }
 
 // Contact save with one field changed; shows undo toast unless silent
@@ -551,6 +556,7 @@ const ANOMALY_COL = { nobday:'birthday', noaddr:'street', nomail:'email', nophon
 function applyAnomaly(v){
   anomaly = (v && v!=='all') ? v : null;
   selected=null; memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  resetGridWidths(); // new selection → fresh perfect-fit columns
   renderTree();
   if(!anomaly){
     const active=document.querySelector('.tab.active');
@@ -648,6 +654,7 @@ async function loadAll(){
 async function selectGroup(node){
   selected = node;
   memEdit = false; $('#addMemberBtn').textContent='＋ Add from pool';
+  resetGridWidths(); // new selection → fresh perfect-fit columns
   renderTree();
   clearAnomaly();
   updateSideCounts();
