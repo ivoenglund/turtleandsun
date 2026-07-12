@@ -2363,8 +2363,8 @@ app.get('/api/family-links', requireAuth, async (req, res) => {
 
 app.post('/api/family-links', requireAuth, async (req, res) => {
   const { parent_id, child_id, role } = req.body || {};
-  if (!parent_id || !child_id || !['father','mother'].includes(role))
-    return res.status(400).json({ error: 'parent_id, child_id and role (father|mother) required' });
+  if (!parent_id || !child_id || !['father','mother','pet'].includes(role))
+    return res.status(400).json({ error: 'parent_id, child_id and role (father|mother|pet) required' });
   if (+parent_id === +child_id) return res.status(400).json({ error: 'A person cannot be their own parent' });
   try {
     const { rows } = await pool.query(

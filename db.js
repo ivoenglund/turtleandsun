@@ -314,6 +314,12 @@ async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS idx_family_links_user ON family_links(user_id);
 
+    -- 2026-07-12: pets join the family — role 'pet' means parent_id OWNS child_id.
+    -- A pet can also have real father/mother links (its own pedigree); the chart
+    -- decides contextually which family it hangs under.
+    ALTER TABLE family_links DROP CONSTRAINT IF EXISTS family_links_role_check;
+    ALTER TABLE family_links ADD CONSTRAINT family_links_role_check CHECK (role IN ('father','mother','pet'));
+
     -- 2026-06-30: Turtle Studio groups — dated, status-aware memberships.
     -- A membership now carries a from/to date range (so the same model handles
     -- ongoing groups, ended memberships, and historical/dated groups like school

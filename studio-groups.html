@@ -1716,7 +1716,7 @@ const childrenOf = cid => famLinks.filter(l=>l.parent_id===cid);
 function personName(cid){ const c=contactsPool.find(x=>x.id===cid); return c?(c.name||'(unnamed)'):('#'+cid); }
 function personYear(cid){ const c=contactsPool.find(x=>x.id===cid); const b=c&&d10(c.birthday); return b?b.slice(0,4):''; }
 // Is this person already known as father or mother somewhere?
-function knownParentRole(cid){ const l=famLinks.find(x=>x.parent_id===cid); return l?l.role:null; }
+function knownParentRole(cid){ const l=famLinks.find(x=>x.parent_id===cid && x.role!=='pet'); return l?l.role:null; }
 
 // Person picker
 let personPickCb=null, personPickExclude=new Set();
@@ -1762,6 +1762,10 @@ function addParentTo(cid, role){
   const exclude=[cid, ...parentsOf(cid).map(l=>l.parent_id)];
   openPersonPick('Who is the '+role+' of '+personName(cid)+'?', exclude, pid=>addFamLink(pid, cid, role));
 }
+function addPetTo(cid){
+  const exclude=[cid, ...famLinks.filter(l=>l.parent_id===cid&&l.role==='pet').map(l=>l.child_id)];
+  openPersonPick('Add a pet of '+personName(cid), exclude, pid=>addFamLink(cid, pid, 'pet'));
+}
 function addChildTo(cid){
   const exclude=[cid, ...childrenOf(cid).map(l=>l.child_id)];
   openPersonPick('Add a child of '+personName(cid), exclude, pid=>{
@@ -1784,6 +1788,7 @@ function openTreeMenu(anchor, cid){
   if(!ps.some(l=>l.role==='father')) opts.push(['＋ Father',()=>addParentTo(cid,'father')]);
   if(!ps.some(l=>l.role==='mother')) opts.push(['＋ Mother',()=>addParentTo(cid,'mother')]);
   opts.push(['＋ Child',()=>addChildTo(cid)]);
+  opts.push(['＋ Pet',()=>addPetTo(cid)]);
   opts.forEach(([label,fn])=>{
     const d=document.createElement('div'); d.textContent=label;
     d.onclick=(e)=>{ e.stopPropagation(); closeTreeMenu(); fn(); };
@@ -1794,35 +1799,71 @@ function openTreeMenu(anchor, cid){
   document.body.appendChild(m); treeMenuEl=m;
 }
 
-// Adapter: our parent→child edges → Topola's GEDCOM-style {indis, fams}
-function buildTopolaData(){
-  const ids=new Set();
+// Adapter: our parent→child edges → Topola's GEDCOM-style {indis, fams}.
+// Pets (and adoptees) can have BOTH biological parents and owners; a node can hang
+// under only one family per chart, so the choice is contextual: inside its own
+// biological island the pedigree wins, seen from the owner's family it hangs there.
+function buildTopolaData(focus){
+  const bio=famLinks.filter(l=>l.role!=='pet');
+  const petL=famLinks.filter(l=>l.role==='pet');
+  const ids=new Set(focus?[focus]:[]);
   famLinks.forEach(l=>{ ids.add(l.parent_id); ids.add(l.child_id); });
-  const parentsBy={};
-  famLinks.forEach(l=>{ (parentsBy[l.child_id]=parentsBy[l.child_id]||[]).push(l); });
+  // biological island of the focus person
+  const island=new Set();
+  if(focus){
+    const st=[focus];
+    while(st.length){
+      const x=st.pop();
+      if(island.has(x)) continue;
+      island.add(x);
+      bio.forEach(l=>{ if(l.parent_id===x) st.push(l.child_id); if(l.child_id===x) st.push(l.parent_id); });
+    }
+  }
+  const bioParentsBy={};
+  bio.forEach(l=>{ (bioParentsBy[l.child_id]=bioParentsBy[l.child_id]||[]).push(l); });
+  const ownersBy={};
+  petL.forEach(l=>{ (ownersBy[l.child_id]=ownersBy[l.child_id]||[]).push(l.parent_id); });
   const famMap=new Map();   // couple-key → family record
   const childFam={};        // child id → family id
   const spouseFams={};      // person id → [family ids]
-  Object.entries(parentsBy).forEach(([child,pl])=>{
-    const fa=pl.find(l=>l.role==='father'), mo=pl.find(l=>l.role==='mother');
-    const key=(fa?fa.parent_id:'x')+'_'+(mo?mo.parent_id:'x');
+  const ensureFamRec=(key,husb,wife)=>{
     if(!famMap.has(key)){
       const fid='F'+(famMap.size+1);
       const fam={id:fid, children:[]};
-      if(fa) fam.husb='I'+fa.parent_id;
-      if(mo) fam.wife='I'+mo.parent_id;
+      if(husb) fam.husb='I'+husb;
+      if(wife) fam.wife='I'+wife;
       famMap.set(key,fam);
-      if(fa) (spouseFams[fa.parent_id]=spouseFams[fa.parent_id]||[]).push(fid);
-      if(mo) (spouseFams[mo.parent_id]=spouseFams[mo.parent_id]||[]).push(fid);
+      if(husb) (spouseFams[husb]=spouseFams[husb]||[]).push(fid);
+      if(wife) (spouseFams[wife]=spouseFams[wife]||[]).push(fid);
     }
-    const fam=famMap.get(key);
+    return famMap.get(key);
+  };
+  const bioRoleOf=id=>{ const l=bio.find(k=>k.parent_id===id); return l?l.role:null; };
+  // biological families — skipped for creatures that should hang under owners in this view
+  Object.entries(bioParentsBy).forEach(([child,pl])=>{
+    child=+child;
+    if(ownersBy[child] && !island.has(child)) return; // outside focus's bio island → owner family below
+    const fa=pl.find(l=>l.role==='father'), mo=pl.find(l=>l.role==='mother');
+    const key=(fa?fa.parent_id:'x')+'_'+(mo?mo.parent_id:'x');
+    const fam=ensureFamRec(key, fa&&fa.parent_id, mo&&mo.parent_id);
+    fam.children.push('I'+child);
+    childFam[child]=fam.id;
+  });
+  // pets/adoptees under their owner couple (joins the owners' existing family when it matches)
+  Object.entries(ownersBy).forEach(([child,owners])=>{
+    child=+child;
+    if(childFam[child]) return; // already placed biologically
+    const o=[...new Set(owners)];
+    o.sort((a,b)=>(bioRoleOf(b)==='father')-(bioRoleOf(a)==='father')); // father-role owner first = husb slot
+    const key=(o[0]||'x')+'_'+(o[1]||'x');
+    const fam=ensureFamRec(key, o[0], o[1]);
     fam.children.push('I'+child);
     childFam[child]=fam.id;
   });
   const indis=[...ids].map(id=>{
     const c=contactsPool.find(x=>x.id===id)||{};
-    const roleLink=famLinks.find(l=>l.parent_id===id);
-    const indi={ id:'I'+id, firstName:(c.name||'(unnamed)'), hideId:true };
+    const roleLink=bio.find(l=>l.parent_id===id);
+    const indi={ id:'I'+id, firstName:(c.name||'(unnamed)')+(c.is_pet?' 🐾':''), hideId:true };
     if(roleLink) indi.sex = roleLink.role==='father'?'M':'F';
     const by=personYear(id);
     if(by) indi.birth={date:{year:+by}};
@@ -1846,7 +1887,7 @@ function renderFamilyTree(){
   const panel=$('#treePanel');
   if(!focus){ panel.innerHTML='<div class="empty">No contacts yet.</div>'; return; }
   if(!window.topola || !window.d3){ panel.innerHTML='<div class="empty">Tree library missing — deploy the vendor files and hard-refresh.</div>'; return; }
-  const json=buildTopolaData();
+  const json=buildTopolaData(focus);
   if(!json.indis.length || !json.indis.some(i=>i.id==='I'+focus)){
     panel.innerHTML='<div class="empty">'+esc(personName(focus))+' has no family links yet — use “＋ Add relation”.</div>';
     return;
@@ -1883,7 +1924,8 @@ function personLabel(id){
   return (c.name||'(unnamed)')+years;
 }
 function famSummary(focus){
-  const links=famLinks||[];
+  const links=(famLinks||[]).filter(l=>l.role!=='pet');
+  const petLinks=(famLinks||[]).filter(l=>l.role==='pet');
   const ps=links.filter(l=>l.child_id===focus);
   const father=ps.find(l=>l.role==='father'), mother=ps.find(l=>l.role==='mother');
   const myParentIds=new Set(ps.map(l=>l.parent_id));
@@ -1902,7 +1944,9 @@ function famSummary(focus){
     mother: mother?personLabel(mother.parent_id):'',
     siblings,
     children: kids.map(personLabel),
-    partners: [...partnerIds].map(personLabel)
+    partners: [...partnerIds].map(personLabel),
+    pets: petLinks.filter(l=>l.parent_id===focus).map(l=>personLabel(l.child_id)),
+    owners: petLinks.filter(l=>l.child_id===focus).map(l=>personLabel(l.parent_id))
   };
 }
 function treInfoFields(c){
@@ -1916,6 +1960,8 @@ function treInfoFields(c){
   f.siblings.forEach(s=>add('Sibling', s));
   f.children.forEach(s=>add('Child', s));
   f.partners.forEach(s=>add('Partner', s));
+  f.pets.forEach(s=>add('Pet', s));
+  f.owners.forEach(s=>add('Owner', s));
   add('Company', c.company);
   add('Email', c.email);
   add('Phone', c.phone);
@@ -2033,8 +2079,8 @@ $('#trePrintBtn').onclick=()=>{
    +'</style></head><body>'
    +'<div class="fitpage">'
    +'<div class="pagerow">'
-   +infoHtml
    +'<div class="chartbox">'+clone.outerHTML+'</div>'
+   +infoHtml
    +'</div>'
    +'<div class="foot">Family tree — '+esc(focusName)+' · turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
    +'</div>'
