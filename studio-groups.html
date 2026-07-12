@@ -207,7 +207,7 @@
       <div class="tools">
         <span id="grpTools" class="hide" style="display:inline-flex;gap:8px;align-items:center;">
           <button class="btn pub" id="shareBtn">🔗 Share fill-in link</button>
-          <button class="btn gray" id="addMemberBtn">＋ Add from pool</button>
+          <button class="btn gray" id="addMemberBtn">☑ Manage members</button>
         </span>
         <button class="btn pub" id="newContactBtn">＋ New contact</button>
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
@@ -216,9 +216,7 @@
       <div class="selbox hide" id="shareBox"></div>
       <div class="bulkbar hide" id="bulkBar">
         <b><span id="bulkCount">0</span> selected:</b>
-        <select id="bulkGroupSel" style="max-width:160px;"></select>
-        <button class="btn sm gray" id="bulkAddGroup">Add to group</button>
-        <button class="btn sm danger" id="bulkDelete">Delete</button>
+        <button class="btn sm danger" id="bulkDelete">Delete contacts</button>
         <button class="btn sm gray" id="bulkClear" style="margin-left:auto;">Clear selection</button>
       </div>
       <div class="panel" id="conPanel"></div>
@@ -743,7 +741,7 @@ async function loadAll(){
 
 async function selectGroup(node){
   selected = node;
-  memEdit = false; $('#addMemberBtn').textContent='＋ Add from pool';
+  memEdit = false; $('#addMemberBtn').textContent='☑ Manage members';
   resetGridWidths(); // new selection → fresh perfect-fit columns
   renderTree();
   clearAnomaly();
@@ -786,7 +784,7 @@ function openEditRow(tr){
     <select class="es"><option value="active"${m.status==='active'?' selected':''}>active</option>
     <option value="invited"${m.status==='invited'?' selected':''}>invited</option>
     <option value="ended"${m.status==='ended'?' selected':''}>ended</option></select>
-    <button class="btn sm pub saveB">Save</button> <button class="btn sm gray rmB">Remove</button>`;
+    <button class="btn sm pub saveB">Save</button>`;
   cell.querySelector('.saveB').onclick=async()=>{
     await api('/api/memberships',{method:'PUT',body:JSON.stringify({
       contact_id:cid, group_id:gid,
@@ -797,19 +795,13 @@ function openEditRow(tr){
     })});
     current = await api('/api/groups/'+selected.id+'/members'); renderContactsTable();
   };
-  cell.querySelector('.rmB').onclick=async()=>{
-    if(!confirm('Remove '+(m.name||'this member')+' from this group? (The person stays in the pool.)')) return;
-    await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
-    memberships = await api('/api/group-memberships'); renderTree();
-    current = await api('/api/groups/'+selected.id+'/members'); renderContactsTable(); renderMap();
-  };
 }
 
-// ── Add from pool: inline grid with Member checkbox column ──
+// ── Manage members: inline grid with Member checkbox column (the ONE place membership changes) ──
 $('#addMemberBtn').onclick=async()=>{
   if(!selected){ alert('Select a group first.'); return; }
   memEdit = !memEdit;
-  $('#addMemberBtn').textContent = memEdit ? '✓ Done' : '＋ Add from pool';
+  $('#addMemberBtn').textContent = memEdit ? '✓ Done' : '☑ Manage members';
   if(memEdit){ renderMemberEdit(); }
   else {
     memberships = await api('/api/group-memberships'); renderTree();
@@ -1062,17 +1054,19 @@ function renderContactsTable(){
   conListIds = list.map(c=>c.id);
   conEditKeys = cols.filter(c=>c.type).map(c=>c.key);
   if(!list.length){
-    $('#conPanel').innerHTML='<div class="empty">'+(groupMode?'No members yet — use “＋ Add from pool”.':'No contacts'+(q?' match your search':' match the filters')+'.')+'</div>';
+    $('#conPanel').innerHTML='<div class="empty">'+(groupMode?'No members yet — use “☑ Manage members”.':'No contacts'+(q?' match your search':' match the filters')+'.')+'</div>';
     updateBulkBar(); return;
   }
   const sortKey=groupMode?'members':'contacts';
-  // header: Name first, then membership columns (group mode), then the rest
+  // header: Name first, then membership columns (group mode), then the rest.
+  // Row checkboxes (bulk delete) exist only in All contacts — one way per action.
   const headCols=[];
   cols.forEach((c,i)=>{
     headCols.push('<th data-k="'+c.key+'">'+c.label+sortIndicator(sortKey,c.key)+'</th>');
     if(i===0 && groupMode) MEM_COLS.forEach(mc=>headCols.push('<th data-k="'+mc.key+'">'+mc.label+sortIndicator(sortKey,mc.key)+'</th>'));
   });
-  let html = `<table class="grid"><tr><th data-k="pin"></th><th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>${headCols.join('')}</tr>`;
+  const selTh = groupMode?'':'<th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>';
+  let html = `<table class="grid"><tr><th data-k="pin"></th>${selTh}${headCols.join('')}</tr>`;
   list.forEach(c=>{
     const m=groupMode?memBy[c.id]:null;
     const cells=[];
@@ -1085,9 +1079,10 @@ function renderContactsTable(){
         cells.push(`<td class="edm" title="Click to edit membership">${statusBadge(m.status)}</td>`);
       }
     });
+    const selTd = groupMode?'':`<td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>`;
     html += `<tr data-cid="${c.id}"${m?' data-gid="'+(m.subgroup_id||current.group.id)+'"':''}>
       <td><span class="pencil conPencil" title="Full editor (all fields, occasions)">✎</span></td>
-      <td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>
+      ${selTd}
       ${cells.join('')}
     </tr>`;
   });
@@ -1116,25 +1111,12 @@ $('#conSearch').oninput = debounce(renderContactsTable,180);
 // ── Bulk actions ──
 function updateBulkBar(){
   const bar=$('#bulkBar');
-  if(!bulkSel.size){ bar.classList.add('hide'); return; }
+  // Bulk actions exist only in All contacts — group membership lives in "Manage members"
+  if(!bulkSel.size || selected){ bar.classList.add('hide'); return; }
   bar.classList.remove('hide');
   $('#bulkCount').textContent=bulkSel.size;
-  const sel=$('#bulkGroupSel'); sel.innerHTML='';
-  flatGroups().forEach(g=>{ const o=document.createElement('option'); o.value=g.id; o.textContent=g.name; sel.appendChild(o); });
 }
 $('#bulkClear').onclick=()=>{ bulkSel.clear(); renderContactsTable(); };
-$('#bulkAddGroup').onclick=async()=>{
-  const gid=+$('#bulkGroupSel').value;
-  if(!gid){ alert('No group selected.'); return; }
-  const today=new Date().toISOString().slice(0,10);
-  for(const cid of bulkSel){
-    await api('/api/memberships',{method:'PUT',body:JSON.stringify({contact_id:cid,group_id:gid,from_date:today,status:'active'})});
-  }
-  memberships = await api('/api/group-memberships'); renderTree();
-  if(selected){ current = await api('/api/groups/'+selected.id+'/members'); }
-  showToast(bulkSel.size+' added to group');
-  bulkSel.clear(); renderContactsTable();
-};
 $('#bulkDelete').onclick=async()=>{
   if(!confirm('Delete '+bulkSel.size+' contacts completely? Removes group memberships and occasions too. Cannot be undone.')) return;
   for(const cid of bulkSel) await api('/api/contacts/'+cid,{method:'DELETE'});
@@ -1407,7 +1389,7 @@ async function mergeInto(keeperId, others){
 }
 $('#poolRow').onclick=()=>{
   selected=null; dupView=false;
-  memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  memEdit=false; $('#addMemberBtn').textContent='☑ Manage members';
   resetGridWidths();
   renderTree();
   const active=document.querySelector('.tab.active');
@@ -1415,7 +1397,7 @@ $('#poolRow').onclick=()=>{
 };
 $('#dupRow').onclick=()=>{
   selected=null; dupView=true;
-  memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  memEdit=false; $('#addMemberBtn').textContent='☑ Manage members';
   renderTree();
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
