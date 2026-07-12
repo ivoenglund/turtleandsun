@@ -482,10 +482,9 @@ function makeResizable(panelSel, tableKey){
   store = GRID_W[tableKey];
   if(!store || store.sig!==sig) measure();
   function apply(){
-    let total=0;
-    ths.forEach((th,i)=>{ const px=store.w[th.dataset.k||('c'+i)]||60; th.style.width=px+'px'; total+=px; });
+    ths.forEach((th,i)=>{ th.style.width=(store.w[th.dataset.k||('c'+i)]||60)+'px'; });
     table.style.tableLayout='fixed';
-    table.style.width=total+'px'; // exact sum — no redistribution, scroll sideways if wide
+    table.style.width='max-content'; // total follows the columns by itself — never computed
   }
   ths.forEach((th,idx)=>{
     if(idx===0) return;
@@ -495,12 +494,10 @@ function makeResizable(panelSel, tableKey){
     h.addEventListener('mousedown',e=>{
       e.preventDefault(); e.stopPropagation();
       const startX=e.pageX, startW=store.w[key];
-      const startTotal=parseInt(table.style.width,10)||table.offsetWidth;
       const move=ev=>{
-        // touch ONLY the dragged column + total table width — nothing else
+        // ONE style write: the dragged column. Nothing else moves.
         const w=Math.max(36, startW+ev.pageX-startX);
         th.style.width=w+'px';
-        table.style.width=(startTotal-startW+w)+'px';
         store.w[key]=w;
       };
       const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
