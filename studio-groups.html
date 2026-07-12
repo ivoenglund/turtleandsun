@@ -9,69 +9,72 @@
         --yellow:#FFE800;--ink:#1C2A14;--line:rgba(28,10,0,0.1);--mut:#6b7560;}
   *{box-sizing:border-box;font-family:'Plus Jakarta Sans',-apple-system,"Segoe UI",Roboto,Arial,sans-serif;}
   body{margin:0;min-height:100vh;color:var(--ink);}
-  .btn{border:none;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;}
+  .btn{border:none;border-radius:8px;padding:7px 13px;font-size:13.5px;font-weight:700;cursor:pointer;}
   .btn.pub{background:var(--yellow);color:#3a3000;border:1.5px solid rgba(58,48,0,0.35);}
-  .btn.sm{padding:5px 10px;font-size:13px;}
+  .btn.sm{padding:2px 8px;font-size:12px;border-radius:6px;}
   .btn.gray{background:#fff;color:#3a3000;border:1.5px solid rgba(28,10,0,0.25);}
   .btn.danger{background:#fff;color:#a12a1a;border:1.5px solid #c98;}
-  .wrap{display:flex;gap:18px;align-items:flex-start;max-width:1200px;margin:0 auto;padding:12px 24px 48px;}
-  .side{width:258px;flex-shrink:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 8px;font-size:14.5px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
-  .lbl{font-size:11px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:10px 10px 6px;}
-  .row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
+  .wrap{display:flex;gap:16px;align-items:flex-start;max-width:1280px;margin:0 auto;padding:10px 20px 44px;}
+  .side{width:240px;flex-shrink:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 6px;font-size:14px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+  .lbl{font-size:10.5px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:8px 10px 4px;}
+  .row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
   .row:hover{background:#F4F1E6;}
   .row.active{background:#EAF3E2;color:var(--green2);font-weight:700;}
   .row .ct{margin-left:auto;font-size:12px;color:var(--mut);}
   .sub{padding-left:26px;}
   .arr{width:14px;display:inline-block;color:var(--mut);font-size:11px;}
-  .addg{color:var(--green2);font-weight:700;padding:8px 10px;cursor:pointer;font-size:14px;}
+  .addg{color:var(--green2);font-weight:700;padding:7px 10px;cursor:pointer;font-size:13.5px;}
   .main{flex:1;min-width:0;}
-  .crumb{font-size:13px;color:rgba(28,10,0,0.55);margin-bottom:2px;}
-  h1{font-size:21px;margin:0 0 12px;}
-  .tabs{display:flex;gap:6px;border-bottom:1px solid rgba(28,10,0,0.15);margin-bottom:18px;flex-wrap:wrap;}
-  .tab{padding:9px 14px;font-size:14px;cursor:pointer;color:#4a553f;border-bottom:3px solid transparent;}
+  .crumb{font-size:12.5px;color:rgba(28,10,0,0.55);margin-bottom:1px;}
+  h1{font-size:19px;margin:0 0 8px;}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid rgba(28,10,0,0.15);margin-bottom:12px;flex-wrap:wrap;}
+  .tab{padding:7px 12px;font-size:13.5px;cursor:pointer;color:#4a553f;border-bottom:3px solid transparent;}
   .tab.active{color:var(--green2);font-weight:700;border-bottom-color:var(--green2);}
-  .panel{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
-  table{width:100%;border-collapse:collapse;font-size:14px;}
-  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #eee9dd;vertical-align:top;}
-  th{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
-  tr.click{cursor:pointer;}
-  tr.click:hover td{background:#FBF9F0;}
-  .tag{display:inline-block;background:#EAF3E2;color:var(--green2);border-radius:20px;padding:2px 9px;font-size:11.5px;margin:1px 2px;}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:3px 6px;border-bottom:1px solid #f0ecdf;vertical-align:middle;line-height:1.35;}
+  th{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding-top:5px;padding-bottom:5px;}
+  td.ed{cursor:text;}
+  td.ed:hover{background:#FBF7E8;box-shadow:inset 0 0 0 1px rgba(28,10,0,0.12);border-radius:4px;}
+  td input,td select{font-size:12.5px;padding:2px 5px;}
+  .pencil{cursor:pointer;opacity:.45;font-size:13px;padding:0 3px;}
+  .pencil:hover{opacity:1;}
+  .tag{display:inline-block;background:#EAF3E2;color:var(--green2);border-radius:20px;padding:1px 8px;font-size:11px;margin:0 2px;}
   .tag.alt{background:#eef3fb;color:#26527f;}
-  .self{font-size:12px;color:var(--leaf2);font-weight:700;}
+  .self{font-size:11px;color:var(--leaf2);font-weight:700;}
   .muted{color:var(--mut);}
-  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;}.ok{background:var(--leaf2);}.no{background:#d9b24a;}
-  .help{font-size:12.5px;color:var(--mut);margin-top:10px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}.ok{background:var(--leaf2);}.no{background:#d9b24a;}
+  .help{font-size:12px;color:var(--mut);margin-top:8px;}
   .toggleRow{display:flex;align-items:center;gap:9px;font-size:14px;padding:6px 0;}
   .hide{display:none;}
-  .selbox{background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:11px 12px;font-size:13.5px;color:var(--green2);margin-bottom:14px;word-break:break-all;}
-  input,select,textarea{font-size:13px;padding:6px 8px;border:1px solid rgba(28,10,0,0.2);border-radius:6px;background:#fff;font-family:inherit;}
+  .selbox{background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:9px 11px;font-size:13px;color:var(--green2);margin-bottom:10px;word-break:break-all;}
+  input,select,textarea{font-size:13px;padding:5px 7px;border:1px solid rgba(28,10,0,0.2);border-radius:6px;background:#fff;font-family:inherit;}
   #map{height:420px;border-radius:12px;border:1px solid var(--line);}
-  .empty{padding:30px;text-align:center;color:var(--mut);}
-  .stbadge{font-size:11.5px;border-radius:20px;padding:2px 9px;}
+  .empty{padding:24px;text-align:center;color:var(--mut);}
+  .stbadge{font-size:11px;border-radius:20px;padding:1px 8px;}
   .st-active{background:#EAF3E2;color:var(--green2);}
   .st-invited{background:#fdf4dd;color:#7a5b00;}
   .st-ended{background:#fbeee9;color:#9a4a3a;}
-  .soon{background:#fdf4dd;color:#7a5b00;border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;}
-  .today{background:var(--yellow);color:#3a3000;border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;}
-  .search{width:100%;max-width:340px;margin-bottom:12px;padding:8px 12px;border-radius:9px;}
+  .soon{background:#fdf4dd;color:#7a5b00;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;}
+  .today{background:var(--yellow);color:#3a3000;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;}
+  .search{width:100%;max-width:320px;margin-bottom:8px;padding:6px 11px;border-radius:9px;}
   /* Modal */
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:3000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;}
   .modal-bg.open{display:flex;}
-  .modal{background:#fff;border-radius:14px;padding:22px 24px;width:100%;max-width:560px;box-shadow:0 12px 48px rgba(0,0,0,0.25);}
-  .modal h3{margin:0 0 14px;font-size:17px;}
-  .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
+  .modal{background:#fff;border-radius:14px;padding:20px 22px;width:100%;max-width:560px;box-shadow:0 12px 48px rgba(0,0,0,0.25);}
+  .modal h3{margin:0 0 12px;font-size:16px;}
+  .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;}
   .modal .grid .full{grid-column:1/-1;}
-  .modal label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
+  .modal label{display:block;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
   .modal input,.modal select{width:100%;}
-  .modal .foot{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
+  .modal .foot{display:flex;gap:10px;margin-top:16px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
   .modal .foot .left{margin-right:auto;}
-  .picklist{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;margin-top:10px;}
-  .pickrow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f2eee2;cursor:pointer;font-size:14px;}
+  .picklist{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px;}
+  .pickrow{display:flex;align-items:center;gap:10px;padding:5px 11px;border-bottom:1px solid #f2eee2;cursor:pointer;font-size:13.5px;}
   .pickrow:hover{background:#FBF9F0;}
   .pickrow input{width:auto;}
   .pickrow .sub2{font-size:12px;color:var(--mut);margin-left:auto;}
-  .occrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f2eee2;font-size:13.5px;flex-wrap:wrap;}
+  .occrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f2eee2;font-size:13px;flex-wrap:wrap;}
   @media(max-width:800px){.wrap{flex-direction:column;}.side{width:100%;}.modal .grid{grid-template-columns:1fr;}}
 </style></head>
 <body>
@@ -98,7 +101,7 @@
 
     <!-- MEMBERS -->
     <div id="med">
-      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
         <button class="btn pub" id="shareBtn">🔗 Share fill-in link</button>
         <button class="btn gray" id="addMemberBtn">＋ Add from pool</button>
       </div>
@@ -108,15 +111,15 @@
 
     <!-- ALL CONTACTS -->
     <div id="kon" class="hide">
-      <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…">
+      <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
       <div class="panel" id="conPanel"></div>
-      <div class="help">Click a contact to edit every field, including birthday and occasions.</div>
+      <div class="help">Click a cell to edit it in place (Enter saves, Esc cancels). ✎ opens the full editor with address and occasions.</div>
     </div>
 
     <!-- OCCASIONS -->
     <div id="occ" class="hide">
       <div class="panel" id="occPanel"><div class="empty">Loading…</div></div>
-      <div class="help">All occasions and birthdays, sorted by next upcoming date. Click a row to update it.</div>
+      <div class="help">All occasions and birthdays by next upcoming date. Click a cell to edit in place; ✎ opens the full editor.</div>
     </div>
 
     <!-- MAP -->
@@ -129,7 +132,7 @@
 
     <!-- YEARBOOK -->
     <div id="bok" class="hide">
-      <div class="panel" style="max-width:520px;">
+      <div class="panel" style="max-width:520px;padding:16px 18px;">
         <h3 style="margin-top:0">Yearbook</h3>
         <div class="selbox" id="bokSrc">Source: –</div>
         <div class="toggleRow"><label><input type="checkbox" id="bokPhotos" checked> Include photos</label></div>
@@ -139,7 +142,7 @@
 
     <!-- EXPORT -->
     <div id="exp" class="hide">
-      <div class="panel" style="max-width:520px;">
+      <div class="panel" style="max-width:520px;padding:16px 18px;">
         <h3 style="margin-top:0">Export &amp; share</h3>
         <div class="help" style="margin-top:0">Exports the members shown in the selected group — with real data.</div>
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
@@ -156,26 +159,26 @@
   <div class="modal">
     <h3 id="conModalTitle">Edit contact</h3>
     <div class="grid">
-      <div class="full"><label>Name</label><input id="cf_name"></div>
-      <div><label>Email</label><input id="cf_email" type="email"></div>
-      <div><label>Phone</label><input id="cf_phone"></div>
-      <div><label>Birthday</label><input id="cf_birthday" type="date"></div>
-      <div><label>Company</label><input id="cf_company"></div>
-      <div class="full"><label>Street</label><input id="cf_street"></div>
-      <div class="full"><label>Street 2</label><input id="cf_street_2"></div>
-      <div><label>Postal code</label><input id="cf_postal_code"></div>
-      <div><label>City</label><input id="cf_city"></div>
-      <div><label>Region</label><input id="cf_region"></div>
-      <div><label>Country</label><input id="cf_country"></div>
-      <div><label>Died on (memorial)</label><input id="cf_died_on" type="date"></div>
+      <div class="full"><label>Name</label><input id="cf_name" autocomplete="off"></div>
+      <div><label>Email</label><input id="cf_email" autocomplete="off"></div>
+      <div><label>Phone</label><input id="cf_phone" autocomplete="off"></div>
+      <div><label>Birthday</label><input id="cf_birthday" type="date" autocomplete="off"></div>
+      <div><label>Company</label><input id="cf_company" autocomplete="off"></div>
+      <div class="full"><label>Street</label><input id="cf_street" autocomplete="off"></div>
+      <div class="full"><label>Street 2</label><input id="cf_street_2" autocomplete="off"></div>
+      <div><label>Postal code</label><input id="cf_postal_code" autocomplete="off"></div>
+      <div><label>City</label><input id="cf_city" autocomplete="off"></div>
+      <div><label>Region</label><input id="cf_region" autocomplete="off"></div>
+      <div><label>Country</label><input id="cf_country" autocomplete="off"></div>
+      <div><label>Died on (memorial)</label><input id="cf_died_on" type="date" autocomplete="off"></div>
       <div style="display:flex;align-items:end;padding-bottom:6px;"><label style="display:flex;align-items:center;gap:7px;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);margin:0;"><input type="checkbox" id="cf_is_pet" style="width:auto;"> This is a pet</label></div>
     </div>
-    <div style="margin-top:16px;">
-      <label style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;">Occasions for this contact</label>
+    <div style="margin-top:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;">Occasions for this contact</label>
       <div id="conOccList"></div>
       <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;align-items:center;">
-        <input id="of_name" placeholder="Occasion (e.g. Wedding day)" style="flex:1;min-width:140px;">
-        <input id="of_date" type="date">
+        <input id="of_name" placeholder="Occasion (e.g. Wedding day)" style="flex:1;min-width:140px;" autocomplete="off">
+        <input id="of_date" type="date" autocomplete="off">
         <select id="of_freq"><option value="yearly">Yearly</option><option value="milestone">Milestone</option><option value="once">One-time</option></select>
         <button class="btn sm gray" id="of_add">＋ Add</button>
       </div>
@@ -192,7 +195,7 @@
 <div class="modal-bg" id="pickModalBg">
   <div class="modal">
     <h3>Add members to <span id="pickGroupName"></span></h3>
-    <input class="search" id="pickSearch" type="text" placeholder="Search…" style="max-width:none;margin-bottom:0;">
+    <input class="search" id="pickSearch" type="text" placeholder="Search…" style="max-width:none;margin-bottom:0;" autocomplete="off">
     <div class="picklist" id="pickList"></div>
     <div class="foot">
       <span class="left muted" id="pickCount" style="font-size:13px;">0 selected</span>
@@ -207,10 +210,10 @@
   <div class="modal" style="max-width:440px;">
     <h3>Edit occasion</h3>
     <div class="grid">
-      <div class="full"><label>Occasion</label><input id="oe_name"></div>
-      <div><label>Date</label><input id="oe_date" type="date"></div>
+      <div class="full"><label>Occasion</label><input id="oe_name" autocomplete="off"></div>
+      <div><label>Date</label><input id="oe_date" type="date" autocomplete="off"></div>
       <div><label>Repeats</label><select id="oe_freq"><option value="yearly">Yearly</option><option value="milestone">Milestone</option><option value="once">One-time</option></select></div>
-      <div class="full"><label>Notes</label><input id="oe_notes"></div>
+      <div class="full"><label>Notes</label><input id="oe_notes" autocomplete="off"></div>
     </div>
     <div class="foot">
       <button class="btn sm danger left" id="oeDelete">Delete</button>
@@ -232,7 +235,7 @@ let selected = null;        // selected group {id,name}
 let current = null;         // last /api/groups/:id/members payload
 let mapObj = null;
 let editingContactId = null;
-let editingOccasion = null; // {id} being edited in occasion modal
+let editingOccasion = null;
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
@@ -240,6 +243,58 @@ async function api(path, opts){
   const data = await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(data.error||('HTTP '+r.status));
   return data;
+}
+
+// ── Inline cell editing ──
+// Click a td.ed → input appears; Enter/blur saves via onSave(newValue); Esc cancels.
+function makeEditable(td, opts){
+  td.classList.add('ed');
+  td.onclick = ()=>{
+    if(td.querySelector('input,select')) return;
+    const old = td.innerHTML;
+    let ctl;
+    if(opts.type==='select'){
+      ctl=document.createElement('select');
+      opts.options.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; ctl.appendChild(op); });
+      ctl.value = opts.value()||opts.options[0];
+    } else {
+      ctl=document.createElement('input');
+      ctl.type=opts.type||'text';
+      ctl.value=opts.value()||'';
+      ctl.autocomplete='off';
+      if(opts.type!=='date') ctl.style.width='100%';
+    }
+    td.innerHTML=''; td.appendChild(ctl); ctl.focus();
+    if(ctl.select) try{ ctl.select(); }catch(e){}
+    let done=false;
+    const finish=async(save)=>{
+      if(done) return; done=true;
+      if(!save){ td.innerHTML=old; return; }
+      try{ await opts.onSave(ctl.value); }
+      catch(e){ alert('Save failed: '+e.message); td.innerHTML=old; }
+    };
+    ctl.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){ e.preventDefault(); finish(true); }
+      else if(e.key==='Escape'){ finish(false); }
+    });
+    ctl.addEventListener('blur',()=>finish(true));
+    if(opts.type==='select') ctl.addEventListener('change',()=>finish(true));
+  };
+}
+
+// Full-body contact save with one field changed (PUT requires all fields)
+async function saveContactField(cid, field, value){
+  const c = contactsPool.find(x=>x.id===cid);
+  if(!c) throw new Error('Contact not in cache');
+  const body = {
+    name:c.name, email:c.email, phone:c.phone, company:c.company,
+    street:c.street, street_2:c.street_2, city:c.city, region:c.region,
+    country:c.country, postal_code:c.postal_code,
+    birthday:d10(c.birthday)||null, died_on:d10(c.died_on)||null, is_pet:!!c.is_pet
+  };
+  body[field] = value===''?null:value;
+  await api('/api/contacts/'+cid,{method:'PUT',body:JSON.stringify(body)});
+  c[field] = body[field];
 }
 
 // Count direct + descendant memberships per group id
@@ -304,11 +359,12 @@ function renderMembers(){
   if(!current){ return; }
   const rows = current.members;
   if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">No members yet. Use “Add from pool” or share a fill-in link.</div>'; return; }
-  let html = `<table><tr><th>Name</th><th>Subgroup</th><th>From–to</th><th>Also in</th><th>Status</th><th>Photo</th><th></th></tr>`;
+  let html = `<table><tr><th></th><th>Name</th><th>Subgroup</th><th>From–to</th><th>Also in</th><th>Status</th><th>Photo</th><th></th></tr>`;
   rows.forEach(m=>{
     const alsoIn = (m.also_in||[]).map(g=>`<span class="tag alt">${esc(g.name)}</span>`).join('')||'<span class="muted">—</span>';
     html += `<tr data-cid="${m.contact_id}" data-gid="${m.subgroup_id||current.group.id}">
-      <td><a href="#" class="conLink" data-cid="${m.contact_id}" style="color:var(--green2);font-weight:600;">${esc(m.name)||'(unnamed)'}</a>${m.self_managed?' <span class="self">✓ self-managed</span>':''}</td>
+      <td><span class="pencil conPencil" data-cid="${m.contact_id}" title="Edit contact">✎</span></td>
+      <td style="font-weight:600;">${esc(m.name)||'(unnamed)'}${m.self_managed?' <span class="self">✓</span>':''}</td>
       <td>${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>
       <td class="rng">${fmtRange(m)}</td>
       <td>${alsoIn}</td>
@@ -317,10 +373,10 @@ function renderMembers(){
       <td><button class="btn sm gray editBtn">Dates</button></td>
     </tr>`;
   });
-  html+='</table><div class="help">Click a <b>name</b> to edit the person (all fields + occasions). “Dates” edits this group membership. A person exists once in the pool and can belong to several groups.</div>';
+  html+='</table>';
   $('#memPanel').innerHTML=html;
   $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
-  $('#memPanel').querySelectorAll('.conLink').forEach(a=>a.onclick=(e)=>{e.preventDefault();openContactModal(+a.dataset.cid);});
+  $('#memPanel').querySelectorAll('.conPencil').forEach(p=>p.onclick=()=>openContactModal(+p.dataset.cid));
 }
 
 function openEdit(e){
@@ -351,7 +407,14 @@ function openEdit(e){
   };
 }
 
-// ── All contacts tab ──
+// ── All contacts tab (compact, inline editable) ──
+const CON_COLS = [
+  {field:'name',    label:'Name',    type:'text'},
+  {field:'email',   label:'Email',   type:'text'},
+  {field:'phone',   label:'Phone',   type:'text'},
+  {field:'city',    label:'City',    type:'text'},
+  {field:'birthday',label:'Birthday',type:'date'},
+];
 function renderContactsTable(){
   const q = ($('#conSearch').value||'').toLowerCase();
   const list = contactsPool.filter(c=>{
@@ -359,19 +422,33 @@ function renderContactsTable(){
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
   if(!list.length){ $('#conPanel').innerHTML='<div class="empty">No contacts'+(q?' match your search':' yet')+'.</div>'; return; }
-  let html = `<table><tr><th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Birthday</th></tr>`;
+  let html = `<table><tr><th></th>${CON_COLS.map(c=>'<th>'+c.label+'</th>').join('')}</tr>`;
   list.forEach(c=>{
-    html += `<tr class="click" data-cid="${c.id}">
-      <td style="font-weight:600;">${esc(c.name)||'<span class="muted">(unnamed)</span>'}${c.is_me?' <span class="self">me</span>':''}${c.is_pet?' 🐾':''}${c.died_on?' <span class="muted">✝</span>':''}</td>
-      <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
-      <td>${esc(c.phone)||'<span class="muted">—</span>'}</td>
-      <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
-      <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
+    html += `<tr data-cid="${c.id}">
+      <td><span class="pencil conPencil" title="Full editor (address, occasions)">✎</span></td>
+      ${CON_COLS.map(col=>{
+        const raw = col.type==='date' ? d10(c[col.field]) : (c[col.field]||'');
+        let disp = esc(raw)||'<span class="muted">—</span>';
+        if(col.field==='name') disp = '<b>'+ (esc(raw)||'<span class="muted">(unnamed)</span>') +'</b>'
+          + (c.is_me?' <span class="self">me</span>':'') + (c.is_pet?' 🐾':'') + (c.died_on?' <span class="muted">✝</span>':'');
+        return `<td data-f="${col.field}">${disp}</td>`;
+      }).join('')}
     </tr>`;
   });
   html += '</table>';
   $('#conPanel').innerHTML = html;
-  $('#conPanel').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>openContactModal(+tr.dataset.cid));
+  $('#conPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
+    const cid = +tr.dataset.cid;
+    tr.querySelector('.conPencil').onclick=()=>openContactModal(cid);
+    CON_COLS.forEach(col=>{
+      const td = tr.querySelector(`td[data-f="${col.field}"]`);
+      makeEditable(td,{
+        type: col.type,
+        value: ()=>{ const c=contactsPool.find(x=>x.id===cid); return col.type==='date'?d10(c[col.field]):(c[col.field]||''); },
+        onSave: async(v)=>{ await saveContactField(cid,col.field,v); renderContactsTable(); }
+      });
+    });
+  });
 }
 $('#conSearch').oninput = renderContactsTable;
 
@@ -396,7 +473,7 @@ async function renderConOccList(cid){
       <b>${esc(o.name)}</b> <span class="muted">${d10(o.start_date)} · ${esc(o.frequency||'once')}</span>${o.notes?` <span class="muted">· ${esc(o.notes)}</span>`:''}
       <button class="btn sm gray occEdit" style="margin-left:auto;">Edit</button>
       <button class="btn sm danger occDel">✕</button>
-    </div>`).join('') : '<div class="muted" style="padding:7px 0;font-size:13px;">No occasions yet (birthday counts automatically if set above).</div>';
+    </div>`).join('') : '<div class="muted" style="padding:6px 0;font-size:13px;">No occasions yet (birthday counts automatically if set above).</div>';
   $('#conOccList').querySelectorAll('.occDel').forEach(b=>b.onclick=async(e)=>{
     const oid=+e.target.closest('.occrow').dataset.oid;
     if(!confirm('Delete this occasion?')) return;
@@ -406,7 +483,7 @@ async function renderConOccList(cid){
   $('#conOccList').querySelectorAll('.occEdit').forEach(b=>b.onclick=(e)=>{
     const oid=+e.target.closest('.occrow').dataset.oid;
     const o=occs.find(x=>x.id===oid);
-    openOccasionModal({id:o.id, name:o.name, start_date:o.start_date, frequency:o.frequency, notes:o.notes, contact_id:cid});
+    openOccasionModal({id:o.id, name:o.name, what:o.name, start_date:o.start_date, frequency:o.frequency, notes:o.notes, contact_id:cid});
   });
 }
 $('#of_add').onclick=async()=>{
@@ -442,7 +519,7 @@ $('#conDelete').onclick=async()=>{
   loadOccasions();
 };
 
-// ── Occasions tab ──
+// ── Occasions tab (compact, inline editable) ──
 function nextYearly(dateStr, today){
   const d=new Date(dateStr); if(isNaN(d)) return null;
   const n=new Date(today.getFullYear(), d.getMonth(), d.getDate());
@@ -457,8 +534,7 @@ async function loadOccasions(){
   const today=new Date(); today.setHours(0,0,0,0);
   const items=[];
   (data.occasions||[]).forEach(o=>{
-    const next = o.frequency==='yearly' ? nextYearly(o.start_date,today)
-               : o.frequency==='milestone' ? nextYearly(o.start_date,today)
+    const next = (o.frequency==='yearly'||o.frequency==='milestone') ? nextYearly(o.start_date,today)
                : (new Date(o.start_date)>=today ? new Date(o.start_date) : null);
     items.push({kind:'occasion', id:o.id, contact_id:o.contact_id, who:o.contact_name, what:o.name,
       start_date:o.start_date, frequency:o.frequency, notes:o.notes, next});
@@ -474,26 +550,47 @@ async function loadOccasions(){
   });
   occItemsCache=items;
   if(!items.length){ $('#occPanel').innerHTML='<div class="empty">No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.</div>'; return; }
-  let html=`<table><tr><th>Next</th><th>In</th><th>Who</th><th>What</th><th>Repeats</th><th>Since</th></tr>`;
+  let html=`<table><tr><th></th><th>Next</th><th>In</th><th>Who</th><th>What</th><th>Repeats</th><th>Since</th><th>Notes</th></tr>`;
   items.forEach((it,i)=>{
     const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
     const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
     const years = it.next&&it.start_date ? it.next.getFullYear()-new Date(it.start_date).getFullYear() : null;
-    html+=`<tr class="click" data-i="${i}">
+    html+=`<tr data-i="${i}">
+      <td><span class="pencil rowPencil" title="Open editor">✎</span></td>
       <td>${it.next?it.next.toISOString().slice(0,10):'<span class="muted">—</span>'}</td>
       <td>${badge}</td>
       <td style="font-weight:600;">${esc(it.who)}</td>
-      <td>${esc(it.what)}${years&&it.frequency==='yearly'?` <span class="muted">(${years})</span>`:''}${it.notes?` <span class="muted">· ${esc(it.notes)}</span>`:''}</td>
-      <td>${esc(it.frequency||'once')}</td>
-      <td>${d10(it.start_date)}</td>
+      <td data-f="what">${esc(it.what)}${years&&it.frequency==='yearly'?` <span class="muted">(${years})</span>`:''}</td>
+      <td data-f="freq">${esc(it.frequency||'once')}</td>
+      <td data-f="since">${d10(it.start_date)}</td>
+      <td data-f="notes">${esc(it.notes||'')||'<span class="muted">—</span>'}</td>
     </tr>`;
   });
   html+='</table>';
   $('#occPanel').innerHTML=html;
-  $('#occPanel').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>{
+  $('#occPanel').querySelectorAll('tr[data-i]').forEach(tr=>{
     const it=occItemsCache[+tr.dataset.i];
-    if(it.kind==='birthday') openContactModal(it.contact_id);
-    else openOccasionModal(it);
+    tr.querySelector('.rowPencil').onclick=()=>{
+      if(it.kind==='birthday') openContactModal(it.contact_id);
+      else openOccasionModal(it);
+    };
+    const saveOcc = async(patch)=>{
+      const body={ name:it.what, start_date:d10(it.start_date), frequency:it.frequency||'once', notes:it.notes||null };
+      Object.assign(body,patch);
+      await api('/api/occasions/'+it.id,{method:'PUT',body:JSON.stringify(body)});
+      loadOccasions();
+    };
+    if(it.kind==='occasion'){
+      makeEditable(tr.querySelector('td[data-f="what"]'), {type:'text', value:()=>it.what, onSave:v=>saveOcc({name:v})});
+      makeEditable(tr.querySelector('td[data-f="freq"]'), {type:'select', options:['yearly','milestone','once'], value:()=>it.frequency||'once', onSave:v=>saveOcc({frequency:v})});
+      makeEditable(tr.querySelector('td[data-f="since"]'),{type:'date', value:()=>d10(it.start_date), onSave:v=>saveOcc({start_date:v})});
+      makeEditable(tr.querySelector('td[data-f="notes"]'),{type:'text', value:()=>it.notes||'', onSave:v=>saveOcc({notes:v||null})});
+    } else {
+      // birthday row: date edits the contact's birthday
+      makeEditable(tr.querySelector('td[data-f="since"]'),{type:'date', value:()=>d10(it.start_date), onSave:async v=>{
+        await saveContactField(it.contact_id,'birthday',v||null); loadOccasions(); renderContactsTable();
+      }});
+    }
   });
 }
 
