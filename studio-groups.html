@@ -1980,11 +1980,30 @@ $('#trePrintBtn').onclick=()=>{
   try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
   const c=contactsPool.find(x=>x.id===focus);
   if(printOn && c){
+    const f=famSummary(c.id);
+    const blk=(label,lines)=>{
+      lines=(lines||[]).filter(Boolean);
+      if(!lines.length) return '';
+      return '<div class="il">'+esc(label)+'</div>'+lines.map(x=>'<div class="iv">'+esc(x)+'</div>').join('');
+    };
+    const inline=[];
+    if(c.birthday) inline.push('Born '+d10(c.birthday));
+    if(c.died_on) inline.push('Died '+d10(c.died_on));
     infoHtml='<div class="infocard">'
       +(c.photo_url?'<img class="infoimg" src="'+esc(c.photo_url)+'">':'')
-      +'<div><b style="font-size:13px;">'+esc(c.name||'')+'</b><br>'
-      +treInfoFields(c).map(([l,v])=>'<b>'+esc(l)+':</b> '+esc(v)).join('<br>')
-      +'</div></div>';
+      +'<div class="iname">'+esc(c.name||'')+'</div>'
+      +(inline.length?'<div class="iv" style="margin-bottom:1mm;">'+esc(inline.join(' · '))+'</div>':'')
+      +blk('Father',[f.father])
+      +blk('Mother',[f.mother])
+      +blk(f.siblings.length>1?'Siblings':'Sibling', f.siblings)
+      +blk(f.children.length>1?'Children':'Child', f.children)
+      +blk(f.partners.length>1?'Partners':'Partner', f.partners)
+      +blk('Address',[[c.street,c.street_2].filter(Boolean).join(', '),[c.postal_code,c.city].filter(Boolean).join(' '),c.region,c.country])
+      +blk('Email',[c.email])
+      +blk('Phone',[c.phone])
+      +blk('Company',[c.company])
+      +blk('About',[c.about])
+      +'</div>';
   }
   const w0=+svgEl.getAttribute('width')||1000, h0=+svgEl.getAttribute('height')||600;
   const clone=svgEl.cloneNode(true);
@@ -2004,8 +2023,11 @@ $('#trePrintBtn').onclick=()=>{
    +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:10px;}'
    +'.fitpage{height:'+usable+'mm;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
    +'.pagerow{flex:1;min-height:0;display:flex;gap:6mm;align-items:flex-start;}'
-   +'.infocard{width:50mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:4mm;font-size:11px;line-height:1.55;}'
-   +'.infoimg{width:100%;height:auto;display:block;margin-bottom:3mm;}' // natural aspect ratio, above the text
+   +'.infocard{width:36mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:3mm;}'
+   +'.infoimg{width:100%;height:auto;display:block;margin-bottom:2mm;}' // natural aspect ratio, above the text
+   +'.iname{font-weight:800;font-size:12.5px;margin-bottom:1mm;}'
+   +'.il{font-size:8px;text-transform:uppercase;letter-spacing:.4px;color:#555;margin-top:2mm;}'
+   +'.iv{font-size:10px;line-height:1.45;}'
    +'.chartbox{flex:1;min-width:0;height:100%;display:flex;align-items:flex-start;justify-content:center;}'
    +'.chartbox svg{max-width:100%;max-height:100%;width:auto;height:auto;display:block;}'
    +'@page{size:'+paper+';margin:12mm;}'
