@@ -202,25 +202,18 @@
       <div class="tab" data-t="exp">Export</div>
     </div>
 
-    <!-- MEMBERS -->
-    <div id="med">
-      <div class="tools">
-        <button class="btn pub" id="shareBtn">🔗 Share fill-in link</button>
-        <button class="btn gray" id="addMemberBtn">＋ Add from pool</button>
-        <input class="search" id="medSearch" type="text" placeholder="Search…" autocomplete="off" style="max-width:180px;">
-        <span id="medColsHost"></span>
-      </div>
-      <div class="selbox hide" id="shareBox"></div>
-      <div class="panel" id="memPanel"><div class="empty">Select a group in the list on the left.</div></div>
-    </div>
-
-    <!-- ALL CONTACTS -->
+    <!-- CONTACTS / MEMBERS — one grid; a selected group adds membership columns -->
     <div id="kon" class="hide">
       <div class="tools">
+        <span id="grpTools" class="hide" style="display:inline-flex;gap:8px;align-items:center;">
+          <button class="btn pub" id="shareBtn">🔗 Share fill-in link</button>
+          <button class="btn gray" id="addMemberBtn">＋ Add from pool</button>
+        </span>
         <button class="btn pub" id="newContactBtn">＋ New contact</button>
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
         <span id="konColsHost"></span>
       </div>
+      <div class="selbox hide" id="shareBox"></div>
       <div class="bulkbar hide" id="bulkBar">
         <b><span id="bulkCount">0</span> selected:</b>
         <select id="bulkGroupSel" style="max-width:160px;"></select>
@@ -779,58 +772,11 @@ function photoCell(url){
 }
 
 // ── Members grid ──
-const MED_COLS = [
-  {key:'name',    label:'Name'},
-  {key:'subgroup',label:'Subgroup'},
-  {key:'range',   label:'From–to'},
-  {key:'alsoin',  label:'Also in'},
-  {key:'status',  label:'Status'},
-  {key:'photo',   label:'Photo'},
-];
-const MED_DEFAULT = ['name','subgroup','range','alsoin','status','photo'];
-const MED_SORT_ACC = {
-  name:m=>m.name, subgroup:m=>m.subgroup_name, range:m=>d10(m.from_date)||null,
-  alsoin:m=>(m.also_in||[]).map(g=>g.name).join(','), status:m=>m.status, photo:m=>m.photo_url?0:1
-};
-function renderMembers(){
-  if(!current){ return; }
-  if(memEdit && selected){ renderMemberEdit(); return; }
-  buildColPicker('medColsHost','members',MED_COLS,MED_DEFAULT,renderMembers);
-  const cols = activeCols('members',MED_COLS,MED_DEFAULT);
-  const q=($('#medSearch').value||'').toLowerCase();
-  let rows = current.members.filter(m=>passesFilterId(m.contact_id)
-    && (!q || ((m.name||'')+' '+(m.subgroup_name||'')).toLowerCase().includes(q)));
-  const s=getSort('members');
-  if(s && MED_SORT_ACC[s.key]) rows=[...rows].sort((a,b)=>s.dir*cmpVals(MED_SORT_ACC[s.key](a),MED_SORT_ACC[s.key](b)));
-  if(!rows.length){ $('#memPanel').innerHTML='<div class="empty">'+(current.members.length?'Nothing matches the filters/search.':'No members yet. Use “Add from pool” or share a fill-in link.')+'</div>'; return; }
-  let html = `<table class="grid"><tr><th data-k="pin"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+sortIndicator('members',c.key)+'</th>').join('')}<th data-k="act"></th></tr>`;
-  rows.forEach(m=>{
-    const cells = cols.map(c=>{
-      if(c.key==='name') return `<td style="font-weight:600;">${esc(m.name)||'(unnamed)'}${m.self_managed?' <span class="self">✓</span>':''}</td>`;
-      if(c.key==='subgroup') return `<td>${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>`;
-      if(c.key==='range') return `<td class="rng">${fmtRange(m)}</td>`;
-      if(c.key==='alsoin') return `<td>${(m.also_in||[]).map(g=>`<span class="tag alt">${esc(g.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>`;
-      if(c.key==='status') return `<td>${statusBadge(m.status)}</td>`;
-      if(c.key==='photo') return `<td>${photoCell(m.photo_url)}</td>`;
-      return '<td></td>';
-    }).join('');
-    html += `<tr data-cid="${m.contact_id}" data-gid="${m.subgroup_id||current.group.id}">
-      <td><span class="pencil conPencil" data-cid="${m.contact_id}" title="Edit contact">✎</span></td>
-      ${cells}
-      <td><button class="btn sm gray editBtn">Dates</button></td>
-    </tr>`;
-  });
-  html+='</table>';
-  $('#memPanel').innerHTML=html;
-  makeResizable('#memPanel','members');
-  wireSort('#memPanel','members',cols.map(c=>c.key),renderMembers);
-  $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
-  $('#memPanel').querySelectorAll('.conPencil').forEach(p=>p.onclick=()=>openContactModal(+p.dataset.cid));
-}
-$('#medSearch').oninput=(()=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(renderMembers,180); }; })();
+// Members view = the contacts grid + membership columns (Subgroup, From–to, Status)
+// injected after Name. Legacy renderMembers() forwards to the unified grid.
+function renderMembers(){ renderContactsTable(); }
 
-function openEdit(e){
-  const tr = e.target.closest('tr');
+function openEditRow(tr){
   const cid = +tr.dataset.cid, gid = +tr.dataset.gid;
   const m = current.members.find(x=>x.contact_id===cid && ((x.subgroup_id||current.group.id)===gid));
   const f = d10(m.from_date), t = d10(m.to_date);
@@ -849,13 +795,13 @@ function openEdit(e){
       status:cell.querySelector('.es').value,
       self_managed:m.self_managed
     })});
-    current = await api('/api/groups/'+selected.id+'/members'); renderMembers();
+    current = await api('/api/groups/'+selected.id+'/members'); renderContactsTable();
   };
   cell.querySelector('.rmB').onclick=async()=>{
     if(!confirm('Remove '+(m.name||'this member')+' from this group? (The person stays in the pool.)')) return;
     await api('/api/memberships?contact_id='+cid+'&group_id='+gid,{method:'DELETE'});
     memberships = await api('/api/group-memberships'); renderTree();
-    current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
+    current = await api('/api/groups/'+selected.id+'/members'); renderContactsTable(); renderMap();
   };
 }
 
@@ -868,13 +814,13 @@ $('#addMemberBtn').onclick=async()=>{
   else {
     memberships = await api('/api/group-memberships'); renderTree();
     current = await api('/api/groups/'+selected.id+'/members');
-    renderMembers(); renderMap();
+    renderContactsTable(); renderMap();
   }
 };
 function renderMemberEdit(){
   const inGroup = new Map();
   (current?current.members:[]).forEach(m=>inGroup.set(m.contact_id, m.subgroup_id||selected.id));
-  const q=($('#medSearch').value||'').toLowerCase();
+  const q=($('#conSearch').value||'').toLowerCase();
   const list = contactsPool.filter(c=>passesFilterC(c)
     && (!q || ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q)));
   let html = `<table class="grid"><tr><th data-k="chk" style="width:64px;">Member</th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="city">City</th><th data-k="birthday">Birthday</th></tr>`;
@@ -888,9 +834,9 @@ function renderMemberEdit(){
     </tr>`;
   });
   html += '</table><div class="help">Tick to add to “'+esc(selected.name)+'”, untick to remove (the person stays in the pool). Click “✓ Done” above when finished.</div>';
-  $('#memPanel').innerHTML = html;
-  makeResizable('#memPanel','memedit');
-  $('#memPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
+  $('#conPanel').innerHTML = html;
+  makeResizable('#conPanel','memedit');
+  $('#conPanel').querySelectorAll('tr[data-cid]').forEach(tr=>{
     const cid=+tr.dataset.cid;
     tr.querySelector('.memChk').onchange=async(e)=>{
       const cb=e.target; cb.disabled=true;
@@ -928,7 +874,13 @@ const CON_COLS = [
   {key:'died_on',    label:'Died on',  type:'date'},
   {key:'photo',      label:'Photo',    type:null},
 ];
-const CON_DEFAULT = ['name','email','phone','city','birthday'];
+const CON_DEFAULT = ['name','email','phone','city','birthday','photo'];
+// Membership columns — appear after Name whenever a group is selected (not toggleable)
+const MEM_COLS = [
+  {key:'msub',  label:'Subgroup'},
+  {key:'mrange',label:'From–to'},
+  {key:'mstat', label:'Status'},
+];
 // Cell display for the contacts grid (used at render AND for in-place updates after a save)
 function conCellHtml(c,col){
   const raw = col.type==='date' ? d10(c[col.key]) : (c[col.key]||'');
@@ -1025,6 +977,8 @@ function startEditCell(td, initial){
     if(pencil){ openContactModal(+pencil.closest('tr').dataset.cid); return; }
     if(e.target.classList.contains('selChk')||e.target.id==='selAll') return;
     if(e.target.classList.contains('thumb')){ openVideoLightbox('<img src="'+esc(e.target.src)+'" style="width:100%;height:100%;object-fit:contain;">'); return; }
+    const mtd=e.target.closest('td.edm'); // membership cells → membership editor
+    if(mtd){ const tr=mtd.closest('tr[data-gid]'); if(tr) openEditRow(tr); return; }
     const td=e.target.closest('td[data-f]');
     if(td && td.closest('tr[data-cid]') && !td.querySelector('input')){
       setConActive(+td.closest('tr').dataset.cid, td.dataset.f); // select only — no editor
@@ -1073,38 +1027,74 @@ document.addEventListener('keydown',(e)=>{
   }
 });
 function renderContactsTable(){
+  // Group mode: members of the selected group with membership columns after Name.
+  const groupMode = !!(selected && current);
+  $('#grpTools').classList.toggle('hide', !selected);
+  if(groupMode && memEdit){ renderMemberEdit(); return; }
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   let cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
   const q = ($('#conSearch').value||'').toLowerCase();
+  // membership info per contact (group mode) — a contact can appear once per subgroup
+  let memBy=null;
+  if(groupMode){
+    memBy={};
+    current.members.forEach(m=>{ if(!memBy[m.contact_id]) memBy[m.contact_id]=m; });
+  }
   let list = contactsPool.filter(c=>{
+    if(groupMode && !memBy[c.id]) return false;
     if(!passesFilterC(c)) return false;
     if(!q) return true;
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
   updateSideCounts();
-  const s=getSort('contacts');
-  if(s) list=[...list].sort((a,b)=>s.dir*cmpVals(
-    s.key==='photo' ? (a.photo_url?0:1) : (s.key==='birthday'||s.key==='died_on') ? d10(a[s.key])||null : a[s.key],
-    s.key==='photo' ? (b.photo_url?0:1) : (s.key==='birthday'||s.key==='died_on') ? d10(b[s.key])||null : b[s.key]
-  ));
+  const s=getSort(groupMode?'members':'contacts');
+  if(s) list=[...list].sort((a,b)=>{
+    const val=x=>{
+      if(s.key==='photo') return x.photo_url?0:1;
+      if(s.key==='birthday'||s.key==='died_on') return d10(x[s.key])||null;
+      if(s.key==='msub') return memBy[x.id]&&memBy[x.id].subgroup_name||null;
+      if(s.key==='mrange') return memBy[x.id]&&d10(memBy[x.id].from_date)||null;
+      if(s.key==='mstat') return memBy[x.id]&&memBy[x.id].status||null;
+      return x[s.key];
+    };
+    return s.dir*cmpVals(val(a),val(b));
+  });
   conListIds = list.map(c=>c.id);
   conEditKeys = cols.filter(c=>c.type).map(c=>c.key);
-  if(!list.length){ $('#conPanel').innerHTML='<div class="empty">No contacts'+(q?' match your search':' match the filters')+'.</div>'; updateBulkBar(); return; }
-  let html = `<table class="grid"><tr><th data-k="pin"></th><th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>${cols.map(c=>'<th data-k="'+c.key+'">'+c.label+sortIndicator('contacts',c.key)+'</th>').join('')}</tr>`;
+  if(!list.length){
+    $('#conPanel').innerHTML='<div class="empty">'+(groupMode?'No members yet — use “＋ Add from pool”.':'No contacts'+(q?' match your search':' match the filters')+'.')+'</div>';
+    updateBulkBar(); return;
+  }
+  const sortKey=groupMode?'members':'contacts';
+  // header: Name first, then membership columns (group mode), then the rest
+  const headCols=[];
+  cols.forEach((c,i)=>{
+    headCols.push('<th data-k="'+c.key+'">'+c.label+sortIndicator(sortKey,c.key)+'</th>');
+    if(i===0 && groupMode) MEM_COLS.forEach(mc=>headCols.push('<th data-k="'+mc.key+'">'+mc.label+sortIndicator(sortKey,mc.key)+'</th>'));
+  });
+  let html = `<table class="grid"><tr><th data-k="pin"></th><th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>${headCols.join('')}</tr>`;
   list.forEach(c=>{
-    html += `<tr data-cid="${c.id}">
+    const m=groupMode?memBy[c.id]:null;
+    const cells=[];
+    cols.forEach((col,i)=>{
+      if(col.key==='photo') cells.push(`<td>${photoCell(c.photo_url)}</td>`);
+      else cells.push(`<td data-f="${col.key}" class="ed">${conCellHtml(c,col)}</td>`);
+      if(i===0 && groupMode){
+        cells.push(`<td class="edm">${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>`);
+        cells.push(`<td class="rng edm" title="Click to edit membership">${fmtRange(m)}</td>`);
+        cells.push(`<td class="edm" title="Click to edit membership">${statusBadge(m.status)}</td>`);
+      }
+    });
+    html += `<tr data-cid="${c.id}"${m?' data-gid="'+(m.subgroup_id||current.group.id)+'"':''}>
       <td><span class="pencil conPencil" title="Full editor (all fields, occasions)">✎</span></td>
       <td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>
-      ${cols.map(col=>{
-        if(col.key==='photo') return `<td>${photoCell(c.photo_url)}</td>`;
-        return `<td data-f="${col.key}" class="ed">${conCellHtml(c,col)}</td>`;
-      }).join('')}
+      ${cells.join('')}
     </tr>`;
   });
   html += '</table>';
   $('#conPanel').innerHTML = html;
-  makeResizable('#conPanel','contacts');
-  wireSort('#conPanel','contacts',cols.map(c=>c.key),renderContactsTable);
+  makeResizable('#conPanel', sortKey);
+  wireSort('#conPanel', sortKey, cols.map(c=>c.key).concat(groupMode?MEM_COLS.map(c=>c.key):[]), renderContactsTable);
   if(conActive) setConActive(conActive.cid, conActive.field); // restore selection after re-render
   updateBulkBar();
 }
@@ -2270,9 +2260,9 @@ $('#printCalBtn').onclick=()=>{
 };
 
 // ── Tabs ──
-const ids=['med','kon','kar','tid','tre','bok','exp','dup'];
+const ids=['kon','kar','tid','tre','bok','exp','dup'];
 function showTab(t){
-  const showId = (t==='med' && !selected) ? 'kon' : t;
+  const showId = (t==='med') ? 'kon' : t; // Members tab = the unified grid
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
   clearAnomaly();
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==showId));
@@ -2343,7 +2333,7 @@ document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.
 NavBar.init({ requireAuth: true }).then(()=>{
   loadAll()
     .then(()=>{ showTab('med'); }) // no group selected on load → shows the populated All contacts grid
-    .catch(e=>{ $('#memPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
+    .catch(e=>{ $('#conPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
 });
 </script>
 </body></html>
