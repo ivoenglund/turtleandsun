@@ -237,7 +237,10 @@
 <!-- Contact editor modal -->
 <div class="modal-bg" id="conModalBg">
   <div class="modal">
-    <h3 id="conModalTitle">Edit contact</h3>
+    <div style="display:flex;gap:14px;align-items:flex-start;">
+      <h3 id="conModalTitle" style="flex:1;">Edit contact</h3>
+      <img id="cf_photo" class="hide" style="width:64px;height:64px;border-radius:50%;object-fit:cover;cursor:pointer;border:2px solid var(--line);" title="Click to view large">
+    </div>
     <div class="grid2">
       <div class="full"><label>Name</label><input id="cf_name" autocomplete="off"></div>
       <div><label>Email</label><input id="cf_email" autocomplete="off"></div>
@@ -252,7 +255,7 @@
       <div><label>Country</label><input id="cf_country" autocomplete="off"></div>
       <div><label>Died on (memorial)</label><input id="cf_died_on" type="date" autocomplete="off"></div>
       <div style="display:flex;align-items:end;padding-bottom:6px;"><label style="display:flex;align-items:center;gap:7px;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);margin:0;"><input type="checkbox" id="cf_is_pet" style="width:auto;"> This is a pet</label></div>
-      <div class="full"><label>About (free text — used in the yearbook)</label><textarea id="cf_about" rows="3" style="width:100%;resize:vertical;" autocomplete="off"></textarea></div>
+      <div class="full"><label>About (free text — used in the yearbook)</label><textarea id="cf_about" rows="7" style="width:100%;resize:vertical;" autocomplete="off"></textarea></div>
     </div>
     <div style="margin-top:14px;">
       <label style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;">Occasions for this contact</label>
@@ -450,15 +453,21 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
 }
 
 // ── Resizable columns: auto-fit on render, drag to override, dblclick divider resets ──
+const AUTOFIT_CACHE = {}; // tableKey+colsSignature → measured widths (in-memory; avoids double layout on every render)
 function makeResizable(panelSel, tableKey){
   const table = document.querySelector(panelSel+' table.grid');
   if(!table) return;
   const ths=[...table.querySelectorAll('tr:first-child th')];
   const widths = COLPREFS[tableKey+'::w'] || {};
-  function autofit(){
-    table.style.tableLayout='auto'; table.style.width='auto';
-    ths.forEach(th=>{ const k=th.dataset.k||''; th.style.width = widths[k] ? widths[k]+'px' : ''; });
-    const measured = ths.map(th=>Math.max(28, Math.min(360, th.offsetWidth+2)));
+  const sig = tableKey+'::'+ths.map(th=>th.dataset.k||'').join(',');
+  function autofit(force){
+    let measured = !force && AUTOFIT_CACHE[sig];
+    if(!measured){
+      table.style.tableLayout='auto'; table.style.width='auto';
+      ths.forEach(th=>{ const k=th.dataset.k||''; th.style.width = widths[k] ? widths[k]+'px' : ''; });
+      measured = ths.map(th=>Math.max(28, Math.min(360, th.offsetWidth+2)));
+      AUTOFIT_CACHE[sig]=measured;
+    }
     ths.forEach((th,i)=>{ const k=th.dataset.k||('c'+i); th.style.width=(widths[k]||measured[i])+'px'; });
     table.style.width='100%'; table.style.tableLayout='fixed';
   }
@@ -480,7 +489,7 @@ function makeResizable(panelSel, tableKey){
     h.addEventListener('dblclick',e=>{
       e.preventDefault(); e.stopPropagation();
       delete widths[key]; COLPREFS[tableKey+'::w']=widths; savePrefs();
-      autofit();
+      autofit(true); // re-measure fresh
     });
   });
   autofit();
@@ -746,7 +755,7 @@ function renderMembers(){
   $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
   $('#memPanel').querySelectorAll('.conPencil').forEach(p=>p.onclick=()=>openContactModal(+p.dataset.cid));
 }
-$('#medSearch').oninput=()=>renderMembers();
+$('#medSearch').oninput=(()=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(renderMembers,180); }; })();
 
 function openEdit(e){
   const tr = e.target.closest('tr');
@@ -845,7 +854,6 @@ const CON_COLS = [
   {key:'country',    label:'Country',  type:'text'},
   {key:'birthday',   label:'Birthday', type:'date'},
   {key:'died_on',    label:'Died on',  type:'date'},
-  {key:'about',      label:'About',    type:'text'},
   {key:'photo',      label:'Photo',    type:null},
 ];
 const CON_DEFAULT = ['name','email','phone','city','birthday'];
@@ -977,7 +985,9 @@ function renderContactsTable(){
   if(conActive) setConActive(conActive.cid, conActive.field); // restore selection after re-render
   updateBulkBar();
 }
-$('#conSearch').oninput = renderContactsTable;
+// Debounced search: rebuild only after typing pauses (rebuilding on every key was the main slowness)
+function debounce(fn,ms){ let t; return ()=>{ clearTimeout(t); t=setTimeout(fn,ms); }; }
+$('#conSearch').oninput = debounce(renderContactsTable,180);
 
 // ── Bulk actions ──
 function updateBulkBar(){
@@ -1020,6 +1030,9 @@ async function openContactModal(cid){
   $('#cf_birthday').value = d10(c.birthday);
   $('#cf_died_on').value = d10(c.died_on);
   $('#cf_is_pet').checked = !!c.is_pet;
+  const ph=$('#cf_photo');
+  if(c.photo_url){ ph.src=c.photo_url; ph.classList.remove('hide'); ph.onclick=()=>openVideoLightbox('<img src="'+esc(c.photo_url)+'" style="width:100%;height:100%;object-fit:contain;">'); }
+  else ph.classList.add('hide');
   await renderConOccList(cid);
   $('#of_name').value=''; $('#of_date').value=''; $('#of_freq').value='yearly';
   $('#conModalBg').classList.add('open');
