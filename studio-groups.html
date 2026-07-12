@@ -14,8 +14,18 @@
   .btn.sm{padding:2px 8px;font-size:12px;border-radius:6px;}
   .btn.gray{background:#fff;color:#3a3000;border:1.5px solid rgba(28,10,0,0.25);}
   .btn.danger{background:#fff;color:#a12a1a;border:1.5px solid #c98;}
-  .wrap{display:flex;gap:16px;align-items:flex-start;max-width:1280px;margin:0 auto;padding:10px 20px 44px;}
-  .side{width:240px;flex-shrink:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 6px;font-size:14px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+  .wrap{display:flex;gap:12px;align-items:flex-start;padding:8px 14px 24px;}
+  .side{width:240px;flex-shrink:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 6px;font-size:14px;box-shadow:0 2px 12px rgba(0,0,0,0.06);position:relative;}
+  .splitter{position:absolute;top:0;right:-7px;width:12px;height:100%;cursor:col-resize;z-index:50;}
+  .side.float{position:fixed;left:0;top:0;bottom:0;z-index:2500;margin:0;border-radius:0 14px 14px 0;overflow-y:auto;
+    transform:translateX(-104%);transition:transform .16s ease;box-shadow:8px 0 30px rgba(0,0,0,0.22);}
+  .side.float.out{transform:none;}
+  .sideStrip{width:20px;flex-shrink:0;align-self:stretch;min-height:70vh;background:rgba(255,255,255,0.55);border:1px solid var(--line);
+    border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mut);font-weight:800;font-size:15px;}
+  .sideStrip:hover{background:#fff;color:var(--green2);}
+  /* Grid panels use the vertical space: scroll inside, header stays visible */
+  #conPanel,#memPanel{max-height:max(300px, calc(100vh - 185px));overflow:auto;}
+  #conPanel .grid th,#memPanel .grid th{position:sticky;top:0;z-index:20;box-shadow:0 1px 0 var(--gridline);}
   .lbl{font-size:10.5px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:8px 10px 4px;}
   .row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
   .row:hover{background:#F4F1E6;}
@@ -125,11 +135,16 @@
   .modal .foot{display:flex;gap:10px;margin-top:16px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
   .modal .foot .left{margin-right:auto;}
   .occrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f2eee2;font-size:13px;flex-wrap:wrap;}
-  @media(max-width:800px){.wrap{flex-direction:column;}.side{width:100%;}.modal .grid2{grid-template-columns:1fr;}}
+  @media(max-width:800px){.wrap{flex-direction:column;}.side{width:100%!important;}.modal .grid2{grid-template-columns:1fr;}}
+  /* Left-justify the shared nav on this full-width page */
+  .ts-nav-panel-spacer{display:none!important;}
+  .ts-nav > a{margin-left:14px!important;}
 </style></head>
 <body>
 <div class="wrap">
-  <div class="side">
+  <div class="side" id="side">
+    <div class="splitter" id="sideSplitter"></div>
+    <div style="display:flex;justify-content:flex-end;padding:0 6px 4px;"><button class="btn sm gray" id="pinBtn" title="Pinned: always visible. Auto-hide: folds away, hover the left strip to open.">📌 Pinned</button></div>
     <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
     <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></div>
     <div class="lbl">Groups</div>
@@ -141,6 +156,7 @@
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPeople" checked> People</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
   </div>
+  <div class="sideStrip hide" id="sideStrip" title="Open the panel">»</div>
 
   <div class="main">
     <div class="tabs" id="tabbar">
@@ -1697,6 +1713,45 @@ document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.
       rerenderAll();
     };
   });
+})();
+
+// ── Sidebar: pin/auto-hide + width splitter (persisted) ──
+(function(){
+  let pref={pinned:true,width:240};
+  try{ Object.assign(pref, JSON.parse(localStorage.getItem('ts_studio_side')||'{}')); }catch(e){}
+  const side=$('#side'), strip=$('#sideStrip'), pin=$('#pinBtn');
+  const save=()=>{ try{ localStorage.setItem('ts_studio_side',JSON.stringify(pref)); }catch(e){} };
+  function applySidebar(){
+    side.style.width=Math.max(170,Math.min(420,pref.width||240))+'px';
+    pin.textContent = pref.pinned ? '📌 Pinned' : '📌 Auto-hide';
+    if(pref.pinned){
+      side.classList.remove('float','out');
+      strip.classList.add('hide');
+    } else {
+      side.classList.add('float');
+      side.classList.remove('out');
+      strip.classList.remove('hide');
+    }
+  }
+  pin.onclick=()=>{ pref.pinned=!pref.pinned; save(); applySidebar(); };
+  strip.addEventListener('mouseenter',()=>side.classList.add('out'));
+  strip.addEventListener('click',()=>side.classList.add('out'));
+  side.addEventListener('mouseleave',()=>{ if(!pref.pinned) side.classList.remove('out'); });
+  // Splitter: guide-free — sidebar is tiny, live resize is cheap
+  $('#sideSplitter').addEventListener('mousedown',e=>{
+    if(!pref.pinned) return;
+    e.preventDefault();
+    const startX=e.clientX, startW=side.offsetWidth;
+    document.body.style.cursor='col-resize';
+    const move=ev=>{ side.style.width=Math.max(170,Math.min(420,startW+ev.clientX-startX))+'px'; };
+    const up=ev=>{
+      document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
+      document.body.style.cursor='';
+      pref.width=side.offsetWidth; save();
+    };
+    document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+  });
+  applySidebar();
 })();
 
 NavBar.init({ requireAuth: true }).then(()=>{
