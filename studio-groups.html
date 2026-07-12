@@ -68,6 +68,9 @@
   .search{max-width:300px;padding:6px 11px;border-radius:9px;}
   .flt{font-size:12.5px;display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;}
   .flt input{width:auto;margin:0;}
+  .fltrow{font-size:12px;padding:2px 10px;display:flex;gap:9px;align-items:center;color:#33402a;}
+  .fltrow .flt{font-size:11.5px;}
+  .fltrow .ct{font-size:11px;color:var(--mut);}
   .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:6px 10px;margin-bottom:8px;font-size:13px;}
   .dupblock{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:12px;}
   .tagchip{display:inline-block;border:1px solid rgba(28,10,0,0.25);border-radius:20px;padding:2px 11px;font-size:12px;cursor:pointer;background:#fff;user-select:none;}
@@ -134,7 +137,19 @@
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fDead" checked> Deceased</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPeople" checked> People</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
-    <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fNoBday"> Missing birthday <span class="ct" id="noBdayCount"></span></label>
+    <div class="lbl">Data (has / missing)</div>
+    <div class="fltrow">Birthday
+      <label class="flt"><input type="checkbox" id="fBdayY" checked> has</label>
+      <label class="flt"><input type="checkbox" id="fBdayN" checked> missing <span class="ct" id="noBdayCount"></span></label>
+    </div>
+    <div class="fltrow">Address
+      <label class="flt"><input type="checkbox" id="fAddrY" checked> has</label>
+      <label class="flt"><input type="checkbox" id="fAddrN" checked> missing <span class="ct" id="noAddrCount"></span></label>
+    </div>
+    <div class="fltrow">Email
+      <label class="flt"><input type="checkbox" id="fMailY" checked> has</label>
+      <label class="flt"><input type="checkbox" id="fMailN" checked> missing <span class="ct" id="noMailCount"></span></label>
+    </div>
   </div>
 
   <div class="main">
@@ -552,13 +567,20 @@ function rerenderAll(){
 }
 
 // ── Global filters ──
+function hasAddress(c){ return !!(c.street || c.city || c.postal_code); }
 function passesFilterC(c){
   const dead = !!c.died_on, pet = !!c.is_pet;
   if(dead && !$('#fDead').checked) return false;
   if(!dead && !$('#fLiving').checked) return false;
   if(pet && !$('#fPets').checked) return false;
   if(!pet && !$('#fPeople').checked) return false;
-  if($('#fNoBday').checked && c.birthday) return false;
+  const bday=!!c.birthday, addr=hasAddress(c), mail=!!c.email;
+  if(bday && !$('#fBdayY').checked) return false;
+  if(!bday && !$('#fBdayN').checked) return false;
+  if(addr && !$('#fAddrY').checked) return false;
+  if(!addr && !$('#fAddrN').checked) return false;
+  if(mail && !$('#fMailY').checked) return false;
+  if(!mail && !$('#fMailN').checked) return false;
   return true;
 }
 function passesFilterId(cid){
@@ -603,6 +625,8 @@ function renderTree(){
 function updateSideCounts(){
   $('#poolCount').textContent = contactsPool.length;
   $('#noBdayCount').textContent = '('+contactsPool.filter(c=>!c.birthday).length+')';
+  $('#noAddrCount').textContent = '('+contactsPool.filter(c=>!hasAddress(c)).length+')';
+  $('#noMailCount').textContent = '('+contactsPool.filter(c=>!c.email).length+')';
   $('#dupCount').textContent = computeDupClusters().length;
 }
 
@@ -1551,7 +1575,8 @@ document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.
 (function(){
   let saved={};
   try{ saved=JSON.parse(localStorage.getItem('ts_studio_filters')||'{}'); }catch(e){}
-  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets',fNoBday:'nobday'};
+  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets',
+    fBdayY:'bday_y',fBdayN:'bday_n',fAddrY:'addr_y',fAddrN:'addr_n',fMailY:'mail_y',fMailN:'mail_n'};
   Object.entries(boxes).forEach(([id,key])=>{
     const cb=document.getElementById(id);
     if(typeof saved[key]==='boolean') cb.checked=saved[key];
