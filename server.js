@@ -2115,6 +2115,18 @@ app.post('/api/contacts/:id/occasions', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/occasions/:id', requireAuth, async (req, res) => {
+  const { name, start_date, frequency, notes } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE occasions SET name=$1, start_date=$2, frequency=$3, notes=$4 WHERE id=$5 AND user_id=$6 RETURNING id`,
+      [name, start_date, frequency, notes || null, req.params.id, req.user.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/occasions/:id', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM occasions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);

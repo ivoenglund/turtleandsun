@@ -8,11 +8,12 @@
   :root{--cream:#FBF6EC;--green:#243A17;--green2:#2E4A1E;--leaf:#7FB36F;--leaf2:#4E944F;
         --yellow:#FFE800;--ink:#1C2A14;--line:rgba(28,10,0,0.1);--mut:#6b7560;}
   *{box-sizing:border-box;font-family:'Plus Jakarta Sans',-apple-system,"Segoe UI",Roboto,Arial,sans-serif;}
-  body{margin:0;color:var(--ink);}
+  body{margin:0;min-height:100vh;color:var(--ink);}
   .btn{border:none;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;}
   .btn.pub{background:var(--yellow);color:#3a3000;border:1.5px solid rgba(58,48,0,0.35);}
   .btn.sm{padding:5px 10px;font-size:13px;}
   .btn.gray{background:#fff;color:#3a3000;border:1.5px solid rgba(28,10,0,0.25);}
+  .btn.danger{background:#fff;color:#a12a1a;border:1.5px solid #c98;}
   .wrap{display:flex;gap:18px;align-items:flex-start;max-width:1200px;margin:0 auto;padding:12px 24px 48px;}
   .side{width:258px;flex-shrink:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 8px;font-size:14.5px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
   .lbl{font-size:11px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:10px 10px 6px;}
@@ -26,13 +27,15 @@
   .main{flex:1;min-width:0;}
   .crumb{font-size:13px;color:rgba(28,10,0,0.55);margin-bottom:2px;}
   h1{font-size:21px;margin:0 0 12px;}
-  .tabs{display:flex;gap:6px;border-bottom:1px solid rgba(28,10,0,0.15);margin-bottom:18px;}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid rgba(28,10,0,0.15);margin-bottom:18px;flex-wrap:wrap;}
   .tab{padding:9px 14px;font-size:14px;cursor:pointer;color:#4a553f;border-bottom:3px solid transparent;}
   .tab.active{color:var(--green2);font-weight:700;border-bottom-color:var(--green2);}
   .panel{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
   table{width:100%;border-collapse:collapse;font-size:14px;}
   th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #eee9dd;vertical-align:top;}
   th{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
+  tr.click{cursor:pointer;}
+  tr.click:hover td{background:#FBF9F0;}
   .tag{display:inline-block;background:#EAF3E2;color:var(--green2);border-radius:20px;padding:2px 9px;font-size:11.5px;margin:1px 2px;}
   .tag.alt{background:#eef3fb;color:#26527f;}
   .self{font-size:12px;color:var(--leaf2);font-weight:700;}
@@ -42,20 +45,40 @@
   .toggleRow{display:flex;align-items:center;gap:9px;font-size:14px;padding:6px 0;}
   .hide{display:none;}
   .selbox{background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:11px 12px;font-size:13.5px;color:var(--green2);margin-bottom:14px;word-break:break-all;}
-  input[type=date],input[type=text],select{font-size:13px;padding:5px 7px;border:1px solid rgba(28,10,0,0.2);border-radius:6px;background:#fff;}
+  input,select,textarea{font-size:13px;padding:6px 8px;border:1px solid rgba(28,10,0,0.2);border-radius:6px;background:#fff;font-family:inherit;}
   #map{height:420px;border-radius:12px;border:1px solid var(--line);}
   .empty{padding:30px;text-align:center;color:var(--mut);}
   .stbadge{font-size:11.5px;border-radius:20px;padding:2px 9px;}
   .st-active{background:#EAF3E2;color:var(--green2);}
   .st-invited{background:#fdf4dd;color:#7a5b00;}
   .st-ended{background:#fbeee9;color:#9a4a3a;}
-  @media(max-width:800px){.wrap{flex-direction:column;}.side{width:100%;}}
+  .soon{background:#fdf4dd;color:#7a5b00;border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;}
+  .today{background:var(--yellow);color:#3a3000;border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;}
+  .search{width:100%;max-width:340px;margin-bottom:12px;padding:8px 12px;border-radius:9px;}
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:3000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;border-radius:14px;padding:22px 24px;width:100%;max-width:560px;box-shadow:0 12px 48px rgba(0,0,0,0.25);}
+  .modal h3{margin:0 0 14px;font-size:17px;}
+  .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
+  .modal .grid .full{grid-column:1/-1;}
+  .modal label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
+  .modal input,.modal select{width:100%;}
+  .modal .foot{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
+  .modal .foot .left{margin-right:auto;}
+  .picklist{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;margin-top:10px;}
+  .pickrow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f2eee2;cursor:pointer;font-size:14px;}
+  .pickrow:hover{background:#FBF9F0;}
+  .pickrow input{width:auto;}
+  .pickrow .sub2{font-size:12px;color:var(--mut);margin-left:auto;}
+  .occrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f2eee2;font-size:13.5px;flex-wrap:wrap;}
+  @media(max-width:800px){.wrap{flex-direction:column;}.side{width:100%;}.modal .grid{grid-template-columns:1fr;}}
 </style></head>
 <body>
 <div class="wrap">
   <div class="side">
     <div class="lbl">Pool</div>
-    <div class="row" id="poolRow"><span>🗂️</span> My contacts <span class="ct" id="poolCount">–</span></div>
+    <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
@@ -64,8 +87,10 @@
   <div class="main">
     <div class="crumb" id="crumb">Groups</div>
     <h1 id="title">Select a group</h1>
-    <div class="tabs">
+    <div class="tabs" id="tabbar">
       <div class="tab active" data-t="med">Members</div>
+      <div class="tab" data-t="kon">All contacts</div>
+      <div class="tab" data-t="occ">Occasions</div>
       <div class="tab" data-t="kar">Map</div>
       <div class="tab" data-t="bok">Yearbook</div>
       <div class="tab" data-t="exp">Export</div>
@@ -79,6 +104,19 @@
       </div>
       <div class="selbox hide" id="shareBox"></div>
       <div class="panel" id="memPanel"><div class="empty">Select a group in the list on the left.</div></div>
+    </div>
+
+    <!-- ALL CONTACTS -->
+    <div id="kon" class="hide">
+      <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…">
+      <div class="panel" id="conPanel"></div>
+      <div class="help">Click a contact to edit every field, including birthday and occasions.</div>
+    </div>
+
+    <!-- OCCASIONS -->
+    <div id="occ" class="hide">
+      <div class="panel" id="occPanel"><div class="empty">Loading…</div></div>
+      <div class="help">All occasions and birthdays, sorted by next upcoming date. Click a row to update it.</div>
     </div>
 
     <!-- MAP -->
@@ -113,16 +151,88 @@
   </div>
 </div>
 
+<!-- Contact editor modal -->
+<div class="modal-bg" id="conModalBg">
+  <div class="modal">
+    <h3 id="conModalTitle">Edit contact</h3>
+    <div class="grid">
+      <div class="full"><label>Name</label><input id="cf_name"></div>
+      <div><label>Email</label><input id="cf_email" type="email"></div>
+      <div><label>Phone</label><input id="cf_phone"></div>
+      <div><label>Birthday</label><input id="cf_birthday" type="date"></div>
+      <div><label>Company</label><input id="cf_company"></div>
+      <div class="full"><label>Street</label><input id="cf_street"></div>
+      <div class="full"><label>Street 2</label><input id="cf_street_2"></div>
+      <div><label>Postal code</label><input id="cf_postal_code"></div>
+      <div><label>City</label><input id="cf_city"></div>
+      <div><label>Region</label><input id="cf_region"></div>
+      <div><label>Country</label><input id="cf_country"></div>
+      <div><label>Died on (memorial)</label><input id="cf_died_on" type="date"></div>
+      <div style="display:flex;align-items:end;padding-bottom:6px;"><label style="display:flex;align-items:center;gap:7px;text-transform:none;font-size:13.5px;font-weight:500;color:var(--ink);margin:0;"><input type="checkbox" id="cf_is_pet" style="width:auto;"> This is a pet</label></div>
+    </div>
+    <div style="margin-top:16px;">
+      <label style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;">Occasions for this contact</label>
+      <div id="conOccList"></div>
+      <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+        <input id="of_name" placeholder="Occasion (e.g. Wedding day)" style="flex:1;min-width:140px;">
+        <input id="of_date" type="date">
+        <select id="of_freq"><option value="yearly">Yearly</option><option value="milestone">Milestone</option><option value="once">One-time</option></select>
+        <button class="btn sm gray" id="of_add">＋ Add</button>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn sm danger left" id="conDelete">Delete contact</button>
+      <button class="btn sm gray" id="conCancel">Close</button>
+      <button class="btn sm pub" id="conSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add-from-pool modal -->
+<div class="modal-bg" id="pickModalBg">
+  <div class="modal">
+    <h3>Add members to <span id="pickGroupName"></span></h3>
+    <input class="search" id="pickSearch" type="text" placeholder="Search…" style="max-width:none;margin-bottom:0;">
+    <div class="picklist" id="pickList"></div>
+    <div class="foot">
+      <span class="left muted" id="pickCount" style="font-size:13px;">0 selected</span>
+      <button class="btn sm gray" id="pickCancel">Cancel</button>
+      <button class="btn sm pub" id="pickAdd">Add selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- Occasion editor modal -->
+<div class="modal-bg" id="occModalBg">
+  <div class="modal" style="max-width:440px;">
+    <h3>Edit occasion</h3>
+    <div class="grid">
+      <div class="full"><label>Occasion</label><input id="oe_name"></div>
+      <div><label>Date</label><input id="oe_date" type="date"></div>
+      <div><label>Repeats</label><select id="oe_freq"><option value="yearly">Yearly</option><option value="milestone">Milestone</option><option value="once">One-time</option></select></div>
+      <div class="full"><label>Notes</label><input id="oe_notes"></div>
+    </div>
+    <div class="foot">
+      <button class="btn sm danger left" id="oeDelete">Delete</button>
+      <button class="btn sm gray" id="oeCancel">Cancel</button>
+      <button class="btn sm pub" id="oeSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const d10 = v => v ? String(v).slice(0,10) : '';
 let groups = [];            // tree from /api/groups
 let memberships = [];       // flat list from /api/group-memberships (for counts)
 let contactsPool = [];      // /api/contacts
 let selected = null;        // selected group {id,name}
 let current = null;         // last /api/groups/:id/members payload
 let mapObj = null;
+let editingContactId = null;
+let editingOccasion = null; // {id} being edited in occasion modal
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
@@ -161,6 +271,7 @@ async function loadAll(){
   groups=g||[]; memberships=ms||[]; contactsPool=cs||[];
   $('#poolCount').textContent = contactsPool.length;
   renderTree();
+  renderContactsTable();
 }
 
 async function selectGroup(node){
@@ -172,14 +283,14 @@ async function selectGroup(node){
   $('#title').innerHTML = `${esc(node.name)} <span style="font-size:13px;color:var(--mut);font-weight:400;">· ${total} members${subN?` · ${subN} subgroups`:''}</span>`;
   $('#shareBox').classList.add('hide');
   $('#bokSrc').textContent = 'Source: '+node.name;
+  showTab('med');
   current = await api('/api/groups/'+node.id+'/members');
   renderMembers();
   renderMap();
 }
 
 function fmtRange(m){
-  const f = m.from_date ? String(m.from_date).slice(0,10) : '';
-  const t = m.to_date ? String(m.to_date).slice(0,10) : '';
+  const f = d10(m.from_date), t = d10(m.to_date);
   if(!f && !t) return '<span class="muted">—</span>';
   if(f && !t) return esc(f.slice(0,4))+'– <span style="color:var(--leaf2)">ongoing</span>';
   return esc(f.slice(0,4))+'–<b>'+esc(t.slice(0,4))+'</b> <span style="color:#9a4a3a">ended</span>';
@@ -197,26 +308,26 @@ function renderMembers(){
   rows.forEach(m=>{
     const alsoIn = (m.also_in||[]).map(g=>`<span class="tag alt">${esc(g.name)}</span>`).join('')||'<span class="muted">—</span>';
     html += `<tr data-cid="${m.contact_id}" data-gid="${m.subgroup_id||current.group.id}">
-      <td>${esc(m.name)||'<span class="muted">(unnamed)</span>'}${m.self_managed?' <span class="self">✓ self-managed</span>':''}</td>
+      <td><a href="#" class="conLink" data-cid="${m.contact_id}" style="color:var(--green2);font-weight:600;">${esc(m.name)||'(unnamed)'}</a>${m.self_managed?' <span class="self">✓ self-managed</span>':''}</td>
       <td>${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>
       <td class="rng">${fmtRange(m)}</td>
       <td>${alsoIn}</td>
       <td>${statusBadge(m.status)}</td>
       <td><span class="dot ${m.photo_url?'ok':'no'}"></span></td>
-      <td><button class="btn sm gray editBtn">Edit</button></td>
+      <td><button class="btn sm gray editBtn">Dates</button></td>
     </tr>`;
   });
-  html+='</table><div class="help">Each membership has a <b>from–to date</b> and a status — the same model handles ongoing, ended and historical/dated groups (school classes, alumni). A person exists once in the pool and can belong to several groups.</div>';
+  html+='</table><div class="help">Click a <b>name</b> to edit the person (all fields + occasions). “Dates” edits this group membership. A person exists once in the pool and can belong to several groups.</div>';
   $('#memPanel').innerHTML=html;
   $('#memPanel').querySelectorAll('.editBtn').forEach(b=>b.onclick=openEdit);
+  $('#memPanel').querySelectorAll('.conLink').forEach(a=>a.onclick=(e)=>{e.preventDefault();openContactModal(+a.dataset.cid);});
 }
 
 function openEdit(e){
   const tr = e.target.closest('tr');
   const cid = +tr.dataset.cid, gid = +tr.dataset.gid;
   const m = current.members.find(x=>x.contact_id===cid && ((x.subgroup_id||current.group.id)===gid));
-  const f = m.from_date?String(m.from_date).slice(0,10):'';
-  const t = m.to_date?String(m.to_date).slice(0,10):'';
+  const f = d10(m.from_date), t = d10(m.to_date);
   const cell = tr.querySelector('.rng');
   cell.innerHTML = `<input type="date" class="ef" value="${f}"> – <input type="date" class="et" value="${t}">
     <select class="es"><option value="active"${m.status==='active'?' selected':''}>active</option>
@@ -240,6 +351,182 @@ function openEdit(e){
   };
 }
 
+// ── All contacts tab ──
+function renderContactsTable(){
+  const q = ($('#conSearch').value||'').toLowerCase();
+  const list = contactsPool.filter(c=>{
+    if(!q) return true;
+    return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
+  });
+  if(!list.length){ $('#conPanel').innerHTML='<div class="empty">No contacts'+(q?' match your search':' yet')+'.</div>'; return; }
+  let html = `<table><tr><th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Birthday</th></tr>`;
+  list.forEach(c=>{
+    html += `<tr class="click" data-cid="${c.id}">
+      <td style="font-weight:600;">${esc(c.name)||'<span class="muted">(unnamed)</span>'}${c.is_me?' <span class="self">me</span>':''}${c.is_pet?' 🐾':''}${c.died_on?' <span class="muted">✝</span>':''}</td>
+      <td>${esc(c.email)||'<span class="muted">—</span>'}</td>
+      <td>${esc(c.phone)||'<span class="muted">—</span>'}</td>
+      <td>${esc(c.city)||'<span class="muted">—</span>'}</td>
+      <td>${d10(c.birthday)||'<span class="muted">—</span>'}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  $('#conPanel').innerHTML = html;
+  $('#conPanel').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>openContactModal(+tr.dataset.cid));
+}
+$('#conSearch').oninput = renderContactsTable;
+
+// ── Contact editor modal ──
+const CF = ['name','email','phone','company','street','street_2','city','region','country','postal_code'];
+async function openContactModal(cid){
+  editingContactId = cid;
+  const c = await api('/api/contacts/'+cid);
+  $('#conModalTitle').textContent = c.name ? 'Edit — '+c.name : 'Edit contact';
+  CF.forEach(f=>{ $('#cf_'+f).value = c[f]||''; });
+  $('#cf_birthday').value = d10(c.birthday);
+  $('#cf_died_on').value = d10(c.died_on);
+  $('#cf_is_pet').checked = !!c.is_pet;
+  await renderConOccList(cid);
+  $('#of_name').value=''; $('#of_date').value=''; $('#of_freq').value='yearly';
+  $('#conModalBg').classList.add('open');
+}
+async function renderConOccList(cid){
+  const occs = await api('/api/contacts/'+cid+'/occasions');
+  $('#conOccList').innerHTML = occs.length ? occs.map(o=>`
+    <div class="occrow" data-oid="${o.id}">
+      <b>${esc(o.name)}</b> <span class="muted">${d10(o.start_date)} · ${esc(o.frequency||'once')}</span>${o.notes?` <span class="muted">· ${esc(o.notes)}</span>`:''}
+      <button class="btn sm gray occEdit" style="margin-left:auto;">Edit</button>
+      <button class="btn sm danger occDel">✕</button>
+    </div>`).join('') : '<div class="muted" style="padding:7px 0;font-size:13px;">No occasions yet (birthday counts automatically if set above).</div>';
+  $('#conOccList').querySelectorAll('.occDel').forEach(b=>b.onclick=async(e)=>{
+    const oid=+e.target.closest('.occrow').dataset.oid;
+    if(!confirm('Delete this occasion?')) return;
+    await api('/api/occasions/'+oid,{method:'DELETE'});
+    await renderConOccList(cid); loadOccasions();
+  });
+  $('#conOccList').querySelectorAll('.occEdit').forEach(b=>b.onclick=(e)=>{
+    const oid=+e.target.closest('.occrow').dataset.oid;
+    const o=occs.find(x=>x.id===oid);
+    openOccasionModal({id:o.id, name:o.name, start_date:o.start_date, frequency:o.frequency, notes:o.notes, contact_id:cid});
+  });
+}
+$('#of_add').onclick=async()=>{
+  const name=$('#of_name').value.trim(), date=$('#of_date').value;
+  if(!name||!date){ alert('Occasion name and date are required.'); return; }
+  await api('/api/contacts/'+editingContactId+'/occasions',{method:'POST',body:JSON.stringify({
+    name, start_date:date, frequency:$('#of_freq').value
+  })});
+  $('#of_name').value=''; $('#of_date').value='';
+  await renderConOccList(editingContactId); loadOccasions();
+};
+$('#conCancel').onclick=()=>$('#conModalBg').classList.remove('open');
+$('#conModalBg').onclick=(e)=>{ if(e.target===$('#conModalBg')) $('#conModalBg').classList.remove('open'); };
+$('#conSave').onclick=async()=>{
+  const body={};
+  CF.forEach(f=>body[f]=$('#cf_'+f).value.trim()||null);
+  body.birthday=$('#cf_birthday').value||null;
+  body.died_on=$('#cf_died_on').value||null;
+  body.is_pet=$('#cf_is_pet').checked;
+  await api('/api/contacts/'+editingContactId,{method:'PUT',body:JSON.stringify(body)});
+  $('#conModalBg').classList.remove('open');
+  await loadAll();
+  if(selected){ current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap(); }
+  loadOccasions();
+};
+$('#conDelete').onclick=async()=>{
+  const c=contactsPool.find(x=>x.id===editingContactId);
+  if(!confirm('Delete '+((c&&c.name)||'this contact')+' completely? This removes them from all groups and deletes their occasions. Cannot be undone.')) return;
+  await api('/api/contacts/'+editingContactId,{method:'DELETE'});
+  $('#conModalBg').classList.remove('open');
+  await loadAll();
+  if(selected){ current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap(); }
+  loadOccasions();
+};
+
+// ── Occasions tab ──
+function nextYearly(dateStr, today){
+  const d=new Date(dateStr); if(isNaN(d)) return null;
+  const n=new Date(today.getFullYear(), d.getMonth(), d.getDate());
+  if(n<today) n.setFullYear(n.getFullYear()+1);
+  return n;
+}
+let occItemsCache=[];
+async function loadOccasions(){
+  let data;
+  try { data = await api('/api/occasions/upcoming'); }
+  catch(e){ $('#occPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; return; }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const items=[];
+  (data.occasions||[]).forEach(o=>{
+    const next = o.frequency==='yearly' ? nextYearly(o.start_date,today)
+               : o.frequency==='milestone' ? nextYearly(o.start_date,today)
+               : (new Date(o.start_date)>=today ? new Date(o.start_date) : null);
+    items.push({kind:'occasion', id:o.id, contact_id:o.contact_id, who:o.contact_name, what:o.name,
+      start_date:o.start_date, frequency:o.frequency, notes:o.notes, next});
+  });
+  (data.contacts||[]).forEach(c=>{
+    if(!c.birthday) return;
+    items.push({kind:'birthday', contact_id:c.id, who:c.name, what:(c.died_on?'Memorial birthday':'Birthday'),
+      start_date:c.birthday, frequency:'yearly', next:nextYearly(c.birthday,today)});
+  });
+  items.sort((a,b)=>{
+    if(!a.next&&!b.next) return 0; if(!a.next) return 1; if(!b.next) return -1;
+    return a.next-b.next;
+  });
+  occItemsCache=items;
+  if(!items.length){ $('#occPanel').innerHTML='<div class="empty">No occasions or birthdays yet. Add birthdays on contacts, or occasions in the contact editor.</div>'; return; }
+  let html=`<table><tr><th>Next</th><th>In</th><th>Who</th><th>What</th><th>Repeats</th><th>Since</th></tr>`;
+  items.forEach((it,i)=>{
+    const days = it.next!=null ? Math.round((it.next-today)/86400000) : null;
+    const badge = days===0?'<span class="today">today</span>':days!=null&&days<=14?`<span class="soon">${days} d</span>`:days!=null?`${days} d`:'<span class="muted">passed</span>';
+    const years = it.next&&it.start_date ? it.next.getFullYear()-new Date(it.start_date).getFullYear() : null;
+    html+=`<tr class="click" data-i="${i}">
+      <td>${it.next?it.next.toISOString().slice(0,10):'<span class="muted">—</span>'}</td>
+      <td>${badge}</td>
+      <td style="font-weight:600;">${esc(it.who)}</td>
+      <td>${esc(it.what)}${years&&it.frequency==='yearly'?` <span class="muted">(${years})</span>`:''}${it.notes?` <span class="muted">· ${esc(it.notes)}</span>`:''}</td>
+      <td>${esc(it.frequency||'once')}</td>
+      <td>${d10(it.start_date)}</td>
+    </tr>`;
+  });
+  html+='</table>';
+  $('#occPanel').innerHTML=html;
+  $('#occPanel').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>{
+    const it=occItemsCache[+tr.dataset.i];
+    if(it.kind==='birthday') openContactModal(it.contact_id);
+    else openOccasionModal(it);
+  });
+}
+
+// ── Occasion editor modal ──
+function openOccasionModal(o){
+  editingOccasion=o;
+  $('#oe_name').value=o.what||o.name||'';
+  $('#oe_date').value=d10(o.start_date);
+  $('#oe_freq').value=o.frequency||'once';
+  $('#oe_notes').value=o.notes||'';
+  $('#occModalBg').classList.add('open');
+}
+$('#oeCancel').onclick=()=>$('#occModalBg').classList.remove('open');
+$('#occModalBg').onclick=(e)=>{ if(e.target===$('#occModalBg')) $('#occModalBg').classList.remove('open'); };
+$('#oeSave').onclick=async()=>{
+  await api('/api/occasions/'+editingOccasion.id,{method:'PUT',body:JSON.stringify({
+    name:$('#oe_name').value.trim(),
+    start_date:$('#oe_date').value,
+    frequency:$('#oe_freq').value,
+    notes:$('#oe_notes').value.trim()||null
+  })});
+  $('#occModalBg').classList.remove('open');
+  loadOccasions();
+  if($('#conModalBg').classList.contains('open') && editingContactId) renderConOccList(editingContactId);
+};
+$('#oeDelete').onclick=async()=>{
+  if(!confirm('Delete this occasion?')) return;
+  await api('/api/occasions/'+editingOccasion.id,{method:'DELETE'});
+  $('#occModalBg').classList.remove('open');
+  loadOccasions();
+  if($('#conModalBg').classList.contains('open') && editingContactId) renderConOccList(editingContactId);
+};
+
 // ── Share link ──
 $('#shareBtn').onclick=async()=>{
   if(!selected){ alert('Select a group first.'); return; }
@@ -250,19 +537,44 @@ $('#shareBtn').onclick=async()=>{
   $('#copyShare').onclick=()=>{ navigator.clipboard.writeText(r.url); $('#copyShare').textContent='Copied ✓'; };
 };
 
-// ── Add from pool ──
-$('#addMemberBtn').onclick=async()=>{
+// ── Add from pool (picker modal) ──
+let pickSelection = new Set();
+$('#addMemberBtn').onclick=()=>{
   if(!selected){ alert('Select a group first.'); return; }
+  pickSelection = new Set();
+  $('#pickGroupName').textContent = selected.name;
+  $('#pickSearch').value='';
+  renderPickList();
+  $('#pickModalBg').classList.add('open');
+};
+function renderPickList(){
   const inGroup = new Set((current?current.members:[]).map(m=>m.contact_id));
-  const avail = contactsPool.filter(c=>!inGroup.has(c.id));
-  if(!avail.length){ alert('All pool contacts are already members, or the pool is empty.'); return; }
-  const name = prompt('Add who? Type (part of) a name:\n'+avail.slice(0,40).map(c=>'• '+c.name).join('\n'));
-  if(!name) return;
-  const match = avail.find(c=>(c.name||'').toLowerCase().includes(name.toLowerCase()));
-  if(!match){ alert('No matching contact found.'); return; }
-  await api('/api/memberships',{method:'PUT',body:JSON.stringify({
-    contact_id:match.id, group_id:selected.id, from_date:new Date().toISOString().slice(0,10), status:'active'
-  })});
+  const q = ($('#pickSearch').value||'').toLowerCase();
+  const avail = contactsPool.filter(c=>!inGroup.has(c.id) && (!q || ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q)));
+  $('#pickList').innerHTML = avail.length ? avail.map(c=>`
+    <label class="pickrow"><input type="checkbox" data-cid="${c.id}"${pickSelection.has(c.id)?' checked':''}>
+      <span>${esc(c.name)||'(unnamed)'}${c.is_pet?' 🐾':''}</span>
+      <span class="sub2">${esc(c.city||c.email||'')}</span>
+    </label>`).join('') : '<div class="empty" style="padding:18px;">Everyone is already a member'+(q?' (or no match)':'')+'.</div>';
+  $('#pickList').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.onchange=()=>{
+    const id=+cb.dataset.cid;
+    if(cb.checked) pickSelection.add(id); else pickSelection.delete(id);
+    $('#pickCount').textContent = pickSelection.size+' selected';
+  });
+  $('#pickCount').textContent = pickSelection.size+' selected';
+}
+$('#pickSearch').oninput=renderPickList;
+$('#pickCancel').onclick=()=>$('#pickModalBg').classList.remove('open');
+$('#pickModalBg').onclick=(e)=>{ if(e.target===$('#pickModalBg')) $('#pickModalBg').classList.remove('open'); };
+$('#pickAdd').onclick=async()=>{
+  if(!pickSelection.size){ alert('Select at least one contact.'); return; }
+  const today=new Date().toISOString().slice(0,10);
+  for(const cid of pickSelection){
+    await api('/api/memberships',{method:'PUT',body:JSON.stringify({
+      contact_id:cid, group_id:selected.id, from_date:today, status:'active'
+    })});
+  }
+  $('#pickModalBg').classList.remove('open');
   await loadAll(); current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); renderMap();
 };
 
@@ -275,6 +587,9 @@ $('#addGroupBtn').onclick=async()=>{
   await loadAll();
 };
 
+// ── Pool row → All contacts tab ──
+$('#poolRow').onclick=()=>{ showTab('kon'); };
+
 // ── Map ──
 function renderMap(){
   if(!current) return;
@@ -285,7 +600,7 @@ function renderMap(){
   if(mapObj._layerGroup) mapObj.removeLayer(mapObj._layerGroup);
   const lg = L.layerGroup().addTo(mapObj); mapObj._layerGroup=lg;
   pts.forEach(m=>L.marker([m.latitude,m.longitude]).addTo(lg).bindPopup(esc(m.name||'')+(m.city?'<br>'+esc(m.city):'')));
-  if(pts.length){ lg.eachLayer(()=>{}); mapObj.fitBounds(pts.map(m=>[m.latitude,m.longitude]),{padding:[40,40],maxZoom:11}); }
+  if(pts.length){ mapObj.fitBounds(pts.map(m=>[m.latitude,m.longitude]),{padding:[40,40],maxZoom:11}); }
   $('#mapHelp').textContent = pts.length
     ? `${pts.length} of ${current.members.length} members have coordinates. Useful for mailings, carpooling and “who lives nearby”.`
     : 'No members have coordinates yet — add an address/city to the contacts and they are geocoded automatically.';
@@ -301,7 +616,7 @@ $('#expCsv').onclick=()=>{
   if(!current||!current.members.length){ alert('No members to export.'); return; }
   const head=['Name','Email','Phone','City','Country','Birthday','Subgroup','From','To','Status'];
   const rows=current.members.map(m=>[m.name,m.email,m.phone,m.city,m.country,m.birthday,m.subgroup_name,
-    m.from_date?String(m.from_date).slice(0,10):'',m.to_date?String(m.to_date).slice(0,10):'',m.status]
+    d10(m.from_date),d10(m.to_date),m.status]
     .map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','));
   dl((selected.name||'group')+'.csv','﻿'+[head.join(','),...rows].join('\r\n'),'text/csv');
 };
@@ -315,12 +630,15 @@ $('#expVcf').onclick=()=>{
 };
 
 // ── Tabs ──
-const ids=['med','kar','bok','exp'];
-document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); tb.classList.add('active');
-  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==tb.dataset.t));
-  if(tb.dataset.t==='kar') setTimeout(renderMap,80);
-});
+const ids=['med','kon','occ','kar','bok','exp'];
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
+  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==t));
+  if(t==='kar') setTimeout(renderMap,80);
+  if(t==='occ') loadOccasions();
+  if(t==='kon') renderContactsTable();
+}
+document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));
 
 NavBar.init({ requireAuth: true }).then(()=>{
   loadAll().catch(e=>{ $('#memPanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
