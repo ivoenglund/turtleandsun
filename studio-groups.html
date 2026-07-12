@@ -3,6 +3,9 @@
 <title>Studio — Groups &amp; contacts — Turtle and Sun</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="/nav.js?v=20260712b"></script>
+<script src="/vendor/d3.v7.min.js"></script>
+<script src="/vendor/family-chart.min.js"></script>
+<link rel="stylesheet" href="/vendor/family-chart.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   :root{--cream:#FBF6EC;--green:#243A17;--green2:#2E4A1E;--leaf:#7FB36F;--leaf2:#4E944F;
@@ -258,11 +261,13 @@
       <div class="tools">
         <span style="font-size:13px;">Tree of</span>
         <select id="treFocus" style="max-width:220px;"></select>
+        <button class="btn gray" id="treAddBtn">＋ Add relation</button>
+        <button class="btn gray" id="treEditBtn">✎ Edit person</button>
+        <button class="btn gray" id="treLinksBtn">🔗 Links</button>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
-        <span class="muted" style="font-size:12px;">— click a name in the tree to re-center on that person</span>
       </div>
-      <div class="treeWrap" id="treePanel"><div class="empty">Loading…</div></div>
-      <div class="help">＋ on a card adds a father, mother or child · ✕ removes that link (the person stays in your contacts) · ✎ opens the contact · <b>solid line = father, dashed = mother</b>.</div>
+      <div class="treeWrap f3" id="treePanel" style="height:max(300px, calc(100vh - 185px));padding:0;"><div class="empty">Loading…</div></div>
+      <div class="help">＋ Add relation adds a father/mother/child to the person in the box · 🔗 Links lists their family links for removal · drag/zoom the tree with the mouse.</div>
     </div>
 
     <!-- YEARBOOK -->
@@ -384,6 +389,15 @@
       <button class="btn sm gray" id="pfCancel">Cancel</button>
       <button class="btn sm pub" id="pfSave">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- Family links manager -->
+<div class="modal-bg" id="linksModalBg">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="linksModalTitle">Family links</h3>
+    <div id="linksList"></div>
+    <div class="foot"><button class="btn sm gray" id="linksClose">Close</button></div>
   </div>
 </div>
 
@@ -1824,18 +1838,9 @@ function descendantEl(cid, depth, linkId){
   }
   return col;
 }
-function renderFamilyTree(){
+// Classic box renderer — kept as the PRINT engine (family-chart draws the screen)
+function buildClassicRoot(focus){
   const sel=$('#treFocus');
-  // (re)build focus options
-  const cur = sel.value || (function(){ try{return localStorage.getItem('ts_tree_focus')||'';}catch(e){return '';} })();
-  sel.innerHTML='';
-  const sorted=[...contactsPool].sort((a,b)=>cmpVals(a.name,b.name));
-  sorted.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name||'(unnamed)'; sel.appendChild(o); });
-  const me=contactsPool.find(c=>c.is_me);
-  sel.value = (cur && contactsPool.some(c=>c.id===+cur)) ? cur : (me?me.id:(sorted[0]&&sorted[0].id)||'');
-  const focus=+sel.value;
-  const panel=$('#treePanel'); panel.innerHTML='';
-  if(!focus){ panel.innerHTML='<div class="empty">No contacts yet.</div>'; return; }
   const root=document.createElement('div'); root.className='tcol'; root.style.minWidth='max-content';
   // ancestors above the focus (focus node rendered inside ancestorEl at depth bottom)
   const ps=parentsOf(focus);
@@ -1896,9 +1901,86 @@ function renderFamilyTree(){
     s.onclick=()=>addChildTo(focus);
     root.appendChild(s);
   }
-  panel.appendChild(root);
-  drawTreeLines(root);
+  return root;
 }
+// Adapter: our parent→child edges → family-chart format
+function buildF3Data(focus){
+  const ids=new Set([focus]);
+  famLinks.forEach(l=>{ ids.add(l.parent_id); ids.add(l.child_id); });
+  const parentsBy={}, childrenBy={};
+  famLinks.forEach(l=>{
+    (parentsBy[l.child_id]=parentsBy[l.child_id]||[]).push(l);
+    (childrenBy[l.parent_id]=childrenBy[l.parent_id]||[]).push(l);
+  });
+  const spouses={};
+  Object.values(parentsBy).forEach(pl=>{
+    if(pl.length===2){
+      const a=pl[0].parent_id, b=pl[1].parent_id;
+      (spouses[a]=spouses[a]||new Set()).add(b);
+      (spouses[b]=spouses[b]||new Set()).add(a);
+    }
+  });
+  return [...ids].map(id=>{
+    const c=contactsPool.find(x=>x.id===id)||{};
+    const roleLink=famLinks.find(l=>l.parent_id===id);
+    const gender = roleLink ? (roleLink.role==='father'?'M':'F') : 'M'; // corrected automatically once they become a parent
+    return {
+      id:String(id),
+      data:{ label:(c.name||'(unnamed)'), sub:personYear(id), gender, avatar:c.photo_url||'' },
+      rels:{
+        parents:(parentsBy[id]||[]).map(l=>String(l.parent_id)),
+        children:(childrenBy[id]||[]).map(l=>String(l.child_id)),
+        spouses:[...(spouses[id]||new Set())].map(String)
+      }
+    };
+  });
+}
+function renderFamilyTree(){
+  const sel=$('#treFocus');
+  const cur = sel.value || (function(){ try{return localStorage.getItem('ts_tree_focus')||'';}catch(e){return '';} })();
+  sel.innerHTML='';
+  const sorted=[...contactsPool].sort((a,b)=>cmpVals(a.name,b.name));
+  sorted.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name||'(unnamed)'; sel.appendChild(o); });
+  const me=contactsPool.find(c=>c.is_me);
+  sel.value = (cur && contactsPool.some(c=>c.id===+cur)) ? cur : (me?me.id:(sorted[0]&&sorted[0].id)||'');
+  const focus=+sel.value;
+  const panel=$('#treePanel');
+  if(!focus){ panel.innerHTML='<div class="empty">No contacts yet.</div>'; return; }
+  if(!window.f3 || !window.d3){ panel.innerHTML='<div class="empty">Tree library missing — deploy the vendor files and hard-refresh.</div>'; return; }
+  panel.innerHTML='';
+  try{
+    const chart=f3.createChart('#treePanel', buildF3Data(focus));
+    chart.setCardHtml().setCardDisplay([["label"],["sub"]]);
+    if(typeof chart.updateMainId==='function') chart.updateMainId(String(focus));
+    chart.updateTree({initial:true});
+  }catch(e){
+    panel.innerHTML='<div class="empty">Tree render failed: '+esc(e.message)+'</div>';
+  }
+}
+// Toolbar actions operate on the person in the "Tree of" box
+$('#treAddBtn').onclick=(e)=>{ e.stopPropagation(); const f=+$('#treFocus').value; if(f) openTreeMenu($('#treAddBtn'), f); };
+$('#treEditBtn').onclick=()=>{ const f=+$('#treFocus').value; if(f) openContactModal(f); };
+$('#treLinksBtn').onclick=()=>{ const f=+$('#treFocus').value; if(f) openLinksModal(f); };
+function openLinksModal(focus){
+  $('#linksModalTitle').textContent='Family links — '+personName(focus);
+  const rows=famLinks.filter(l=>l.parent_id===focus||l.child_id===focus);
+  $('#linksList').innerHTML = rows.length ? rows.map(l=>`
+    <div class="occrow" data-lid="${l.id}">
+      <span>${esc(personName(l.parent_id))} <span class="muted">— ${l.role} of —</span> ${esc(personName(l.child_id))}</span>
+      <button class="btn sm danger lnkDel" style="margin-left:auto;">✕</button>
+    </div>`).join('') : '<div class="muted" style="padding:8px 0;">No family links yet.</div>';
+  $('#linksList').querySelectorAll('.lnkDel').forEach(b=>b.onclick=async(e)=>{
+    const lid=+e.target.closest('.occrow').dataset.lid;
+    if(!confirm('Remove this family link? (The person stays in your contacts.)')) return;
+    await api('/api/family-links/'+lid,{method:'DELETE'});
+    await ensureFam(true);
+    openLinksModal(focus);
+    renderFamilyTree();
+  });
+  $('#linksModalBg').classList.add('open');
+}
+$('#linksClose').onclick=()=>$('#linksModalBg').classList.remove('open');
+$('#linksModalBg').onclick=(e)=>{ if(e.target===$('#linksModalBg')) $('#linksModalBg').classList.remove('open'); };
 // Right-angle genealogy connectors: one line per parent→child link on screen.
 // Solid = father, dashed = mother.
 function drawTreeLines(root){
@@ -1931,7 +2013,18 @@ $('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tr
 
 // Print the tree: clean B/W copy, auto-scaled to A4 landscape, browser print → paper or PDF
 $('#trePrintBtn').onclick=()=>{
-  const focusName=personName(+$('#treFocus').value);
+  const focus=+$('#treFocus').value;
+  const focusName=personName(focus);
+  // Print uses the classic box renderer (family-chart's zoom canvas prints poorly):
+  // build it offscreen, measure, take the HTML.
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-12000px;top:0;background:#fff;';
+  document.body.appendChild(host);
+  const root=buildClassicRoot(focus);
+  host.appendChild(root);
+  drawTreeLines(root);
+  const treeHtml=host.innerHTML;
+  host.remove();
   const w=window.open('','_blank');
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
@@ -1951,7 +2044,7 @@ $('#trePrintBtn').onclick=()=>{
    +'@page{size:A4 landscape;margin:12mm;}'
    +'</style></head><body>'
    +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+' · solid line = father, dashed = mother</div>'
-   +'<div id="scaler">'+$('#treePanel').innerHTML+'</div>'
+   +'<div id="scaler">'+treeHtml+'</div>'
    +'<scr'+'ipt>'
    +'var LINKS='+JSON.stringify(famLinks||[])+';'
    +'var s=document.getElementById("scaler");'
