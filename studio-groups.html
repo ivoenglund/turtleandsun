@@ -1867,6 +1867,13 @@ function renderFamilyTree(){
 // Info panel: everything about the selected person, with a print-include toggle
 // Family summary derived from the links: father, mother, siblings (half marked),
 // children, and the co-parents the children were had with.
+// "Lars Englund (1932–2001)" / "(1932)" / plain name
+function personLabel(id){
+  const c=contactsPool.find(x=>x.id===id)||{};
+  const b=d10(c.birthday).slice(0,4), d=d10(c.died_on).slice(0,4);
+  const years = b&&d ? ' ('+b+'–'+d+')' : b ? ' ('+b+')' : d ? ' (✝'+d+')' : '';
+  return (c.name||'(unnamed)')+years;
+}
 function famSummary(focus){
   const links=famLinks||[];
   const ps=links.filter(l=>l.child_id===focus);
@@ -1877,17 +1884,17 @@ function famSummary(focus){
   const siblings=[...sibIds].map(sid=>{
     const sp=new Set(links.filter(l=>l.child_id===sid).map(l=>l.parent_id));
     const full = myParentIds.size===2 && sp.size===2 && [...myParentIds].every(p=>sp.has(p));
-    return personName(sid)+(full?'':' (half)');
+    return personLabel(sid)+(full?'':' · half');
   });
   const kids=links.filter(l=>l.parent_id===focus).map(l=>l.child_id);
   const partnerIds=new Set();
   kids.forEach(kid=>links.filter(l=>l.child_id===kid && l.parent_id!==focus).forEach(l=>partnerIds.add(l.parent_id)));
   return {
-    father: father?personName(father.parent_id):'',
-    mother: mother?personName(mother.parent_id):'',
-    siblings: siblings.join(', '),
-    children: kids.map(personName).join(', '),
-    partners: [...partnerIds].map(personName).join(', ')
+    father: father?personLabel(father.parent_id):'',
+    mother: mother?personLabel(mother.parent_id):'',
+    siblings,
+    children: kids.map(personLabel),
+    partners: [...partnerIds].map(personLabel)
   };
 }
 function treInfoFields(c){
@@ -1898,9 +1905,9 @@ function treInfoFields(c){
   const f=famSummary(c.id);
   add('Father', f.father);
   add('Mother', f.mother);
-  add('Siblings', f.siblings);
-  add('Children', f.children);
-  add(f.partners && f.partners.includes(',')?'Partners':'Partner', f.partners);
+  f.siblings.forEach(s=>add('Sibling', s));
+  f.children.forEach(s=>add('Child', s));
+  f.partners.forEach(s=>add('Partner', s));
   add('Company', c.company);
   add('Email', c.email);
   add('Phone', c.phone);
