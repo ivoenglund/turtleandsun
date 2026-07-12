@@ -271,12 +271,12 @@
           <option value="desc">Descendants</option>
         </select>
         <select id="trePaper" style="max-width:130px;">
-          <option value="A4 landscape">A4 lying</option>
-          <option value="A4 portrait">A4 standing</option>
-          <option value="A3 landscape">A3 lying</option>
-          <option value="A3 portrait">A3 standing</option>
-          <option value="A2 landscape">A2 lying</option>
-          <option value="A2 portrait">A2 standing</option>
+          <option value="A4 landscape">A4 landscape</option>
+          <option value="A4 portrait">A4 portrait</option>
+          <option value="A3 landscape">A3 landscape</option>
+          <option value="A3 portrait">A3 portrait</option>
+          <option value="A2 landscape">A2 landscape</option>
+          <option value="A2 portrait">A2 portrait</option>
         </select>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
@@ -1933,8 +1933,7 @@ function renderTreeInfo(focus){
   let printOn=true;
   try{ printOn = localStorage.getItem('ts_tree_infoprint')!=='0'; }catch(e){}
   box.innerHTML =
-    (c.photo_url?'<img src="'+esc(c.photo_url)+'" style="width:84px;height:84px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px;border:2px solid var(--line);">':'')
-    +'<div style="font-weight:800;font-size:15px;text-align:center;">'+esc(c.name||'(unnamed)')+(c.is_pet?' 🐾':'')+'</div>'
+    '<div style="font-weight:800;font-size:15px;text-align:center;">'+esc(c.name||'(unnamed)')+(c.is_pet?' 🐾':'')+'</div>'
     +'<div style="text-align:center;margin:6px 0 10px;"><button class="btn sm gray" id="treInfoEdit">✎ Edit</button></div>'
     +treInfoFields(c).map(([l,v])=>'<div style="margin-bottom:6px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);">'+esc(l)+'</div><div style="white-space:pre-wrap;">'+esc(v)+'</div></div>').join('')
     +'<label class="flt" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;"><input type="checkbox" id="treInfoPrint"'+(printOn?' checked':'')+'> Include on print</label>';
