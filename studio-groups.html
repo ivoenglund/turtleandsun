@@ -2018,7 +2018,7 @@ $('#trePrintBtn').onclick=()=>{
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
    +'body{font-family:Arial,sans-serif;color:#000;margin:0;background:#fff;}'
-   +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:10px;}'
+   +'.foot{text-align:center;font-size:9px;color:#555;padding-top:2mm;}'
    +'.fitpage{height:'+usable+'mm;display:flex;flex-direction:column;page-break-inside:avoid;overflow:hidden;}'
    +'.pagerow{flex:1;min-height:0;display:flex;gap:6mm;align-items:flex-start;}'
    +'.infocard{width:36mm;flex-shrink:0;border:1px solid #000;border-radius:6px;padding:3mm;}'
@@ -2032,11 +2032,12 @@ $('#trePrintBtn').onclick=()=>{
    +'@media screen{body{margin:16px;}}'
    +'</style></head><body>'
    +'<div class="fitpage">'
-   +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
    +'<div class="pagerow">'
    +infoHtml
    +'<div class="chartbox">'+clone.outerHTML+'</div>'
-   +'</div></div>'
+   +'</div>'
+   +'<div class="foot">Family tree — '+esc(focusName)+' · turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +'</div>'
    +'<scr'+'ipt>setTimeout(function(){window.print();},600);</scr'+'ipt></body></html>');
   w.document.close();
 };
