@@ -482,9 +482,12 @@ function makeResizable(panelSel, tableKey){
   store = GRID_W[tableKey];
   if(!store || store.sig!==sig) measure();
   function apply(){
-    ths.forEach((th,i)=>{ th.style.width=(store.w[th.dataset.k||('c'+i)]||60)+'px'; });
+    // Fixed layout REQUIRES a definite table width (max-content silently falls back
+    // to auto layout → columns refuse to shrink below text + slow relayouts).
+    let total=0;
+    ths.forEach((th,i)=>{ const px=store.w[th.dataset.k||('c'+i)]||60; th.style.width=px+'px'; total+=px; });
     table.style.tableLayout='fixed';
-    table.style.width='max-content'; // total follows the columns by itself — never computed
+    table.style.width=total+'px';
   }
   ths.forEach((th,idx)=>{
     if(idx===0) return;
@@ -498,7 +501,7 @@ function makeResizable(panelSel, tableKey){
       const startX=e.clientX, startW=store.w[key];
       const panel=table.closest('.panel');
       const rect=panel.getBoundingClientRect();
-      const minX=startX-(startW-36);
+      const minX=startX-(startW-14);
       const line=document.createElement('div');
       line.style.cssText='position:fixed;top:'+rect.top+'px;height:'+rect.height+'px;width:2px;background:var(--green2);z-index:5000;pointer-events:none;left:'+startX+'px;';
       document.body.appendChild(line);
@@ -507,9 +510,8 @@ function makeResizable(panelSel, tableKey){
       const up=ev=>{
         document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
         line.remove(); document.body.style.cursor='';
-        const w=Math.max(36, startW+(ev.clientX-startX));
-        store.w[key]=w;
-        th.style.width=w+'px'; // applied once, now that you're done
+        store.w[key]=Math.max(14, startW+(ev.clientX-startX)); // user is the boss — one letter wide is allowed
+        apply(); // applied once, now that you're done — fixed layout honors ANY width, even one letter
       };
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
