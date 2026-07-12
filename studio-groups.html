@@ -128,7 +128,8 @@
   <div class="side">
     <div class="lbl">Pool</div>
     <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
-    <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></div>
+    <div class="lbl">Anomalies</div>
+    <div style="padding:0 10px 2px;"><select id="anomalySel" style="width:100%;font-size:12.5px;"><option value="none">— none —</option></select></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
@@ -137,19 +138,6 @@
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fDead" checked> Deceased</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPeople" checked> People</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
-    <div class="lbl">Data (has / missing)</div>
-    <div class="fltrow">Birthday
-      <label class="flt"><input type="checkbox" id="fBdayY" checked> has</label>
-      <label class="flt"><input type="checkbox" id="fBdayN" checked> missing <span class="ct" id="noBdayCount"></span></label>
-    </div>
-    <div class="fltrow">Address
-      <label class="flt"><input type="checkbox" id="fAddrY" checked> has</label>
-      <label class="flt"><input type="checkbox" id="fAddrN" checked> missing <span class="ct" id="noAddrCount"></span></label>
-    </div>
-    <div class="fltrow">Email
-      <label class="flt"><input type="checkbox" id="fMailY" checked> has</label>
-      <label class="flt"><input type="checkbox" id="fMailN" checked> missing <span class="ct" id="noMailCount"></span></label>
-    </div>
   </div>
 
   <div class="main">
@@ -574,14 +562,40 @@ function passesFilterC(c){
   if(!dead && !$('#fLiving').checked) return false;
   if(pet && !$('#fPets').checked) return false;
   if(!pet && !$('#fPeople').checked) return false;
-  const bday=!!c.birthday, addr=hasAddress(c), mail=!!c.email;
-  if(bday && !$('#fBdayY').checked) return false;
-  if(!bday && !$('#fBdayN').checked) return false;
-  if(addr && !$('#fAddrY').checked) return false;
-  if(!addr && !$('#fAddrN').checked) return false;
-  if(mail && !$('#fMailY').checked) return false;
-  if(!mail && !$('#fMailN').checked) return false;
   return true;
+}
+// ── Anomalies: pool-wide "what needs fixing" views ──
+let anomaly = null; // 'dup' | 'nobday' | 'noaddr' | 'nomail' | 'nophone'
+const ANOMALY_TEST = {
+  nobday: c=>!c.birthday,
+  noaddr: c=>!hasAddress(c),
+  nomail: c=>!c.email,
+  nophone: c=>!c.phone,
+};
+const ANOMALY_COL = { nobday:'birthday', noaddr:'street', nomail:'email', nophone:'phone' };
+function applyAnomaly(v){
+  anomaly = (v && v!=='none') ? v : null;
+  if(!anomaly){
+    const active=document.querySelector('.tab.active');
+    showTab(active?active.dataset.t:'med');
+    return;
+  }
+  selected=null; memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  renderTree();
+  $('#poolRow').classList.remove('active');
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  if(anomaly==='dup'){
+    ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
+    renderDuplicates();
+  } else {
+    ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='kon'));
+    renderContactsTable();
+  }
+}
+function clearAnomaly(){
+  anomaly=null;
+  const sel=document.getElementById('anomalySel');
+  if(sel) sel.value='none';
 }
 function passesFilterId(cid){
   const c = contactsPool.find(x=>x.id===cid);
@@ -624,10 +638,17 @@ function renderTree(){
 
 function updateSideCounts(){
   $('#poolCount').textContent = contactsPool.length;
-  $('#noBdayCount').textContent = '('+contactsPool.filter(c=>!c.birthday).length+')';
-  $('#noAddrCount').textContent = '('+contactsPool.filter(c=>!hasAddress(c)).length+')';
-  $('#noMailCount').textContent = '('+contactsPool.filter(c=>!c.email).length+')';
-  $('#dupCount').textContent = computeDupClusters().length;
+  const sel=$('#anomalySel');
+  const cur=sel.value||'none';
+  const n = f=>contactsPool.filter(f).length;
+  sel.innerHTML =
+    '<option value="none">— none —</option>'+
+    '<option value="dup">Duplicates ('+computeDupClusters().length+')</option>'+
+    '<option value="nobday">Missing birthday ('+n(c=>!c.birthday)+')</option>'+
+    '<option value="noaddr">Missing address ('+n(c=>!hasAddress(c))+')</option>'+
+    '<option value="nomail">Missing email ('+n(c=>!c.email)+')</option>'+
+    '<option value="nophone">Missing phone ('+n(c=>!c.phone)+')</option>';
+  sel.value=cur;
 }
 
 async function loadAll(){
@@ -646,7 +667,7 @@ async function selectGroup(node){
   memEdit = false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
   $('#poolRow').classList.remove('active');
-  $('#dupRow').classList.remove('active');
+  clearAnomaly();
   $('#shareBox').classList.add('hide');
   $('#bokSrc').textContent = 'Source: '+node.name;
   current = await api('/api/groups/'+node.id+'/members');
@@ -837,13 +858,19 @@ function conNav(cid, field, dir){
 }
 function renderContactsTable(){
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
-  const cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
+  let cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
+  // Anomaly view: make sure the column being fixed is visible
+  if(anomaly && ANOMALY_COL[anomaly] && !cols.some(c=>c.key===ANOMALY_COL[anomaly])){
+    cols = cols.concat(CON_COLS.filter(c=>c.key===ANOMALY_COL[anomaly]));
+  }
   const q = ($('#conSearch').value||'').toLowerCase();
   let list = contactsPool.filter(c=>{
     if(!passesFilterC(c)) return false;
+    if(anomaly && ANOMALY_TEST[anomaly] && !ANOMALY_TEST[anomaly](c)) return false;
     if(!q) return true;
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
+  updateSideCounts();
   const s=getSort('contacts');
   if(s) list=[...list].sort((a,b)=>s.dir*cmpVals(
     s.key==='photo' ? (a.photo_url?0:1) : (s.key==='birthday'||s.key==='died_on') ? d10(a[s.key])||null : a[s.key],
@@ -1163,13 +1190,7 @@ async function mergeInto(keeperId, others){
     showToast('Merged '+others.length+' duplicate'+(others.length>1?'s':''));
   }catch(e){ alert('Merge failed: '+e.message+'\nNothing more was changed — check the duplicates list.'); await loadAll(); renderDuplicates(); }
 }
-$('#dupRow').onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  $('#poolRow').classList.remove('active');
-  $('#dupRow').classList.add('active');
-  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
-  renderDuplicates();
-};
+$('#anomalySel').onchange=()=>applyAnomaly($('#anomalySel').value);
 
 // ── Media helpers: images, video files, YouTube/external links ──
 function isVideoFile(u){ return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u); }
@@ -1479,7 +1500,7 @@ $('#poolRow').onclick=()=>{
   memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
   $('#poolRow').classList.add('active');
-  $('#dupRow').classList.remove('active');
+  clearAnomaly();
   const active=document.querySelector('.tab.active');
   showTab(active?active.dataset.t:'med');
 };
@@ -1562,7 +1583,7 @@ const ids=['med','kon','kar','tid','bok','exp','dup'];
 function showTab(t){
   const showId = (t==='med' && !selected) ? 'kon' : t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
-  $('#dupRow').classList.remove('active');
+  clearAnomaly();
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==showId));
   if(showId==='kar') setTimeout(renderMap,80);
   if(showId==='kon') renderContactsTable();
@@ -1575,8 +1596,7 @@ document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.
 (function(){
   let saved={};
   try{ saved=JSON.parse(localStorage.getItem('ts_studio_filters')||'{}'); }catch(e){}
-  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets',
-    fBdayY:'bday_y',fBdayN:'bday_n',fAddrY:'addr_y',fAddrN:'addr_n',fMailY:'mail_y',fMailN:'mail_n'};
+  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets'};
   Object.entries(boxes).forEach(([id,key])=>{
     const cb=document.getElementById(id);
     if(typeof saved[key]==='boolean') cb.checked=saved[key];
