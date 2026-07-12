@@ -4,8 +4,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="/nav.js?v=20260712b"></script>
 <script src="/vendor/d3.v7.min.js"></script>
-<script src="/vendor/family-chart.min.js"></script>
-<link rel="stylesheet" href="/vendor/family-chart.css">
+<script src="/vendor/topola.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   :root{--cream:#FBF6EC;--green:#243A17;--green2:#2E4A1E;--leaf:#7FB36F;--leaf2:#4E944F;
@@ -264,11 +263,16 @@
         <button class="btn gray" id="treAddBtn">＋ Add relation</button>
         <button class="btn gray" id="treEditBtn">✎ Edit person</button>
         <button class="btn gray" id="treLinksBtn">🔗 Links</button>
-        <label class="flt"><input type="checkbox" id="treWhole"> Whole family</label>
+        <select id="treChart" style="max-width:150px;">
+          <option value="rel">Relatives (all)</option>
+          <option value="hour">Hourglass</option>
+          <option value="anc">Ancestors</option>
+          <option value="desc">Descendants</option>
+        </select>
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
-      <div class="treeWrap f3" id="treePanel" style="height:max(300px, calc(100vh - 185px));padding:0;"><div class="empty">Loading…</div></div>
-      <div class="help">＋ Add relation adds a father/mother/child to the person in the box · 🔗 Links lists their family links for removal · drag/zoom the tree with the mouse.</div>
+      <div class="treeWrap" id="treePanel" style="height:max(300px, calc(100vh - 185px));padding:10px;"><div class="empty">Loading…</div></div>
+      <div class="help">＋ Add relation adds a father/mother/child to the person in the box · 🔗 Links lists their family links for removal · click a person in the chart to re-center on them · "Relatives (all)" shows the complete family including uncles and cousins.</div>
     </div>
 
     <!-- YEARBOOK -->
@@ -1778,163 +1782,45 @@ function openTreeMenu(anchor, cid){
   document.body.appendChild(m); treeMenuEl=m;
 }
 
-function treeNode(cid, opts){
-  // opts: {focus, roleTag, linkId}
-  const el=document.createElement('div');
-  el.className='tnode'+(opts&&opts.focus?' focus':'');
-  el.dataset.cid=cid;
-  if(opts&&opts.roleTag){ const t=document.createElement('span'); t.className='trole'; t.textContent=opts.roleTag; el.appendChild(t); }
-  const n=document.createElement('span'); n.className='tn'; n.textContent=personName(cid);
-  if(!(opts&&opts.focus)) n.onclick=()=>{ $('#treFocus').value=cid; try{localStorage.setItem('ts_tree_focus',cid);}catch(e){} renderFamilyTree(); };
-  el.appendChild(n);
-  const y=personYear(cid);
-  if(y){ const ye=document.createElement('span'); ye.className='ty'; ye.textContent=y; el.appendChild(ye); }
-  const btns=document.createElement('div'); btns.className='tbtns';
-  const plus=document.createElement('span'); plus.textContent='＋'; plus.title='Add father / mother / child';
-  plus.onclick=(e)=>{ e.stopPropagation(); openTreeMenu(plus, cid); };
-  btns.appendChild(plus);
-  const pen=document.createElement('span'); pen.textContent='✎'; pen.title='Edit contact';
-  pen.onclick=()=>openContactModal(cid);
-  btns.appendChild(pen);
-  if(opts&&opts.linkId){
-    const x=document.createElement('span'); x.textContent='✕'; x.title='Remove this family link';
-    x.onclick=async()=>{
-      if(!confirm('Remove this family link? (The person stays in your contacts.)')) return;
-      await api('/api/family-links/'+opts.linkId,{method:'DELETE'});
-      await ensureFam(true); renderFamilyTree();
-    };
-    btns.appendChild(x);
-  }
-  el.appendChild(btns);
-  return el;
-}
-function vline(){ const d=document.createElement('div'); d.className='vline'; return d; }
-// Ancestors: recursive upward (parents above the person)
-function ancestorEl(cid, depth, linkId, roleTag){
-  const col=document.createElement('div'); col.className='tcol';
-  if(depth>0){
-    const ps=parentsOf(cid);
-    const row=document.createElement('div'); row.className='trow';
-    const fa=ps.find(l=>l.role==='father'), mo=ps.find(l=>l.role==='mother');
-    if(fa) row.appendChild(ancestorEl(fa.parent_id, depth-1, fa.id, 'father'));
-    else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ father'; s.onclick=()=>addParentTo(cid,'father'); row.appendChild(s); }
-    if(mo) row.appendChild(ancestorEl(mo.parent_id, depth-1, mo.id, 'mother'));
-    else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ mother'; s.onclick=()=>addParentTo(cid,'mother'); row.appendChild(s); }
-    col.appendChild(row);
-    col.appendChild(vline());
-  }
-  col.appendChild(treeNode(cid,{roleTag, linkId}));
-  return col;
-}
-// Descendants: recursive downward (children below the person)
-function descendantEl(cid, depth, linkId){
-  const col=document.createElement('div'); col.className='tcol';
-  col.appendChild(treeNode(cid,{linkId}));
-  const kids=childrenOf(cid);
-  if(kids.length && depth>0){
-    col.appendChild(vline());
-    const row=document.createElement('div'); row.className='trowD';
-    kids.forEach(l=>row.appendChild(descendantEl(l.child_id, depth-1, l.id)));
-    col.appendChild(row);
-  }
-  return col;
-}
-// Classic box renderer — kept as the PRINT engine (family-chart draws the screen)
-function buildClassicRoot(focus){
-  const sel=$('#treFocus');
-  const root=document.createElement('div'); root.className='tcol'; root.style.minWidth='max-content';
-  // ancestors above the focus (focus node rendered inside ancestorEl at depth bottom)
-  const ps=parentsOf(focus);
-  const ancCol=document.createElement('div'); ancCol.className='tcol';
-  const row=document.createElement('div'); row.className='trow';
-  const fa=ps.find(l=>l.role==='father'), mo=ps.find(l=>l.role==='mother');
-  if(fa) row.appendChild(ancestorEl(fa.parent_id, 3, fa.id, 'father'));
-  else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ father'; s.onclick=()=>addParentTo(focus,'father'); row.appendChild(s); }
-  if(mo) row.appendChild(ancestorEl(mo.parent_id, 3, mo.id, 'mother'));
-  else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ mother'; s.onclick=()=>addParentTo(focus,'mother'); row.appendChild(s); }
-  ancCol.appendChild(row);
-  ancCol.appendChild(vline());
-  root.appendChild(ancCol);
-  // Focus generation: focus + all siblings (incl. half-siblings) as real tree cards.
-  // A sibling with a different second parent shows that parent on the card (clickable).
-  const focusRow=document.createElement('div'); focusRow.className='trow'; focusRow.style.alignItems='flex-start';
-  const focusParentIds=new Set(ps.map(l=>l.parent_id));
-  const sibIds=new Set();
-  ps.forEach(l=>childrenOf(l.parent_id).forEach(k=>{ if(k.child_id!==focus) sibIds.add(k.child_id); }));
-  const sibArr=[...sibIds].sort((a,b)=>cmpVals(personYear(a)||'9999', personYear(b)||'9999'));
-  const focusYear=personYear(focus)||'9999';
-  let placedFocus=false;
-  const cells=[];
-  sibArr.forEach(sid=>{
-    if(!placedFocus && (personYear(sid)||'9999')>=focusYear){ cells.push({focus:true}); placedFocus=true; }
-    cells.push({sid});
-  });
-  if(!placedFocus) cells.push({focus:true});
-  cells.forEach(cell=>{
-    if(cell.focus){ focusRow.appendChild(treeNode(focus,{focus:true})); return; }
-    const sid=cell.sid;
-    const col=document.createElement('div'); col.className='tcol';
-    const node=treeNode(sid,{});
-    // other parent(s) not shared with focus → show on the card (this is where the
-    // half-sibling's mother/father becomes visible)
-    parentsOf(sid).filter(l=>!focusParentIds.has(l.parent_id)).forEach(l=>{
-      const via=document.createElement('span'); via.className='ty';
-      via.style.cssText='cursor:pointer;text-decoration:underline dotted;';
-      via.textContent=(l.role==='mother'?'mother: ':'father: ')+personName(l.parent_id);
-      via.title='Click to center the tree on '+personName(l.parent_id);
-      via.onclick=()=>{ sel.value=l.parent_id; try{localStorage.setItem('ts_tree_focus',l.parent_id);}catch(e){} renderFamilyTree(); };
-      node.insertBefore(via, node.querySelector('.tbtns'));
-    });
-    col.appendChild(node);
-    focusRow.appendChild(col);
-  });
-  root.appendChild(focusRow);
-  // descendants below
-  const kids=childrenOf(focus);
-  if(kids.length){
-    root.appendChild(vline());
-    const drow=document.createElement('div'); drow.className='trowD';
-    kids.forEach(l=>drow.appendChild(descendantEl(l.child_id, 3)));
-    root.appendChild(drow);
-  } else {
-    root.appendChild(vline());
-    const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ child';
-    s.onclick=()=>addChildTo(focus);
-    root.appendChild(s);
-  }
-  return root;
-}
-// Adapter: our parent→child edges → family-chart format
-function buildF3Data(focus){
-  const ids=new Set([focus]);
+// Adapter: our parent→child edges → Topola's GEDCOM-style {indis, fams}
+function buildTopolaData(){
+  const ids=new Set();
   famLinks.forEach(l=>{ ids.add(l.parent_id); ids.add(l.child_id); });
-  const parentsBy={}, childrenBy={};
-  famLinks.forEach(l=>{
-    (parentsBy[l.child_id]=parentsBy[l.child_id]||[]).push(l);
-    (childrenBy[l.parent_id]=childrenBy[l.parent_id]||[]).push(l);
-  });
-  const spouses={};
-  Object.values(parentsBy).forEach(pl=>{
-    if(pl.length===2){
-      const a=pl[0].parent_id, b=pl[1].parent_id;
-      (spouses[a]=spouses[a]||new Set()).add(b);
-      (spouses[b]=spouses[b]||new Set()).add(a);
+  const parentsBy={};
+  famLinks.forEach(l=>{ (parentsBy[l.child_id]=parentsBy[l.child_id]||[]).push(l); });
+  const famMap=new Map();   // couple-key → family record
+  const childFam={};        // child id → family id
+  const spouseFams={};      // person id → [family ids]
+  Object.entries(parentsBy).forEach(([child,pl])=>{
+    const fa=pl.find(l=>l.role==='father'), mo=pl.find(l=>l.role==='mother');
+    const key=(fa?fa.parent_id:'x')+'_'+(mo?mo.parent_id:'x');
+    if(!famMap.has(key)){
+      const fid='F'+(famMap.size+1);
+      const fam={id:fid, children:[]};
+      if(fa) fam.husb='I'+fa.parent_id;
+      if(mo) fam.wife='I'+mo.parent_id;
+      famMap.set(key,fam);
+      if(fa) (spouseFams[fa.parent_id]=spouseFams[fa.parent_id]||[]).push(fid);
+      if(mo) (spouseFams[mo.parent_id]=spouseFams[mo.parent_id]||[]).push(fid);
     }
+    const fam=famMap.get(key);
+    fam.children.push('I'+child);
+    childFam[child]=fam.id;
   });
-  return [...ids].map(id=>{
+  const indis=[...ids].map(id=>{
     const c=contactsPool.find(x=>x.id===id)||{};
     const roleLink=famLinks.find(l=>l.parent_id===id);
-    const gender = roleLink ? (roleLink.role==='father'?'M':'F') : 'M'; // corrected automatically once they become a parent
-    return {
-      id:String(id),
-      data:{ label:(c.name||'(unnamed)'), sub:personYear(id), gender, avatar:c.photo_url||'' },
-      rels:{
-        parents:(parentsBy[id]||[]).map(l=>String(l.parent_id)),
-        children:(childrenBy[id]||[]).map(l=>String(l.child_id)),
-        spouses:[...(spouses[id]||new Set())].map(String)
-      }
-    };
+    const indi={ id:'I'+id, firstName:(c.name||'(unnamed)'), hideId:true };
+    if(roleLink) indi.sex = roleLink.role==='father'?'M':'F';
+    const by=personYear(id);
+    if(by) indi.birth={date:{year:+by}};
+    if(c.died_on) indi.death={date:{year:+String(c.died_on).slice(0,4)}, confirmed:true};
+    if(c.photo_url) indi.images=[{url:c.photo_url}];
+    if(childFam[id]) indi.famc=childFam[id];
+    if(spouseFams[id]) indi.fams=spouseFams[id];
+    return indi;
   });
+  return {indis, fams:[...famMap.values()]};
 }
 function renderFamilyTree(){
   const sel=$('#treFocus');
@@ -1947,34 +1833,28 @@ function renderFamilyTree(){
   const focus=+sel.value;
   const panel=$('#treePanel');
   if(!focus){ panel.innerHTML='<div class="empty">No contacts yet.</div>'; return; }
-  if(!window.f3 || !window.d3){ panel.innerHTML='<div class="empty">Tree library missing — deploy the vendor files and hard-refresh.</div>'; return; }
-  panel.innerHTML='';
-  // "Whole family": center the chart on the oldest root ancestor of this person's
-  // family island — everyone descended from there (uncles, cousins, all partners) shows.
-  let mainId=focus;
-  if($('#treWhole').checked){
-    const seen=new Set();
-    const roots=new Set();
-    (function climb(id){
-      if(seen.has(id)) return; seen.add(id);
-      const ps=parentsOf(id);
-      if(!ps.length){ roots.add(id); return; }
-      ps.forEach(l=>climb(l.parent_id));
-    })(focus);
-    // pick the root with the most descendants (widest picture)
-    let best=focus, bestN=-1;
-    roots.forEach(r=>{
-      let n=0; const st=[r]; const v=new Set();
-      while(st.length){ const x=st.pop(); if(v.has(x)) continue; v.add(x); n++; childrenOf(x).forEach(l=>st.push(l.child_id)); }
-      if(n>bestN){ bestN=n; best=r; }
-    });
-    mainId=best;
+  if(!window.topola || !window.d3){ panel.innerHTML='<div class="empty">Tree library missing — deploy the vendor files and hard-refresh.</div>'; return; }
+  const json=buildTopolaData();
+  if(!json.indis.length || !json.indis.some(i=>i.id==='I'+focus)){
+    panel.innerHTML='<div class="empty">'+esc(personName(focus))+' has no family links yet — use “＋ Add relation”.</div>';
+    return;
   }
+  const CT={ rel:topola.RelativesChart, hour:topola.HourglassChart, anc:topola.AncestorChart, desc:topola.DescendantChart };
+  const chartType=CT[$('#treChart').value]||topola.RelativesChart;
+  panel.innerHTML='<svg id="treeSvg"></svg>';
   try{
-    const chart=f3.createChart('#treePanel', buildF3Data(focus));
-    chart.setCardHtml().setCardDisplay([["label"],["sub"]]);
-    if(typeof chart.updateMainId==='function') chart.updateMainId(String(mainId));
-    chart.updateTree({initial:true});
+    topola.createChart({
+      json,
+      chartType,
+      renderer: topola.DetailedRenderer,
+      svgSelector: '#treeSvg',
+      animate: false,
+      updateSvgSize: true,
+      indiCallback: (info)=>{
+        const nid=+String(info.id).replace('I','');
+        if(nid){ sel.value=nid; try{localStorage.setItem('ts_tree_focus',nid);}catch(e){} renderFamilyTree(); }
+      }
+    }).render({startIndi:'I'+focus});
   }catch(e){
     panel.innerHTML='<div class="empty">Tree render failed: '+esc(e.message)+'</div>';
   }
@@ -2003,105 +1883,30 @@ function openLinksModal(focus){
 }
 $('#linksClose').onclick=()=>$('#linksModalBg').classList.remove('open');
 $('#linksModalBg').onclick=(e)=>{ if(e.target===$('#linksModalBg')) $('#linksModalBg').classList.remove('open'); };
-// Right-angle genealogy connectors: one line per parent→child link on screen.
-// Solid = father, dashed = mother.
-function drawTreeLines(root){
-  const old=root.querySelector('svg.tlines'); if(old) old.remove();
-  root.style.position='relative';
-  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('class','tlines');
-  svg.setAttribute('width',root.scrollWidth); svg.setAttribute('height',root.scrollHeight);
-  svg.style.cssText='position:absolute;left:0;top:0;pointer-events:none;z-index:0;';
-  const rRect=root.getBoundingClientRect();
-  const pos=el=>{ const r=el.getBoundingClientRect(); return {x:r.left-rRect.left, y:r.top-rRect.top, w:r.width, h:r.height}; };
-  famLinks.forEach(l=>{
-    const pe=root.querySelector('.tnode[data-cid="'+l.parent_id+'"]');
-    const ce=root.querySelector('.tnode[data-cid="'+l.child_id+'"]');
-    if(!pe||!ce) return;
-    const p=pos(pe), c=pos(ce);
-    const x1=p.x+p.w/2, y1=p.y+p.h, x2=c.x+c.w/2, y2=c.y;
-    const midY=y2-12;
-    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('d','M'+x1+' '+y1+' L'+x1+' '+midY+' L'+x2+' '+midY+' L'+x2+' '+y2);
-    path.setAttribute('fill','none');
-    path.setAttribute('stroke','#1C2A14');
-    path.setAttribute('stroke-width','1.5');
-    if(l.role==='mother') path.setAttribute('stroke-dasharray','5 3');
-    svg.appendChild(path);
-  });
-  root.insertBefore(svg, root.firstChild);
-}
 $('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tree_focus',$('#treFocus').value);}catch(e){} renderFamilyTree(); });
-$('#treWhole') && ($('#treWhole').onchange=()=>renderFamilyTree());
+$('#treChart') && ($('#treChart').onchange=()=>renderFamilyTree());
 
-// Print the tree: clean B/W copy, auto-scaled to A4 landscape, browser print → paper or PDF
+// Print the tree: the rendered SVG itself, scaled to A4 landscape
 $('#trePrintBtn').onclick=()=>{
-  const focus=+$('#treFocus').value;
-  const focusName=personName(focus);
-  // Print uses the classic box renderer (family-chart's zoom canvas prints poorly):
-  // build it offscreen, measure, take the HTML.
-  const host=document.createElement('div');
-  host.style.cssText='position:fixed;left:-12000px;top:0;background:#fff;';
-  document.body.appendChild(host);
-  const root=buildClassicRoot(focus);
-  host.appendChild(root);
-  drawTreeLines(root);
-  const treeHtml=host.innerHTML;
-  host.remove();
+  const focusName=personName(+$('#treFocus').value);
+  const svgEl=document.querySelector('#treePanel svg');
+  if(!svgEl || !svgEl.getAttribute('width')){ alert('Nothing to print yet — render a tree first.'); return; }
+  const w0=+svgEl.getAttribute('width')||1000, h0=+svgEl.getAttribute('height')||600;
+  const clone=svgEl.cloneNode(true);
+  clone.setAttribute('viewBox','0 0 '+w0+' '+h0);
+  clone.setAttribute('width','100%');
+  clone.removeAttribute('height');
   const w=window.open('','_blank');
   if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
-   +"@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap');"
-   +"body{font-family:'Plus Jakarta Sans',Arial,sans-serif;color:#000;margin:20px;background:#fff;}"
-   +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:18px;}'
-   +'.tcol{display:flex;flex-direction:column;align-items:center;}'
-   +'.trow{display:flex;justify-content:center;gap:22px;align-items:flex-end;}'
-   +'.trowD{display:flex;justify-content:center;gap:22px;align-items:flex-start;}'
-   +'.tnode{display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:1.5px solid #000;border-radius:9px;padding:5px 12px;font-size:13px;min-width:110px;position:relative;white-space:nowrap;}'
-   +'.tnode.focus{background:#eee;}'
-   +'.tn{font-weight:700;} .ty{font-size:10.5px;color:#444;}'
-   +'.trole{position:absolute;top:-9px;left:8px;background:#fff;border:1px solid #999;border-radius:8px;font-size:9.5px;padding:0 6px;color:#555;}'
-   +'.vline{width:1.5px;height:16px;background:#000;}'
-   +'.tslot,.tbtns,.sibchip{display:none!important;}'
-   +'#scaler{transform-origin:top left;width:max-content;}'
+   +'body{font-family:Arial,sans-serif;color:#000;margin:16px;background:#fff;}'
+   +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:14px;}'
+   +'svg{max-width:100%;height:auto;}'
    +'@page{size:A4 landscape;margin:12mm;}'
    +'</style></head><body>'
-   +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+' · solid line = father, dashed = mother</div>'
-   +'<div id="scaler">'+treeHtml+'</div>'
-   +'<scr'+'ipt>'
-   +'var LINKS='+JSON.stringify(famLinks||[])+';'
-   +'var s=document.getElementById("scaler");'
-   +'function redraw(){'
-   +'  var root=s.firstElementChild; if(!root) return;'
-   +'  var old=root.querySelector("svg.tlines"); if(old) old.remove();'
-   +'  root.style.position="relative";'
-   +'  var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");'
-   +'  svg.setAttribute("class","tlines");'
-   +'  svg.setAttribute("width",root.scrollWidth); svg.setAttribute("height",root.scrollHeight);'
-   +'  svg.style.cssText="position:absolute;left:0;top:0;pointer-events:none;z-index:0;";'
-   +'  var rr=root.getBoundingClientRect();'
-   +'  LINKS.forEach(function(l){'
-   +'    var pe=root.querySelector(".tnode[data-cid=\\""+l.parent_id+"\\"]");'
-   +'    var ce=root.querySelector(".tnode[data-cid=\\""+l.child_id+"\\"]");'
-   +'    if(!pe||!ce) return;'
-   +'    var pr=pe.getBoundingClientRect(), cr=ce.getBoundingClientRect();'
-   +'    var x1=pr.left-rr.left+pr.width/2, y1=pr.bottom-rr.top;'
-   +'    var x2=cr.left-rr.left+cr.width/2, y2=cr.top-rr.top, midY=y2-12;'
-   +'    var path=document.createElementNS("http://www.w3.org/2000/svg","path");'
-   +'    path.setAttribute("d","M"+x1+" "+y1+" L"+x1+" "+midY+" L"+x2+" "+midY+" L"+x2+" "+y2);'
-   +'    path.setAttribute("fill","none"); path.setAttribute("stroke","#000"); path.setAttribute("stroke-width","1.5");'
-   +'    if(l.role==="mother") path.setAttribute("stroke-dasharray","5 3");'
-   +'    svg.appendChild(path);'
-   +'  });'
-   +'  root.insertBefore(svg, root.firstChild);'
-   +'}'
-   +'setTimeout(function(){'
-   +'  redraw();'
-   +'  var avail=document.body.clientWidth, w0=s.scrollWidth;'
-   +'  if(w0>avail) s.style.transform="scale("+(avail/w0)+")";'
-   +'  setTimeout(function(){window.print();},250);'
-   +'},300);'
-   +'</scr'+'ipt></body></html>');
+   +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +clone.outerHTML
+   +'<scr'+'ipt>setTimeout(function(){window.print();},400);</scr'+'ipt></body></html>');
   w.document.close();
 };
 
