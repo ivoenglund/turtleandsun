@@ -71,6 +71,7 @@
   .fltrow{font-size:12px;padding:2px 10px;display:flex;gap:9px;align-items:center;color:#33402a;}
   .fltrow .flt{font-size:11.5px;}
   .fltrow .ct{font-size:11px;color:var(--mut);}
+  #anomalySel.selactive{background:#EAF3E2;border-color:var(--leaf2);font-weight:700;color:var(--green2);}
   .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:6px 10px;margin-bottom:8px;font-size:13px;}
   .dupblock{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:12px;}
   .tagchip{display:inline-block;border:1px solid rgba(28,10,0,0.25);border-radius:20px;padding:2px 11px;font-size:12px;cursor:pointer;background:#fff;user-select:none;}
@@ -126,10 +127,8 @@
 <body>
 <div class="wrap">
   <div class="side">
-    <div class="lbl">Pool</div>
-    <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
-    <div class="lbl">Anomalies</div>
-    <div style="padding:0 10px 2px;"><select id="anomalySel" style="width:100%;font-size:12.5px;"><option value="none">— none —</option></select></div>
+    <div class="lbl">Show</div>
+    <div style="padding:0 10px 2px;"><select id="anomalySel" style="width:100%;font-size:12.5px;"><option value="all">🗂 All contacts</option></select></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
@@ -574,15 +573,14 @@ const ANOMALY_TEST = {
 };
 const ANOMALY_COL = { nobday:'birthday', noaddr:'street', nomail:'email', nophone:'phone' };
 function applyAnomaly(v){
-  anomaly = (v && v!=='none') ? v : null;
+  anomaly = (v && v!=='all') ? v : null;
+  selected=null; memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  renderTree();
   if(!anomaly){
     const active=document.querySelector('.tab.active');
     showTab(active?active.dataset.t:'med');
     return;
   }
-  selected=null; memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
-  renderTree();
-  $('#poolRow').classList.remove('active');
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   if(anomaly==='dup'){
     ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
@@ -595,7 +593,11 @@ function applyAnomaly(v){
 function clearAnomaly(){
   anomaly=null;
   const sel=document.getElementById('anomalySel');
-  if(sel) sel.value='none';
+  if(sel) sel.value='all';
+}
+function updateSelHighlight(){
+  const sel=document.getElementById('anomalySel');
+  if(sel) sel.classList.toggle('selactive', !selected);
 }
 function passesFilterId(cid){
   const c = contactsPool.find(x=>x.id===cid);
@@ -634,25 +636,26 @@ function renderTree(){
     (node.subgroups||[]).forEach(c=>row(c,depth+1));
   }
   groups.forEach(g=>row(g,0));
+  updateSelHighlight();
 }
 
 function updateSideCounts(){
-  $('#poolCount').textContent = contactsPool.length;
   const sel=$('#anomalySel');
-  const cur=sel.value||'none';
+  let cur=sel.value||'all';
   const n = f=>contactsPool.filter(f).length;
   sel.innerHTML =
-    '<option value="none">— none —</option>'+
-    '<option value="dup">Duplicates ('+computeDupClusters().length+')</option>'+
-    '<option value="nobday">Missing birthday ('+n(c=>!c.birthday)+')</option>'+
-    '<option value="noaddr">Missing address ('+n(c=>!hasAddress(c))+')</option>'+
-    '<option value="nomail">Missing email ('+n(c=>!c.email)+')</option>'+
-    '<option value="nophone">Missing phone ('+n(c=>!c.phone)+')</option>';
+    '<option value="all">🗂 All contacts ('+contactsPool.length+')</option>'+
+    '<option value="dup">⚠ Duplicates ('+computeDupClusters().length+')</option>'+
+    '<option value="nobday">⚠ Missing birthday ('+n(c=>!c.birthday)+')</option>'+
+    '<option value="noaddr">⚠ Missing address ('+n(c=>!hasAddress(c))+')</option>'+
+    '<option value="nomail">⚠ Missing email ('+n(c=>!c.email)+')</option>'+
+    '<option value="nophone">⚠ Missing phone ('+n(c=>!c.phone)+')</option>';
+  if(!['all','dup','nobday','noaddr','nomail','nophone'].includes(cur)) cur='all';
   sel.value=cur;
+  updateSelHighlight();
 }
 
 async function loadAll(){
-  $('#poolCount').textContent='…';
   const [g, ms, cs] = await Promise.all([
     api('/api/groups'), api('/api/group-memberships'), api('/api/contacts')
   ]);
@@ -666,7 +669,6 @@ async function selectGroup(node){
   selected = node;
   memEdit = false; $('#addMemberBtn').textContent='＋ Add from pool';
   renderTree();
-  $('#poolRow').classList.remove('active');
   clearAnomaly();
   $('#shareBox').classList.add('hide');
   $('#bokSrc').textContent = 'Source: '+node.name;
@@ -1494,16 +1496,6 @@ $('#addGroupBtn').onclick=async()=>{
   await loadAll();
 };
 
-// ── Pool row ──
-$('#poolRow').onclick=()=>{
-  selected=null;
-  memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
-  renderTree();
-  $('#poolRow').classList.add('active');
-  clearAnomaly();
-  const active=document.querySelector('.tab.active');
-  showTab(active?active.dataset.t:'med');
-};
 
 // ── Map ──
 let coordsCache = null;
