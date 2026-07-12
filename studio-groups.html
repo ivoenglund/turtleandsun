@@ -1990,7 +1990,6 @@ $('#trePrintBtn').onclick=()=>{
     if(c.birthday) inline.push('Born '+d10(c.birthday));
     if(c.died_on) inline.push('Died '+d10(c.died_on));
     infoHtml='<div class="infocard">'
-      +(c.photo_url?'<img class="infoimg" src="'+esc(c.photo_url)+'">':'')
       +'<div class="iname">'+esc(c.name||'')+'</div>'
       +(inline.length?'<div class="iv" style="margin-bottom:1mm;">'+esc(inline.join(' · '))+'</div>':'')
       +blk('Father',[f.father])
