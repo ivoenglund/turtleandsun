@@ -32,7 +32,7 @@
   #conPanel .grid th,#conPanel .grid td,#memPanel .grid th,#memPanel .grid td{border-width:0 1px 1px 0;}
   #conPanel .grid th,#memPanel .grid th{position:sticky;top:0;z-index:20;}
   /* Row trace: discreet tint along the active cell's row (the strong outline stays on the cell) */
-  .grid tr.rowActive td{background:#F6F1DC!important;}
+  .grid tr.rowActive td{background:#F2EBC8!important;}
   .grid tr.rowActive td.cellActive{background:#F5FAF0!important;}
   .lbl{font-size:10.5px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:8px 10px 4px;}
   .row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
@@ -852,17 +852,28 @@ function conActiveTd(){
   if(!conActive) return null;
   return document.querySelector('#conPanel tr[data-cid="'+conActive.cid+'"] td[data-f="'+conActive.field+'"]');
 }
+let _lastTd=null, _lastTr=null;
 function setConActive(cid, field){
   conActive = {cid, field};
-  document.querySelectorAll('#conPanel .cellActive').forEach(x=>x.classList.remove('cellActive'));
-  document.querySelectorAll('#conPanel .rowActive').forEach(x=>x.classList.remove('rowActive'));
+  if(_lastTd) _lastTd.classList.remove('cellActive');
+  if(_lastTr) _lastTr.classList.remove('rowActive');
   const td=conActiveTd();
-  if(td){
-    td.classList.add('cellActive');
-    td.closest('tr').classList.add('rowActive');
-    td.scrollIntoView({block:'nearest',inline:'nearest'});
-    // On the first column, scroll all the way left so the ✎/checkbox columns come back
-    if(conEditKeys.indexOf(field)===0) $('#conPanel').scrollLeft=0;
+  if(!td){ _lastTd=_lastTr=null; return; }
+  const tr=td.parentElement;
+  td.classList.add('cellActive');
+  tr.classList.add('rowActive');
+  _lastTd=td; _lastTr=tr;
+  // Minimal scroll math — no scrollIntoView (it solves both axes and janks on wide tables)
+  const panel=document.getElementById('conPanel');
+  const headH=td.closest('table').rows[0].offsetHeight;
+  const rTop=tr.offsetTop, rBot=rTop+tr.offsetHeight;
+  if(rTop < panel.scrollTop + headH) panel.scrollTop = rTop - headH;
+  else if(rBot > panel.scrollTop + panel.clientHeight) panel.scrollTop = rBot - panel.clientHeight;
+  if(conEditKeys.indexOf(field)===0){ panel.scrollLeft=0; }
+  else{
+    const cLeft=td.offsetLeft, cRight=cLeft+td.offsetWidth;
+    if(cLeft < panel.scrollLeft) panel.scrollLeft=cLeft;
+    else if(cRight > panel.scrollLeft + panel.clientWidth) panel.scrollLeft = cRight - panel.clientWidth;
   }
 }
 function moveActive(dr,dc){
