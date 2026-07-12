@@ -263,8 +263,9 @@
         <button class="btn gray" id="treAddBtn">＋ Add relation</button>
         <button class="btn gray" id="treEditBtn">✎ Edit person</button>
         <button class="btn gray" id="treLinksBtn">🔗 Links</button>
-        <select id="treChart" style="max-width:150px;">
-          <option value="rel">Relatives (all)</option>
+        <select id="treChart" style="max-width:170px;">
+          <option value="kin">Kinship (everyone)</option>
+          <option value="rel">Relatives</option>
           <option value="hour">Hourglass</option>
           <option value="anc">Ancestors</option>
           <option value="desc">Descendants</option>
@@ -272,7 +273,7 @@
         <button class="btn gray" id="trePrintBtn">🖨 Print</button>
       </div>
       <div class="treeWrap" id="treePanel" style="height:max(300px, calc(100vh - 185px));padding:10px;"><div class="empty">Loading…</div></div>
-      <div class="help">＋ Add relation adds a father/mother/child to the person in the box · 🔗 Links lists their family links for removal · click a person in the chart to re-center on them · "Relatives (all)" shows the complete family including uncles and cousins.</div>
+      <div class="help">＋ Add relation adds a father/mother/child to the person in the box · 🔗 Links lists their family links for removal · click a person in the chart to re-center on them · "Kinship (everyone)" shows all relatives at once: grandparents, siblings, half-siblings, uncles, cousins.</div>
     </div>
 
     <!-- YEARBOOK -->
@@ -1839,8 +1840,8 @@ function renderFamilyTree(){
     panel.innerHTML='<div class="empty">'+esc(personName(focus))+' has no family links yet — use “＋ Add relation”.</div>';
     return;
   }
-  const CT={ rel:topola.RelativesChart, hour:topola.HourglassChart, anc:topola.AncestorChart, desc:topola.DescendantChart };
-  const chartType=CT[$('#treChart').value]||topola.RelativesChart;
+  const CT={ kin:topola.KinshipChart, rel:topola.RelativesChart, hour:topola.HourglassChart, anc:topola.AncestorChart, desc:topola.DescendantChart };
+  const chartType=CT[$('#treChart').value]||topola.KinshipChart;
   panel.innerHTML='<svg id="treeSvg"></svg>';
   try{
     topola.createChart({
