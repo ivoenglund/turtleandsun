@@ -74,12 +74,24 @@
   .tagchip.inc{background:#EAF3E2;border-color:var(--leaf2);color:var(--green2);font-weight:700;}
   .tagchip.exc{background:#fbeee9;border-color:#c98;color:#9a4a3a;font-weight:700;text-decoration:line-through;}
   .yearhdr{font-size:15px;font-weight:800;margin:16px 0 6px;color:var(--green2);}
-  .postcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+  .postcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
   .postcard h4{margin:0 0 2px;font-size:14.5px;}
   .postcard .pdate{font-size:11.5px;color:var(--mut);margin-bottom:6px;}
   .postcard .pbody{font-size:13px;white-space:pre-wrap;line-height:1.45;}
+  .prow{display:flex;gap:12px;align-items:flex-start;}
+  .pmain{flex:1;min-width:0;}
+  .pright{display:grid;grid-template-columns:repeat(2,86px);gap:6px;flex-shrink:0;}
+  .pright.single{grid-template-columns:120px;}
+  .pright img{width:100%;height:64px;object-fit:cover;border-radius:8px;cursor:pointer;display:block;}
+  .pright.single img{height:90px;}
   .postphotos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;}
   .postphotos img{height:84px;border-radius:8px;object-fit:cover;cursor:pointer;}
+  .galgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:420px;overflow-y:auto;margin-top:10px;}
+  .galitem{position:relative;cursor:pointer;border:2px solid transparent;border-radius:9px;}
+  .galitem img{width:100%;height:90px;object-fit:cover;border-radius:7px;display:block;}
+  .galitem.sel{border-color:var(--green2);}
+  .galitem .galck{position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:4px;background:rgba(255,255,255,0.9);border:1.5px solid rgba(28,10,0,0.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--green2);font-weight:800;}
+  .galitem .galused{position:absolute;bottom:5px;left:5px;background:rgba(28,42,20,0.8);color:#fff;font-size:10px;border-radius:6px;padding:1px 6px;}
   .occitem{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,0.55);border:1px solid var(--line);border-radius:9px;padding:4px 10px;margin-bottom:4px;font-size:12.5px;}
   .occitem img{width:22px;height:22px;border-radius:50%;object-fit:cover;}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1C2A14;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;z-index:4000;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.3);}
@@ -179,6 +191,7 @@
     <div id="tid" class="hide">
       <div class="tools">
         <button class="btn pub" id="postAddBtn">＋ New post</button>
+        <button class="btn gray" id="galAddBtn">＋ From gallery</button>
         <label class="flt"><input type="checkbox" id="tfPosts" checked> Posts</label>
         <label class="flt"><input type="checkbox" id="tfOcc" checked> Occasions</label>
         <label class="flt"><input type="checkbox" id="tfBday" checked> Birthdays</label>
@@ -255,6 +268,20 @@
       <button class="btn sm danger left" id="conDelete">Delete contact</button>
       <button class="btn sm gray" id="conCancel">Close</button>
       <button class="btn sm pub" id="conSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gallery picker modal -->
+<div class="modal-bg" id="galModalBg">
+  <div class="modal" style="max-width:720px;">
+    <h3>Add pictures from your gallery to the timeline</h3>
+    <div class="muted" style="font-size:12.5px;">Each picked picture becomes its own timeline post (dated when the picture was added). Edit it afterwards to add title, text and tags.</div>
+    <div class="galgrid" id="galGrid"><div class="empty">Loading…</div></div>
+    <div class="foot">
+      <span class="left muted" id="galCount" style="font-size:13px;">0 selected</span>
+      <button class="btn sm gray" id="galCancel">Cancel</button>
+      <button class="btn sm pub" id="galAdd">Add to timeline</button>
     </div>
   </div>
 </div>
@@ -1308,12 +1335,17 @@ async function renderTimeline(){
     const ds=fmtD(it.date);
     if(it.kind==='post'){
       const p=it.p;
+      const ph=(p.photos||[]);
       html+=`<div class="postcard" data-pid="${p.id}">
-        <h4>${esc(p.title)||'<span class="muted">(untitled)</span>'}</h4>
-        <div class="pdate">${ds}${(p.tags||[]).map(t=>' <span class="tag">'+esc(t)+'</span>').join('')}</div>
-        ${(p.photos||[]).length?'<div class="postphotos">'+(p.photos||[]).map(u=>'<img src="'+esc(u)+'" loading="lazy" onclick="window.open(\''+esc(u)+'\',\'_blank\')">').join('')+'</div>':''}
-        ${p.body?'<div class="pbody">'+esc(p.body)+'</div>':''}
-        <div style="margin-top:8px;"><button class="btn sm gray pEdit">Edit</button></div>
+        <div class="prow">
+          <div class="pmain">
+            <h4>${esc(p.title)||'<span class="muted">(untitled)</span>'}</h4>
+            <div class="pdate">${ds}${(p.tags||[]).map(t=>' <span class="tag">'+esc(t)+'</span>').join('')}</div>
+            ${p.body?'<div class="pbody">'+esc(p.body)+'</div>':''}
+            <div style="margin-top:8px;"><button class="btn sm gray pEdit">Edit</button></div>
+          </div>
+          ${ph.length?'<div class="pright'+(ph.length===1?' single':'')+'">'+ph.map(u=>'<img src="'+esc(u)+'" loading="lazy" onclick="window.open(\''+esc(u)+'\',\'_blank\')">').join('')+'</div>':''}
+        </div>
       </div>`;
     } else {
       const c=contactsPool.find(x=>x.id===it.cid);
@@ -1328,6 +1360,57 @@ async function renderTimeline(){
   });
 }
 ['tfPosts','tfOcc','tfBday'].forEach(id=>{ document.getElementById(id).onchange=()=>renderTimeline(); });
+
+// ── Gallery picker: turn archive pictures into timeline posts ──
+let galSel = new Map(); // url → date
+$('#galAddBtn').onclick=async()=>{
+  galSel.clear();
+  $('#galCount').textContent='0 selected';
+  $('#galGrid').innerHTML='<div class="empty">Loading…</div>';
+  $('#galModalBg').classList.add('open');
+  try{
+    await ensureBlog();
+    const data = await api('/api/account/data');
+    const used = new Set();
+    (blogCache||[]).forEach(p=>(p.photos||[]).forEach(u=>used.add(u)));
+    const seen = new Set();
+    const imgs = (data.orders||[]).map(o=>({
+      url: o.output_asset_url || o.result_url || o.input_asset_url,
+      date: d10(o.created_at)
+    })).filter(x=>x.url && !/\.(mp4|webm|mov)(\?|$)/i.test(x.url) && !seen.has(x.url) && seen.add(x.url));
+    if(!imgs.length){ $('#galGrid').innerHTML='<div class="empty">No pictures in your gallery yet.</div>'; return; }
+    $('#galGrid').innerHTML = imgs.map((im,i)=>`
+      <div class="galitem" data-url="${esc(im.url)}" data-date="${im.date}">
+        <img src="${esc(im.url)}" loading="lazy">
+        <span class="galck"></span>
+        ${used.has(im.url)?'<span class="galused">in timeline</span>':''}
+      </div>`).join('');
+    $('#galGrid').querySelectorAll('.galitem').forEach(el=>{
+      el.onclick=()=>{
+        const url=el.dataset.url;
+        if(galSel.has(url)){ galSel.delete(url); el.classList.remove('sel'); el.querySelector('.galck').textContent=''; }
+        else { galSel.set(url, el.dataset.date); el.classList.add('sel'); el.querySelector('.galck').textContent='✓'; }
+        $('#galCount').textContent=galSel.size+' selected';
+      };
+    });
+  }catch(e){ $('#galGrid').innerHTML='<div class="empty">Could not load gallery: '+esc(e.message)+'</div>'; }
+};
+$('#galCancel').onclick=()=>$('#galModalBg').classList.remove('open');
+$('#galModalBg').onclick=(e)=>{ if(e.target===$('#galModalBg')) $('#galModalBg').classList.remove('open'); };
+$('#galAdd').onclick=async()=>{
+  if(!galSel.size){ alert('Pick at least one picture.'); return; }
+  const tags = selected ? [selected.name] : [];
+  for(const [url,date] of galSel){
+    await api('/api/blog-posts',{method:'POST',body:JSON.stringify({
+      title:null, body:null, post_date:date||new Date().toISOString().slice(0,10), tags, photos:[url]
+    })});
+  }
+  $('#galModalBg').classList.remove('open');
+  showToast(galSel.size+' picture'+(galSel.size>1?'s':'')+' added to the timeline');
+  galSel.clear();
+  await ensureBlog(true);
+  renderTimeline();
+};
 
 // ── Post editor modal ──
 let editingPost=null;
