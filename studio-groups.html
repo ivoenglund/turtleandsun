@@ -2054,24 +2054,29 @@ $('#trePrintBtn').onclick=()=>{
   const focus=+$('#treFocus').value;
   const focusName=personName(focus);
   const po=getPrintOpts();
-  // Render a print-specific chart honoring the options (pets/photos), offscreen.
+  // The screen chart is reused directly when the print options match it
+  // (pets + photos on). Only differing options force a separate render.
   let svgEl=null, host=null;
-  try{
-    host=document.createElement('div');
-    host.style.cssText='position:fixed;left:-13000px;top:0;';
-    host.innerHTML='<svg id="printSvg"></svg>';
-    document.body.appendChild(host);
-    topola.createChart({
-      json: buildTopolaData(focus, {noPets:!po.pets, noPhotos:!po.photos}),
-      chartType: topolaChartType(),
-      renderer: topola.DetailedRenderer,
-      svgSelector: '#printSvg',
-      animate: false,
-      updateSvgSize: true
-    }).render({startIndi:'I'+focus});
-    svgEl=host.querySelector('svg');
-  }catch(e){
-    svgEl=document.querySelector('#treePanel svg'); // fall back to what's on screen
+  if(po.pets && po.photos){
+    svgEl=document.querySelector('#treePanel svg');
+  } else {
+    try{
+      host=document.createElement('div');
+      host.style.cssText='position:fixed;left:-13000px;top:0;';
+      host.innerHTML='<svg id="printSvg"></svg>';
+      document.body.appendChild(host);
+      topola.createChart({
+        json: buildTopolaData(focus, {noPets:!po.pets, noPhotos:!po.photos}),
+        chartType: topolaChartType(),
+        renderer: topola.DetailedRenderer,
+        svgSelector: '#printSvg',
+        animate: false,
+        updateSvgSize: true
+      }).render({startIndi:'I'+focus});
+      svgEl=host.querySelector('svg');
+    }catch(e){
+      svgEl=document.querySelector('#treePanel svg'); // fall back to what's on screen
+    }
   }
   if(!svgEl || !svgEl.getAttribute('width')){ if(host) host.remove(); alert('Nothing to print yet — render a tree first.'); return; }
   // Optional info block about the selected person
@@ -2142,7 +2147,10 @@ $('#trePrintBtn').onclick=()=>{
    +'</div>'
    +(po.footer?'<div class="foot">Family tree — '+esc(focusName)+' · turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>':'')
    +'</div>'
-   +'<scr'+'ipt>setTimeout(function(){window.print();},600);</scr'+'ipt></body></html>');
+   +'<scr'+'ipt>'
+   +'window.addEventListener("afterprint",function(){ setTimeout(function(){window.close();},150); });'
+   +'setTimeout(function(){window.print();},600);'
+   +'</scr'+'ipt></body></html>');
   w.document.close();
 };
 // restore last paper choice
