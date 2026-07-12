@@ -72,7 +72,6 @@
   .fltrow{font-size:12px;padding:2px 10px;display:flex;gap:9px;align-items:center;color:#33402a;}
   .fltrow .flt{font-size:11.5px;}
   .fltrow .ct{font-size:11px;color:var(--mut);}
-  #anomalySel.selactive{background:#EAF3E2;border-color:var(--leaf2);font-weight:700;color:var(--green2);}
   .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EAF3E2;border:1px solid var(--leaf);border-radius:9px;padding:6px 10px;margin-bottom:8px;font-size:13px;}
   .dupblock{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:12px;}
   .tagchip{display:inline-block;border:1px solid rgba(28,10,0,0.25);border-radius:20px;padding:2px 11px;font-size:12px;cursor:pointer;background:#fff;user-select:none;}
@@ -128,8 +127,8 @@
 <body>
 <div class="wrap">
   <div class="side">
-    <div class="lbl">Show</div>
-    <div style="padding:0 10px 2px;"><select id="anomalySel" style="width:100%;font-size:12.5px;"><option value="all">🗂 All contacts</option></select></div>
+    <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
+    <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
@@ -470,7 +469,7 @@ function makeResizable(panelSel, tableKey){
   const ths=[...table.querySelectorAll('tr:first-child th')];
   const sig = ths.map(th=>th.dataset.k||'').join(',');
   // A hidden table measures 0 — never fit while invisible. The render that
-  // reveals the grid (showTab/applyAnomaly) measures for real.
+  // reveals the grid (showTab/poolRow/dupRow) measures for real.
   if(table.offsetWidth===0) return;
   let store;
   function measure(){
@@ -547,44 +546,15 @@ function passesFilterC(c){
   if(!pet && !$('#fPeople').checked) return false;
   return true;
 }
-// ── Anomalies: pool-wide "what needs fixing" views ──
-let anomaly = null; // 'dup' | 'nobday' | 'noaddr' | 'nomail' | 'nophone'
-const ANOMALY_TEST = {
-  nobday: c=>!c.birthday,
-  noaddr: c=>!hasAddress(c),
-  nomail: c=>!c.email,
-  nophone: c=>!c.phone,
-};
-const ANOMALY_COL = { nobday:'birthday', noaddr:'street', nomail:'email', nophone:'phone' };
-function applyAnomaly(v){
-  anomaly = (v && v!=='all') ? v : null;
-  selected=null; memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
-  resetGridWidths(); // new selection → fresh perfect-fit columns
-  renderTree();
-  if(!anomaly){
-    const active=document.querySelector('.tab.active');
-    showTab(active?active.dataset.t:'med');
-    return;
-  }
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  if(anomaly==='dup'){
-    ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
-    renderDuplicates();
-  } else {
-    ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='kon'));
-    renderContactsTable();
-  }
-}
-function clearAnomaly(){
-  anomaly=null;
-  const sel=document.getElementById('anomalySel');
-  // While a group is selected the dropdown shows a placeholder "group" state —
-  // so picking "All contacts" later is a real change event (else it never fires).
-  if(sel) sel.value = selected ? 'group' : 'all';
+// ── Sidebar: All contacts / Duplicates rows ──
+let dupView = false;
+function clearAnomaly(){ // kept name: called from showTab/selectGroup
+  dupView = false;
+  $('#dupRow').classList.remove('active');
 }
 function updateSelHighlight(){
-  const sel=document.getElementById('anomalySel');
-  if(sel) sel.classList.toggle('selactive', !selected);
+  $('#poolRow').classList.toggle('active', !selected && !dupView);
+  $('#dupRow').classList.toggle('active', dupView);
 }
 function passesFilterId(cid){
   const c = contactsPool.find(x=>x.id===cid);
@@ -627,20 +597,8 @@ function renderTree(){
 }
 
 function updateSideCounts(){
-  const sel=$('#anomalySel');
-  let cur=sel.value||'all';
-  const n = f=>contactsPool.filter(f).length;
-  sel.innerHTML =
-    '<option value="all">🗂 All contacts ('+contactsPool.length+')</option>'+
-    '<option value="group" hidden>📁 '+esc(selected?selected.name:'group')+'</option>'+
-    '<option value="dup">⚠ Duplicates ('+computeDupClusters().length+')</option>'+
-    '<option value="nobday">⚠ Missing birthday ('+n(c=>!c.birthday)+')</option>'+
-    '<option value="noaddr">⚠ Missing address ('+n(c=>!hasAddress(c))+')</option>'+
-    '<option value="nomail">⚠ Missing email ('+n(c=>!c.email)+')</option>'+
-    '<option value="nophone">⚠ Missing phone ('+n(c=>!c.phone)+')</option>';
-  if(!['all','group','dup','nobday','noaddr','nomail','nophone'].includes(cur)) cur='all';
-  if(cur==='group' && !selected) cur='all';
-  sel.value=cur;
+  $('#poolCount').textContent = contactsPool.length;
+  $('#dupCount').textContent = computeDupClusters().length;
   updateSelHighlight();
 }
 
@@ -895,7 +853,6 @@ function startEditCell(td, initial){
       updateSideCounts();
     }
     redraw(); // in-place — no full table rebuild, keeps it fast
-    if(anomaly && v!==cur) renderContactsTable(); // fixed rows leave the anomaly view
     if(move) moveActive(move==='down'?1:0, move==='right'?1:move==='left'?-1:0);
   };
   inp.addEventListener('keydown',ev=>{
@@ -964,14 +921,9 @@ document.addEventListener('keydown',(e)=>{
 function renderContactsTable(){
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   let cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
-  // Anomaly view: make sure the column being fixed is visible
-  if(anomaly && ANOMALY_COL[anomaly] && !cols.some(c=>c.key===ANOMALY_COL[anomaly])){
-    cols = cols.concat(CON_COLS.filter(c=>c.key===ANOMALY_COL[anomaly]));
-  }
   const q = ($('#conSearch').value||'').toLowerCase();
   let list = contactsPool.filter(c=>{
     if(!passesFilterC(c)) return false;
-    if(anomaly && ANOMALY_TEST[anomaly] && !ANOMALY_TEST[anomaly](c)) return false;
     if(!q) return true;
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
@@ -1298,7 +1250,23 @@ async function mergeInto(keeperId, others){
     showToast('Merged '+others.length+' duplicate'+(others.length>1?'s':''));
   }catch(e){ alert('Merge failed: '+e.message+'\nNothing more was changed — check the duplicates list.'); await loadAll(); renderDuplicates(); }
 }
-$('#anomalySel').onchange=()=>applyAnomaly($('#anomalySel').value);
+$('#poolRow').onclick=()=>{
+  selected=null; dupView=false;
+  memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  resetGridWidths();
+  renderTree();
+  const active=document.querySelector('.tab.active');
+  showTab(active?active.dataset.t:'med');
+};
+$('#dupRow').onclick=()=>{
+  selected=null; dupView=true;
+  memEdit=false; $('#addMemberBtn').textContent='＋ Add from pool';
+  renderTree();
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  ids.forEach(i=>$('#'+i).classList.toggle('hide', i!=='dup'));
+  updateSelHighlight();
+  renderDuplicates();
+};
 
 // ── Media helpers: images, video files, YouTube/external links ──
 function isVideoFile(u){ return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u); }
