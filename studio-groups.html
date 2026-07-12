@@ -1593,6 +1593,8 @@ async function renderTimeline(){
 ['tfFromY','tfToY'].forEach(id=>{
   let t; document.getElementById(id).oninput=()=>{ clearTimeout(t); t=setTimeout(renderTimeline,350); };
 });
+// Preloaded window: current year ±1 — widen or narrow from there
+(function(){ const y=new Date().getFullYear(); $('#tfFromY').value=y-1; $('#tfToY').value=y+1; })();
 
 // ── Gallery picker: turn archive pictures into timeline posts ──
 let galSel = new Map(); // url → date
