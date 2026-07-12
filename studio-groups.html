@@ -23,9 +23,13 @@
   .sideStrip{width:20px;flex-shrink:0;align-self:stretch;min-height:70vh;background:rgba(255,255,255,0.55);border:1px solid var(--line);
     border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mut);font-weight:800;font-size:15px;}
   .sideStrip:hover{background:#fff;color:var(--green2);}
-  /* Grid panels use the vertical space: scroll inside, header stays visible */
+  /* Grid panels use the vertical space: scroll inside, header stays visible.
+     border-collapse:collapse breaks sticky headers (rows bleed through above them),
+     so these tables use separate borders: each cell draws right+bottom, table draws the frame. */
   #conPanel,#memPanel{max-height:max(300px, calc(100vh - 185px));overflow:auto;}
-  #conPanel .grid th,#memPanel .grid th{position:sticky;top:0;z-index:20;box-shadow:0 1px 0 var(--gridline);}
+  #conPanel table.grid,#memPanel table.grid{border-collapse:separate;border-spacing:0;}
+  #conPanel .grid th,#conPanel .grid td,#memPanel .grid th,#memPanel .grid td{border-width:0 1px 1px 0;}
+  #conPanel .grid th,#memPanel .grid th{position:sticky;top:0;z-index:20;}
   .lbl{font-size:10.5px;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin:8px 10px 4px;}
   .row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
   .row:hover{background:#F4F1E6;}
