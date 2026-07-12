@@ -257,6 +257,7 @@
       <div class="tools">
         <span style="font-size:13px;">Tree of</span>
         <select id="treFocus" style="max-width:220px;"></select>
+        <button class="btn gray" id="trePrintBtn">🖨 Print</button>
         <span class="muted" style="font-size:12px;">— click a name in the tree to re-center on that person</span>
       </div>
       <div class="treeWrap" id="treePanel"><div class="empty">Loading…</div></div>
@@ -1877,6 +1878,40 @@ function renderFamilyTree(){
   panel.appendChild(root);
 }
 $('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tree_focus',$('#treFocus').value);}catch(e){} renderFamilyTree(); });
+
+// Print the tree: clean B/W copy, auto-scaled to A4 landscape, browser print → paper or PDF
+$('#trePrintBtn').onclick=()=>{
+  const focusName=personName(+$('#treFocus').value);
+  const w=window.open('','_blank');
+  if(!w){ alert('Popup blocked — allow popups for this site to print.'); return; }
+  w.document.write('<!DOCTYPE html><html><head><title>Family tree — '+esc(focusName)+'</title><style>'
+   +"@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap');"
+   +"body{font-family:'Plus Jakarta Sans',Arial,sans-serif;color:#000;margin:20px;background:#fff;}"
+   +'h1{font-size:20px;margin:0 0 3px;} .sub{font-size:11px;color:#555;margin-bottom:18px;}'
+   +'.tcol{display:flex;flex-direction:column;align-items:center;}'
+   +'.trow{display:flex;justify-content:center;gap:22px;align-items:flex-end;}'
+   +'.trowD{display:flex;justify-content:center;gap:22px;align-items:flex-start;}'
+   +'.tnode{display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:1.5px solid #000;border-radius:9px;padding:5px 12px;font-size:13px;min-width:110px;position:relative;white-space:nowrap;}'
+   +'.tnode.focus{background:#eee;}'
+   +'.tn{font-weight:700;} .ty{font-size:10.5px;color:#444;}'
+   +'.trole{position:absolute;top:-9px;left:8px;background:#fff;border:1px solid #999;border-radius:8px;font-size:9.5px;padding:0 6px;color:#555;}'
+   +'.vline{width:1.5px;height:16px;background:#000;}'
+   +'.tslot,.tbtns,.sibchip{display:none!important;}'
+   +'#scaler{transform-origin:top left;width:max-content;}'
+   +'@page{size:A4 landscape;margin:12mm;}'
+   +'</style></head><body>'
+   +'<h1>Family tree — '+esc(focusName)+'</h1><div class="sub">turtleandsun.com · '+new Date().toISOString().slice(0,10)+'</div>'
+   +'<div id="scaler">'+$('#treePanel').innerHTML+'</div>'
+   +'<scr'+'ipt>'
+   +'const s=document.getElementById("scaler");'
+   +'setTimeout(function(){'
+   +'  var avail=document.body.clientWidth, w0=s.scrollWidth;'
+   +'  if(w0>avail) s.style.transform="scale("+(avail/w0)+")";'
+   +'  setTimeout(function(){window.print();},250);'
+   +'},250);'
+   +'</scr'+'ipt></body></html>');
+  w.document.close();
+};
 
 // ── Share link ──
 $('#shareBtn').onclick=async()=>{
