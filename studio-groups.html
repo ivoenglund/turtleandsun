@@ -32,7 +32,7 @@
   .tab.active{color:var(--green2);font-weight:700;border-bottom-color:var(--green2);}
   .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;box-shadow:0 2px 12px rgba(0,0,0,0.06);overflow-x:auto;}
   /* Excel-style grid */
-  table.grid{width:100%;border-collapse:collapse;font-size:13px;border:1px solid var(--gridline);table-layout:fixed;}
+  table.grid{width:100%;border-collapse:collapse;font-size:13px;border:1px solid var(--gridline);}
   .grid th,.grid td{text-align:left;padding:1px 6px;border:1px solid var(--gridline);vertical-align:middle;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .grid th{color:#5d5747;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;background:#F4F1E6;padding-top:3px;padding-bottom:3px;position:relative;}
   .rsz{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:5;}
@@ -317,16 +317,24 @@ function buildColPicker(hostId, tableKey, cols, defaults, rerender){
   host.appendChild(allBtn); host.appendChild(btn); host.appendChild(dd);
 }
 
-// ── Resizable columns: drag the right edge of a header. Widths persist per grid. ──
+// ── Resizable columns: auto-fit to content on render; drag header edge to override
+//    (persisted); double-click the divider to reset a column to auto-fit. ──
 function makeResizable(panelSel, tableKey){
   const table = document.querySelector(panelSel+' table.grid');
   if(!table) return;
   const ths=[...table.querySelectorAll('tr:first-child th')];
   const widths = COLPREFS[tableKey+'::w'] || {};
+  function autofit(){
+    // Let the browser lay out by content, measure, then lock the widths.
+    table.style.tableLayout='auto'; table.style.width='auto';
+    ths.forEach(th=>{ const k=th.dataset.k||''; th.style.width = widths[k] ? widths[k]+'px' : ''; });
+    const measured = ths.map(th=>Math.max(28, Math.min(360, th.offsetWidth+2)));
+    ths.forEach((th,i)=>{ const k=th.dataset.k||('c'+i); th.style.width=(widths[k]||measured[i])+'px'; });
+    table.style.width='100%'; table.style.tableLayout='fixed';
+  }
   ths.forEach((th,idx)=>{
+    if(idx===0) return; // pencil/checkbox column: auto-fit only
     const key = th.dataset.k || ('c'+idx);
-    if(idx===0){ th.style.width=(widths[key]||30)+'px'; return; } // pencil column
-    if(widths[key]) th.style.width=widths[key]+'px';
     const h=document.createElement('span'); h.className='rsz';
     th.appendChild(h);
     h.addEventListener('mousedown',e=>{
@@ -339,7 +347,13 @@ function makeResizable(panelSel, tableKey){
       };
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     });
+    h.addEventListener('dblclick',e=>{
+      e.preventDefault(); e.stopPropagation();
+      delete widths[key]; COLPREFS[tableKey+'::w']=widths; savePrefs();
+      autofit();
+    });
   });
+  autofit();
 }
 
 // ── Inline cell editing ──
