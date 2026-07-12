@@ -65,6 +65,8 @@
   .soon{background:#fdf4dd;color:#7a5b00;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;}
   .today{background:var(--yellow);color:#3a3000;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;}
   .search{max-width:300px;padding:6px 11px;border-radius:9px;}
+  .flt{font-size:12.5px;display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;}
+  .flt input{width:auto;margin:0;}
   /* Modal */
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:3000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;}
   .modal-bg.open{display:flex;}
@@ -99,7 +101,6 @@
     <h1 id="title">Select a group</h1>
     <div class="tabs" id="tabbar">
       <div class="tab active" data-t="med">Members</div>
-      <div class="tab" data-t="kon">All contacts</div>
       <div class="tab" data-t="occ">Occasions</div>
       <div class="tab" data-t="kar">Map</div>
       <div class="tab" data-t="bok">Yearbook</div>
@@ -121,6 +122,10 @@
     <div id="kon" class="hide">
       <div class="tools">
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
+        <label class="flt"><input type="checkbox" id="fLiving" checked> Living</label>
+        <label class="flt"><input type="checkbox" id="fDead" checked> Deceased</label>
+        <label class="flt"><input type="checkbox" id="fPeople" checked> People</label>
+        <label class="flt"><input type="checkbox" id="fPets" checked> Pets</label>
         <span id="konColsHost"></span>
       </div>
       <div class="panel" id="conPanel"></div>
@@ -378,6 +383,7 @@ async function loadAll(){
 async function selectGroup(node){
   selected = node;
   renderTree();
+  $('#poolRow').classList.remove('active');
   $('#crumb').textContent = 'Groups › '+node.name;
   const total = countFor(node);
   const subN = (node.subgroups||[]).length;
@@ -489,7 +495,13 @@ function renderContactsTable(){
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   const cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
   const q = ($('#conSearch').value||'').toLowerCase();
+  const fL=$('#fLiving').checked, fD=$('#fDead').checked, fP=$('#fPeople').checked, fPet=$('#fPets').checked;
   const list = contactsPool.filter(c=>{
+    const dead = !!c.died_on, pet = !!c.is_pet;
+    if(dead && !fD) return false;
+    if(!dead && !fL) return false;
+    if(pet && !fPet) return false;
+    if(!pet && !fP) return false;
     if(!q) return true;
     return ((c.name||'')+' '+(c.email||'')+' '+(c.city||'')).toLowerCase().includes(q);
   });
@@ -523,6 +535,22 @@ function renderContactsTable(){
   });
 }
 $('#conSearch').oninput = renderContactsTable;
+// Filter checkboxes: restore saved state, save on change, re-render
+(function(){
+  let saved={};
+  try{ saved=JSON.parse(localStorage.getItem('ts_studio_filters')||'{}'); }catch(e){}
+  const boxes={fLiving:'living',fDead:'dead',fPeople:'people',fPets:'pets'};
+  Object.entries(boxes).forEach(([id,key])=>{
+    const cb=document.getElementById(id);
+    if(typeof saved[key]==='boolean') cb.checked=saved[key];
+    cb.onchange=()=>{
+      const out={};
+      Object.entries(boxes).forEach(([i2,k2])=>out[k2]=document.getElementById(i2).checked);
+      try{ localStorage.setItem('ts_studio_filters',JSON.stringify(out)); }catch(e){}
+      renderContactsTable();
+    };
+  });
+})();
 
 // ── Contact editor modal ──
 const CF = ['name','email','phone','company','street','street_2','city','region','country','postal_code'];
@@ -772,8 +800,15 @@ $('#addGroupBtn').onclick=async()=>{
   await loadAll();
 };
 
-// ── Pool row → All contacts tab ──
-$('#poolRow').onclick=()=>{ showTab('kon'); };
+// ── Pool row → All contacts view (no tab; sidebar drives it) ──
+$('#poolRow').onclick=()=>{
+  selected=null;
+  renderTree();
+  $('#poolRow').classList.add('active');
+  $('#crumb').textContent='Pool';
+  $('#title').textContent='All contacts';
+  showTab('kon');
+};
 
 // ── Map ──
 function renderMap(){
