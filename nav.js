@@ -64,9 +64,7 @@
     var dd =
       '<div class="ts-nav-dd" id="ts-nav-dd">' +
         '<div class="ts-nav-dd-email ts-nav-auth" id="ts-nav-dd-email"></div>' +
-        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
-        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-occasions" href="/account/occasions">Occasions</a>' +
@@ -143,9 +141,7 @@
         '<a class="ts-nav-drawer-link ts-nav-admin-only" href="/admin/visits">Visits</a>' +
         '<div id="ts-nav-devmode-wrap-drawer" class="ts-nav-admin-only" style="padding:0 20px 4px;"></div>' +
         '<div class="ts-nav-drawer-sep ts-nav-admin-only"></div>' +
-        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-contacts" href="/account/contacts">Contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-network" href="/account/network?view=network">Network</a>' +
-        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-outline" href="/account/network?view=outline">Outline</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-calendar" href="/account/network?view=calendar">Calendar</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-occasions" href="/account/occasions">Occasions</a>' +
@@ -232,8 +228,7 @@
   function detectPage() {
     var p = window.location.pathname;
     var view = new URLSearchParams(window.location.search).get('view');
-    if (p === '/account/contacts') return 'contacts';
-    if (p === '/account/network') return view === 'outline' ? 'outline' : view === 'calendar' ? 'calendar' : view === 'map' ? 'map' : 'network';
+    if (p === '/account/network') return view === 'calendar' ? 'calendar' : view === 'map' ? 'map' : 'network';
     if (p === '/account/occasions') return 'occasions';
     if (p === '/account/library') return 'library';
     if (p === '/account/studio') return 'studio';

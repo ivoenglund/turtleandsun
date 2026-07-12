@@ -301,6 +301,19 @@ async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS idx_blog_posts_user ON blog_posts(user_id, post_date);
 
+    -- 2026-07-12: Family tree — one edge per parent→child link. role = the PARENT's
+    -- role (father/mother). Everything else (siblings, couples, grandparents) derives.
+    CREATE TABLE IF NOT EXISTS family_links (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      parent_id INTEGER NOT NULL,
+      child_id INTEGER NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('father','mother')),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, parent_id, child_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_family_links_user ON family_links(user_id);
+
     -- 2026-06-30: Turtle Studio groups — dated, status-aware memberships.
     -- A membership now carries a from/to date range (so the same model handles
     -- ongoing groups, ended memberships, and historical/dated groups like school

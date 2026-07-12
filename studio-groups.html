@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Studio — Groups &amp; contacts — Turtle and Sun</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="/nav.js?v=20260712a"></script>
+<script src="/nav.js?v=20260712b"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   :root{--cream:#FBF6EC;--green:#243A17;--green2:#2E4A1E;--leaf:#7FB36F;--leaf2:#4E944F;
@@ -129,6 +129,29 @@
   .vlb iframe,.vlb video{width:100%;height:100%;border:0;display:block;}
   .occitem{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,0.55);border:1px solid var(--line);border-radius:9px;padding:4px 10px;margin-bottom:4px;font-size:12.5px;}
   .occitem img{width:22px;height:22px;border-radius:50%;object-fit:cover;}
+  /* Family tree */
+  .treeWrap{overflow:auto;padding:26px 18px;background:#fff;border:1px solid var(--gridline);max-height:max(300px, calc(100vh - 185px));}
+  .tcol{display:flex;flex-direction:column;align-items:center;}
+  .trow{display:flex;justify-content:center;gap:22px;align-items:flex-end;}
+  .trowD{display:flex;justify-content:center;gap:22px;align-items:flex-start;}
+  .tnode{display:inline-flex;flex-direction:column;align-items:center;background:#fff;border:1.5px solid var(--green2);
+    border-radius:9px;padding:5px 10px;font-size:12.5px;min-width:110px;position:relative;white-space:nowrap;}
+  .tnode.focus{background:#EAF3E2;box-shadow:0 0 0 2px var(--leaf);}
+  .tnode .tn{font-weight:700;cursor:pointer;}
+  .tnode .tn:hover{color:var(--green2);text-decoration:underline;}
+  .tnode .ty{font-size:10.5px;color:var(--mut);}
+  .tnode .tbtns{display:flex;gap:5px;margin-top:2px;}
+  .tnode .tbtns span{cursor:pointer;opacity:.4;font-size:11.5px;}
+  .tnode .tbtns span:hover{opacity:1;}
+  .trole{position:absolute;top:-9px;left:8px;background:#F4F1E6;border:1px solid var(--line);border-radius:8px;font-size:9.5px;padding:0 6px;color:var(--mut);}
+  .tslot{border:1.5px dashed rgba(28,10,0,0.3);color:var(--mut);background:transparent;border-radius:9px;padding:8px 12px;font-size:11.5px;cursor:pointer;white-space:nowrap;}
+  .tslot:hover{border-color:var(--green2);color:var(--green2);}
+  .vline{width:1.5px;height:16px;background:var(--gridline);}
+  .tmenu{position:absolute;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 30px rgba(0,0,0,0.18);z-index:1200;padding:5px 0;font-size:13px;}
+  .tmenu div{padding:5px 16px;cursor:pointer;white-space:nowrap;}
+  .tmenu div:hover{background:#F4F1E6;}
+  .sibchip{background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 10px;font-size:11.5px;cursor:pointer;color:#33402a;}
+  .sibchip:hover{border-color:var(--green2);color:var(--green2);}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1C2A14;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;z-index:4000;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.3);}
   .toast button{background:none;border:none;color:var(--yellow);font-weight:700;cursor:pointer;font-size:13.5px;padding:0;}
   /* Modal */
@@ -171,6 +194,7 @@
       <div class="tab active" data-t="med">Members</div>
       <div class="tab" data-t="kar">Map</div>
       <div class="tab" data-t="tid">Timeline</div>
+      <div class="tab" data-t="tre">Family tree</div>
       <div class="tab" data-t="bok">Yearbook</div>
       <div class="tab" data-t="exp">Export</div>
     </div>
@@ -190,6 +214,7 @@
     <!-- ALL CONTACTS -->
     <div id="kon" class="hide">
       <div class="tools">
+        <button class="btn pub" id="newContactBtn">＋ New contact</button>
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
         <span id="konColsHost"></span>
       </div>
@@ -225,6 +250,17 @@
       <div class="tools" id="tagBar" style="margin-top:-2px;"></div>
       <div id="tidFeed"></div>
       <div class="help">Tags: click once to <b>show only</b> (green), twice to <b>hide</b> (red), a third time to reset. No green tags = all posts (minus the red ones). The sidebar selection scopes whose occasions appear, and posts tagged with the group's name follow it.</div>
+    </div>
+
+    <!-- FAMILY TREE -->
+    <div id="tre" class="hide">
+      <div class="tools">
+        <span style="font-size:13px;">Tree of</span>
+        <select id="treFocus" style="max-width:220px;"></select>
+        <span class="muted" style="font-size:12px;">— click a name in the tree to re-center on that person</span>
+      </div>
+      <div class="treeWrap" id="treePanel"><div class="empty">Loading…</div></div>
+      <div class="help">＋ on a card adds a father, mother or child. ✕ removes that link (the person stays in your contacts). ✎ opens the contact.</div>
     </div>
 
     <!-- YEARBOOK -->
@@ -345,6 +381,19 @@
       <button class="btn sm danger left hide" id="pfDelete">Delete post</button>
       <button class="btn sm gray" id="pfCancel">Cancel</button>
       <button class="btn sm pub" id="pfSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Person picker (family tree) -->
+<div class="modal-bg" id="personPickBg">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="personPickTitle">Pick a person</h3>
+    <input class="search" id="personPickSearch" type="text" placeholder="Search…" style="max-width:none;width:100%;" autocomplete="off">
+    <div class="picklist" id="personPickList" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px;"></div>
+    <div class="foot">
+      <button class="btn sm gray left" id="personPickNew">＋ New person…</button>
+      <button class="btn sm gray" id="personPickCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1015,6 +1064,17 @@ function renderContactsTable(){
   if(conActive) setConActive(conActive.cid, conActive.field); // restore selection after re-render
   updateBulkBar();
 }
+// New contact: create, then open the editor to fill in the rest
+$('#newContactBtn').onclick=async()=>{
+  const name=prompt('Name of the new contact:');
+  if(!name||!name.trim()) return;
+  try{
+    const r=await api('/api/contacts/placeholder',{method:'POST',body:JSON.stringify({name:name.trim()})});
+    await loadAll();
+    openContactModal(r.id);
+  }catch(e){ alert('Could not create: '+e.message); }
+};
+
 // Debounced search: rebuild only after typing pauses (rebuilding on every key was the main slowness)
 function debounce(fn,ms){ let t; return ()=>{ clearTimeout(t); t=setTimeout(fn,ms); }; }
 $('#conSearch').oninput = debounce(renderContactsTable,180);
@@ -1612,6 +1672,212 @@ $('#pfDelete').onclick=async()=>{
   renderTimeline();
 };
 
+// ── Family tree ──
+let famLinks = null;
+async function ensureFam(force){
+  if(famLinks && !force) return;
+  famLinks = await api('/api/family-links') || [];
+}
+const parentsOf = cid => famLinks.filter(l=>l.child_id===cid);
+const childrenOf = cid => famLinks.filter(l=>l.parent_id===cid);
+function personName(cid){ const c=contactsPool.find(x=>x.id===cid); return c?(c.name||'(unnamed)'):('#'+cid); }
+function personYear(cid){ const c=contactsPool.find(x=>x.id===cid); const b=c&&d10(c.birthday); return b?b.slice(0,4):''; }
+// Is this person already known as father or mother somewhere?
+function knownParentRole(cid){ const l=famLinks.find(x=>x.parent_id===cid); return l?l.role:null; }
+
+// Person picker
+let personPickCb=null, personPickExclude=new Set();
+function openPersonPick(title, exclude, cb){
+  personPickCb=cb; personPickExclude=new Set(exclude||[]);
+  $('#personPickTitle').textContent=title;
+  $('#personPickSearch').value='';
+  renderPersonPick();
+  $('#personPickBg').classList.add('open');
+  $('#personPickSearch').focus();
+}
+function renderPersonPick(){
+  const q=($('#personPickSearch').value||'').toLowerCase();
+  const list=contactsPool.filter(c=>!personPickExclude.has(c.id)
+    && (!q || (c.name||'').toLowerCase().includes(q))).slice(0,60);
+  $('#personPickList').innerHTML = list.length ? list.map(c=>`
+    <div class="pickrow" data-cid="${c.id}"><span>${esc(c.name)||'(unnamed)'}</span>
+      <span class="sub2">${personYear(c.id)||esc(c.city||'')}</span></div>`).join('')
+    : '<div class="empty" style="padding:14px;">No match.</div>';
+  $('#personPickList').querySelectorAll('.pickrow').forEach(r=>r.onclick=()=>{
+    $('#personPickBg').classList.remove('open');
+    if(personPickCb) personPickCb(+r.dataset.cid);
+  });
+}
+$('#personPickSearch').oninput=renderPersonPick;
+$('#personPickCancel').onclick=()=>$('#personPickBg').classList.remove('open');
+$('#personPickBg').onclick=(e)=>{ if(e.target===$('#personPickBg')) $('#personPickBg').classList.remove('open'); };
+$('#personPickNew').onclick=async()=>{
+  const name=prompt('Name of the new person:');
+  if(!name||!name.trim()) return;
+  const r=await api('/api/contacts/placeholder',{method:'POST',body:JSON.stringify({name:name.trim()})});
+  contactsPool = await api('/api/contacts');
+  $('#personPickBg').classList.remove('open');
+  if(personPickCb) personPickCb(r.id);
+};
+
+async function addFamLink(parent_id, child_id, role){
+  await api('/api/family-links',{method:'POST',body:JSON.stringify({parent_id, child_id, role})});
+  await ensureFam(true);
+  renderFamilyTree();
+}
+function addParentTo(cid, role){
+  const exclude=[cid, ...parentsOf(cid).map(l=>l.parent_id)];
+  openPersonPick('Who is the '+role+' of '+personName(cid)+'?', exclude, pid=>addFamLink(pid, cid, role));
+}
+function addChildTo(cid){
+  const exclude=[cid, ...childrenOf(cid).map(l=>l.child_id)];
+  openPersonPick('Add a child of '+personName(cid), exclude, pid=>{
+    const role=knownParentRole(cid);
+    if(role) return addFamLink(cid, pid, role);
+    // one-time question until the data knows
+    const isF=confirm('Is '+personName(cid)+' the FATHER?\n\nOK = father · Cancel = mother');
+    addFamLink(cid, pid, isF?'father':'mother');
+  });
+}
+
+let treeMenuEl=null;
+function closeTreeMenu(){ if(treeMenuEl){ treeMenuEl.remove(); treeMenuEl=null; } }
+document.addEventListener('click',()=>closeTreeMenu());
+function openTreeMenu(anchor, cid){
+  closeTreeMenu();
+  const m=document.createElement('div'); m.className='tmenu';
+  const ps=parentsOf(cid);
+  const opts=[];
+  if(!ps.some(l=>l.role==='father')) opts.push(['＋ Father',()=>addParentTo(cid,'father')]);
+  if(!ps.some(l=>l.role==='mother')) opts.push(['＋ Mother',()=>addParentTo(cid,'mother')]);
+  opts.push(['＋ Child',()=>addChildTo(cid)]);
+  opts.forEach(([label,fn])=>{
+    const d=document.createElement('div'); d.textContent=label;
+    d.onclick=(e)=>{ e.stopPropagation(); closeTreeMenu(); fn(); };
+    m.appendChild(d);
+  });
+  const r=anchor.getBoundingClientRect();
+  m.style.left=r.left+'px'; m.style.top=(r.bottom+4)+'px'; m.style.position='fixed';
+  document.body.appendChild(m); treeMenuEl=m;
+}
+
+function treeNode(cid, opts){
+  // opts: {focus, roleTag, linkId}
+  const el=document.createElement('div');
+  el.className='tnode'+(opts&&opts.focus?' focus':'');
+  if(opts&&opts.roleTag){ const t=document.createElement('span'); t.className='trole'; t.textContent=opts.roleTag; el.appendChild(t); }
+  const n=document.createElement('span'); n.className='tn'; n.textContent=personName(cid);
+  if(!(opts&&opts.focus)) n.onclick=()=>{ $('#treFocus').value=cid; try{localStorage.setItem('ts_tree_focus',cid);}catch(e){} renderFamilyTree(); };
+  el.appendChild(n);
+  const y=personYear(cid);
+  if(y){ const ye=document.createElement('span'); ye.className='ty'; ye.textContent=y; el.appendChild(ye); }
+  const btns=document.createElement('div'); btns.className='tbtns';
+  const plus=document.createElement('span'); plus.textContent='＋'; plus.title='Add father / mother / child';
+  plus.onclick=(e)=>{ e.stopPropagation(); openTreeMenu(plus, cid); };
+  btns.appendChild(plus);
+  const pen=document.createElement('span'); pen.textContent='✎'; pen.title='Edit contact';
+  pen.onclick=()=>openContactModal(cid);
+  btns.appendChild(pen);
+  if(opts&&opts.linkId){
+    const x=document.createElement('span'); x.textContent='✕'; x.title='Remove this family link';
+    x.onclick=async()=>{
+      if(!confirm('Remove this family link? (The person stays in your contacts.)')) return;
+      await api('/api/family-links/'+opts.linkId,{method:'DELETE'});
+      await ensureFam(true); renderFamilyTree();
+    };
+    btns.appendChild(x);
+  }
+  el.appendChild(btns);
+  return el;
+}
+function vline(){ const d=document.createElement('div'); d.className='vline'; return d; }
+// Ancestors: recursive upward (parents above the person)
+function ancestorEl(cid, depth, linkId, roleTag){
+  const col=document.createElement('div'); col.className='tcol';
+  if(depth>0){
+    const ps=parentsOf(cid);
+    const row=document.createElement('div'); row.className='trow';
+    const fa=ps.find(l=>l.role==='father'), mo=ps.find(l=>l.role==='mother');
+    if(fa) row.appendChild(ancestorEl(fa.parent_id, depth-1, fa.id, 'father'));
+    else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ father'; s.onclick=()=>addParentTo(cid,'father'); row.appendChild(s); }
+    if(mo) row.appendChild(ancestorEl(mo.parent_id, depth-1, mo.id, 'mother'));
+    else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ mother'; s.onclick=()=>addParentTo(cid,'mother'); row.appendChild(s); }
+    col.appendChild(row);
+    col.appendChild(vline());
+  }
+  col.appendChild(treeNode(cid,{roleTag, linkId}));
+  return col;
+}
+// Descendants: recursive downward (children below the person)
+function descendantEl(cid, depth, linkId){
+  const col=document.createElement('div'); col.className='tcol';
+  col.appendChild(treeNode(cid,{linkId}));
+  const kids=childrenOf(cid);
+  if(kids.length && depth>0){
+    col.appendChild(vline());
+    const row=document.createElement('div'); row.className='trowD';
+    kids.forEach(l=>row.appendChild(descendantEl(l.child_id, depth-1, l.id)));
+    col.appendChild(row);
+  }
+  return col;
+}
+function renderFamilyTree(){
+  const sel=$('#treFocus');
+  // (re)build focus options
+  const cur = sel.value || (function(){ try{return localStorage.getItem('ts_tree_focus')||'';}catch(e){return '';} })();
+  sel.innerHTML='';
+  const sorted=[...contactsPool].sort((a,b)=>cmpVals(a.name,b.name));
+  sorted.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name||'(unnamed)'; sel.appendChild(o); });
+  const me=contactsPool.find(c=>c.is_me);
+  sel.value = (cur && contactsPool.some(c=>c.id===+cur)) ? cur : (me?me.id:(sorted[0]&&sorted[0].id)||'');
+  const focus=+sel.value;
+  const panel=$('#treePanel'); panel.innerHTML='';
+  if(!focus){ panel.innerHTML='<div class="empty">No contacts yet.</div>'; return; }
+  const root=document.createElement('div'); root.className='tcol'; root.style.minWidth='max-content';
+  // ancestors above the focus (focus node rendered inside ancestorEl at depth bottom)
+  const ps=parentsOf(focus);
+  const ancCol=document.createElement('div'); ancCol.className='tcol';
+  const row=document.createElement('div'); row.className='trow';
+  const fa=ps.find(l=>l.role==='father'), mo=ps.find(l=>l.role==='mother');
+  if(fa) row.appendChild(ancestorEl(fa.parent_id, 3, fa.id, 'father'));
+  else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ father'; s.onclick=()=>addParentTo(focus,'father'); row.appendChild(s); }
+  if(mo) row.appendChild(ancestorEl(mo.parent_id, 3, mo.id, 'mother'));
+  else { const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ mother'; s.onclick=()=>addParentTo(focus,'mother'); row.appendChild(s); }
+  ancCol.appendChild(row);
+  ancCol.appendChild(vline());
+  root.appendChild(ancCol);
+  // focus node + siblings (other children of the same parents) as chips beside it
+  const focusRow=document.createElement('div'); focusRow.style.cssText='display:flex;gap:10px;align-items:center;justify-content:center;';
+  const sibIds=new Set();
+  ps.forEach(l=>childrenOf(l.parent_id).forEach(k=>{ if(k.child_id!==focus) sibIds.add(k.child_id); }));
+  focusRow.appendChild(treeNode(focus,{focus:true}));
+  if(sibIds.size){
+    const sb=document.createElement('div'); sb.style.cssText='display:flex;gap:5px;flex-wrap:wrap;max-width:300px;';
+    sibIds.forEach(sid=>{
+      const chip=document.createElement('span'); chip.className='sibchip'; chip.textContent=personName(sid);
+      chip.title='Sibling — click to center'; chip.onclick=()=>{ sel.value=sid; renderFamilyTree(); };
+      sb.appendChild(chip);
+    });
+    focusRow.appendChild(sb);
+  }
+  root.appendChild(focusRow);
+  // descendants below
+  const kids=childrenOf(focus);
+  if(kids.length){
+    root.appendChild(vline());
+    const drow=document.createElement('div'); drow.className='trowD';
+    kids.forEach(l=>drow.appendChild(descendantEl(l.child_id, 3)));
+    root.appendChild(drow);
+  } else {
+    root.appendChild(vline());
+    const s=document.createElement('button'); s.className='tslot'; s.textContent='＋ child';
+    s.onclick=()=>addChildTo(focus);
+    root.appendChild(s);
+  }
+  panel.appendChild(root);
+}
+$('#treFocus') && ($('#treFocus').onchange=()=>{ try{localStorage.setItem('ts_tree_focus',$('#treFocus').value);}catch(e){} renderFamilyTree(); });
+
 // ── Share link ──
 $('#shareBtn').onclick=async()=>{
   if(!selected){ alert('Select a group first.'); return; }
@@ -1706,7 +1972,7 @@ $('#printCalBtn').onclick=()=>{
 };
 
 // ── Tabs ──
-const ids=['med','kon','kar','tid','bok','exp','dup'];
+const ids=['med','kon','kar','tid','tre','bok','exp','dup'];
 function showTab(t){
   const showId = (t==='med' && !selected) ? 'kon' : t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
@@ -1715,6 +1981,7 @@ function showTab(t){
   if(showId==='kar') setTimeout(renderMap,80);
   if(showId==='kon') renderContactsTable();
   if(showId==='tid') renderTimeline();
+  if(showId==='tre') ensureFam().then(renderFamilyTree).catch(e=>{ $('#treePanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
   if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
 }
 document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));

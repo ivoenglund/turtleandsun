@@ -1709,7 +1709,7 @@ app.get('/account', requireAuth, (req, res) => {
 });
 
 app.get('/account/contacts', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'contacts.html'));
+  res.redirect('/account/studio'); // contacts page retired 2026-07-12 — Studio covers it
 });
 
 app.get('/account/network', requireAuth, (req, res) => {
@@ -2348,6 +2348,38 @@ app.delete('/api/contacts/:id', requireAuth, async (req, res) => {
     await pool.query(`DELETE FROM contact_group_memberships WHERE contact_id = $1 AND user_id = $2`, [id, uid]);
     await pool.query(`DELETE FROM occasions WHERE contact_id = $1 AND user_id = $2`, [id, uid]);
     await pool.query(`DELETE FROM contacts WHERE id = $1 AND user_id = $2`, [id, uid]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Family tree links (Studio) ────────────────────────────────────────────────
+app.get('/api/family-links', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, parent_id, child_id, role FROM family_links WHERE user_id = $1`, [req.user.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/family-links', requireAuth, async (req, res) => {
+  const { parent_id, child_id, role } = req.body || {};
+  if (!parent_id || !child_id || !['father','mother'].includes(role))
+    return res.status(400).json({ error: 'parent_id, child_id and role (father|mother) required' });
+  if (+parent_id === +child_id) return res.status(400).json({ error: 'A person cannot be their own parent' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO family_links (user_id, parent_id, child_id, role)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (user_id, parent_id, child_id) DO UPDATE SET role = EXCLUDED.role
+       RETURNING *`,
+      [req.user.id, parent_id, child_id, role]);
+    res.json({ ok: true, link: rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/family-links/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM family_links WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
