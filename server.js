@@ -1771,8 +1771,6 @@ app.get('/print/labels', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-labels.html'));
 });
 
-app.get('/print/test', (req, res) => res.sendFile(path.join(__dirname, 'print-test.html')));
-
 app.get('/print/calendar', async (req, res) => {
   const user = await getSessionUser(req).catch(() => null);
   if (!user) return res.redirect('/login?redirect=' + encodeURIComponent('/print/calendar' + (req.url.replace(/^\/print\/calendar/, '') || '')));

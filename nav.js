@@ -71,6 +71,7 @@
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-library" href="/account/library">Library</a>' +
+        '<a class="ts-nav-dd-link ts-nav-auth ts-pg-studio" href="/account/studio">Studio</a>' +
         '<div class="ts-nav-dd-sep ts-nav-auth"></div>' +
         '<a class="ts-nav-dd-link ts-nav-auth" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth" href="/print/labels">Print address labels</a>' +
@@ -149,6 +150,7 @@
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-map" href="/account/network?view=map">Map</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-occasions" href="/account/occasions">Occasions</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-library" href="/account/library">Library</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-studio" href="/account/studio">Studio</a>' +
         '<div class="ts-nav-drawer-sep ts-nav-auth"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/auth/google/contacts">↻ Sync Google contacts</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/print/labels">Print address labels</a>' +
@@ -234,6 +236,7 @@
     if (p === '/account/network') return view === 'outline' ? 'outline' : view === 'calendar' ? 'calendar' : view === 'map' ? 'map' : 'network';
     if (p === '/account/occasions') return 'occasions';
     if (p === '/account/library') return 'library';
+    if (p === '/account/studio') return 'studio';
     if (p === '/account') return 'account';
     if (p === '/admin') return 'admin';
     return null;
