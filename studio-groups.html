@@ -1025,6 +1025,9 @@ function renderContactsTable(){
   if(groupMode && memEdit){ renderMemberEdit(); return; }
   buildColPicker('konColsHost','contacts',CON_COLS,CON_DEFAULT,renderContactsTable);
   let cols = activeCols('contacts',CON_COLS,CON_DEFAULT);
+  // Photo always first — before Name — in every grid (All contacts and groups)
+  { let pc = cols.find(c=>c.key==='photo') || CON_COLS.find(c=>c.key==='photo');
+    cols = [pc, ...cols.filter(c=>c.key!=='photo')]; }
   const q = ($('#conSearch').value||'').toLowerCase();
   // membership info per contact (group mode) — a contact can appear once per subgroup
   let memBy=null;
@@ -1063,7 +1066,7 @@ function renderContactsTable(){
   const headCols=[];
   cols.forEach((c,i)=>{
     headCols.push('<th data-k="'+c.key+'">'+c.label+sortIndicator(sortKey,c.key)+'</th>');
-    if(i===0 && groupMode) MEM_COLS.forEach(mc=>headCols.push('<th data-k="'+mc.key+'">'+mc.label+sortIndicator(sortKey,mc.key)+'</th>'));
+    if(c.key==='name' && groupMode) MEM_COLS.forEach(mc=>headCols.push('<th data-k="'+mc.key+'">'+mc.label+sortIndicator(sortKey,mc.key)+'</th>'));
   });
   const selTh = groupMode?'':'<th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>';
   let html = `<table class="grid"><tr><th data-k="pin"></th>${selTh}${headCols.join('')}</tr>`;
@@ -1073,7 +1076,7 @@ function renderContactsTable(){
     cols.forEach((col,i)=>{
       if(col.key==='photo') cells.push(`<td>${photoCell(c.photo_url)}</td>`);
       else cells.push(`<td data-f="${col.key}" class="ed">${conCellHtml(c,col)}</td>`);
-      if(i===0 && groupMode){
+      if(col.key==='name' && groupMode){
         cells.push(`<td class="edm">${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>`);
         cells.push(`<td class="rng edm" title="Click to edit membership">${fmtRange(m)}</td>`);
         cells.push(`<td class="edm" title="Click to edit membership">${statusBadge(m.status)}</td>`);
