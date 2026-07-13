@@ -794,8 +794,7 @@ async function selectGroup(node){
 function fmtRange(m){
   const f = d10(m.from_date), t = d10(m.to_date);
   if(!f && !t) return '<span class="muted">—</span>';
-  if(f && !t) return esc(f.slice(0,4))+'– <span style="color:var(--leaf2)">ongoing</span>';
-  return esc(f.slice(0,4))+'–<b>'+esc(t.slice(0,4))+'</b> <span style="color:#9a4a3a">ended</span>';
+  return esc(f?f.slice(0,4):'')+' – '+esc(t?t.slice(0,4):'');
 }
 function statusBadge(s){
   const map={active:['st-active','active'],invited:['st-invited','invited'],ended:['st-ended','ended']};
@@ -817,16 +816,15 @@ function openEditRow(tr){
   let cell = tr.querySelector('.rng');
   if(!cell){ cell = tr.cells[1]; }
   cell.innerHTML = `<input type="date" class="ef" value="${f}"> – <input type="date" class="et" value="${t}">
-    <select class="es"><option value="active"${m.status==='active'?' selected':''}>active</option>
-    <option value="invited"${m.status==='invited'?' selected':''}>invited</option>
-    <option value="ended"${m.status==='ended'?' selected':''}>ended</option></select>
     <button class="btn sm pub saveB">Save</button>`;
   cell.querySelector('.saveB').onclick=async()=>{
+    const fromV = cell.querySelector('.ef').value||null;
+    const toV   = cell.querySelector('.et').value||null;
+    // Status is derived from the dates: no dates = invited, start only = active, both = ended.
+    const status = (!fromV && !toV) ? 'invited' : (fromV && toV) ? 'ended' : 'active';
     await api('/api/memberships',{method:'PUT',body:JSON.stringify({
       contact_id:cid, group_id:gid,
-      from_date:cell.querySelector('.ef').value||null,
-      to_date:cell.querySelector('.et').value||null,
-      status:cell.querySelector('.es').value,
+      from_date:fromV, to_date:toV, status,
       self_managed:m.self_managed
     })});
     current = await api('/api/groups/'+selected.id+'/members'); renderContactsTable();
@@ -907,7 +905,6 @@ const CON_DEFAULT = ['name','email','phone','city','birthday','photo'];
 const MEM_COLS = [
   {key:'msub',  label:'Subgroup'},
   {key:'mrange',label:'From–to'},
-  {key:'mstat', label:'Status'},
 ];
 // Cell display for the contacts grid (used at render AND for in-place updates after a save)
 function conCellHtml(c,col){
@@ -1114,8 +1111,7 @@ function renderContactsTable(){
       else cells.push(`<td data-f="${col.key}" class="ed">${conCellHtml(c,col)}</td>`);
       if(col.key==='name' && groupMode){
         cells.push(`<td class="edm">${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>`);
-        cells.push(`<td class="rng edm" title="Click to edit membership">${fmtRange(m)}</td>`);
-        cells.push(`<td class="edm" title="Click to edit membership">${statusBadge(m.status)}</td>`);
+        cells.push(`<td class="rng edm" title="Click to edit dates">${fmtRange(m)}</td>`);
       }
     });
     const selTd = groupMode?'':`<td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>`;
