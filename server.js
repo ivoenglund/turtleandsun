@@ -1846,6 +1846,46 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Update a group — rename and/or move it under a new parent (drag-and-drop re-parent).
+// Send parent_group_id: null for top-level, or a group id to nest under it.
+app.put('/api/groups/:id', requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const g = await pool.query(`SELECT id, name FROM groups WHERE id=$1 AND user_id=$2`, [id, req.user.id]);
+    if (!g.rows.length) return res.status(404).json({ error: 'Group not found' });
+
+    const fields = [];
+    const vals = [];
+    if (typeof req.body.name === 'string' && req.body.name.trim()) {
+      vals.push(req.body.name.trim()); fields.push(`name = $${vals.length}`);
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'parent_group_id')) {
+      const pid = req.body.parent_group_id || null;
+      if (pid) {
+        if (String(pid) === String(id)) return res.status(400).json({ error: 'A group cannot be its own parent.' });
+        const parent = await pool.query(`SELECT id, name, parent_group_id FROM groups WHERE id=$1 AND user_id=$2`, [pid, req.user.id]);
+        if (!parent.rows.length) return res.status(404).json({ error: 'Parent group not found' });
+        if (parent.rows[0].name === 'Family') return res.status(400).json({ error: 'Family cannot have subgroups.' });
+        // Cycle guard: walk up from the new parent — if we reach this group, the move would loop.
+        let cur = parent.rows[0];
+        while (cur && cur.parent_group_id) {
+          if (String(cur.parent_group_id) === String(id)) return res.status(400).json({ error: 'Cannot move a group into one of its own subgroups.' });
+          const up = await pool.query(`SELECT id, parent_group_id FROM groups WHERE id=$1 AND user_id=$2`, [cur.parent_group_id, req.user.id]);
+          cur = up.rows[0];
+        }
+      }
+      vals.push(pid); fields.push(`parent_group_id = $${vals.length}`);
+    }
+    if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
+
+    vals.push(id, req.user.id);
+    const result = await pool.query(
+      `UPDATE groups SET ${fields.join(', ')} WHERE id = $${vals.length - 1} AND user_id = $${vals.length}
+       RETURNING id, name, parent_group_id`, vals);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Contact group memberships ─────────────────────────────────────────────────
 
 app.get('/api/contacts/:id/groups', requireAuth, async (req, res) => {

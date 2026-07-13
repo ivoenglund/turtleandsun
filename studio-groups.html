@@ -44,6 +44,11 @@
   .sub{padding-left:26px;}
   .arr{width:14px;display:inline-block;color:var(--mut);font-size:11px;}
   .addg{color:var(--green2);font-weight:700;padding:7px 10px;cursor:pointer;font-size:13.5px;}
+  .row .del{margin-left:6px;color:#a12a1a;font-weight:700;opacity:0;cursor:pointer;padding:0 5px;border-radius:5px;font-size:12px;}
+  .row:hover .del{opacity:.7;}
+  .row .del:hover{opacity:1;background:#f6e3df;}
+  .row.dragover{outline:2px dashed var(--leaf2);outline-offset:-2px;background:#eef6e6;}
+  .row.dragging{opacity:.45;}
   .main{flex:1;min-width:0;}
   .tabs{display:flex;gap:4px;border-bottom:1px solid rgba(28,10,0,0.15);margin-bottom:12px;flex-wrap:wrap;}
   .tab{padding:7px 12px;font-size:13.5px;cursor:pointer;color:#4a553f;border-bottom:3px solid transparent;}
@@ -708,18 +713,49 @@ function flatGroups(){
   return out;
 }
 
+let dragGroupId=null;
+async function moveGroup(srcId, parentId){
+  try{
+    await api('/api/groups/'+srcId,{method:'PUT',body:JSON.stringify({parent_group_id:parentId})});
+    await loadAll();
+    if(selected){ current = await api('/api/groups/'+selected.id+'/members'); renderMembers(); }
+  }catch(err){ alert('Could not move group: '+err.message); }
+}
 function renderTree(){
   const host = $('#tree'); host.innerHTML='';
   function row(node, depth){
     const div=document.createElement('div');
     div.className='row'+(selected&&selected.id===node.id?' active':'')+(depth?' sub':'');
     const arrow = (node.subgroups&&node.subgroups.length)?'▾':'';
-    div.innerHTML = `<span class="arr">${arrow}</span><span>${depth?'•':'📁'}</span> ${esc(node.name)} <span class="ct">${countFor(node)}</span>`;
+    const isFamily = node.name==='Family';
+    div.innerHTML = `<span class="arr">${arrow}</span><span>${depth?'•':'📁'}</span> ${esc(node.name)} <span class="ct">${countFor(node)}</span>`
+      + (isFamily?'':`<span class="del" title="Delete group">✕</span>`);
     div.onclick = ()=>selectGroup(node);
+    const del = div.querySelector('.del');
+    if(del) del.onclick = async(e)=>{
+      e.stopPropagation();
+      const extra = (node.subgroups&&node.subgroups.length)?' and its subgroups':'';
+      if(!confirm('Delete the group "'+node.name+'"'+extra+'? Your contacts stay — only the group and its memberships are removed.')) return;
+      try{
+        await api('/api/groups/'+node.id,{method:'DELETE'});
+        if(selected && selected.id===node.id){ selected=null; }
+        await loadAll();
+        if(!selected){ const active=document.querySelector('.tab.active'); showTab(active?active.dataset.t:'med'); }
+      }catch(err){ alert('Could not delete: '+err.message); }
+    };
+    // Drag a group onto another to make it a subgroup; drop on empty tree area = top level.
+    div.draggable = true;
+    div.ondragstart = (e)=>{ e.stopPropagation(); dragGroupId=node.id; div.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',String(node.id)); };
+    div.ondragend = ()=>{ dragGroupId=null; div.classList.remove('dragging'); host.querySelectorAll('.row.dragover').forEach(r=>r.classList.remove('dragover')); };
+    div.ondragover = (e)=>{ if(dragGroupId && dragGroupId!==node.id && !isFamily){ e.preventDefault(); e.dataTransfer.dropEffect='move'; div.classList.add('dragover'); } };
+    div.ondragleave = ()=>div.classList.remove('dragover');
+    div.ondrop = async(e)=>{ e.preventDefault(); e.stopPropagation(); div.classList.remove('dragover'); const src=dragGroupId; dragGroupId=null; if(src && src!==node.id) await moveGroup(src, node.id); };
     host.appendChild(div);
     (node.subgroups||[]).forEach(c=>row(c,depth+1));
   }
   groups.forEach(g=>row(g,0));
+  host.ondragover = (e)=>{ if(dragGroupId){ e.preventDefault(); e.dataTransfer.dropEffect='move'; } };
+  host.ondrop = async(e)=>{ if(e.target===host && dragGroupId){ e.preventDefault(); const src=dragGroupId; dragGroupId=null; await moveGroup(src, null); } };
   updateSelHighlight();
 }
 
