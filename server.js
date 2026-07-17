@@ -1725,6 +1725,11 @@ app.get('/join/:token', (req, res) => {
   res.sendFile(path.join(__dirname, 'join.html'));
 });
 
+// Public group website (no auth — gated by the site token instead)
+app.get('/site/:token', (req, res) => {
+  res.sendFile(path.join(__dirname, 'group-site.html'));
+});
+
 app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
@@ -2130,6 +2135,130 @@ app.post('/api/join/:token', async (req, res) => {
       [link.user_id, contact.rows[0].id, link.group_id]
     );
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Group websites (the Web tab) ──────────────────────────────────────────────
+
+// Current site status for a group.
+app.get('/api/groups/:id/site', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT token, active, tagline, created_at FROM group_sites
+       WHERE group_id = $1 AND user_id = $2 AND active = TRUE
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, req.user.id]
+    );
+    if (!result.rows.length) return res.json({ token: null });
+    const row = result.rows[0];
+    res.json({ ...row, url: `${req.protocol}://${req.get('host')}/site/${row.token}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Publish (create or reuse) the website for a group.
+app.post('/api/groups/:id/site', requireAuth, async (req, res) => {
+  try {
+    const grp = await pool.query(`SELECT id FROM groups WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    if (!grp.rows.length) return res.status(404).json({ error: 'Group not found' });
+
+    const tagline = (req.body && typeof req.body.tagline === 'string') ? req.body.tagline.slice(0, 200) : null;
+    const existing = await pool.query(
+      `SELECT token FROM group_sites WHERE group_id = $1 AND user_id = $2 AND active = TRUE ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, req.user.id]
+    );
+    let token = existing.rows[0]?.token;
+    if (!token) {
+      token = require('crypto').randomBytes(24).toString('hex');
+      await pool.query(
+        `INSERT INTO group_sites (user_id, group_id, token, tagline) VALUES ($1, $2, $3, $4)`,
+        [req.user.id, req.params.id, token, tagline]
+      );
+    } else if (tagline !== null) {
+      await pool.query(
+        `UPDATE group_sites SET tagline = $1 WHERE token = $2`, [tagline, token]
+      );
+    }
+    res.json({ token, url: `${req.protocol}://${req.get('host')}/site/${token}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Unpublish a group's website.
+app.delete('/api/groups/:id/site', requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE group_sites SET active = FALSE WHERE group_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Public site data (no auth — the token is the credential). Public-safe fields
+// only: names, photos, cities and map pins — never email, phone or full birthdays.
+app.get('/api/site/:token', async (req, res) => {
+  try {
+    const site = await pool.query(
+      `SELECT s.group_id, s.user_id, s.tagline, g.name AS group_name
+       FROM group_sites s JOIN groups g ON g.id = s.group_id
+       WHERE s.token = $1 AND s.active = TRUE`,
+      [req.params.token]
+    );
+    if (!site.rows.length) return res.status(404).json({ error: 'This site is not published.' });
+    const { group_id, user_id, tagline, group_name } = site.rows[0];
+
+    const subgroups = await pool.query(
+      `SELECT id, name FROM groups WHERE parent_group_id = $1 AND user_id = $2`,
+      [group_id, user_id]
+    );
+    const treeIds = [group_id, ...subgroups.rows.map(s => s.id)];
+
+    const members = await pool.query(
+      `SELECT DISTINCT ON (c.id)
+              c.id, c.name, c.photo_url, c.birthday, c.city, c.country,
+              c.latitude, c.longitude,
+              CASE WHEN g.parent_group_id = $3 THEN g.name ELSE NULL END AS subgroup_name
+       FROM contact_group_memberships m
+       JOIN contacts c ON c.id = m.contact_id
+       JOIN groups g   ON g.id = m.group_id
+       WHERE m.user_id = $1 AND m.group_id = ANY($2)
+         AND (m.to_date IS NULL OR m.to_date >= CURRENT_DATE)
+       ORDER BY c.id`,
+      [user_id, treeIds, group_id]
+    );
+
+    const contactIds = members.rows.map(r => r.id);
+    let occasions = [];
+    if (contactIds.length) {
+      const occ = await pool.query(
+        `SELECT o.name, o.start_date, o.frequency, c.name AS contact_name
+         FROM occasions o JOIN contacts c ON c.id = o.contact_id
+         WHERE o.user_id = $1 AND o.contact_id = ANY($2)`,
+        [user_id, contactIds]
+      );
+      occasions = occ.rows;
+    }
+
+    const posts = await pool.query(
+      `SELECT title, body, post_date, photos FROM blog_posts
+       WHERE user_id = $1 AND EXISTS (
+         SELECT 1 FROM jsonb_array_elements_text(tags) t WHERE LOWER(t) = LOWER($2)
+       )
+       ORDER BY post_date DESC, id DESC LIMIT 12`,
+      [user_id, group_name]
+    );
+
+    res.json({
+      group_name,
+      tagline,
+      members: members.rows.map(r => ({
+        name: r.name, photo_url: r.photo_url, city: r.city, country: r.country,
+        latitude: r.latitude, longitude: r.longitude,
+        subgroup_name: r.subgroup_name,
+        birthday: r.birthday ? String(r.birthday).replace(/^\d{4}-/, '') : null,
+      })),
+      occasions,
+      posts: posts.rows,
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -206,6 +206,7 @@
       <div class="tab" data-t="tre">Family tree</div>
       <div class="tab" data-t="bok">Yearbook</div>
       <div class="tab" data-t="exp">Export</div>
+      <div class="tab" data-t="web">Web</div>
     </div>
 
     <!-- CONTACTS / MEMBERS — one grid; a selected group adds membership columns -->
@@ -316,6 +317,14 @@
           <button class="btn pub" id="printCalBtn">🖨 Open print calendar</button>
         </div>
         <div class="help">The print calendar opens with this group pre-selected (its own filters can change it there).</div>
+      </div>
+    </div>
+
+    <!-- WEB — public website for the selected group -->
+    <div id="web" class="hide">
+      <div class="panel" style="max-width:760px;padding:16px 18px;">
+        <h3 style="margin-top:0">Website</h3>
+        <div id="webBody"></div>
       </div>
     </div>
 
@@ -2278,8 +2287,55 @@ $('#printCalBtn').onclick=()=>{
   window.open('/print/calendar'+(selected?'?groups='+selected.id:''),'_blank');
 };
 
+// ── Web tab: publish / preview the group's public website ──
+async function renderWeb(){
+  const host=$('#webBody');
+  if(!selected){
+    host.innerHTML='<div class="help" style="margin:0;">Select a group in the sidebar to publish its website. The site shows the group’s people, upcoming dates, news posts and map — always current, straight from the living data.</div>';
+    return;
+  }
+  host.innerHTML='<div class="help" style="margin:0;">Loading…</div>';
+  try{
+    const s=await api('/api/groups/'+selected.id+'/site');
+    if(!s || !s.token){
+      host.innerHTML=
+        '<div class="help" style="margin-top:0;">Publish a public website for <b>'+esc(selected.name)+'</b>. '+
+        'One link — works as the group’s web page, and on any screen you point at it. '+
+        'It shows people, upcoming dates, news posts tagged “'+esc(selected.name)+'”, and the map. '+
+        'Email, phone and full birthdays are never shown.</div>'+
+        '<label style="display:block;font-size:13px;margin:10px 0 4px;">Tagline (optional)</label>'+
+        '<input type="text" id="webTagline" placeholder="A short line under the name…" style="width:100%;max-width:420px;padding:6px 8px;">'+
+        '<div style="margin-top:12px;"><button class="btn pub" id="webPublish">🌐 Publish website</button></div>';
+      $('#webPublish').onclick=async()=>{
+        try{
+          await api('/api/groups/'+selected.id+'/site',{method:'POST',body:JSON.stringify({tagline:$('#webTagline').value.trim()||null})});
+          renderWeb();
+        }catch(e){ alert(e.message); }
+      };
+      return;
+    }
+    host.innerHTML=
+      '<div class="selbox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
+        '<b>Live:</b> <a href="'+esc(s.url)+'" target="_blank" id="webUrl">'+esc(s.url)+'</a>'+
+        '<button class="btn sm gray" id="webCopy">Copy link</button>'+
+        '<button class="btn sm gray" id="webOpenDisplay" title="Auto-scrolling screen mode">Open as screen</button>'+
+        '<button class="btn sm danger" id="webUnpub" style="margin-left:auto;">Unpublish</button>'+
+      '</div>'+
+      '<div class="help">Anyone with the link can see it. It updates by itself when the group’s data changes — nothing to re-publish. “Open as screen” adds slow auto-scroll for a TV or shop window.</div>'+
+      '<iframe src="'+esc(s.url)+'" style="width:100%;height:520px;border:1px solid #d9d4c4;border-radius:10px;margin-top:8px;background:#fff;"></iframe>';
+    $('#webCopy').onclick=()=>{ navigator.clipboard.writeText(s.url).then(()=>showToast('Link copied')); };
+    $('#webOpenDisplay').onclick=()=>window.open(s.url+'?display=1','_blank');
+    $('#webUnpub').onclick=async()=>{
+      if(!confirm('Unpublish this website? The link stops working (you can publish again later).')) return;
+      try{ await api('/api/groups/'+selected.id+'/site',{method:'DELETE'}); renderWeb(); }catch(e){ alert(e.message); }
+    };
+  }catch(e){
+    host.innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>';
+  }
+}
+
 // ── Tabs ──
-const ids=['kon','kar','tid','tre','bok','exp','dup'];
+const ids=['kon','kar','tid','tre','bok','exp','web','dup'];
 function showTab(t){
   const showId = (t==='med') ? 'kon' : t; // Members tab = the unified grid
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
@@ -2290,6 +2346,7 @@ function showTab(t){
   if(showId==='tid') renderTimeline();
   if(showId==='tre') ensureFam().then(renderFamilyTree).catch(e=>{ $('#treePanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
   if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
+  if(showId==='web') renderWeb();
 }
 document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));
 

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turtle &amp; Sun</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Segoe UI',Arial,sans-serif; color:var(--ink); background:#fdfcf8; }
+  .hero{ background:var(--green); color:#f4efe4; padding:64px 20px 56px; text-align:center; }
+  .hero h1{ font-family:Georgia,'Times New Roman',serif; font-size:clamp(30px,6vw,52px); margin:0; }
+  .hero .tag{ font-size:clamp(15px,2.5vw,19px); color:#cdddd2; margin-top:10px; }
+  .hero .count{ display:inline-block; margin-top:18px; font-size:14px; color:var(--gold); letter-spacing:1px; text-transform:uppercase; }
+  .wrap{ max-width:960px; margin:0 auto; padding:0 20px; }
+  section{ padding:44px 0 8px; }
+  h2{ font-family:Georgia,serif; color:var(--green); font-size:26px; margin:0 0 6px; }
+  .rule{ border:none; border-top:3px solid var(--gold); width:64px; margin:0 0 24px; }
+  .people{ display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:18px; }
+  .person{ text-align:center; }
+  .person .ph{ width:96px; height:96px; border-radius:50%; object-fit:cover; margin:0 auto; display:block; background:var(--cream); }
+  .person .init{ width:96px; height:96px; border-radius:50%; background:var(--cream); color:var(--green); display:flex; align-items:center; justify-content:center; font-size:28px; font-family:Georgia,serif; margin:0 auto; }
+  .person .nm{ font-size:14.5px; font-weight:600; margin-top:8px; }
+  .person .sub{ font-size:12.5px; color:var(--muted); }
+  .updates{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
+  .upd{ background:var(--cream); border-radius:10px; padding:14px 16px; }
+  .upd .d{ font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .upd .t{ font-size:15px; font-weight:600; margin-top:3px; }
+  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px; }
+  .post{ background:#fff; border:1px solid #e2dccb; border-radius:12px; overflow:hidden; }
+  .post img{ width:100%; height:170px; object-fit:cover; display:block; }
+  .post .bd{ padding:14px 16px; }
+  .post .dt{ font-size:12.5px; color:var(--muted); }
+  .post h3{ margin:4px 0 6px; font-size:17px; color:var(--green); }
+  .post p{ margin:0; font-size:14px; line-height:1.55; }
+  #map{ height:340px; border-radius:12px; }
+  footer{ margin-top:56px; padding:26px 20px; background:var(--cream); text-align:center; font-size:13px; color:var(--muted); }
+  footer a{ color:var(--green); text-decoration:none; }
+  .err{ text-align:center; padding:80px 20px; color:var(--muted); font-size:16px; }
+  .hide{ display:none!important; }
+</style>
+</head>
+<body>
+
+<div id="page" class="hide">
+  <div class="hero">
+    <h1 id="gname"></h1>
+    <div class="tag" id="gtag"></div>
+    <div class="count" id="gcount"></div>
+  </div>
+
+  <div class="wrap">
+    <section id="secPeople" class="hide">
+      <h2>People</h2><hr class="rule">
+      <div class="people" id="people"></div>
+    </section>
+
+    <section id="secUpd" class="hide">
+      <h2>Coming up</h2><hr class="rule">
+      <div class="updates" id="updates"></div>
+    </section>
+
+    <section id="secPosts" class="hide">
+      <h2>News</h2><hr class="rule">
+      <div class="posts" id="posts"></div>
+    </section>
+
+    <section id="secMap" class="hide">
+      <h2>Where we are</h2><hr class="rule">
+      <div id="map"></div>
+    </section>
+  </div>
+
+  <footer>Made with <a href="/" target="_blank">Turtle &amp; Sun</a> · always up to date</footer>
+</div>
+
+<div id="err" class="err hide">This page is not published.</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const token = location.pathname.split('/').pop();
+const display = new URLSearchParams(location.search).has('display');
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function nextDate(md){
+  const m = String(md||'').match(/^(\d{1,2})-(\d{1,2})/);
+  if(!m) return null;
+  const now = new Date();
+  let d = new Date(now.getFullYear(), +m[1]-1, +m[2]);
+  if(d < new Date(now.getFullYear(), now.getMonth(), now.getDate())) d = new Date(now.getFullYear()+1, +m[1]-1, +m[2]);
+  return d;
+}
+function fmt(d){ return d.getDate() + ' ' + MON[d.getMonth()]; }
+
+async function load(){
+  const r = await fetch('/api/site/' + token);
+  if(!r.ok){ document.getElementById('err').classList.remove('hide'); return; }
+  const data = await r.json();
+  document.title = data.group_name + ' · Turtle & Sun';
+
+  document.getElementById('gname').textContent = data.group_name;
+  document.getElementById('gtag').textContent = data.tagline || '';
+  document.getElementById('gtag').classList.toggle('hide', !data.tagline);
+  const n = (data.members||[]).length;
+  document.getElementById('gcount').textContent = n ? (n + (n===1?' member':' members')) : '';
+
+  const ppl = data.members||[];
+  if(ppl.length){
+    document.getElementById('secPeople').classList.remove('hide');
+    document.getElementById('people').innerHTML = ppl.map(p => {
+      const init = (p.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+      const img = p.photo_url
+        ? '<img class="ph" src="'+esc(p.photo_url)+'" alt="" loading="lazy">'
+        : '<div class="init">'+esc(init)+'</div>';
+      const sub = [p.subgroup_name, p.city].filter(Boolean).join(' · ');
+      return '<div class="person">'+img+'<div class="nm">'+esc(p.name||'')+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'')+'</div>';
+    }).join('');
+  }
+
+  const ups = [];
+  const horizon = new Date(); horizon.setDate(horizon.getDate()+90);
+  ppl.forEach(p => {
+    const d = nextDate(p.birthday);
+    if(d && d <= horizon) ups.push({ d, label:(p.name||'').split(' ')[0] + "'s birthday" });
+  });
+  (data.occasions||[]).forEach(o => {
+    let d = null;
+    if(o.frequency === 'yearly'){ d = nextDate(String(o.start_date).slice(5,10)); }
+    else { const t = new Date(o.start_date); if(t >= new Date()) d = t; }
+    if(d && d <= horizon) ups.push({ d, label: o.name + (o.contact_name ? ' · ' + o.contact_name.split(' ')[0] : '') });
+  });
+  ups.sort((a,b)=>a.d-b.d);
+  if(ups.length){
+    document.getElementById('secUpd').classList.remove('hide');
+    document.getElementById('updates').innerHTML = ups.slice(0,8).map(u =>
+      '<div class="upd"><div class="d">'+fmt(u.d)+'</div><div class="t">'+esc(u.label)+'</div></div>').join('');
+  }
+
+  const posts = data.posts||[];
+  if(posts.length){
+    document.getElementById('secPosts').classList.remove('hide');
+    document.getElementById('posts').innerHTML = posts.map(p => {
+      const ph = (p.photos||[])[0];
+      const body = String(p.body||'').slice(0,180) + (String(p.body||'').length>180?'…':'');
+      const dt = new Date(p.post_date);
+      return '<div class="post">'+(ph?'<img src="'+esc(ph)+'" alt="" loading="lazy">':'')+
+        '<div class="bd"><div class="dt">'+fmt(dt)+' '+dt.getFullYear()+'</div>'+
+        (p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p>'+esc(body)+'</p></div></div>';
+    }).join('');
+  }
+
+  const pins = ppl.filter(p => p.latitude != null && p.longitude != null);
+  if(pins.length && window.L && !window._tsMap){
+    document.getElementById('secMap').classList.remove('hide');
+    const map = window._tsMap = L.map('map', { scrollWheelZoom:false });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+    const b = L.latLngBounds(pins.map(p=>[p.latitude,p.longitude]));
+    pins.forEach(p => L.marker([p.latitude,p.longitude]).addTo(map).bindPopup(esc(p.name||'')));
+    map.fitBounds(b.pad(0.3));
+  }
+
+  document.getElementById('page').classList.remove('hide');
+}
+
+load();
+setInterval(load, 5*60*1000);
+
+if(display){
+  let dir = 1;
+  document.body.style.cursor = 'none';
+  setInterval(() => {
+    window.scrollBy(0, dir);
+    const max = document.documentElement.scrollHeight - innerHeight;
+    if(scrollY >= max - 2) dir = -1;
+    if(scrollY <= 0) dir = 1;
+  }, 40);
+}
+</script>
+</body>
+</html>

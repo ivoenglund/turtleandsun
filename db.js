@@ -344,6 +344,19 @@ async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS group_share_links_group_idx ON group_share_links(group_id);
 
+    -- 2026-07-17: Group websites — one public token per group. The token gates the
+    -- public site page (/site/:token); deactivating unpublishes without deleting.
+    CREATE TABLE IF NOT EXISTS group_sites (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id),
+      group_id    INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+      token       VARCHAR(64) NOT NULL UNIQUE,
+      active      BOOLEAN DEFAULT TRUE,
+      tagline     TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS group_sites_group_idx ON group_sites(group_id);
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle
