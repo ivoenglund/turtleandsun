@@ -2267,7 +2267,7 @@ app.get('/api/site/:token', async (req, res) => {
        WHERE user_id = $1 AND EXISTS (
          SELECT 1 FROM jsonb_array_elements_text(tags) t WHERE LOWER(t) = LOWER($2)
        )
-       ORDER BY post_date DESC, id DESC LIMIT 12`,
+       ORDER BY post_date DESC, id DESC LIMIT 200`,
       [user_id, group_name]
     );
 

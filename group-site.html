@@ -14,7 +14,11 @@
   .hero h1{ font-family:Georgia,'Times New Roman',serif; font-size:clamp(30px,6vw,52px); margin:0; }
   .hero .tag{ font-size:clamp(15px,2.5vw,19px); color:#cdddd2; margin-top:10px; }
   .hero .count{ display:inline-block; margin-top:18px; font-size:14px; color:var(--gold); letter-spacing:1px; text-transform:uppercase; }
-  .wrap{ max-width:960px; margin:0 auto; padding:0 20px; }
+  .wrap{ width:100%; margin:0; padding:0 36px; }
+  @media (max-width:600px){ .wrap{ padding:0 16px; } }
+  body.display{ user-select:none; }
+  body.display.dragging{ cursor:grabbing!important; }
+  body.idle{ cursor:none; }
   section{ padding:44px 0 8px; }
   h2{ font-family:Georgia,serif; color:var(--green); font-size:26px; margin:0 0 6px; }
   .rule{ border:none; border-top:3px solid var(--gold); width:64px; margin:0 0 24px; }
@@ -31,7 +35,7 @@
   .upd{ background:var(--cream); border-radius:10px; padding:14px 16px; }
   .upd .d{ font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
   .upd .t{ font-size:15px; font-weight:600; margin-top:3px; }
-  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px; }
+  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
   .post{ background:#fff; border:1px solid #e2dccb; border-radius:12px; overflow:hidden; }
   .post img{ width:100%; height:170px; object-fit:cover; display:block; }
   .post .bd{ padding:14px 16px; }
@@ -188,14 +192,43 @@ load();
 setInterval(load, 5*60*1000);
 
 if(display){
-  let dir = 1;
-  document.body.style.cursor = 'none';
+  document.body.classList.add('display');
+  let dir = 1, pauseUntil = Date.now() + 2500, idleTimer = null;
+
+  // Any human activity: show the cursor, pause the auto-scroll; both come back
+  // by themselves after a few idle seconds.
+  function humanActivity(){
+    pauseUntil = Date.now() + 5000;
+    document.body.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => document.body.classList.add('idle'), 4000);
+  }
+  ['mousemove','wheel','touchstart','mousedown','keydown'].forEach(ev =>
+    addEventListener(ev, humanActivity, { passive:true }));
+  idleTimer = setTimeout(() => document.body.classList.add('idle'), 4000);
+
   setInterval(() => {
+    if(Date.now() < pauseUntil) return;
     window.scrollBy(0, dir);
     const max = document.documentElement.scrollHeight - innerHeight;
     if(scrollY >= max - 2) dir = -1;
     if(scrollY <= 0) dir = 1;
   }, 40);
+
+  // Grab the page and drag it, without breaking normal clicks on links:
+  // only counts as a drag after 5px of movement.
+  let dragY = null, dragged = false;
+  addEventListener('mousedown', e => { if(e.button===0){ dragY = e.clientY; dragged = false; } });
+  addEventListener('mousemove', e => {
+    if(dragY == null) return;
+    const dy = dragY - e.clientY;
+    if(Math.abs(dy) > 5){ dragged = true; document.body.classList.add('dragging'); }
+    if(dragged){ window.scrollBy(0, dy); dragY = e.clientY; }
+  });
+  addEventListener('mouseup', () => { dragY = null; document.body.classList.remove('dragging'); });
+  addEventListener('click', e => {
+    if(dragged){ e.preventDefault(); e.stopPropagation(); dragged = false; }
+  }, true);
 }
 </script>
 </body>
