@@ -1,0 +1,18 @@
+{
+  "group": "QCC",
+  "company": "QCC Management AB",
+  "city": "Stockholm",
+  "contacts": [
+    { "name": "Nils Ström", "email": "nils.strom@qcc.se", "phone": "08-400 507 05", "job_title": "Delägare", "about": "Över 35 års erfarenhet som konsult från Skatteverket, stora och mindre revisionsbyråer och längre projektuppdrag. Huvudinriktning: köp och försäljning av bolag, omstruktureringar, skattefrågor och affärsjuridik." },
+    { "name": "Niklas Brolin", "email": "niklas.brolin@qcc.se", "phone": "08-400 507 09", "job_title": "Delägare", "about": "Över 30 års erfarenhet från revisionsbyrå, som ekonomichef på börsnoterat konsultföretag samt som konsult åt ett stort antal mindre och medelstora företag. Huvudinriktning: skattefrågor, ägarfrågor i fåmansföretag samt bolagsjuridik." },
+    { "name": "Anna Johnard Wickenberg", "email": "anna.wickenberg@qcc.se", "phone": "08-400 507 01", "job_title": "Konsult" },
+    { "name": "Anneli Röine", "email": "anneli.roine@qcc.se", "phone": "08-400 507 10", "job_title": "Konsult" },
+    { "name": "Ingrid Steen", "email": "ingrid.steen@qcc.se", "phone": "08-400 507 03", "job_title": "Konsult" },
+    { "name": "Jennifer Dammhag", "email": "jennifer.dammhag@qcc.se", "phone": "08-400 507 04", "job_title": "Konsult" },
+    { "name": "Nina Öhlund", "email": "nina.ohlund@qcc.se", "phone": "08-400 507 08", "job_title": "Konsult" },
+    { "name": "Dalia Jakobsson", "email": "dalia.jakobsson@qcc.se", "phone": "08-400 507 06", "job_title": "Konsult" },
+    { "name": "Anna Zelenina", "email": "anna.zelenina@qcc.se", "phone": "08-400 507 07", "job_title": "Konsult" },
+    { "name": "Christine Lembrant", "email": "christine.lembrant@qcc.se", "phone": "08-400 507 02", "job_title": "Konsult" },
+    { "name": "Jennifer Mannerstål", "email": "jennifer.mannerstal@qcc.se", "phone": "08-400 507 11", "job_title": "Konsult" }
+  ]
+}

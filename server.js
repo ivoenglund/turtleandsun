@@ -2249,6 +2249,58 @@ app.get('/api/admin/import-facebook', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Import a contact list (JSON in ./demo-data) into a group — e.g. a company's
+// team harvested from their website. Dedupes via google_id marker; re-run safe.
+//   /api/admin/import-contacts?file=qcc-team
+app.get('/api/admin/import-contacts', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+
+    const file = String(req.query.file || '').replace(/[^a-z0-9_-]/gi, '');
+    const fp = path.join(__dirname, 'demo-data', file + '.json');
+    if (!file || !require('fs').existsSync(fp)) return res.status(404).json({ error: `demo-data/${file}.json not found` });
+    const data = JSON.parse(require('fs').readFileSync(fp, 'utf8'));
+    const groupName = req.query.group || data.group || 'Imported';
+
+    let grp = await pool.query(`SELECT id FROM groups WHERE user_id = $1 AND LOWER(name) = LOWER($2)`, [req.user.id, groupName]);
+    let groupId = grp.rows[0]?.id;
+    if (!groupId) {
+      const ins = await pool.query(`INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id`, [req.user.id, groupName]);
+      groupId = ins.rows[0].id;
+    }
+
+    let inserted = 0, updated = 0;
+    let i = 0;
+    for (const c of (data.contacts || [])) {
+      i++;
+      if (!c.name) continue;
+      const marker = 'import-' + file + '-' + i;
+      const row = await pool.query(
+        `INSERT INTO contacts (user_id, google_id, name, email, phone, company, job_title, city, country, about, is_placeholder)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Sverige',$9,FALSE)
+         ON CONFLICT (user_id, google_id) DO UPDATE
+           SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
+               company = EXCLUDED.company, job_title = EXCLUDED.job_title, about = EXCLUDED.about
+         RETURNING (xmax = 0) AS is_new, id`,
+        [req.user.id, marker, c.name, c.email || null, c.phone || null,
+         c.company || data.company || null, c.job_title || null, c.city || data.city || null, c.about || null]
+      );
+      row.rows[0].is_new ? inserted++ : updated++;
+      await pool.query(
+        `INSERT INTO contact_group_memberships (user_id, contact_id, group_id, from_date, status)
+         VALUES ($1,$2,$3,CURRENT_DATE,'active')
+         ON CONFLICT (user_id, contact_id, group_id) DO NOTHING`,
+        [req.user.id, row.rows[0].id, groupId]
+      );
+    }
+
+    res.json({ ok: true, inserted, updated, group: groupName });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
 // kind: 'public' = customer website (/site/…), 'internal' = staff board (/board/…)
