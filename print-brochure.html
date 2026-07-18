@@ -12,6 +12,27 @@
   .toolbar button{ font-family:inherit; font-weight:700; font-size:14px; padding:8px 16px; border:none; border-radius:8px; background:var(--green); color:#f4efe4; cursor:pointer; }
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
+  body.fmt-a5 .page{ width:148mm; min-height:209mm; padding:10mm; }
+  body.fmt-a3 .page{ width:297mm; min-height:419mm; padding:22mm; }
+  body.fmt-a5 .cover h1{ font-size:30px; } body.fmt-a3 .cover h1{ font-size:62px; }
+  .block.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
+  .block.pos-left, .block.pos-right{ display:flex; gap:5mm; align-items:flex-start; }
+  .block.pos-left img, .block.pos-right img{ width:45%; margin-bottom:0; }
+  .block.pos-right{ flex-direction:row-reverse; }
+  .block.pos-left > div, .block.pos-right > div{ flex:1; }
+  .block.img-s img{ max-height:55mm; object-fit:cover; }
+  .block.img-m img{ max-height:95mm; object-fit:cover; }
+  .block.img-l img{ max-height:150mm; object-fit:cover; }
+  .block.txt-s p{ font-size:11.5px; } .block.txt-l p{ font-size:16px; line-height:1.5; }
+  .block.txt-l h3{ font-size:25px; }
+  #knobs{ position:fixed; right:14px; top:64px; width:220px; background:#fff; border:2px solid var(--gold);
+          border-radius:12px; padding:12px 14px; box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; }
+  #knobs .kh{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:8px 0 4px; }
+  #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
+  #knobs button{ font-family:inherit; font-size:12px; padding:4px 9px; border:1px solid #d9d4c4; background:#fff;
+                 border-radius:7px; cursor:pointer; color:var(--ink); }
+  #knobs button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  @media print{ #knobs{ display:none!important; } .block.sel{ outline:none; } }
   .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
   .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
   .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
@@ -50,8 +71,14 @@
 
 <div class="toolbar">
   <button onclick="window.print()">🖨 Print / save as PDF</button>
-  <span style="font-size:13px;color:#5c5c4d;">A4 portrait · the first card is the cover · people group into team pages</span>
+  <label style="font-size:13.5px;font-weight:700;">Paper
+    <select id="paper" style="font-family:inherit;font-size:13.5px;padding:5px 8px;border-radius:7px;border:1px solid #c9c4b4;">
+      <option value="a5">A5</option><option value="a4" selected>A4</option><option value="a3">A3</option>
+    </select></label>
+  <button id="saveBtn" style="background:#fff;color:var(--green);border:2px solid var(--green);">Save layout</button>
+  <span style="font-size:13px;color:#5c5c4d;">Click a card in the preview to adjust it · the first card is the cover</span>
 </div>
+<div id="knobs" class="hidden" style="display:none;"></div>
 <div id="out"><div class="err">Loading…</div></div>
 
 <script>
@@ -59,16 +86,16 @@ const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<'
 const compId = new URLSearchParams(location.search).get('comp');
 
 function postBlock(it){
-  const c=it.content, big=it.overrides&&it.overrides.big;
+  const c=it.content, ov=it.overrides||{}, big=ov.big;
   const ph=(c.photos||[])[0];
   const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0, big?12:4)
     .map(p=>'<p>'+esc(p)+'</p>').join('');
   const d=c.post_date?new Date(c.post_date):null;
-  return '<div class="block'+(big?' big':'')+'">'+
-    (ph?'<img src="'+esc(ph)+'">':'')+
-    (c.title?'<h3>'+esc(c.title)+'</h3>':'')+
-    (d?'<div class="meta">'+d.toLocaleDateString('sv-SE')+(c.author?' · '+esc(c.author):'')+'</div>':'')+
-    paras+'</div>';
+  const cls=['block', big?'big':'', ov.pos?'pos-'+ov.pos:'', ov.img?'img-'+ov.img:'', ov.txt?'txt-'+ov.txt:''].filter(Boolean).join(' ');
+  const inner='<div>'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
+    (d?'<div class="meta">'+d.toLocaleDateString('sv-SE')+(c.author?' · '+esc(c.author):'')+'</div>':'')+paras+'</div>';
+  return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
+    (ph?'<img src="'+esc(ph)+'">':'')+inner+'</div>';
 }
 function personCard(it){
   const c=it.content;
@@ -80,13 +107,30 @@ function personCard(it){
     '<div class="ct">'+[c.email,c.phone].filter(Boolean).map(esc).join('<br>')+'</div></div>';
 }
 
+let COMP=null;
+function render(){ renderPages(COMP); }
+
 async function load(){
   if(!compId){ document.getElementById('out').innerHTML='<div class="err">No composition given (?comp=ID).</div>'; return; }
   const r=await fetch('/api/compositions/'+compId);
   if(!r.ok){ document.getElementById('out').innerHTML='<div class="err">Could not load the brochure.</div>'; return; }
-  const comp=await r.json();
-  document.title=comp.name+' · Turtle & Sun';
-  const items=comp.items||[];
+  COMP=await r.json();
+  document.title=COMP.name+' · Turtle & Sun';
+  const paper=(COMP.params&&COMP.params.paper)||'a4';
+  document.getElementById('paper').value=paper;
+  applyPaper(paper);
+  render();
+}
+
+function applyPaper(p){
+  document.body.className='fmt-'+p;
+  let st=document.getElementById('pageSize');
+  if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
+  st.textContent='@page{ size:'+p.toUpperCase()+' portrait; margin:0; }';
+}
+
+function renderPages(comp){
+  const items=(comp.items||[]).map((it,i)=>({ ...it, _idx:i }));
   if(!items.length){ document.getElementById('out').innerHTML='<div class="err">This brochure has no cards yet.</div>'; return; }
 
   const pages=[];
@@ -135,6 +179,55 @@ async function load(){
 
   document.getElementById('out').innerHTML=pages.join('');
 }
+
+// ── Knobs: click a block → adjust its parameters, live ──
+let selIdx=null;
+const KN={
+  img:[['s','Small'],['m','Medium'],['l','Large'],['','Full']],
+  pos:[['','Top'],['left','Left'],['right','Right']],
+  txt:[['s','Small'],['','Normal'],['l','Large']],
+};
+function knobRow(kind,label,cur){
+  return '<div class="kh">'+label+'</div><div class="row">'+
+    KN[kind].map(([v,t])=>'<button data-k="'+kind+'" data-v="'+v+'" class="'+((cur||'')===v?'on':'')+'">'+t+'</button>').join('')+'</div>';
+}
+function showKnobs(){
+  const k=document.getElementById('knobs');
+  if(selIdx==null){ k.style.display='none'; return; }
+  const ov=COMP.items[selIdx].overrides=COMP.items[selIdx].overrides||{};
+  k.style.display='block';
+  k.innerHTML='<b style="font-size:13px;">Card '+(selIdx+1)+'</b>'+
+    knobRow('img','Picture size',ov.img)+
+    knobRow('pos','Picture placement',ov.pos)+
+    knobRow('txt','Text size',ov.txt)+
+    '<div class="kh">Own page</div><div class="row"><button data-k="big" data-v="'+(ov.big?'':'1')+'" class="'+(ov.big?'on':'')+'">'+(ov.big?'Yes — turn off':'Make it a full page')+'</button></div>'+
+    '<div style="margin-top:10px;"><button id="knClose" style="width:100%;">Done</button></div>';
+  k.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
+    const kk=b.dataset.k, v=b.dataset.v;
+    if(kk==='big') ov.big=!!v; else if(v==='') delete ov[kk]; else ov[kk]=v;
+    render(); showKnobs(); markSel();
+  });
+  document.getElementById('knClose').onclick=()=>{ selIdx=null; showKnobs(); markSel(); };
+}
+function markSel(){
+  document.querySelectorAll('.block.sel').forEach(x=>x.classList.remove('sel'));
+  if(selIdx!=null){ const el=document.querySelector('.block[data-idx="'+selIdx+'"]'); if(el) el.classList.add('sel'); }
+}
+document.getElementById('out').addEventListener('click',e=>{
+  const bl=e.target.closest('.block[data-idx]'); if(!bl) return;
+  selIdx=+bl.dataset.idx; showKnobs(); markSel();
+});
+document.getElementById('paper').onchange=e=>{
+  COMP.params=COMP.params||{}; COMP.params.paper=e.target.value;
+  applyPaper(e.target.value);
+};
+document.getElementById('saveBtn').onclick=async()=>{
+  const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
+  const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({items, params:COMP.params||{}})});
+  document.getElementById('saveBtn').textContent = r.ok ? '✓ Saved' : 'Save failed';
+  setTimeout(()=>document.getElementById('saveBtn').textContent='Save layout',1500);
+};
 load();
 </script>
 </body>
