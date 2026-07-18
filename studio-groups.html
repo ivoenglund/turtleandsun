@@ -490,6 +490,14 @@ let bulkSel = new Set();
 let conListIds = [];   // row order of last contacts render (for keyboard nav)
 let conEditKeys = [];  // editable column keys of last contacts render
 
+// Escape text but make URLs clickable (odd split indexes are the URLs)
+function linkifyText(raw){
+  return String(raw==null?'':raw).split(/(https?:\/\/[^\s<>"')]+|www\.[^\s<>"')]+)/g)
+    .map((t,i)=> i%2
+      ? '<a href="'+esc(t.startsWith('www.')?'https://'+t:t)+'" target="_blank" rel="noopener">'+esc(t)+'</a>'
+      : esc(t)).join('');
+}
+
 async function api(path, opts){
   const r = await fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
   if(r.status===401){ location.href='/login'; return null; }
@@ -1638,7 +1646,7 @@ async function renderTimeline(){
           <div class="pmain">
             <h4>${esc(p.title)||'<span class="muted">(untitled)</span>'}</h4>
             <div class="pdate">${ds}${p.author?' · by '+esc(p.author):''}${p.size?' <span class="tag" title="Size on the website">◱ '+p.size+'</span>':''}${(p.tags||[]).map(t=>' <span class="tag">'+esc(t)+'</span>').join('')}</div>
-            ${p.body?'<div class="pbody">'+esc(p.body)+'</div>':''}
+            ${p.body?'<div class="pbody">'+linkifyText(p.body)+'</div>':''}
             <div style="margin-top:8px;"><button class="btn sm gray pEdit">Edit</button></div>
           </div>
           ${ph.length?'<div class="pright'+(ph.length===1?' single':'')+'">'+ph.map(mediaHtml).join('')+'</div>':''}
