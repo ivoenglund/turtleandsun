@@ -2301,6 +2301,156 @@ app.get('/api/admin/import-contacts', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Crawl a website via Apify's Website Content Crawler and import the people
+// found on it (name + email + phone + photo) into a group.
+//   /api/admin/crawl-import?token=APIFY_TOKEN&url=https://www.qcc.se&group=QCC2&mode=strict
+// mode=strict: every value must exist verbatim in the page, else the row/field
+// is dropped (no photo = no photo, no title ever). mode=loose: keeps partial
+// rows and guesses photo association. Dedupe key: google_id 'crawl:<group>:<email>'.
+app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+
+    const apifyToken = req.query.token;
+    const siteUrl2 = req.query.url;
+    const groupName = req.query.group || 'Crawl';
+    const mode = req.query.mode === 'loose' ? 'loose' : 'strict';
+    if (!apifyToken || !siteUrl2) return res.status(400).json({ error: 'token and url are required' });
+
+    const runRes = await fetch(
+      'https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=' + encodeURIComponent(apifyToken),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url: siteUrl2 }],
+          maxCrawlPages: 5,
+          maxCrawlDepth: 1,
+          saveHtml: true,
+        }),
+      }
+    );
+    if (!runRes.ok) {
+      const t = await runRes.text();
+      return res.status(502).json({ error: 'Apify run failed: HTTP ' + runRes.status, detail: t.slice(0, 300) });
+    }
+    const pages = await runRes.json();
+    if (!Array.isArray(pages) || !pages.length) return res.status(502).json({ error: 'Crawler returned no pages' });
+
+    // Group: find or create.
+    let grp = await pool.query(`SELECT id FROM groups WHERE user_id = $1 AND LOWER(name) = LOWER($2)`, [req.user.id, groupName]);
+    let groupId = grp.rows[0]?.id;
+    if (!groupId) {
+      const ins = await pool.query(`INSERT INTO groups (user_id, name) VALUES ($1, $2) RETURNING id`, [req.user.id, groupName]);
+      groupId = ins.rows[0].id;
+    }
+
+    const { uploadStream } = require('./cloudinary');
+    const seen = new Set();
+    let inserted = 0, dropped = 0, photosDone = 0;
+    const report = [];
+
+    for (const page of pages) {
+      const html = page.html || '';
+      const text = (page.text || html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ');
+      const emails = [...new Set((text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/g) || []))];
+
+      for (const email of emails) {
+        if (seen.has(email)) continue;
+        seen.add(email);
+        if (/^(info|kontakt|office|hello|mail)@/i.test(email)) continue;
+
+        const at = text.indexOf(email);
+        const before = text.slice(Math.max(0, at - 300), at);
+        const after = text.slice(at, at + 300);
+
+        // Name: the last capitalized 2–3 word sequence before the email — must
+        // exist verbatim in the page (it comes from the page, so it does).
+        const nameMatches = before.match(/[A-ZÅÄÖÉ][a-zà-öåäöé]+(?: [A-ZÅÄÖÉ][a-zà-öåäöé]+){1,2}/g) || [];
+        let name = nameMatches.length ? nameMatches[nameMatches.length - 1] : null;
+        if (!name && mode === 'loose') {
+          name = email.split('@')[0].split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+        if (!name) { dropped++; report.push({ email, dropped: 'no name found' }); continue; }
+
+        // Phone: strict needs a "Tel"-prefixed number near the email; loose takes any.
+        const phoneStrict = after.match(/Tel[.:]?\s*([0-9][0-9 \-]{6,})/i) || before.match(/Tel[.:]?\s*([0-9][0-9 \-]{6,})/i);
+        const phoneLoose = after.match(/([0-9]{2,4}[ \-][0-9]{2,4}[ \-][0-9 \-]{2,})/);
+        const phone = phoneStrict ? phoneStrict[1].trim() : (mode === 'loose' && phoneLoose ? phoneLoose[1].trim() : null);
+
+        // Photo: an <img> shortly before the email in the raw HTML.
+        let photoUrl = null;
+        const hAt = html.indexOf(email);
+        if (hAt > 0) {
+          const win = html.slice(Math.max(0, hAt - (mode === 'loose' ? 5000 : 1500)), hAt);
+          const imgs = [...win.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m => m[1])
+            .filter(u => !/logo|icon|\.svg/i.test(u));
+          if (imgs.length) {
+            try {
+              const abs = new URL(imgs[imgs.length - 1], page.url || siteUrl2).href;
+              const r = await fetch(abs);
+              if (r.ok) {
+                const up = await uploadStream(Buffer.from(await r.arrayBuffer()), { folder: 'turtleandsun/crawl-import' });
+                photoUrl = up.secure_url; photosDone++;
+              }
+            } catch (e) { /* no photo is honest */ }
+          }
+        }
+
+        const marker = 'crawl:' + groupName + ':' + email.toLowerCase();
+        const row = await pool.query(
+          `INSERT INTO contacts (user_id, google_id, name, email, phone, photo_url, is_placeholder)
+           VALUES ($1,$2,$3,$4,$5,$6,FALSE)
+           ON CONFLICT (user_id, google_id) DO UPDATE
+             SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
+                 photo_url = COALESCE(EXCLUDED.photo_url, contacts.photo_url)
+           RETURNING id`,
+          [req.user.id, marker, name, email, phone, photoUrl]
+        );
+        await pool.query(
+          `INSERT INTO contact_group_memberships (user_id, contact_id, group_id, from_date, status)
+           VALUES ($1,$2,$3,CURRENT_DATE,'active')
+           ON CONFLICT (user_id, contact_id, group_id) DO NOTHING`,
+          [req.user.id, row.rows[0].id, groupId]
+        );
+        inserted++;
+        report.push({ name, email, phone: phone || null, photo: !!photoUrl });
+      }
+    }
+
+    res.json({ ok: true, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Remove everything a crawl import created (contacts marked with the group's prefix).
+//   /api/admin/remove-crawl?group=QCC2
+app.get('/api/admin/remove-crawl', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+    const groupName = req.query.group;
+    if (!groupName) return res.status(400).json({ error: 'group is required' });
+
+    const old = await pool.query(
+      `SELECT id FROM contacts WHERE user_id = $1 AND google_id LIKE $2`,
+      [req.user.id, 'crawl:' + groupName + ':%']
+    );
+    const ids = old.rows.map(r => r.id);
+    if (ids.length) {
+      await pool.query(`DELETE FROM contact_group_memberships WHERE user_id = $1 AND contact_id = ANY($2)`, [req.user.id, ids]);
+      await pool.query(`DELETE FROM occasions WHERE user_id = $1 AND contact_id = ANY($2)`, [req.user.id, ids]);
+      await pool.query(`DELETE FROM contact_relationships WHERE user_id = $1 AND (contact_a_id = ANY($2) OR contact_b_id = ANY($2))`, [req.user.id, ids]);
+      await pool.query(`DELETE FROM contacts WHERE user_id = $1 AND id = ANY($2)`, [req.user.id, ids]);
+    }
+    res.json({ ok: true, removed: ids.length, note: 'The group itself can be deleted in the sidebar (✕).' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
 // kind: 'public' = customer website (/site/…), 'internal' = staff board (/board/…)
