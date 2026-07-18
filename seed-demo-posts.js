@@ -183,24 +183,20 @@ const POSTS = [
     'The house smelled like Thursday at Grandma\'s in 1995, which was the whole point.' ] },
 ];
 
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
-async function main() {
-  const userRes = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [EMAIL]);
-  if (!userRes.rows.length) { console.error('No user with email ' + EMAIL); process.exit(1); }
+// Reusable: called from the CLI below or from the admin endpoint in server.js.
+async function seedDemoPosts(db, { email, tag = 'Family', count = 50 } = {}) {
+  const userRes = await db.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [email]);
+  if (!userRes.rows.length) throw new Error('No user with email ' + email);
   const userId = userRes.rows[0].id;
 
-  const grp = await pool.query(`SELECT id FROM groups WHERE user_id = $1 AND LOWER(name) = LOWER($2)`, [userId, GROUP_TAG]);
-  if (!grp.rows.length) console.warn(`Note: no group named "${GROUP_TAG}" for this user — posts are tagged "${GROUP_TAG}" anyway.`);
-
-  const cleaned = await pool.query(
+  const cleaned = await db.query(
     `DELETE FROM blog_posts WHERE user_id = $1 AND tags @> '["demo"]'::jsonb`, [userId]
   );
-  if (cleaned.rowCount) console.log(`Removed ${cleaned.rowCount} earlier demo posts.`);
 
   const now = new Date();
-  const posts = POSTS.slice(0, COUNT);
+  const posts = POSTS.slice(0, count);
   let inserted = 0;
 
   for (const p of posts) {
@@ -217,9 +213,9 @@ async function main() {
       photos.push(`https://picsum.photos/seed/${seed}/900/600`);
     }
 
-    const tags = [GROUP_TAG, 'demo', ...p.tags];
+    const tags = [tag, 'demo', ...p.tags];
 
-    await pool.query(
+    await db.query(
       `INSERT INTO blog_posts (user_id, title, body, post_date, tags, photos)
        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)`,
       [userId, p.t, p.paras.join('\n\n'), post_date, JSON.stringify(tags), JSON.stringify(photos)]
@@ -227,10 +223,13 @@ async function main() {
     inserted++;
   }
 
-  console.log(`Inserted ${inserted} demo posts for ${EMAIL}, tagged "${GROUP_TAG}".`);
-  console.log(`They appear in the studio timeline and on the group's public site.`);
-  console.log(`Remove them anytime with: DELETE FROM blog_posts WHERE tags @> '["demo"]'::jsonb;`);
-  await pool.end();
+  return { removed: cleaned.rowCount, inserted, email, tag };
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+module.exports = { seedDemoPosts };
+
+if (require.main === module) {
+  seedDemoPosts(pool, { email: EMAIL, tag: GROUP_TAG, count: COUNT })
+    .then(out => { console.log(`Removed ${out.removed} old, inserted ${out.inserted} demo posts for ${out.email}, tagged "${out.tag}".`); return pool.end(); })
+    .catch(e => { console.error(e); process.exit(1); });
+}

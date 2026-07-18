@@ -2139,6 +2139,28 @@ app.post('/api/join/:token', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Demo content (admin only) ─────────────────────────────────────────────────
+// Open in the browser while logged in as admin:
+//   /api/admin/seed-demo-posts            → 50 posts for your own account, tag "Family"
+//   /api/admin/seed-demo-posts?email=x&tag=Y&count=N  → override any of them
+app.get('/api/admin/seed-demo-posts', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+
+    const me = await pool.query(`SELECT email FROM users WHERE id = $1`, [req.user.id]);
+    const email = req.query.email || me.rows[0].email;
+    const tag = req.query.tag || 'Family';
+    const count = Math.min(parseInt(req.query.count || '50', 10) || 50, 50);
+
+    const { seedDemoPosts } = require('./seed-demo-posts');
+    const out = await seedDemoPosts(pool, { email, tag, count });
+    res.json({ ok: true, ...out, note: 'Posts are tagged "demo" — rerunning replaces them.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
 // Current site status for a group.
