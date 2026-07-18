@@ -147,7 +147,7 @@ function eventsFor(y, m){
     const sd = String(e.date).slice(0,10);
     const ey = +sd.slice(0,4), em = +sd.slice(5,7), ed = +sd.slice(8,10);
     const label = e.name + (e.author ? ' — ' + e.author : '');
-    const cls = (e.big ? 'big' : '') + (e.calendar_name === 'Anteckningar' ? ' note' : '');
+    const cls = (e.big ? 'big' : '') + (e.calendar_name === 'Notes' || e.calendar_name === 'Anteckningar' ? ' note' : '');
     if(e.frequency === 'yearly'){ if(em === m && ey <= y) add(ed, label, cls); }
     else if(ey === y && em === m) add(ed, label, cls);
   });
@@ -192,7 +192,7 @@ function renderPeople(filter){
       p.phone ? '<div class="ln"><a href="tel:'+esc(String(p.phone).replace(/[^+\d]/g,''))+'">'+esc(p.phone)+'</a></div>' : '',
       (p.city||p.subgroup_name) ? '<div class="ln mut">'+esc([p.subgroup_name,p.city].filter(Boolean).join(' · '))+'</div>' : '',
       p.birthday ? '<div class="ln mut">🎂 '+esc(String(p.birthday))+'</div>' : '',
-      (p.handlers||[]).length ? '<div class="ln" style="color:var(--gold);font-weight:700;">☂ '+esc(p.handlers.join(', '))+'</div>' : ''
+      (p.handlers||[]).length ? '<div class="ln" style="color:var(--gold);font-weight:700;">Responsible: '+esc(p.handlers.join(', '))+'</div>' : ''
     ].join('');
     return '<div class="card">'+img+'<div><div class="nm">'+esc(p.name||'')+'</div>'+lines+'</div></div>';
   }).join('') || '<div class="err" style="padding:20px;">No one matches.</div>';

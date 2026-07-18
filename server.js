@@ -2454,14 +2454,21 @@ app.delete('/api/groups/:id/calendars/:calId(\\d+)', requireAuth, async (req, re
 // The pair is seeded once per user into the typed-relation system; the labels
 // are ordinary relationship_types, so they can be renamed like any other.
 async function ensureHandlerTypes(userId) {
+  // Renames any previously seeded Swedish pair, then looks up / seeds English.
+  await pool.query(
+    `UPDATE relationship_types rt SET name = 'Responsible for'
+     FROM groups g WHERE g.id = rt.group_id AND g.user_id = $1 AND rt.name = 'Tar hand om'`, [userId]);
+  await pool.query(
+    `UPDATE relationship_types rt SET name = 'In the care of'
+     FROM groups g WHERE g.id = rt.group_id AND g.user_id = $1 AND rt.name = 'Tas om hand av'`, [userId]);
   const found = await pool.query(
     `SELECT rt.id, rt.name FROM relationship_types rt
      JOIN groups g ON g.id = rt.group_id
-     WHERE g.user_id = $1 AND rt.name IN ('Tar hand om','Tas om hand av')`,
+     WHERE g.user_id = $1 AND rt.name IN ('Responsible for','In the care of')`,
     [userId]
   );
-  let a = found.rows.find(r => r.name === 'Tar hand om')?.id;
-  let b = found.rows.find(r => r.name === 'Tas om hand av')?.id;
+  let a = found.rows.find(r => r.name === 'Responsible for')?.id;
+  let b = found.rows.find(r => r.name === 'In the care of')?.id;
   if (a && b) return { a, b };
   const g = await pool.query(
     `SELECT id FROM groups WHERE user_id = $1 ORDER BY (name = 'Family') DESC, id LIMIT 1`,
@@ -2469,8 +2476,8 @@ async function ensureHandlerTypes(userId) {
   );
   if (!g.rows.length) throw new Error('No group to anchor relationship types');
   const gid = g.rows[0].id;
-  if (!a) a = (await pool.query(`INSERT INTO relationship_types (group_id, name) VALUES ($1, 'Tar hand om') RETURNING id`, [gid])).rows[0].id;
-  if (!b) b = (await pool.query(`INSERT INTO relationship_types (group_id, name) VALUES ($1, 'Tas om hand av') RETURNING id`, [gid])).rows[0].id;
+  if (!a) a = (await pool.query(`INSERT INTO relationship_types (group_id, name) VALUES ($1, 'Responsible for') RETURNING id`, [gid])).rows[0].id;
+  if (!b) b = (await pool.query(`INSERT INTO relationship_types (group_id, name) VALUES ($1, 'In the care of') RETURNING id`, [gid])).rows[0].id;
   await pool.query(`UPDATE relationship_types SET mirror_id = $1 WHERE id = $2`, [b, a]);
   await pool.query(`UPDATE relationship_types SET mirror_id = $1 WHERE id = $2`, [a, b]);
   return { a, b };
@@ -2500,22 +2507,33 @@ app.get('/api/groups/:id/handlers', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Create / remove one handler↔customer pair (both directions).
+// Set (or clear) THE responsible person for a customer — one per customer:
+// setting always replaces any previous edges; handler_id null clears.
 app.post('/api/handlers', requireAuth, async (req, res) => {
   const { handler_id, customer_id } = req.body || {};
-  if (!handler_id || !customer_id) return res.status(400).json({ error: 'handler_id and customer_id are required' });
+  if (!customer_id) return res.status(400).json({ error: 'customer_id is required' });
   try {
     const { a, b } = await ensureHandlerTypes(req.user.id);
     await pool.query(
-      `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
-       VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-      [req.user.id, handler_id, customer_id, a]
+      `DELETE FROM contact_relationships WHERE user_id = $1 AND relationship_type_id = $2 AND contact_b_id = $3`,
+      [req.user.id, a, customer_id]
     );
     await pool.query(
-      `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
-       VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-      [req.user.id, customer_id, handler_id, b]
+      `DELETE FROM contact_relationships WHERE user_id = $1 AND relationship_type_id = $2 AND contact_a_id = $3`,
+      [req.user.id, b, customer_id]
     );
+    if (handler_id) {
+      await pool.query(
+        `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
+         VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+        [req.user.id, handler_id, customer_id, a]
+      );
+      await pool.query(
+        `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
+         VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+        [req.user.id, customer_id, handler_id, b]
+      );
+    }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2638,7 +2656,7 @@ app.post('/api/board/:token/note', async (req, res) => {
     if (!calId) {
       const ins = await pool.query(
         `INSERT INTO calendars (user_id, name, source_key) VALUES ($1, $2, $3) RETURNING id`,
-        [user_id, 'Anteckningar', key]
+        [user_id, 'Notes', key]
       );
       calId = ins.rows[0].id;
       await pool.query(
