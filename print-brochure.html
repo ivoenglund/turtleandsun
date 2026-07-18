@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brochure — Turtle &amp; Sun</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+  :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; }
+  .toolbar{ padding:10px 16px; display:flex; gap:10px; align-items:center; }
+  .toolbar button{ font-family:inherit; font-weight:700; font-size:14px; padding:8px 16px; border:none; border-radius:8px; background:var(--green); color:#f4efe4; cursor:pointer; }
+  .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
+         box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
+  .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
+  .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
+  .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
+  .cover .txt{ position:absolute; left:0; right:0; bottom:0; padding:18mm; }
+  .cover h1{ font-family:Georgia,serif; font-size:44px; margin:0 0 6px; line-height:1.1; }
+  .cover .sub{ font-size:17px; color:#ffe8b0; font-weight:600; }
+  .cover .band{ position:absolute; top:0; left:0; right:0; height:9mm;
+                background:linear-gradient(90deg,#FFF5A0,#FFE800,#FFD000,#FFAA00,#FF9500); }
+  h2.sect{ font-family:Georgia,serif; color:var(--green); font-size:26px; margin:0 0 3mm; }
+  .rule{ border:none; border-top:3px solid var(--gold); width:60px; margin:0 0 6mm; }
+  .block{ margin-bottom:8mm; }
+  .block img{ width:100%; height:auto; border-radius:4mm; display:block; margin-bottom:4mm; }
+  .block.big img{ max-height:150mm; object-fit:cover; }
+  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:21px; margin:0 0 2mm; }
+  .block .meta{ font-size:11.5px; color:var(--muted); margin-bottom:2mm; }
+  .block p{ margin:0 0 2.6mm; font-size:13.5px; line-height:1.45; }
+  .team{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6mm; }
+  .person{ text-align:center; }
+  .person img{ max-width:100%; max-height:52mm; width:auto; border-radius:3mm; display:block; margin:0 auto 2mm; }
+  .person .init{ width:30mm; height:36mm; border-radius:3mm; background:var(--cream); color:var(--green);
+                 display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:22px; margin:0 auto 2mm; }
+  .person b{ font-size:13.5px; display:block; }
+  .person .role{ font-size:11px; color:var(--green); font-weight:700; }
+  .person .ct{ font-size:10.5px; color:var(--muted); line-height:1.4; }
+  .backpage{ background:var(--green); color:#f4efe4; align-items:center; justify-content:center; text-align:center; }
+  .backpage h2{ font-family:Georgia,serif; font-size:30px; margin:0 0 4mm; color:#f4efe4; }
+  .backpage .foot{ position:absolute; bottom:12mm; left:0; right:0; font-size:11.5px; color:#cdddd2; }
+  .err{ text-align:center; padding:60px; color:var(--muted); }
+  @media print{
+    body{ background:#fff; } .toolbar{ display:none; }
+    .page{ box-shadow:none; margin:0; page-break-after:always; width:auto; min-height:auto; height:296mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()">🖨 Print / save as PDF</button>
+  <span style="font-size:13px;color:#5c5c4d;">A4 portrait · the first card is the cover · people group into team pages</span>
+</div>
+<div id="out"><div class="err">Loading…</div></div>
+
+<script>
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const compId = new URLSearchParams(location.search).get('comp');
+
+function postBlock(it){
+  const c=it.content, big=it.overrides&&it.overrides.big;
+  const ph=(c.photos||[])[0];
+  const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0, big?12:4)
+    .map(p=>'<p>'+esc(p)+'</p>').join('');
+  const d=c.post_date?new Date(c.post_date):null;
+  return '<div class="block'+(big?' big':'')+'">'+
+    (ph?'<img src="'+esc(ph)+'">':'')+
+    (c.title?'<h3>'+esc(c.title)+'</h3>':'')+
+    (d?'<div class="meta">'+d.toLocaleDateString('sv-SE')+(c.author?' · '+esc(c.author):'')+'</div>':'')+
+    paras+'</div>';
+}
+function personCard(it){
+  const c=it.content;
+  const init=(c.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  return '<div class="person">'+
+    (c.photo_url?'<img src="'+esc(c.photo_url)+'">':'<div class="init">'+esc(init)+'</div>')+
+    '<b>'+esc(c.name||'')+'</b>'+
+    (c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
+    '<div class="ct">'+[c.email,c.phone].filter(Boolean).map(esc).join('<br>')+'</div></div>';
+}
+
+async function load(){
+  if(!compId){ document.getElementById('out').innerHTML='<div class="err">No composition given (?comp=ID).</div>'; return; }
+  const r=await fetch('/api/compositions/'+compId);
+  if(!r.ok){ document.getElementById('out').innerHTML='<div class="err">Could not load the brochure.</div>'; return; }
+  const comp=await r.json();
+  document.title=comp.name+' · Turtle & Sun';
+  const items=comp.items||[];
+  if(!items.length){ document.getElementById('out').innerHTML='<div class="err">This brochure has no cards yet.</div>'; return; }
+
+  const pages=[];
+
+  // Cover = first item.
+  const cov=items[0];
+  const covImg = cov.ref_type==='post' ? ((cov.content.photos||[])[0]||'') : (cov.content.photo_url||'');
+  const covTitle = cov.ref_type==='post' ? (cov.content.title||comp.name) : comp.name;
+  pages.push('<div class="page cover"><div class="band"></div>'+
+    (covImg?'<div class="img" style="background-image:url(\''+esc(covImg)+'\')"></div>':'')+
+    '<div class="scrim"></div><div class="txt"><h1>'+esc(covTitle)+'</h1>'+
+    '<div class="sub">'+esc(comp.name)+'</div></div></div>');
+
+  // Body: group runs of contacts into team pages (6/page); posts flow 2/page (big = own page).
+  let buf=[], bufKind=null;
+  const flush=()=>{
+    if(!buf.length) return;
+    if(bufKind==='contact'){
+      for(let i=0;i<buf.length;i+=6){
+        pages.push('<div class="page"><h2 class="sect">Teamet</h2><hr class="rule"><div class="team">'+
+          buf.slice(i,i+6).map(personCard).join('')+'</div></div>');
+      }
+    } else {
+      for(let i=0;i<buf.length;){
+        const it=buf[i];
+        if(it.overrides&&it.overrides.big){ pages.push('<div class="page">'+postBlock(it)+'</div>'); i++; }
+        else{
+          const two=buf.slice(i,i+2).filter(x=>!(x.overrides&&x.overrides.big)||x===it);
+          pages.push('<div class="page">'+two.map(postBlock).join('')+'</div>');
+          i+=two.length;
+        }
+      }
+    }
+    buf=[]; bufKind=null;
+  };
+  items.slice(1).forEach(it=>{
+    if(bufKind && it.ref_type!==bufKind) flush();
+    bufKind=it.ref_type; buf.push(it);
+  });
+  flush();
+
+  // Back page.
+  pages.push('<div class="page backpage"><div><h2>'+esc(comp.name)+'</h2>'+
+    '<div style="font-size:14px;color:#cdddd2;">Alltid aktuell — gjord från levande data.</div></div>'+
+    '<div class="foot">Made with Turtle &amp; Sun · turtleandsun.com</div></div>');
+
+  document.getElementById('out').innerHTML=pages.join('');
+}
+load();
+</script>
+</body>
+</html>

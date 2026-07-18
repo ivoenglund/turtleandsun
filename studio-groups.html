@@ -207,6 +207,7 @@
       <div class="tab" data-t="bok">Yearbook</div>
       <div class="tab" data-t="exp">Export</div>
       <div class="tab" data-t="web">Web</div>
+      <div class="tab" data-t="mak">Make</div>
     </div>
 
     <!-- CONTACTS / MEMBERS — one grid; a selected group adds membership columns -->
@@ -325,6 +326,35 @@
       <div class="panel" style="max-width:760px;padding:16px 18px;">
         <h3 style="margin-top:0">Website</h3>
         <div id="webBody"></div>
+      </div>
+    </div>
+
+    <!-- MAKE — compositions: tick cards, order them, print -->
+    <div id="mak" class="hide">
+      <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+        <div class="panel" style="flex:1;min-width:340px;padding:12px 14px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <b style="font-size:14px;">Your cards</b>
+            <input class="search" id="makSearch" type="text" placeholder="Search posts and people…" style="flex:1;min-width:140px;">
+            <label class="flt" style="padding:3px 8px;"><input type="checkbox" id="makPosts" checked> Posts</label>
+            <label class="flt" style="padding:3px 8px;"><input type="checkbox" id="makPeople" checked> People</label>
+          </div>
+          <div id="makShelf" style="max-height:520px;overflow:auto;"></div>
+        </div>
+        <div class="panel" style="flex:1;min-width:340px;padding:12px 14px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <select id="makSel" style="max-width:220px;"></select>
+            <button class="btn sm gray" id="makNew">＋ New brochure</button>
+            <button class="btn sm gray" id="makSuggest" title="Pre-fill from the selected group">✨ Suggest</button>
+          </div>
+          <div id="makItems"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn pub" id="makSave">Save</button>
+            <button class="btn gray" id="makOpen">🖨 Open brochure</button>
+            <button class="btn danger sm" id="makDel" style="margin-left:auto;">Delete</button>
+          </div>
+          <div class="help">Tick cards on the left — they land here. Use ↑ ↓ to set the order (the first card is the cover), Big for a full-page card. Save, then open the brochure and print to PDF.</div>
+        </div>
       </div>
     </div>
 
@@ -2506,8 +2536,128 @@ async function renderCalEntries(calId, calName){
   }catch(e){ host.innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; }
 }
 
+// ── Make tab: compositions — tick cards, order, print ──
+let makComp = null;      // {id,name,template,items:[{ref_type,ref_id,overrides}]}
+let makList = [];        // available compositions
+
+function makLabel(it){
+  if(it.ref_type==='post'){
+    const p=(blogCache||[]).find(x=>x.id===it.ref_id);
+    return p ? {t:(p.title||(p.body||'').slice(0,40)||'(untitled)'), img:(p.photos||[])[0]||null, sub:d10(p.post_date)} : null;
+  }
+  const c=contactsPool.find(x=>x.id===it.ref_id);
+  return c ? {t:c.name||'(unnamed)', img:c.photo_url||null, sub:c.job_title||'person'} : null;
+}
+function makThumb(img){
+  return img?'<img src="'+esc(img)+'" style="width:34px;height:34px;object-fit:cover;border-radius:6px;flex-shrink:0;">'
+            :'<span style="width:34px;height:34px;background:#f0ead8;border-radius:6px;flex-shrink:0;display:inline-block;"></span>';
+}
+async function renderMak(){
+  try{ await ensureBlog(); }catch(e){}
+  const sel=$('#makSel');
+  makList=await api('/api/compositions')||[];
+  sel.innerHTML=makList.length
+    ? makList.map(c=>'<option value="'+c.id+'"'+(makComp&&makComp.id===c.id?' selected':'')+'>'+esc(c.name)+' ('+c.item_count+')</option>').join('')
+    : '<option value="">— no brochures yet —</option>';
+  if(!makComp && makList.length) await makLoad(makList[0].id);
+  renderMakShelf(); renderMakItems();
+}
+async function makLoad(id){
+  const c=await api('/api/compositions/'+id);
+  makComp={id:c.id,name:c.name,template:c.template,items:c.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}))};
+}
+function makHas(rt,rid){ return makComp&&makComp.items.some(i=>i.ref_type===rt&&i.ref_id===rid); }
+function renderMakShelf(){
+  const q=($('#makSearch').value||'').toLowerCase();
+  const rows=[];
+  if($('#makPosts').checked){
+    (blogCache||[]).forEach(p=>{
+      const hay=((p.title||'')+' '+(p.body||'')+' '+(p.tags||[]).join(' ')).toLowerCase();
+      if(q&&!hay.includes(q)) return;
+      rows.push({rt:'post',id:p.id,t:p.title||(p.body||'').slice(0,40)||'(untitled)',img:(p.photos||[])[0],sub:d10(p.post_date)+((p.tags||[]).length?' · '+p.tags.slice(0,2).join(', '):'')});
+    });
+  }
+  if($('#makPeople').checked){
+    contactsPool.forEach(c=>{
+      if(c.died_on) return;
+      const hay=((c.name||'')+' '+(c.company||'')+' '+(c.job_title||'')).toLowerCase();
+      if(q&&!hay.includes(q)) return;
+      rows.push({rt:'contact',id:c.id,t:c.name||'(unnamed)',img:c.photo_url,sub:[c.job_title,c.company].filter(Boolean).join(' · ')||'person'});
+    });
+  }
+  $('#makShelf').innerHTML=rows.slice(0,200).map(r=>{
+    const on=makHas(r.rt,r.id);
+    return '<div style="display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid #eee8d8;">'+
+      '<input type="checkbox" class="makTick" data-rt="'+r.rt+'" data-id="'+r.id+'" '+(on?'checked':'')+' style="width:auto;">'+
+      makThumb(r.img)+
+      '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(r.t)+'</div>'+
+      '<div class="muted" style="font-size:12px;">'+esc(r.sub)+'</div></div></div>';
+  }).join('')||'<div class="empty">Nothing matches.</div>';
+  $('#makShelf').querySelectorAll('.makTick').forEach(cb=>cb.onchange=()=>{
+    if(!makComp){ alert('Create a brochure first (＋ New brochure).'); cb.checked=false; return; }
+    const rt=cb.dataset.rt,rid=+cb.dataset.id;
+    if(cb.checked){ if(!makHas(rt,rid)) makComp.items.push({ref_type:rt,ref_id:rid,overrides:{}}); }
+    else makComp.items=makComp.items.filter(i=>!(i.ref_type===rt&&i.ref_id===rid));
+    renderMakItems();
+  });
+}
+function renderMakItems(){
+  const host=$('#makItems');
+  if(!makComp){ host.innerHTML='<div class="empty">Create or choose a brochure.</div>'; return; }
+  host.innerHTML=makComp.items.map((it,i)=>{
+    const l=makLabel(it); if(!l) return '';
+    return '<div style="display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid #eee8d8;">'+
+      '<b class="muted" style="width:18px;font-size:12px;">'+(i+1)+'</b>'+makThumb(l.img)+
+      '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(l.t)+(i===0?' <span class="tag">cover</span>':'')+'</div>'+
+      '<div class="muted" style="font-size:12px;">'+esc(l.sub)+'</div></div>'+
+      '<label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" class="makBig" data-i="'+i+'" '+(it.overrides.big?'checked':'')+' style="width:auto;"> Big</label>'+
+      '<button class="btn sm gray makUp" data-i="'+i+'">↑</button>'+
+      '<button class="btn sm gray makDn" data-i="'+i+'">↓</button>'+
+      '<button class="btn sm danger makRm" data-i="'+i+'">✕</button></div>';
+  }).join('')||'<div class="empty">Tick cards on the left to add them.</div>';
+  host.querySelectorAll('.makUp').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i>0){[makComp.items[i-1],makComp.items[i]]=[makComp.items[i],makComp.items[i-1]];renderMakItems();}});
+  host.querySelectorAll('.makDn').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i<makComp.items.length-1){[makComp.items[i+1],makComp.items[i]]=[makComp.items[i],makComp.items[i+1]];renderMakItems();}});
+  host.querySelectorAll('.makRm').forEach(b=>b.onclick=()=>{makComp.items.splice(+b.dataset.i,1);renderMakItems();renderMakShelf();});
+  host.querySelectorAll('.makBig').forEach(cb=>cb.onchange=()=>{makComp.items[+cb.dataset.i].overrides.big=cb.checked;});
+}
+$('#makSearch') && ($('#makSearch').oninput=debounce(renderMakShelf,180));
+$('#makPosts').onchange=renderMakShelf; $('#makPeople').onchange=renderMakShelf;
+$('#makSel').onchange=async()=>{ if($('#makSel').value){ await makLoad(+$('#makSel').value); renderMakShelf(); renderMakItems(); } };
+$('#makNew').onclick=async()=>{
+  const name=prompt('Name of the brochure (e.g. "QCC broschyr"):'); if(!name||!name.trim()) return;
+  const r=await api('/api/compositions',{method:'POST',body:JSON.stringify({name:name.trim(),template:'brochure'})});
+  makComp={id:r.composition.id,name:r.composition.name,template:'brochure',items:[]};
+  renderMak();
+};
+$('#makSuggest').onclick=()=>{
+  if(!makComp){ alert('Create a brochure first.'); return; }
+  const tag=selected?selected.name.toLowerCase():null;
+  const posts=(blogCache||[]).filter(p=>!tag||(p.tags||[]).some(t=>t.toLowerCase()===tag)).slice(0,3);
+  const people=(selected&&current)?current.members.slice(0,6):[];
+  posts.forEach(p=>{ if(!makHas('post',p.id)) makComp.items.push({ref_type:'post',ref_id:p.id,overrides:{}}); });
+  people.forEach(m=>{ if(!makHas('contact',m.contact_id)) makComp.items.push({ref_type:'contact',ref_id:m.contact_id,overrides:{}}); });
+  renderMakItems(); renderMakShelf();
+  showToast(posts.length+' posts + '+people.length+' people suggested'+(selected?' from '+selected.name:''));
+};
+$('#makSave').onclick=async()=>{
+  if(!makComp) return;
+  await api('/api/compositions/'+makComp.id,{method:'PUT',body:JSON.stringify({items:makComp.items})});
+  showToast('Saved');
+  renderMak();
+};
+$('#makOpen').onclick=async()=>{
+  if(!makComp) return;
+  await api('/api/compositions/'+makComp.id,{method:'PUT',body:JSON.stringify({items:makComp.items})});
+  window.open('/print/brochure?comp='+makComp.id,'_blank');
+};
+$('#makDel').onclick=async()=>{
+  if(!makComp||!confirm('Delete "'+makComp.name+'"? The cards themselves are not touched.')) return;
+  await api('/api/compositions/'+makComp.id,{method:'DELETE'});
+  makComp=null; renderMak();
+};
+
 // ── Tabs ──
-const ids=['kon','kar','tid','tre','bok','exp','web','dup'];
+const ids=['kon','kar','tid','tre','bok','exp','web','mak','dup'];
 function showTab(t){
   const showId = (t==='med') ? 'kon' : t; // Members tab = the unified grid
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
@@ -2519,6 +2669,7 @@ function showTab(t){
   if(showId==='tre') ensureFam().then(renderFamilyTree).catch(e=>{ $('#treePanel').innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; });
   if(showId==='bok') $('#bokSrc').textContent = 'Source: '+chosenLabel();
   if(showId==='web') renderWeb();
+  if(showId==='mak') renderMak();
 }
 document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>showTab(tb.dataset.t));
 

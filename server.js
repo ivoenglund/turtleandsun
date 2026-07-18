@@ -2507,6 +2507,110 @@ app.get('/api/admin/remove-crawl', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Compositions ("everything is a card") ─────────────────────────────────────
+// A composition = template + ordered card references. Cards resolve LIVE at read
+// time (mirror principle): a contact-card always shows current data. Printing
+// freezes it on paper — no stored copies anywhere.
+
+app.get('/api/compositions', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.name, c.template, c.params, c.created_at, COUNT(i.id)::int AS item_count
+       FROM compositions c LEFT JOIN composition_items i ON i.composition_id = c.id
+       WHERE c.user_id = $1 GROUP BY c.id ORDER BY c.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/compositions', requireAuth, async (req, res) => {
+  const { name, template } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO compositions (user_id, name, template) VALUES ($1, $2, $3) RETURNING *`,
+      [req.user.id, name.trim(), template === 'yearbook' ? 'yearbook' : 'brochure']
+    );
+    res.json({ ok: true, composition: rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Resolved read: items come back with live content attached.
+app.get('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    const comp = await pool.query(
+      `SELECT id, name, template, params FROM compositions WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!comp.rows.length) return res.status(404).json({ error: 'Not found' });
+    const items = await pool.query(
+      `SELECT id, ref_type, ref_id, position, overrides FROM composition_items
+       WHERE composition_id = $1 AND user_id = $2 ORDER BY position, id`,
+      [req.params.id, req.user.id]
+    );
+    const out = [];
+    for (const it of items.rows) {
+      let content = null;
+      if (it.ref_type === 'post') {
+        const r = await pool.query(
+          `SELECT title, body, post_date, tags, photos, size, author FROM blog_posts WHERE id = $1 AND user_id = $2`,
+          [it.ref_id, req.user.id]);
+        content = r.rows[0] || null;
+      } else if (it.ref_type === 'contact') {
+        const r = await pool.query(
+          `SELECT name, job_title, company, email, phone, photo_url, city FROM contacts WHERE id = $1 AND user_id = $2`,
+          [it.ref_id, req.user.id]);
+        content = r.rows[0] || null;
+      }
+      if (content) out.push({ ...it, content });
+    }
+    res.json({ ...comp.rows[0], items: out });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Replace items (ordered array) and/or params/name.
+app.put('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
+  const { name, params, items } = req.body || {};
+  try {
+    const comp = await pool.query(
+      `SELECT id FROM compositions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    if (!comp.rows.length) return res.status(404).json({ error: 'Not found' });
+    if (name || params) {
+      await pool.query(
+        `UPDATE compositions SET name = COALESCE($1, name), params = COALESCE($2, params) WHERE id = $3`,
+        [name ? name.trim() : null, params ? JSON.stringify(params) : null, req.params.id]);
+    }
+    if (Array.isArray(items)) {
+      await pool.query(`DELETE FROM composition_items WHERE composition_id = $1 AND user_id = $2`,
+        [req.params.id, req.user.id]);
+      let pos = 0;
+      for (const it of items) {
+        if (!it || !['post','contact'].includes(it.ref_type) || !it.ref_id) continue;
+        await pool.query(
+          `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [req.user.id, req.params.id, it.ref_type, +it.ref_id, pos++, JSON.stringify(it.overrides || {})]);
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM compositions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Print view (brochure template) — same auth pattern as /print/calendar.
+app.get('/print/brochure', async (req, res) => {
+  const user = await getSessionUser(req).catch(() => null);
+  if (!user) return res.redirect('/login?redirect=' + encodeURIComponent('/print/brochure' + (req.url.replace(/^\/print\/brochure/, '') || '')));
+  res.sendFile(path.join(__dirname, 'print-brochure.html'));
+});
+
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
 // kind: 'public' = customer website (/site/…), 'internal' = staff board (/board/…)

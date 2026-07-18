@@ -396,6 +396,29 @@ async function initDb() {
       UNIQUE(group_id, calendar_id)
     );
 
+    -- 2026-07-18: Compositions — "everything is a card". A composition = a named
+    -- artifact (brochure, yearbook, card): template + ordered items. Items REFERENCE
+    -- content (post or contact = mirror card), never copy it; overrides are
+    -- parameters (jsonb), never HTML. See _HANDOFF_2026-07-18 in the workspace.
+    CREATE TABLE IF NOT EXISTS compositions (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id),
+      name        TEXT NOT NULL,
+      template    TEXT NOT NULL DEFAULT 'brochure',
+      params      JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS composition_items (
+      id             SERIAL PRIMARY KEY,
+      user_id        INTEGER REFERENCES users(id),
+      composition_id INTEGER REFERENCES compositions(id) ON DELETE CASCADE,
+      ref_type       TEXT NOT NULL CHECK (ref_type IN ('post','contact')),
+      ref_id         INTEGER NOT NULL,
+      position       INTEGER NOT NULL DEFAULT 0,
+      overrides      JSONB NOT NULL DEFAULT '{}'::jsonb
+    );
+    CREATE INDEX IF NOT EXISTS composition_items_comp_idx ON composition_items(composition_id);
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle
