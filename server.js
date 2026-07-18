@@ -2166,6 +2166,27 @@ app.get('/api/admin/seed-demo-posts', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Open in the browser while logged in as admin:
+//   /api/admin/seed-demo-customers                     → 100 companies into "Kunder"
+//   /api/admin/seed-demo-customers?group=X&count=N&email=Y
+app.get('/api/admin/seed-demo-customers', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+
+    const me = await pool.query(`SELECT email FROM users WHERE id = $1`, [req.user.id]);
+    const email = req.query.email || me.rows[0].email;
+    const group = req.query.group || 'Kunder';
+    const count = Math.min(parseInt(req.query.count || '100', 10) || 100, 200);
+
+    const { seedDemoCustomers } = require('./seed-demo-customers');
+    const out = await seedDemoCustomers(pool, { email, group, count });
+    res.json({ ok: true, ...out, note: 'Rerunning replaces the demo customers. Publish the staff board for this group in the Web tab.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
 // kind: 'public' = customer website (/site/…), 'internal' = staff board (/board/…)
