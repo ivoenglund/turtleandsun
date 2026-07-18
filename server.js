@@ -2272,21 +2272,36 @@ app.get('/api/admin/import-contacts', requireAuth, async (req, res) => {
       groupId = ins.rows[0].id;
     }
 
-    let inserted = 0, updated = 0;
+    const { uploadStream } = require('./cloudinary');
+    let inserted = 0, updated = 0, photosDone = 0;
     let i = 0;
     for (const c of (data.contacts || [])) {
       i++;
       if (!c.name) continue;
       const marker = 'import-' + file + '-' + i;
+
+      // Photo: download from the source site, re-host on Cloudinary.
+      let photoUrl = null;
+      if (c.photo) {
+        try {
+          const r = await fetch(c.photo);
+          if (r.ok) {
+            const up = await uploadStream(Buffer.from(await r.arrayBuffer()), { folder: 'turtleandsun/site-import' });
+            photoUrl = up.secure_url; photosDone++;
+          }
+        } catch (e) { /* no photo is honest */ }
+      }
+
       const row = await pool.query(
-        `INSERT INTO contacts (user_id, google_id, name, email, phone, company, job_title, city, country, about, is_placeholder)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Sverige',$9,FALSE)
+        `INSERT INTO contacts (user_id, google_id, name, email, phone, company, job_title, city, country, about, photo_url, is_placeholder)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Sverige',$9,$10,FALSE)
          ON CONFLICT (user_id, google_id) DO UPDATE
            SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
-               company = EXCLUDED.company, job_title = EXCLUDED.job_title, about = EXCLUDED.about
+               company = EXCLUDED.company, job_title = EXCLUDED.job_title, about = EXCLUDED.about,
+               photo_url = COALESCE(EXCLUDED.photo_url, contacts.photo_url)
          RETURNING (xmax = 0) AS is_new, id`,
         [req.user.id, marker, c.name, c.email || null, c.phone || null,
-         c.company || data.company || null, c.job_title || null, c.city || data.city || null, c.about || null]
+         c.company || data.company || null, c.job_title || null, c.city || data.city || null, c.about || null, photoUrl]
       );
       row.rows[0].is_new ? inserted++ : updated++;
       await pool.query(
