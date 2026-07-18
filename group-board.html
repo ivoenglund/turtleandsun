@@ -32,6 +32,13 @@
   .cal .dnum{ font-size:13px; font-weight:700; color:var(--muted); }
   .cal .ev{ font-size:12.5px; font-weight:600; background:var(--cream); border-radius:6px; padding:2px 6px; margin-top:4px; line-height:1.3; }
   .cal .ev.bday{ background:#eef4e7; }
+  .cal .ev.big{ font-size:14.5px; font-weight:800; background:var(--green); color:#f4efe4; padding:5px 8px; }
+  .cal .ev.note{ background:#fff8d6; border:1px dashed var(--gold); }
+  .cal .day{ cursor:pointer; }
+  .noteform{ background:#fff; border:2px solid var(--gold); border-radius:12px; padding:14px 16px; margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .noteform input{ font-family:inherit; font-size:14px; padding:7px 10px; border:1px solid #e2dccb; border-radius:8px; }
+  .noteform button{ font-family:inherit; font-size:14px; font-weight:700; padding:7px 14px; border:none; border-radius:8px; background:var(--green); color:#f4efe4; cursor:pointer; }
+  .noteform .x{ background:#fff; color:var(--muted); border:1px solid #e2dccb; }
 
   .updates{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
   .upd{ background:#fff; border:1px solid #e2dccb; border-radius:10px; padding:12px 14px; }
@@ -72,6 +79,15 @@
         <b id="calTitle"></b>
         <button id="calNext" aria-label="Next month">›</button>
         <button id="calToday">Today</button>
+        <span style="font-size:13px;color:var(--muted);margin-left:auto;">Click a day to write a note</span>
+      </div>
+      <div class="noteform hide" id="noteForm">
+        <b id="nfDate" style="min-width:86px;"></b>
+        <input id="nfText" placeholder="What happens this day?" style="flex:1;min-width:180px;" maxlength="200">
+        <input id="nfAuthor" placeholder="Your name" style="width:130px;" maxlength="60">
+        <label style="font-size:13.5px;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="nfBig" style="width:auto;"> Big</label>
+        <button id="nfSave">Add to calendar</button>
+        <button class="x" id="nfCancel">Cancel</button>
       </div>
       <div class="cal" id="cal"></div>
     </section>
@@ -104,19 +120,33 @@ let calY, calM; // displayed month
 
 function mdOf(s){ const m = String(s||'').match(/(\d{1,2})-(\d{1,2})$/); return m ? [+m[1], +m[2]] : null; }
 
-// All events for a given month: birthdays + occasions (yearly repeat, milestones/one-time on their date).
+// All events for a given month: birthdays (name · company · age), occasions,
+// and attached calendar entries (deadlines, personnel days, board notes).
 function eventsFor(y, m){
   const out = {}; // day -> [{label, cls}]
   const add = (d, label, cls) => { (out[d] = out[d] || []).push({label, cls}); };
   (DATA.members||[]).forEach(p => {
     const md = mdOf(p.birthday);
-    if(md && md[0] === m) add(md[1], '🎂 ' + (p.name||'').split(' ')[0], 'bday');
+    if(md && md[0] === m){
+      const by = String(p.birthday||'').match(/^(\d{4})-/);
+      const age = by ? (y - +by[1]) : null;
+      const label = '🎂 ' + [p.name, p.company].filter(Boolean).join(' · ') + (age ? ' · ' + age : '');
+      add(md[1], label, 'bday');
+    }
   });
   (DATA.occasions||[]).forEach(o => {
     const sd = String(o.start_date).slice(0,10);
     const oy = +sd.slice(0,4), om = +sd.slice(5,7), od = +sd.slice(8,10);
     if(o.frequency === 'yearly'){ if(om === m && oy <= y) add(od, o.name + (o.contact_name?' · '+o.contact_name.split(' ')[0]:''), ''); }
     else if(oy === y && om === m) add(od, o.name + (o.contact_name?' · '+o.contact_name.split(' ')[0]:''), '');
+  });
+  (DATA.calendar_entries||[]).forEach(e => {
+    const sd = String(e.date).slice(0,10);
+    const ey = +sd.slice(0,4), em = +sd.slice(5,7), ed = +sd.slice(8,10);
+    const label = e.name + (e.author ? ' — ' + e.author : '');
+    const cls = (e.big ? 'big' : '') + (e.calendar_name === 'Anteckningar' ? ' note' : '');
+    if(e.frequency === 'yearly'){ if(em === m && ey <= y) add(ed, label, cls); }
+    else if(ey === y && em === m) add(ed, label, cls);
   });
   return out;
 }
@@ -138,7 +168,7 @@ function renderCal(){
     else {
       const isToday = calY===now.getFullYear() && calM===now.getMonth()+1 && dnum===now.getDate();
       const evs = (ev[dnum]||[]).map(e => '<div class="ev '+e.cls+'">'+esc(e.label)+'</div>').join('');
-      html += '<div class="day'+(isToday?' today':'')+'"><div class="dnum">'+dnum+'</div>'+evs+'</div>';
+      html += '<div class="day'+(isToday?' today':'')+'" data-d="'+dnum+'"><div class="dnum">'+dnum+'</div>'+evs+'</div>';
     }
   }
   document.getElementById('cal').innerHTML = html;
@@ -178,6 +208,13 @@ function renderUpcoming(){
     else { const t = new Date(sd); if(t >= today) d = t; }
     if(d && d <= horizon) ups.push({ d, t:o.name+(o.contact_name?' · '+o.contact_name:''), n:o.notes||'' });
   });
+  (DATA.calendar_entries||[]).forEach(e => {
+    const sd = String(e.date).slice(0,10);
+    let d = null;
+    if(e.frequency === 'yearly') d = next([+sd.slice(5,7), +sd.slice(8,10)]);
+    else { const t = new Date(sd); if(t >= today) d = t; }
+    if(d && d <= horizon) ups.push({ d, t:(e.big?'⚑ ':'')+e.name+(e.author?' — '+e.author:''), n:e.notes||'' });
+  });
   ups.sort((a,b)=>a.d-b.d);
   if(ups.length){
     document.getElementById('secUpd').classList.remove('hide');
@@ -201,6 +238,34 @@ async function load(){
   renderPeople(document.getElementById('q').value);
   document.getElementById('page').classList.remove('hide');
 }
+
+// Click a day → the note form opens with that date; saving posts via the board
+// token and reloads, so the note appears for everyone.
+let noteDate = null;
+document.getElementById('cal').addEventListener('click', e => {
+  const day = e.target.closest('.day[data-d]');
+  if(!day) return;
+  noteDate = calY + '-' + String(calM).padStart(2,'0') + '-' + String(day.dataset.d).padStart(2,'0');
+  document.getElementById('nfDate').textContent = day.dataset.d + ' ' + MON[calM-1].slice(0,3);
+  document.getElementById('noteForm').classList.remove('hide');
+  document.getElementById('nfText').focus();
+});
+document.getElementById('nfCancel').onclick = () => document.getElementById('noteForm').classList.add('hide');
+document.getElementById('nfSave').onclick = async () => {
+  const text = document.getElementById('nfText').value.trim();
+  if(!text || !noteDate) return;
+  const author = document.getElementById('nfAuthor').value.trim();
+  try{ localStorage.setItem('ts_board_name', author); }catch(e){}
+  const r = await fetch('/api/board/' + token + '/note', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ date:noteDate, text, author, big:document.getElementById('nfBig').checked })
+  });
+  if(!r.ok){ const d = await r.json().catch(()=>({})); alert(d.error||'Could not save'); return; }
+  document.getElementById('nfText').value=''; document.getElementById('nfBig').checked=false;
+  document.getElementById('noteForm').classList.add('hide');
+  load();
+};
+try{ document.getElementById('nfAuthor').value = localStorage.getItem('ts_board_name')||''; }catch(e){}
 
 document.getElementById('calPrev').onclick = () => { calM--; if(calM<1){calM=12;calY--;} renderCal(); };
 document.getElementById('calNext').onclick = () => { calM++; if(calM>12){calM=1;calY++;} renderCal(); };

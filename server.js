@@ -2323,6 +2323,133 @@ app.get('/api/site/:token', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Calendar groups ───────────────────────────────────────────────────────────
+// Named lists of dates, independent of contacts. Copied-per-account templates:
+// each firm tweaks its own copy.
+
+const CALENDAR_TEMPLATES = {
+  skattedatum: {
+    name: 'Skattedatum',
+    entries: [
+      { name: 'Momsdeklaration (kvartal)', date: '2026-02-12', frequency: 'yearly', big: true },
+      { name: 'Arbetsgivardeklaration', date: '2026-01-17', frequency: 'yearly', big: false },
+      { name: 'Inkomstdeklaration 1 – sista dag', date: '2026-05-02', frequency: 'yearly', big: true },
+      { name: 'Preliminärskatt betalning', date: '2026-01-12', frequency: 'yearly', big: false },
+      { name: 'Årsredovisning till Bolagsverket (bokslut 31 dec)', date: '2026-07-31', frequency: 'yearly', big: true },
+      { name: 'Inkomstdeklaration 2 (AB, bokslut 31 dec)', date: '2026-07-01', frequency: 'yearly', big: true },
+      { name: 'Kontrolluppgifter – sista dag', date: '2026-01-31', frequency: 'yearly', big: false },
+      { name: 'Kvarskatt – sista betalningsdag', date: '2026-11-12', frequency: 'yearly', big: false },
+    ],
+  },
+};
+
+app.get('/api/calendars', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.name, c.source_key, COUNT(e.id)::int AS entry_count
+       FROM calendars c LEFT JOIN calendar_entries e ON e.calendar_id = c.id
+       WHERE c.user_id = $1 GROUP BY c.id ORDER BY c.name`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/calendars', requireAuth, async (req, res) => {
+  try {
+    const template = req.body && req.body.template ? CALENDAR_TEMPLATES[req.body.template] : null;
+    const name = ((req.body && req.body.name) || (template && template.name) || '').trim();
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+    const cal = await pool.query(
+      `INSERT INTO calendars (user_id, name, source_key) VALUES ($1, $2, $3) RETURNING *`,
+      [req.user.id, name, req.body && req.body.template || null]
+    );
+    if (template) {
+      for (const e of template.entries) {
+        await pool.query(
+          `INSERT INTO calendar_entries (user_id, calendar_id, name, date, frequency, big)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [req.user.id, cal.rows[0].id, e.name, e.date, e.frequency, !!e.big]
+        );
+      }
+    }
+    res.json({ ok: true, calendar: cal.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/calendars/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM calendars WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/calendars/:id(\\d+)/entries', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, date, frequency, notes, big, author FROM calendar_entries
+       WHERE calendar_id = $1 AND user_id = $2 ORDER BY date`,
+      [req.params.id, req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/calendars/:id(\\d+)/entries', requireAuth, async (req, res) => {
+  const { name, date, frequency, notes, big } = req.body || {};
+  if (!name || !date) return res.status(400).json({ error: 'Name and date are required' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO calendar_entries (user_id, calendar_id, name, date, frequency, notes, big)
+       SELECT $1, c.id, $3, $4, $5, $6, $7 FROM calendars c WHERE c.id = $2 AND c.user_id = $1
+       RETURNING *`,
+      [req.user.id, req.params.id, name.trim(), date, frequency === 'once' ? 'once' : 'yearly', notes || null, !!big]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Calendar not found' });
+    res.json({ ok: true, entry: rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/calendar-entries/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM calendar_entries WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Attach / detach calendars on a group (feeds that group's board).
+app.get('/api/groups/:id/calendars', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT calendar_id FROM group_calendars WHERE group_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json(rows.map(r => r.calendar_id));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/groups/:id/calendars/:calId(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `INSERT INTO group_calendars (user_id, group_id, calendar_id)
+       SELECT $1, $2, c.id FROM calendars c WHERE c.id = $3 AND c.user_id = $1
+       ON CONFLICT (group_id, calendar_id) DO NOTHING`,
+      [req.user.id, req.params.id, req.params.calId]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/groups/:id/calendars/:calId(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `DELETE FROM group_calendars WHERE group_id = $1 AND calendar_id = $2 AND user_id = $3`,
+      [req.params.id, req.params.calId, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Staff board data (no auth — internal token is the credential). Full details:
 // this feeds the employee-facing board, so email/phone/birthdays are included.
 app.get('/api/board/:token', async (req, res) => {
@@ -2369,7 +2496,59 @@ app.get('/api/board/:token', async (req, res) => {
       occasions = occ.rows;
     }
 
-    res.json({ group_name, tagline, members: members.rows, occasions });
+    const cals = await pool.query(
+      `SELECT e.id, e.name, e.date, e.frequency, e.notes, e.big, e.author, c.name AS calendar_name
+       FROM group_calendars gc
+       JOIN calendars c ON c.id = gc.calendar_id
+       JOIN calendar_entries e ON e.calendar_id = c.id
+       WHERE gc.group_id = $1 AND gc.user_id = $2`,
+      [group_id, user_id]
+    );
+
+    res.json({ group_name, tagline, members: members.rows, occasions, calendar_entries: cals.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Staff remark written from the board itself (token is the credential).
+// Lands in an auto-created "Anteckningar" calendar attached to the group.
+app.post('/api/board/:token/note', async (req, res) => {
+  try {
+    const site = await pool.query(
+      `SELECT s.group_id, s.user_id, g.name AS group_name
+       FROM group_sites s JOIN groups g ON g.id = s.group_id
+       WHERE s.token = $1 AND s.active = TRUE AND s.kind = 'internal'`,
+      [req.params.token]
+    );
+    if (!site.rows.length) return res.status(404).json({ error: 'This board is not published.' });
+    const { group_id, user_id } = site.rows[0];
+
+    const { date, text, author, big } = req.body || {};
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'A date is required' });
+    if (!text || !String(text).trim()) return res.status(400).json({ error: 'A text is required' });
+
+    const key = 'board-notes-' + group_id;
+    let cal = await pool.query(
+      `SELECT id FROM calendars WHERE user_id = $1 AND source_key = $2`, [user_id, key]
+    );
+    let calId = cal.rows[0]?.id;
+    if (!calId) {
+      const ins = await pool.query(
+        `INSERT INTO calendars (user_id, name, source_key) VALUES ($1, $2, $3) RETURNING id`,
+        [user_id, 'Anteckningar', key]
+      );
+      calId = ins.rows[0].id;
+      await pool.query(
+        `INSERT INTO group_calendars (user_id, group_id, calendar_id) VALUES ($1,$2,$3)
+         ON CONFLICT (group_id, calendar_id) DO NOTHING`,
+        [user_id, group_id, calId]
+      );
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO calendar_entries (user_id, calendar_id, name, date, frequency, big, author)
+       VALUES ($1,$2,$3,$4,'once',$5,$6) RETURNING *`,
+      [user_id, calId, String(text).trim().slice(0, 200), date, !!big, (author || '').trim().slice(0, 60) || null]
+    );
+    res.json({ ok: true, entry: rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

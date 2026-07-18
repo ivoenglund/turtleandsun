@@ -363,6 +363,37 @@ async function initDb() {
     -- board (/board/:token) with full contact details and the calendar.
     ALTER TABLE group_sites ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'public';
 
+    -- 2026-07-18: Calendar groups — named lists of dates (deadlines, personnel
+    -- days), independent of contacts. Attached to groups via group_calendars;
+    -- the staff board renders people-dates + attached calendars + board notes.
+    CREATE TABLE IF NOT EXISTS calendars (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id),
+      name        TEXT NOT NULL,
+      source_key  TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS calendar_entries (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id),
+      calendar_id INTEGER REFERENCES calendars(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      date        DATE NOT NULL,
+      frequency   TEXT NOT NULL DEFAULT 'yearly' CHECK (frequency IN ('yearly','once')),
+      notes       TEXT,
+      big         BOOLEAN NOT NULL DEFAULT FALSE,
+      author      TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS calendar_entries_cal_idx ON calendar_entries(calendar_id);
+    CREATE TABLE IF NOT EXISTS group_calendars (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id),
+      group_id    INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+      calendar_id INTEGER REFERENCES calendars(id) ON DELETE CASCADE,
+      UNIQUE(group_id, calendar_id)
+    );
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle

@@ -2309,9 +2309,11 @@ async function renderWeb(){
     ]);
     host.innerHTML =
       '<h4 style="margin:0 0 6px;">Customer website</h4><div id="webPub"></div>'+
-      '<h4 style="margin:18px 0 6px;">Staff board (internal)</h4><div id="webInt"></div>';
+      '<h4 style="margin:18px 0 6px;">Staff board (internal)</h4><div id="webInt"></div>'+
+      '<h4 style="margin:18px 0 6px;">Calendars on this board</h4><div id="webCals"></div>';
     renderSiteBlock($('#webPub'), site, 'public');
     renderSiteBlock($('#webInt'), board, 'internal');
+    renderCalPanel($('#webCals'));
   }catch(e){
     host.innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>';
   }
@@ -2357,6 +2359,91 @@ function renderSiteBlock(el, s, kind){
     if(!confirm('Unpublish? The link stops working (you can publish again later).')) return;
     try{ await api('/api/groups/'+selected.id+'/site?kind='+kind,{method:'DELETE'}); renderWeb(); }catch(e){ alert(e.message); }
   };
+}
+
+// ── Calendars panel (Web tab): attach/detach + create + edit entries ──
+async function renderCalPanel(el){
+  try{
+    const [cals, attached] = await Promise.all([
+      api('/api/calendars'),
+      api('/api/groups/'+selected.id+'/calendars')
+    ]);
+    const att = new Set(attached);
+    el.innerHTML =
+      '<div class="help" style="margin-top:0;">Tick a calendar to show it on this group’s board. Deadlines, personnel days, notes — dates that belong to no single person.</div>'+
+      (cals.length ? cals.map(c=>
+        '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">'+
+          '<label style="display:flex;align-items:center;gap:7px;font-size:14px;flex:1;cursor:pointer;">'+
+            '<input type="checkbox" class="calAtt" data-id="'+c.id+'" '+(att.has(c.id)?'checked':'')+' style="width:auto;"> '+
+            esc(c.name)+' <span class="muted">('+c.entry_count+')</span></label>'+
+          '<button class="btn sm gray calEdit" data-id="'+c.id+'" data-name="'+esc(c.name)+'">Edit</button>'+
+          '<button class="btn sm danger calDel" data-id="'+c.id+'">✕</button>'+
+        '</div>').join('') : '<div class="muted" style="font-size:13.5px;padding:4px 0;">No calendars yet.</div>')+
+      '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'+
+        '<input id="calNewName" placeholder="New calendar name…" style="padding:6px 8px;max-width:220px;">'+
+        '<button class="btn sm gray" id="calNewBtn">＋ Create</button>'+
+        '<button class="btn sm gray" id="calTplBtn">＋ Skattedatum (template)</button>'+
+      '</div>'+
+      '<div id="calEntries"></div>';
+    el.querySelectorAll('.calAtt').forEach(cb=>cb.onchange=async()=>{
+      try{
+        await api('/api/groups/'+selected.id+'/calendars/'+cb.dataset.id,{method:cb.checked?'POST':'DELETE'});
+        showToast(cb.checked?'Shown on the board':'Removed from the board');
+      }catch(e){ alert(e.message); cb.checked=!cb.checked; }
+    });
+    el.querySelectorAll('.calDel').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Delete this calendar and all its entries?')) return;
+      try{ await api('/api/calendars/'+b.dataset.id,{method:'DELETE'}); renderCalPanel(el); }catch(e){ alert(e.message); }
+    });
+    el.querySelectorAll('.calEdit').forEach(b=>b.onclick=()=>renderCalEntries(+b.dataset.id, b.dataset.name));
+    $('#calNewBtn').onclick=async()=>{
+      const name=$('#calNewName').value.trim(); if(!name) return;
+      try{ await api('/api/calendars',{method:'POST',body:JSON.stringify({name})}); renderCalPanel(el); }catch(e){ alert(e.message); }
+    };
+    $('#calTplBtn').onclick=async()=>{
+      try{
+        const r=await api('/api/calendars',{method:'POST',body:JSON.stringify({template:'skattedatum'})});
+        await api('/api/groups/'+selected.id+'/calendars/'+r.calendar.id,{method:'POST'});
+        showToast('Skattedatum added and shown on the board — tweak the dates to your liking');
+        renderCalPanel(el);
+      }catch(e){ alert(e.message); }
+    };
+  }catch(e){ el.innerHTML='<div class="empty">Could not load calendars: '+esc(e.message)+'</div>'; }
+}
+
+async function renderCalEntries(calId, calName){
+  const host=$('#calEntries');
+  host.innerHTML='<div class="help">Loading…</div>';
+  try{
+    const rows=await api('/api/calendars/'+calId+'/entries');
+    host.innerHTML =
+      '<div class="selbox" style="margin-top:10px;"><b>'+esc(calName)+'</b></div>'+
+      (rows.length ? rows.map(r=>
+        '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13.5px;">'+
+          '<span class="muted" style="min-width:84px;">'+esc(String(r.date).slice(0,10))+'</span>'+
+          '<span style="flex:1;">'+(r.big?'<b>':'')+esc(r.name)+(r.big?'</b>':'')+(r.frequency==='yearly'?' <span class="muted">(yearly)</span>':'')+(r.author?' <span class="muted">— '+esc(r.author)+'</span>':'')+'</span>'+
+          '<button class="btn sm danger entDel" data-id="'+r.id+'">✕</button>'+
+        '</div>').join('') : '<div class="muted" style="font-size:13.5px;padding:4px 0;">No entries yet.</div>')+
+      '<div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;align-items:center;">'+
+        '<input id="entDate" type="date" style="padding:5px 7px;">'+
+        '<input id="entName" placeholder="What happens…" style="padding:5px 7px;flex:1;min-width:160px;">'+
+        '<select id="entFreq"><option value="yearly">Yearly</option><option value="once">One-time</option></select>'+
+        '<label style="font-size:13px;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="entBig" style="width:auto;"> Big</label>'+
+        '<button class="btn sm gray" id="entAdd">＋ Add</button>'+
+      '</div>';
+    host.querySelectorAll('.entDel').forEach(b=>b.onclick=async()=>{
+      try{ await api('/api/calendar-entries/'+b.dataset.id,{method:'DELETE'}); renderCalEntries(calId, calName); }catch(e){ alert(e.message); }
+    });
+    $('#entAdd').onclick=async()=>{
+      const date=$('#entDate').value, name=$('#entName').value.trim();
+      if(!date||!name) return;
+      try{
+        await api('/api/calendars/'+calId+'/entries',{method:'POST',body:JSON.stringify({
+          date, name, frequency:$('#entFreq').value, big:$('#entBig').checked })});
+        renderCalEntries(calId, calName);
+      }catch(e){ alert(e.message); }
+    };
+  }catch(e){ host.innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; }
 }
 
 // ── Tabs ──
