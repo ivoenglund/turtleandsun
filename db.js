@@ -269,6 +269,8 @@ async function initDb() {
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS job_title TEXT;
     ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS size INTEGER;
     ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS author TEXT;
+    -- 2026-07-18: external origin of an imported post (e.g. 'fb:<postId>') — dedupe key for re-runs.
+    ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS source_id TEXT;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS photo_url TEXT;

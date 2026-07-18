@@ -2187,6 +2187,68 @@ app.get('/api/admin/seed-demo-customers', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Import a scraped Facebook dataset (Apify JSON placed in ./demo-data) as blog
+// posts. Photos are re-hosted to Cloudinary (FB URLs expire). Dedupes on the FB
+// post id, so re-running is safe. Open in the browser while logged in as admin:
+//   /api/admin/import-facebook?file=qcc-facebook&tag=QCC
+app.get('/api/admin/import-facebook', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+
+    const file = String(req.query.file || 'qcc-facebook').replace(/[^a-z0-9_-]/gi, '');
+    const tag = req.query.tag || 'QCC';
+    const fp = path.join(__dirname, 'demo-data', file + '.json');
+    if (!require('fs').existsSync(fp)) return res.status(404).json({ error: `demo-data/${file}.json not found` });
+    const items = JSON.parse(require('fs').readFileSync(fp, 'utf8'));
+
+    const { uploadStream } = require('./cloudinary');
+    let inserted = 0, skipped = 0, photosDone = 0, photosFailed = 0;
+
+    for (const p of items) {
+      if (p.error || !p.postId) { skipped++; continue; }
+      const text = (p.text || '').trim();
+      const mediaUris = (p.media || [])
+        .map(m => m.photo_image && m.photo_image.uri)
+        .filter(Boolean)
+        .slice(0, 4);
+      if (!text && !mediaUris.length) { skipped++; continue; }
+
+      const sourceId = 'fb:' + p.postId;
+      const dupe = await pool.query(
+        `SELECT 1 FROM blog_posts WHERE user_id = $1 AND source_id = $2`, [req.user.id, sourceId]
+      );
+      if (dupe.rows.length) { skipped++; continue; }
+
+      const photos = [];
+      for (const uri of mediaUris) {
+        try {
+          const r = await fetch(uri);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const buf = Buffer.from(await r.arrayBuffer());
+          const up = await uploadStream(buf, { folder: 'turtleandsun/fb-import' });
+          photos.push(up.secure_url);
+          photosDone++;
+        } catch (e) { photosFailed++; }
+      }
+
+      const post_date = p.time ? String(p.time).slice(0, 10) : new Date().toISOString().slice(0, 10);
+      await pool.query(
+        `INSERT INTO blog_posts (user_id, title, body, post_date, tags, photos, source_id)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
+        [req.user.id, null, text || null, post_date,
+         JSON.stringify([tag, 'fb-import']), JSON.stringify(photos), sourceId]
+      );
+      inserted++;
+    }
+
+    res.json({ ok: true, inserted, skipped, photosDone, photosFailed, tag,
+      note: `Posts are tagged "${tag}" + "fb-import". A group named "${tag}" shows them on its site; delete them all via the timeline or: tags @> ["fb-import"].` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
 // kind: 'public' = customer website (/site/…), 'internal' = staff board (/board/…)
