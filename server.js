@@ -2336,8 +2336,12 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             startUrls: [{ url: siteUrl2 }],
-            maxCrawlPages: 5,
-            maxCrawlDepth: 1,
+            maxCrawlPages: 3,
+            maxCrawlDepth: 0,
+            crawlerType: 'playwright:firefox',
+            removeCookieWarnings: true,
+            maxScrollHeightPixels: 50000,
+            htmlTransformer: 'none',
             saveHtml: true,
           }),
         }
@@ -2458,7 +2462,7 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
       }
     }
 
-    res.json({ ok: true, v: 3, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report, diagnostics });
+    res.json({ ok: true, v: 4, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report, diagnostics });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
