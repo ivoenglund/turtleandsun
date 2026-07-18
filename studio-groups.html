@@ -407,6 +407,8 @@
     <div class="grid2">
       <div><label>Date</label><input id="pf_date" type="date" autocomplete="off"></div>
       <div><label>Tags (comma separated)</label><input id="pf_tags" list="tagList" autocomplete="off" placeholder="Family, Midsummer, private…"></div>
+      <div><label>Author (optional)</label><input id="pf_author" autocomplete="off" placeholder="Shown as “by …” on the website"></div>
+      <div><label>Size on the website</label><select id="pf_size"><option value="">Auto</option><option value="1">1 — small</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6 — wide</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 — biggest</option></select></div>
       <datalist id="tagList"></datalist>
       <div class="full"><label>Title</label><input id="pf_title" autocomplete="off"></div>
       <div class="full"><label>Text</label><textarea id="pf_body" rows="6" style="width:100%;resize:vertical;"></textarea></div>
@@ -1584,7 +1586,7 @@ async function renderTimeline(){
         <div class="prow">
           <div class="pmain">
             <h4>${esc(p.title)||'<span class="muted">(untitled)</span>'}</h4>
-            <div class="pdate">${ds}${(p.tags||[]).map(t=>' <span class="tag">'+esc(t)+'</span>').join('')}</div>
+            <div class="pdate">${ds}${p.author?' · by '+esc(p.author):''}${p.size?' <span class="tag" title="Size on the website">◱ '+p.size+'</span>':''}${(p.tags||[]).map(t=>' <span class="tag">'+esc(t)+'</span>').join('')}</div>
             ${p.body?'<div class="pbody">'+esc(p.body)+'</div>':''}
             <div style="margin-top:8px;"><button class="btn sm gray pEdit">Edit</button></div>
           </div>
@@ -1693,6 +1695,8 @@ function openPostModal(p){
   $('#pf_title').value=p?(p.title||''):'';
   $('#pf_body').value=p?(p.body||''):'';
   $('#pf_tags').value=p?(p.tags||[]).join(', '):(selected?selected.name:'');
+  $('#pf_author').value=p?(p.author||''):'';
+  $('#pf_size').value=p&&p.size?String(p.size):'';
   pfPhotos=p?[...(p.photos||[])]:[];
   renderPfPhotos();
   $('#pfDelete').classList.toggle('hide',!p);
@@ -1730,7 +1734,9 @@ $('#pfSave').onclick=async()=>{
     body:$('#pf_body').value.trim()||null,
     post_date:$('#pf_date').value||new Date().toISOString().slice(0,10),
     tags:$('#pf_tags').value.split(',').map(t=>t.trim()).filter(Boolean),
-    photos:pfPhotos
+    photos:pfPhotos,
+    author:$('#pf_author').value.trim()||null,
+    size:$('#pf_size').value?+$('#pf_size').value:null
   };
   if(editingPost) await api('/api/blog-posts/'+editingPost.id,{method:'PUT',body:JSON.stringify(body)});
   else await api('/api/blog-posts',{method:'POST',body:JSON.stringify(body)});

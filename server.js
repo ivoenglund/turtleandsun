@@ -2263,7 +2263,7 @@ app.get('/api/site/:token', async (req, res) => {
     }
 
     const posts = await pool.query(
-      `SELECT title, body, post_date, photos FROM blog_posts
+      `SELECT title, body, post_date, photos, size, author FROM blog_posts
        WHERE user_id = $1 AND EXISTS (
          SELECT 1 FROM jsonb_array_elements_text(tags) t WHERE LOWER(t) = LOWER($2)
        )
@@ -2332,7 +2332,7 @@ app.delete('/api/occasions/:id', requireAuth, async (req, res) => {
 app.get('/api/blog-posts', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, body, post_date, tags, photos, created_at
+      `SELECT id, title, body, post_date, tags, photos, size, author, created_at
        FROM blog_posts WHERE user_id = $1 ORDER BY post_date DESC, id DESC`,
       [req.user.id]
     );
@@ -2340,27 +2340,34 @@ app.get('/api/blog-posts', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+function postSize(v) {
+  const n = parseInt(v, 10);
+  return (n >= 1 && n <= 10) ? n : null;
+}
+
 app.post('/api/blog-posts', requireAuth, async (req, res) => {
-  const { title, body, post_date, tags, photos } = req.body || {};
+  const { title, body, post_date, tags, photos, size, author } = req.body || {};
   try {
     const { rows } = await pool.query(
-      `INSERT INTO blog_posts (user_id, title, body, post_date, tags, photos)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      `INSERT INTO blog_posts (user_id, title, body, post_date, tags, photos, size, author)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [req.user.id, title || null, body || null, post_date || new Date().toISOString().slice(0,10),
-       JSON.stringify(Array.isArray(tags)?tags:[]), JSON.stringify(Array.isArray(photos)?photos:[])]
+       JSON.stringify(Array.isArray(tags)?tags:[]), JSON.stringify(Array.isArray(photos)?photos:[]),
+       postSize(size), (author || '').trim() || null]
     );
     res.json({ ok: true, post: rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/blog-posts/:id(\\d+)', requireAuth, async (req, res) => {
-  const { title, body, post_date, tags, photos } = req.body || {};
+  const { title, body, post_date, tags, photos, size, author } = req.body || {};
   try {
     const { rows } = await pool.query(
-      `UPDATE blog_posts SET title=$1, body=$2, post_date=$3, tags=$4, photos=$5
-       WHERE id=$6 AND user_id=$7 RETURNING *`,
+      `UPDATE blog_posts SET title=$1, body=$2, post_date=$3, tags=$4, photos=$5, size=$6, author=$7
+       WHERE id=$8 AND user_id=$9 RETURNING *`,
       [title || null, body || null, post_date || new Date().toISOString().slice(0,10),
        JSON.stringify(Array.isArray(tags)?tags:[]), JSON.stringify(Array.isArray(photos)?photos:[]),
+       postSize(size), (author || '').trim() || null,
        req.params.id, req.user.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });

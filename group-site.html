@@ -210,16 +210,15 @@ async function load(){
       const dt = new Date(p.post_date);
       const paras = String(p.body||'').split(/\n\n+/).filter(Boolean)
         .map(par => '<p>'+esc(par)+'</p>').join('');
-      let cls='', img='';
-      if(ph){
-        const n = hash(p.title||p.body) % 10;
-        cls = n === 9 ? ' c3' : (n >= 5 ? ' c2' : '');
-        img = '<img src="'+esc(ph)+'" alt="" loading="lazy">';
-      } else if(String(p.body||'').length > 700){
-        cls = ' c2';
-      }
+      // Width: the author's chosen size (1–5 one column, 6–9 wide, 10 biggest),
+      // otherwise a stable hash pick for photo posts / long text posts.
+      const n = (p.size >= 1 && p.size <= 10) ? p.size - 1
+              : (ph ? hash(p.title||p.body) % 10 : (String(p.body||'').length > 700 ? 5 : 0));
+      const cls = n === 9 ? ' c3' : (n >= 5 ? ' c2' : '');
+      const img = ph ? '<img src="'+esc(ph)+'" alt="" loading="lazy">' : '';
+      const by = p.author ? ' · by '+esc(p.author) : '';
       return '<div class="post'+cls+'">'+img+
-        '<div class="bd"><div class="dt">'+fmt(dt)+' '+dt.getFullYear()+'</div>'+
+        '<div class="bd"><div class="dt">'+fmt(dt)+' '+dt.getFullYear()+by+'</div>'+
         (p.title?'<h3>'+esc(p.title)+'</h3>':'')+paras+'</div></div>';
     }).join('');
     requestAnimationFrame(layoutPosts);
