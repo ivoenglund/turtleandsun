@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Brochure — Turtle &amp; Sun</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Caveat:wght@600&display=swap');
   :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
   *{ box-sizing:border-box; }
   body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; }
@@ -32,7 +32,17 @@
   #knobs button{ font-family:inherit; font-size:12px; padding:4px 9px; border:1px solid #d9d4c4; background:#fff;
                  border-radius:7px; cursor:pointer; color:var(--ink); }
   #knobs button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  @media print{ #knobs{ display:none!important; } .block.sel{ outline:none; } }
+  .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
+  .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
+  .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; }
+  body.fmt-poster #out{ transform-origin:top center; }
+  body.fmt-poster .page{ width:700mm; height:1000mm; padding:0; }
+  .block.abs{ position:absolute; margin:0; cursor:grab; }
+  .block.abs:active{ cursor:grabbing; }
+  .block.abs .person{ background:#fff; }
+  @media print{ #knobs{ display:none!important; } .block.sel{ outline:none; }
+    .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
+    .block{ page-break-inside:avoid; } #zoomWrap{ display:none; } }
   .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
   .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
   .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
@@ -74,7 +84,11 @@
   <label style="font-size:13.5px;font-weight:700;">Paper
     <select id="paper" style="font-family:inherit;font-size:13.5px;padding:5px 8px;border-radius:7px;border:1px solid #c9c4b4;">
       <option value="a5">A5</option><option value="a4" selected>A4</option><option value="a3">A3</option>
+      <option value="poster">Poster 70×100</option>
     </select></label>
+  <label id="zoomWrap" style="font-size:13.5px;font-weight:700;display:none;">Zoom
+    <input type="range" id="zoom" min="8" max="100" value="18" style="vertical-align:middle;">
+  </label>
   <button id="saveBtn" style="background:#fff;color:var(--green);border:2px solid var(--green);">Save layout</button>
   <span style="font-size:13px;color:#5c5c4d;">Click a card in the preview to adjust it · the first card is the cover</span>
 </div>
@@ -85,15 +99,27 @@
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const compId = new URLSearchParams(location.search).get('comp');
 
+// Limited rich text: only harmless formatting survives (text is content; scripts are not).
+function sanitizeHtml(s){
+  return String(s||'')
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?(<\/\s*\1\s*>|$)/gi,'')
+    .replace(/<([a-z0-9]+)([^>]*)>/gi,(m,tag)=>['h3','p','b','strong','u','i','em','br','div','span'].includes(tag.toLowerCase())?'<'+tag.toLowerCase()+'>':'')
+    .replace(/<\/([a-z0-9]+)>/gi,(m,tag)=>['h3','p','b','strong','u','i','em','br','div','span'].includes(tag.toLowerCase())?'</'+tag.toLowerCase()+'>':'');
+}
 function postBlock(it){
   const c=it.content, ov=it.overrides||{}, big=ov.big;
   const ph=(c.photos||[])[0];
-  const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0, big?12:4)
-    .map(p=>'<p>'+esc(p)+'</p>').join('');
   const d=c.post_date?new Date(c.post_date):null;
-  const cls=['block', big?'big':'', ov.pos?'pos-'+ov.pos:'', ov.img?'img-'+ov.img:'', ov.txt?'txt-'+ov.txt:''].filter(Boolean).join(' ');
-  const inner='<div>'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
-    (d?'<div class="meta">'+d.toLocaleDateString('sv-SE')+(c.author?' · '+esc(c.author):'')+'</div>':'')+paras+'</div>';
+  const cls=['block', big?'big':'', ov.pos?'pos-'+ov.pos:'', ov.img?'img-'+ov.img:'',
+             ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:''].filter(Boolean).join(' ');
+  let inner;
+  if(ov.text){ inner='<div class="bd">'+sanitizeHtml(ov.text)+'</div>'; }
+  else{
+    const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0, big?12:4)
+      .map(p=>'<p>'+esc(p)+'</p>').join('');
+    inner='<div class="bd">'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
+      (d&&!ov.nodate?'<div class="meta">'+d.toLocaleDateString('sv-SE')+(c.author?' · '+esc(c.author):'')+'</div>':'')+paras+'</div>';
+  }
   return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
     (ph?'<img src="'+esc(ph)+'">':'')+inner+'</div>';
 }
@@ -126,11 +152,61 @@ function applyPaper(p){
   document.body.className='fmt-'+p;
   let st=document.getElementById('pageSize');
   if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
-  st.textContent='@page{ size:'+p.toUpperCase()+' portrait; margin:0; }';
+  st.textContent='@page{ size:'+(p==='poster'?'700mm 1000mm':p.toUpperCase()+' portrait')+'; margin:0; }';
+  const zw=document.getElementById('zoomWrap');
+  zw.style.display = p==='poster' ? 'inline' : 'none';
+  applyZoom(p==='poster' ? +document.getElementById('zoom').value : 100);
+}
+function applyZoom(pct){
+  const out=document.getElementById('out');
+  out.style.transform = pct<100 ? 'scale('+(pct/100)+')' : '';
+  out.style.transformOrigin='top center';
+  out.style.height = pct<100 ? (out.scrollHeight*pct/100)+'px' : '';
+}
+
+// Poster: one huge canvas, every card freely placed (x/y/w saved as % in overrides).
+function renderPoster(items){
+  const blocks=items.map((it,i)=>{
+    const ov=it.overrides||{};
+    const x=ov.x!=null?ov.x:8+(i%3)*30, y=ov.y!=null?ov.y:6+Math.floor(i/3)*22, w=ov.w||28;
+    const inner = it.ref_type==='contact' ? personCard(it) : postBlock(it);
+    return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;" data-absidx="'+it._idx+'">'+inner+'</div>';
+  }).join('');
+  document.getElementById('out').innerHTML='<div class="page poster" style="position:relative;">'+blocks+'</div>';
+  document.querySelectorAll('.abswrap .block,.abswrap .person').forEach(b=>b.classList.add('abs'));
+  wireDrag();
+}
+function wireDrag(){
+  document.querySelectorAll('.abswrap').forEach(w=>{
+    w.onpointerdown=e=>{
+      if(e.target.closest('[contenteditable="true"]')) return;
+      const page=w.parentElement, pr=page.getBoundingClientRect();
+      const idx=+w.dataset.absidx; selIdx=idx; showKnobs(); markSel();
+      const sx=e.clientX, sy=e.clientY;
+      const ox=parseFloat(w.style.left), oy=parseFloat(w.style.top);
+      let moved=false;
+      const mv=ev=>{
+        const dx=(ev.clientX-sx)/pr.width*100, dy=(ev.clientY-sy)/pr.height*100;
+        if(Math.abs(dx)+Math.abs(dy)>0.1) moved=true;
+        w.style.left=Math.max(0,Math.min(92,ox+dx))+'%';
+        w.style.top=Math.max(0,Math.min(96,oy+dy))+'%';
+      };
+      const up=()=>{
+        removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+        if(moved){
+          const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+          ov.x=Math.round(parseFloat(w.style.left)*10)/10; ov.y=Math.round(parseFloat(w.style.top)*10)/10;
+        }
+      };
+      addEventListener('pointermove',mv); addEventListener('pointerup',up);
+      e.preventDefault();
+    };
+  });
 }
 
 function renderPages(comp){
   const items=(comp.items||[]).map((it,i)=>({ ...it, _idx:i }));
+  if(((comp.params&&comp.params.paper)||'a4')==='poster'){ renderPoster(items); return; }
   if(!items.length){ document.getElementById('out').innerHTML='<div class="err">This brochure has no cards yet.</div>'; return; }
 
   const pages=[];
@@ -186,6 +262,8 @@ const KN={
   img:[['s','Small'],['m','Medium'],['l','Large'],['','Full']],
   pos:[['','Top'],['left','Left'],['right','Right']],
   txt:[['s','Small'],['','Normal'],['l','Large']],
+  font:[['','Jakarta'],['serif','Georgia'],['hand','Handwritten']],
+  w:[['20','Narrow'],['28','Medium'],['40','Wide'],['60','Huge']],
 };
 function knobRow(kind,label,cur){
   return '<div class="kh">'+label+'</div><div class="row">'+
@@ -194,19 +272,51 @@ function knobRow(kind,label,cur){
 function showKnobs(){
   const k=document.getElementById('knobs');
   if(selIdx==null){ k.style.display='none'; return; }
-  const ov=COMP.items[selIdx].overrides=COMP.items[selIdx].overrides||{};
+  const it=COMP.items[selIdx];
+  const ov=it.overrides=it.overrides||{};
+  const poster=((COMP.params&&COMP.params.paper)||'a4')==='poster';
+  const isPost=it.ref_type==='post';
   k.style.display='block';
   k.innerHTML='<b style="font-size:13px;">Card '+(selIdx+1)+'</b>'+
-    knobRow('img','Picture size',ov.img)+
-    knobRow('pos','Picture placement',ov.pos)+
-    knobRow('txt','Text size',ov.txt)+
-    '<div class="kh">Own page</div><div class="row"><button data-k="big" data-v="'+(ov.big?'':'1')+'" class="'+(ov.big?'on':'')+'">'+(ov.big?'Yes — turn off':'Make it a full page')+'</button></div>'+
+    (isPost?knobRow('img','Picture size',ov.img):'')+
+    (isPost&&!poster?knobRow('pos','Picture placement',ov.pos):'')+
+    (isPost?knobRow('txt','Text size',ov.txt):'')+
+    (isPost?knobRow('font','Font',ov.font):'')+
+    (poster?knobRow('w','Card width',String(ov.w||28)):'')+
+    (isPost?'<div class="kh">Date</div><div class="row"><button data-k="nodate" data-v="'+(ov.nodate?'':'1')+'" class="'+(ov.nodate?'on':'')+'">'+(ov.nodate?'Hidden — show it':'Hide the date')+'</button></div>':'')+
+    (!poster?'<div class="kh">Own page</div><div class="row"><button data-k="big" data-v="'+(ov.big?'':'1')+'" class="'+(ov.big?'on':'')+'">'+(ov.big?'Yes — turn off':'Make it a full page')+'</button></div>':'')+
+    (isPost?'<div style="margin-top:8px;"><button id="knEdit" style="width:100%;">✏ Edit the text</button></div>':'')+
+    '<div id="knEditBar" style="display:none;margin-top:6px;" class="row">'+
+      '<button id="knB" style="font-weight:800;">B</button>'+
+      '<button id="knU" style="text-decoration:underline;">U</button>'+
+      '<button id="knReset" title="Back to the original text">↺ Original</button>'+
+      '<button id="knDone" style="flex:1;">✓ Done editing</button></div>'+
     '<div style="margin-top:10px;"><button id="knClose" style="width:100%;">Done</button></div>';
   k.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
     const kk=b.dataset.k, v=b.dataset.v;
-    if(kk==='big') ov.big=!!v; else if(v==='') delete ov[kk]; else ov[kk]=v;
+    if(kk==='big') ov.big=!!v;
+    else if(kk==='nodate') ov.nodate=!!v;
+    else if(kk==='w') ov.w=+v;
+    else if(v==='') delete ov[kk]; else ov[kk]=v;
     render(); showKnobs(); markSel();
   });
+  const editBtn=document.getElementById('knEdit');
+  if(editBtn) editBtn.onclick=()=>{
+    const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd');
+    if(!bd) return;
+    bd.setAttribute('contenteditable','true'); bd.focus();
+    document.getElementById('knEditBar').style.display='flex';
+    editBtn.style.display='none';
+  };
+  const q=id=>document.getElementById(id);
+  q('knB').onclick=e=>{ e.preventDefault(); document.execCommand('bold'); };
+  q('knU').onclick=e=>{ e.preventDefault(); document.execCommand('underline'); };
+  q('knReset').onclick=()=>{ delete ov.text; render(); showKnobs(); markSel(); };
+  q('knDone').onclick=()=>{
+    const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd');
+    if(bd){ ov.text=sanitizeHtml(bd.innerHTML); bd.removeAttribute('contenteditable'); }
+    render(); showKnobs(); markSel();
+  };
   document.getElementById('knClose').onclick=()=>{ selIdx=null; showKnobs(); markSel(); };
 }
 function markSel(){
@@ -219,8 +329,9 @@ document.getElementById('out').addEventListener('click',e=>{
 });
 document.getElementById('paper').onchange=e=>{
   COMP.params=COMP.params||{}; COMP.params.paper=e.target.value;
-  applyPaper(e.target.value);
+  applyPaper(e.target.value); render();
 };
+document.getElementById('zoom').oninput=e=>applyZoom(+e.target.value);
 document.getElementById('saveBtn').onclick=async()=>{
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
   const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
