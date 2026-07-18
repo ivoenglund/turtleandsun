@@ -35,13 +35,20 @@
   .upd{ background:var(--cream); border-radius:10px; padding:14px 16px; }
   .upd .d{ font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
   .upd .t{ font-size:15px; font-weight:600; margin-top:3px; }
-  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
-  .post{ background:#fff; border:1px solid #e2dccb; border-radius:12px; overflow:hidden; }
-  .post img{ width:100%; height:170px; object-fit:cover; display:block; }
+  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); grid-auto-rows:8px; grid-auto-flow:dense; gap:18px; }
+  .post{ background:#fff; border:1px solid #e2dccb; border-radius:12px; overflow:hidden; align-self:start; }
+  .post.c2{ grid-column:span 2; }
+  .post.c3{ grid-column:span 3; }
+  @media (max-width:640px){ .post.c2,.post.c3{ grid-column:span 1; } }
+  .post img{ width:100%; object-fit:cover; display:block; }
   .post .bd{ padding:14px 16px; }
   .post .dt{ font-size:12.5px; color:var(--muted); }
   .post h3{ margin:4px 0 6px; font-size:17px; color:var(--green); }
-  .post p{ margin:0; font-size:14px; line-height:1.55; }
+  .post.c2 h3,.post.c3 h3{ font-size:20px; }
+  .post p{ margin:0 0 10px; font-size:14px; line-height:1.6; }
+  .post p:last-child{ margin-bottom:0; }
+  .person{ cursor:pointer; border-radius:10px; padding:6px 4px; }
+  .person.sel{ outline:3px solid var(--gold); outline-offset:2px; }
   #map{ height:340px; border-radius:12px; }
   footer{ margin-top:56px; padding:26px 20px; background:var(--cream); text-align:center; font-size:13px; color:var(--muted); }
   footer a{ color:var(--green); text-decoration:none; }
@@ -102,6 +109,34 @@ function nextDate(md){
 }
 function fmt(d){ return d.getDate() + ' ' + MON[d.getMonth()]; }
 
+// Masonry: each card spans as many 8px grid rows as its natural height needs,
+// so a text-only post takes exactly the space of its text.
+function layoutPosts(){
+  const cards = document.querySelectorAll('#posts .post');
+  cards.forEach(card => {
+    card.style.gridRowEnd = '';
+    const h = card.getBoundingClientRect().height;
+    card.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + 18) / (8 + 18)));
+  });
+}
+addEventListener('resize', () => { clearTimeout(window._lay); window._lay = setTimeout(layoutPosts, 150); });
+
+// Two-way selection: person card <-> map pin.
+function selectPerson(i, from){
+  document.querySelectorAll('.person.sel').forEach(x => x.classList.remove('sel'));
+  const card = document.querySelector('.person[data-i="'+i+'"]');
+  if(card) card.classList.add('sel');
+  const mk = (window._markers||{})[i];
+  if(from === 'people' && mk && window._tsMap){
+    document.getElementById('secMap').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    window._tsMap.panTo(mk.getLatLng());
+    mk.openPopup();
+  }
+  if(from === 'map' && card){
+    card.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+}
+
 async function load(){
   const r = await fetch('/api/site/' + token);
   if(!r.ok){ document.getElementById('err').classList.remove('hide'); return; }
@@ -115,6 +150,7 @@ async function load(){
   document.getElementById('gcount').textContent = n ? (n + (n===1?' member':' members')) : '';
 
   const ppl = data.members||[];
+  ppl.forEach((p,i)=>p._i=i);
   if(ppl.length){
     document.getElementById('secPeople').classList.remove('hide');
     document.getElementById('people').innerHTML = ppl.map(p => {
@@ -122,18 +158,22 @@ async function load(){
       const img = p.photo_url
         ? '<img class="ph" src="'+esc(p.photo_url)+'" alt="" loading="lazy">'
         : '<div class="init">'+esc(init)+'</div>';
-      const sub = [p.subgroup_name, p.city].filter(Boolean).join(' · ');
       const ct = [
         p.email ? '<a href="mailto:'+esc(p.email)+'">'+esc(p.email)+'</a>' : '',
         p.phone ? '<a href="tel:'+esc(String(p.phone).replace(/[^+\d]/g,''))+'">'+esc(p.phone)+'</a>' : ''
       ].filter(Boolean).join('<br>');
-      return '<div class="person">'+img+
+      return '<div class="person" data-i="'+p._i+'">'+img+
         '<div class="nm">'+esc(p.name||'')+'</div>'+
         (p.job_title?'<div class="role">'+esc(p.job_title)+'</div>':'')+
-        (sub?'<div class="sub">'+esc(sub)+'</div>':'')+
+        (p.subgroup_name?'<div class="sub">'+esc(p.subgroup_name)+'</div>':'')+
         (ct?'<div class="ct">'+ct+'</div>':'')+
         '</div>';
     }).join('');
+    document.getElementById('people').onclick = e => {
+      if(e.target.closest('a')) return;
+      const card = e.target.closest('.person');
+      if(card) selectPerson(+card.dataset.i, 'people');
+    };
   }
 
   const ups = [];
@@ -158,14 +198,30 @@ async function load(){
   const posts = data.posts||[];
   if(posts.length){
     document.getElementById('secPosts').classList.remove('hide');
+    // Ten sizes: 0–4 one column, 5–8 two columns, 9 three columns — bigger size,
+    // taller picture. Deterministic per post (hash of the title) so the wall is
+    // stable between visits. Text is NEVER cut, so card height = text height.
+    const SIZES=[{c:1,i:120},{c:1,i:150},{c:1,i:190},{c:1,i:230},{c:1,i:280},{c:2,i:220},{c:2,i:280},{c:2,i:340},{c:2,i:420},{c:3,i:480}];
+    const hash = s => { let h=0; for(const ch of String(s)) h=(h*31+ch.charCodeAt(0))|0; return Math.abs(h); };
     document.getElementById('posts').innerHTML = posts.map(p => {
       const ph = (p.photos||[])[0];
-      const body = String(p.body||'').slice(0,180) + (String(p.body||'').length>180?'…':'');
       const dt = new Date(p.post_date);
-      return '<div class="post">'+(ph?'<img src="'+esc(ph)+'" alt="" loading="lazy">':'')+
+      const paras = String(p.body||'').split(/\n\n+/).filter(Boolean)
+        .map(par => '<p>'+esc(par)+'</p>').join('');
+      let cls='', img='';
+      if(ph){
+        const s = SIZES[hash(p.title||p.body) % 10];
+        cls = s.c>1 ? ' c'+s.c : '';
+        img = '<img src="'+esc(ph)+'" alt="" loading="lazy" style="height:'+s.i+'px;">';
+      } else if(String(p.body||'').length > 700){
+        cls = ' c2';
+      }
+      return '<div class="post'+cls+'">'+img+
         '<div class="bd"><div class="dt">'+fmt(dt)+' '+dt.getFullYear()+'</div>'+
-        (p.title?'<h3>'+esc(p.title)+'</h3>':'')+'<p>'+esc(body)+'</p></div></div>';
+        (p.title?'<h3>'+esc(p.title)+'</h3>':'')+paras+'</div></div>';
     }).join('');
+    requestAnimationFrame(layoutPosts);
+    document.querySelectorAll('#posts img').forEach(im => im.addEventListener('load', layoutPosts));
   }
 
   document.getElementById('page').classList.remove('hide');
@@ -180,7 +236,12 @@ async function load(){
     const map = window._tsMap;
     if(map._pinLayer) map.removeLayer(map._pinLayer);
     const lg = L.layerGroup().addTo(map); map._pinLayer = lg;
-    pins.forEach(p => L.marker([p.latitude,p.longitude]).addTo(lg).bindPopup(esc(p.name||'')));
+    window._markers = {};
+    pins.forEach(p => {
+      const mk = L.marker([p.latitude,p.longitude]).addTo(lg).bindPopup(esc(p.name||''));
+      mk.on('click', () => selectPerson(p._i, 'map'));
+      window._markers[p._i] = mk;
+    });
     setTimeout(() => {
       map.invalidateSize();
       map.fitBounds(pins.map(p=>[p.latitude,p.longitude]), { padding:[40,40], maxZoom:11 });
