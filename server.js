@@ -2353,9 +2353,15 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
     let inserted = 0, dropped = 0, photosDone = 0;
     const report = [];
 
+    const diagnostics = pages.map(p => ({
+      url: p.url, keys: Object.keys(p),
+      textLen: (p.text || '').length, htmlLen: (p.html || '').length, mdLen: (p.markdown || '').length,
+    }));
+
     for (const page of pages) {
       const html = page.html || '';
-      const text = (page.text || html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ');
+      // Search everything the crawler gave us — text, markdown AND raw html.
+      const text = ((page.text || '') + ' ' + (page.markdown || '') + ' ' + html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ');
       const emails = [...new Set((text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/g) || []))];
 
       for (const email of emails) {
@@ -2421,7 +2427,7 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
       }
     }
 
-    res.json({ ok: true, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report });
+    res.json({ ok: true, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report, diagnostics });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
