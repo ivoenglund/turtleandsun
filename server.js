@@ -2320,25 +2320,35 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
     const mode = req.query.mode === 'loose' ? 'loose' : 'strict';
     if (!apifyToken || !siteUrl2) return res.status(400).json({ error: 'token and url are required' });
 
-    const runRes = await fetch(
-      'https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=' + encodeURIComponent(apifyToken),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startUrls: [{ url: siteUrl2 }],
-          maxCrawlPages: 5,
-          maxCrawlDepth: 1,
-          saveHtml: true,
-        }),
+    let pages;
+    if (req.query.engine === 'direct') {
+      // Server-rendered sites: fetch the page ourselves — full raw HTML, no
+      // crawler middleman, no cookie-overlay truncation.
+      const r = await fetch(siteUrl2, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TurtleAndSun/1.0)' } });
+      if (!r.ok) return res.status(502).json({ error: 'Fetch failed: HTTP ' + r.status });
+      const html = await r.text();
+      pages = [{ url: siteUrl2, html, text: html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ') }];
+    } else {
+      const runRes = await fetch(
+        'https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=' + encodeURIComponent(apifyToken),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startUrls: [{ url: siteUrl2 }],
+            maxCrawlPages: 5,
+            maxCrawlDepth: 1,
+            saveHtml: true,
+          }),
+        }
+      );
+      if (!runRes.ok) {
+        const t = await runRes.text();
+        return res.status(502).json({ error: 'Apify run failed: HTTP ' + runRes.status, detail: t.slice(0, 300) });
       }
-    );
-    if (!runRes.ok) {
-      const t = await runRes.text();
-      return res.status(502).json({ error: 'Apify run failed: HTTP ' + runRes.status, detail: t.slice(0, 300) });
+      pages = await runRes.json();
+      if (!Array.isArray(pages) || !pages.length) return res.status(502).json({ error: 'Crawler returned no pages' });
     }
-    const pages = await runRes.json();
-    if (!Array.isArray(pages) || !pages.length) return res.status(502).json({ error: 'Crawler returned no pages' });
 
     // Group: find or create.
     let grp = await pool.query(`SELECT id FROM groups WHERE user_id = $1 AND LOWER(name) = LOWER($2)`, [req.user.id, groupName]);
