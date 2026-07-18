@@ -2368,8 +2368,20 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
       textLen: (p.text || '').length, htmlLen: (p.html || '').length, mdLen: (p.markdown || '').length,
     }));
 
+    // Cloudflare email protection: addresses are XOR-encoded in data-cfemail
+    // attributes and normally decoded by the visitor's browser. Same math here.
+    const cfDecode = hex => {
+      const k = parseInt(hex.slice(0, 2), 16); let out = '';
+      for (let i = 2; i < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ k);
+      return out;
+    };
+
     for (const page of pages) {
-      const html = page.html || '';
+      // Swap protected anchors for their decoded address IN PLACE, so the
+      // email keeps its position next to the person's name and phone.
+      const html = (page.html || '')
+        .replace(/<a[^>]*data-cfemail="([0-9a-fA-F]+)"[^>]*>[\s\S]*?<\/a>/g, (m, h) => ' ' + cfDecode(h) + ' ')
+        .replace(/<span[^>]*data-cfemail="([0-9a-fA-F]+)"[^>]*>[\s\S]*?<\/span>/g, (m, h) => ' ' + cfDecode(h) + ' ');
       // Search everything the crawler gave us — text, markdown AND raw html.
       const text = ((page.text || '') + ' ' + (page.markdown || '') + ' ' + html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ');
       const emails = [...new Set((text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/g) || []))];
