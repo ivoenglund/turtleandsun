@@ -351,6 +351,7 @@
     <div class="grid2">
       <div><label>Name</label><input id="cf_name" autocomplete="off"></div>
       <div><label>Company</label><input id="cf_company" autocomplete="off"></div>
+      <div><label>Job title</label><input id="cf_job_title" autocomplete="off"></div>
       <div><label>Email</label><input id="cf_email" autocomplete="off"></div>
       <div><label>Phone</label><input id="cf_phone" autocomplete="off"></div>
       <div><label>Birthday</label><input id="cf_birthday" type="date" autocomplete="off"></div>
@@ -655,7 +656,7 @@ async function saveContactField(cid, field, value, silent){
   if(!c) throw new Error('Contact not in cache');
   const prev = c[field] ?? null;
   const body = {
-    name:c.name, email:c.email, phone:c.phone, company:c.company,
+    name:c.name, email:c.email, phone:c.phone, company:c.company, job_title:c.job_title,
     street:c.street, street_2:c.street_2, city:c.city, region:c.region,
     country:c.country, postal_code:c.postal_code, about:c.about||null,
     birthday:d10(c.birthday)||null, died_on:d10(c.died_on)||null, is_pet:!!c.is_pet
@@ -1173,7 +1174,7 @@ $('#bulkDelete').onclick=async()=>{
 };
 
 // ── Contact editor modal ──
-const CF = ['name','email','phone','company','street','street_2','city','region','country','postal_code','about'];
+const CF = ['name','email','phone','company','job_title','street','street_2','city','region','country','postal_code','about'];
 async function openContactModal(cid){
   editingContactId = cid;
   const c = await api('/api/contacts/'+cid);

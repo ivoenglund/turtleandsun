@@ -1071,6 +1071,7 @@ app.get('/auth/google/callback', async (req, res) => {
       const email = c.emailAddresses?.[0]?.value  || null;
       const phone = c.phoneNumbers?.[0]?.value    || null;
       const company = c.organizations?.[0]?.name  || null;
+      const job_title = c.organizations?.[0]?.title || null;
       const addr = c.addresses?.[0] || null;
       const street = addr?.streetAddress || null;
       const street_2 = addr?.extendedAddress || null;
@@ -1081,15 +1082,15 @@ app.get('/auth/google/callback', async (req, res) => {
       const bd = c.birthdays?.[0]?.date;
       const birthday = bd ? `${bd.year || ''}-${String(bd.month).padStart(2,'0')}-${String(bd.day).padStart(2,'0')}` : null;
       await pool.query(
-        `INSERT INTO contacts (user_id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `INSERT INTO contacts (user_id, google_id, name, email, phone, company, job_title, street, street_2, city, region, country, postal_code, birthday)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT (user_id, google_id) DO UPDATE
            SET name = EXCLUDED.name, email = EXCLUDED.email, phone = EXCLUDED.phone,
-               company = EXCLUDED.company,
+               company = EXCLUDED.company, job_title = EXCLUDED.job_title,
                street = EXCLUDED.street, street_2 = EXCLUDED.street_2,
                city = EXCLUDED.city, region = EXCLUDED.region, country = EXCLUDED.country,
                postal_code = EXCLUDED.postal_code, birthday = EXCLUDED.birthday`,
-        [user.id, googleId, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday]
+        [user.id, googleId, name, email, phone, company, job_title, street, street_2, city, region, country, postal_code, birthday]
       );
       saved++;
     }
@@ -2215,6 +2216,7 @@ app.get('/api/site/:token', async (req, res) => {
     const members = await pool.query(
       `SELECT DISTINCT ON (c.id)
               c.id, c.name, c.photo_url, c.birthday, c.city, c.country,
+              c.email, c.phone, c.job_title, c.company,
               c.latitude, c.longitude,
               CASE WHEN g.parent_group_id = $3 THEN g.name ELSE NULL END AS subgroup_name
        FROM contact_group_memberships m
@@ -2252,6 +2254,7 @@ app.get('/api/site/:token', async (req, res) => {
       tagline,
       members: members.rows.map(r => ({
         name: r.name, photo_url: r.photo_url, city: r.city, country: r.country,
+        email: r.email, phone: r.phone, job_title: r.job_title, company: r.company,
         latitude: r.latitude, longitude: r.longitude,
         subgroup_name: r.subgroup_name,
         birthday: r.birthday ? String(r.birthday).replace(/^\d{4}-/, '') : null,
@@ -2406,7 +2409,7 @@ app.get('/api/network', requireAuth, async (req, res) => {
 app.get('/api/contacts', requireAuth, async (req, res) => {
   try {
     const contacts = await pool.query(
-      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url, about
+      `SELECT id, google_id, name, email, phone, company, job_title, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url, about
        FROM contacts WHERE user_id = $1 ORDER BY is_me DESC NULLS LAST, name ASC NULLS LAST`,
       [req.user.id]
     );
@@ -2445,7 +2448,7 @@ app.get('/api/contacts/related-ids', requireAuth, async (req, res) => {
 app.get('/api/contacts/:id', requireAuth, async (req, res) => {
   try {
     const contact = await pool.query(
-      `SELECT id, google_id, name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url, about
+      `SELECT id, google_id, name, email, phone, company, job_title, street, street_2, city, region, country, postal_code, birthday, is_placeholder, died_on, is_pet, is_me, photo_url, about
        FROM contacts WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]
     );
@@ -2472,15 +2475,17 @@ app.get('/api/contacts/:id', requireAuth, async (req, res) => {
 });
 
 app.put('/api/contacts/:id', requireAuth, async (req, res) => {
-  const { name, email, phone, company, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet, about, photo_url } = req.body;
-  // photo_url only changes when the key is present in the body (older callers don't send it)
+  const { name, email, phone, company, job_title, street, street_2, city, region, country, postal_code, birthday, died_on, is_pet, about, photo_url } = req.body;
+  // photo_url / job_title only change when the key is present in the body (older callers don't send them)
   const hasPhoto = Object.prototype.hasOwnProperty.call(req.body, 'photo_url');
+  const hasTitle = Object.prototype.hasOwnProperty.call(req.body, 'job_title');
   try {
     await pool.query(
       `UPDATE contacts SET name=$1, email=$2, phone=$3, company=$4, street=$5, street_2=$6, city=$7, region=$8, country=$9, postal_code=$10, birthday=$11, died_on=$12, is_pet=$13, about=$14,
-         photo_url = CASE WHEN $15::boolean THEN $16 ELSE photo_url END
-       WHERE id=$17 AND user_id=$18`,
-      [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, about || null, hasPhoto, photo_url || null, req.params.id, req.user.id]
+         photo_url = CASE WHEN $15::boolean THEN $16 ELSE photo_url END,
+         job_title = CASE WHEN $17::boolean THEN $18 ELSE job_title END
+       WHERE id=$19 AND user_id=$20`,
+      [name, email, phone, company, street, street_2, city, region, country, postal_code, birthday || null, died_on || null, !!is_pet, about || null, hasPhoto, photo_url || null, hasTitle, job_title || null, req.params.id, req.user.id]
     );
     res.json({ ok: true });
 
