@@ -2363,10 +2363,19 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
     let inserted = 0, dropped = 0, photosDone = 0;
     const report = [];
 
-    const diagnostics = pages.map(p => ({
-      url: p.url, keys: Object.keys(p),
-      textLen: (p.text || '').length, htmlLen: (p.html || '').length, mdLen: (p.markdown || '').length,
-    }));
+    const diagnostics = pages.map(p => {
+      const h = p.html || '';
+      const stripped = h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const telAt = stripped.search(/Tel/i);
+      return {
+        url: p.url, keys: Object.keys(p),
+        textLen: (p.text || '').length, htmlLen: h.length, mdLen: (p.markdown || '').length,
+        cfemailAttrs: (h.match(/data-cfemail/g) || []).length,
+        emailProtectionLinks: (h.match(/email-protection/g) || []).length,
+        atSigns: (h.match(/@/g) || []).length,
+        telSnippet: telAt >= 0 ? stripped.slice(Math.max(0, telAt - 150), telAt + 100) : null,
+      };
+    });
 
     // Cloudflare email protection: addresses are XOR-encoded in data-cfemail
     // attributes and normally decoded by the visitor's browser. Same math here.
@@ -2449,7 +2458,7 @@ app.get('/api/admin/crawl-import', requireAuth, async (req, res) => {
       }
     }
 
-    res.json({ ok: true, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report, diagnostics });
+    res.json({ ok: true, v: 3, mode, group: groupName, pagesCrawled: pages.length, inserted, dropped, photosDone, report, diagnostics });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
