@@ -35,17 +35,18 @@
   .upd{ background:var(--cream); border-radius:10px; padding:14px 16px; }
   .upd .d{ font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
   .upd .t{ font-size:15px; font-weight:600; margin-top:3px; }
-  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); grid-auto-rows:8px; grid-auto-flow:dense; gap:18px; }
-  .post{ background:#fff; border:1px solid #e2dccb; border-radius:12px; overflow:hidden; align-self:start; }
+  .posts{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); grid-auto-rows:2px; grid-auto-flow:dense; column-gap:18px; row-gap:0; }
+  .post{ background:#fff; border:1px solid #e2dccb; border-radius:12px; overflow:hidden; align-self:start; margin-bottom:18px; }
   .post.c2{ grid-column:span 2; }
   .post.c3{ grid-column:span 3; }
   @media (max-width:640px){ .post.c2,.post.c3{ grid-column:span 1; } }
-  .post img{ width:100%; object-fit:cover; display:block; }
-  .post .bd{ padding:14px 16px; }
-  .post .dt{ font-size:12.5px; color:var(--muted); }
-  .post h3{ margin:4px 0 6px; font-size:17px; color:var(--green); }
-  .post.c2 h3,.post.c3 h3{ font-size:20px; }
-  .post p{ margin:0 0 10px; font-size:14px; line-height:1.6; }
+  .post img{ width:100%; height:auto; display:block; }
+  .post img+.bd{ padding-top:9px; }
+  .post .bd{ padding:14px 16px 15px; }
+  .post .dt{ font-size:13px; color:var(--muted); }
+  .post h3{ margin:3px 0 7px; font-size:18px; color:var(--green); }
+  .post.c2 h3,.post.c3 h3{ font-size:21px; }
+  .post p{ margin:0 0 11px; font-size:15.5px; line-height:1.65; }
   .post p:last-child{ margin-bottom:0; }
   .person{ cursor:pointer; border-radius:10px; padding:6px 4px; }
   .person.sel{ outline:3px solid var(--gold); outline-offset:2px; }
@@ -116,10 +117,12 @@ function layoutPosts(){
   cards.forEach(card => {
     card.style.gridRowEnd = '';
     const h = card.getBoundingClientRect().height;
-    card.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + 18) / (8 + 18)));
+    card.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((h + 18) / 2));
   });
 }
 addEventListener('resize', () => { clearTimeout(window._lay); window._lay = setTimeout(layoutPosts, 150); });
+addEventListener('load', layoutPosts);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(layoutPosts);
 
 // Two-way selection: person card <-> map pin.
 function selectPerson(i, from){
@@ -198,10 +201,9 @@ async function load(){
   const posts = data.posts||[];
   if(posts.length){
     document.getElementById('secPosts').classList.remove('hide');
-    // Ten sizes: 0–4 one column, 5–8 two columns, 9 three columns — bigger size,
-    // taller picture. Deterministic per post (hash of the title) so the wall is
-    // stable between visits. Text is NEVER cut, so card height = text height.
-    const SIZES=[{c:1,i:120},{c:1,i:150},{c:1,i:190},{c:1,i:230},{c:1,i:280},{c:2,i:220},{c:2,i:280},{c:2,i:340},{c:2,i:420},{c:3,i:480}];
+    // Sizes control WIDTH only (1–3 columns); pictures are never cropped — they
+    // show whole at natural aspect, and the masonry puzzles the heights.
+    // Deterministic per post (hash of the title) so the wall is stable.
     const hash = s => { let h=0; for(const ch of String(s)) h=(h*31+ch.charCodeAt(0))|0; return Math.abs(h); };
     document.getElementById('posts').innerHTML = posts.map(p => {
       const ph = (p.photos||[])[0];
@@ -210,9 +212,9 @@ async function load(){
         .map(par => '<p>'+esc(par)+'</p>').join('');
       let cls='', img='';
       if(ph){
-        const s = SIZES[hash(p.title||p.body) % 10];
-        cls = s.c>1 ? ' c'+s.c : '';
-        img = '<img src="'+esc(ph)+'" alt="" loading="lazy" style="height:'+s.i+'px;">';
+        const n = hash(p.title||p.body) % 10;
+        cls = n === 9 ? ' c3' : (n >= 5 ? ' c2' : '');
+        img = '<img src="'+esc(ph)+'" alt="" loading="lazy">';
       } else if(String(p.body||'').length > 700){
         cls = ' c2';
       }
