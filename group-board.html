@@ -99,7 +99,10 @@
 
     <section>
       <h2>Everyone</h2><hr class="rule">
-      <input class="search" id="q" type="search" placeholder="Search name, company, city…">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+        <input class="search" id="q" type="search" placeholder="Search name, company, city…" style="margin-bottom:0;">
+        <select id="hFilter" class="search" style="max-width:230px;margin-bottom:0;"><option value="">Everyone</option></select>
+      </div>
       <div class="people" id="people"></div>
     </section>
   </div>
@@ -176,8 +179,10 @@ function renderCal(){
 
 function renderPeople(filter){
   const q = (filter||'').toLowerCase();
+  const hf = document.getElementById('hFilter').value;
   const ppl = (DATA.members||[]).filter(p =>
-    !q || [p.name,p.company,p.city,p.job_title,p.email].some(v => String(v||'').toLowerCase().includes(q)));
+    (!q || [p.name,p.company,p.city,p.job_title,p.email].some(v => String(v||'').toLowerCase().includes(q))) &&
+    (!hf || (p.handlers||[]).includes(hf)));
   document.getElementById('people').innerHTML = ppl.map(p => {
     const init = (p.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
     const img = p.photo_url ? '<img src="'+esc(p.photo_url)+'" alt="" loading="lazy">' : '<div class="init">'+esc(init)+'</div>';
@@ -186,7 +191,8 @@ function renderPeople(filter){
       p.email ? '<div class="ln"><a href="mailto:'+esc(p.email)+'">'+esc(p.email)+'</a></div>' : '',
       p.phone ? '<div class="ln"><a href="tel:'+esc(String(p.phone).replace(/[^+\d]/g,''))+'">'+esc(p.phone)+'</a></div>' : '',
       (p.city||p.subgroup_name) ? '<div class="ln mut">'+esc([p.subgroup_name,p.city].filter(Boolean).join(' · '))+'</div>' : '',
-      p.birthday ? '<div class="ln mut">🎂 '+esc(String(p.birthday))+'</div>' : ''
+      p.birthday ? '<div class="ln mut">🎂 '+esc(String(p.birthday))+'</div>' : '',
+      (p.handlers||[]).length ? '<div class="ln" style="color:var(--gold);font-weight:700;">☂ '+esc(p.handlers.join(', '))+'</div>' : ''
     ].join('');
     return '<div class="card">'+img+'<div><div class="nm">'+esc(p.name||'')+'</div>'+lines+'</div></div>';
   }).join('') || '<div class="err" style="padding:20px;">No one matches.</div>';
@@ -233,6 +239,12 @@ async function load(){
   const n = (DATA.members||[]).length;
   document.getElementById('gcount').textContent = n + (n===1?' person':' people');
   if(calY === undefined){ const now = new Date(); calY = now.getFullYear(); calM = now.getMonth()+1; }
+  const hf = document.getElementById('hFilter');
+  const names = [...new Set((DATA.members||[]).flatMap(p => p.handlers||[]))].sort();
+  const kept = hf.value;
+  hf.innerHTML = '<option value="">Everyone</option>' + names.map(n =>
+    '<option'+(n===kept?' selected':'')+'>'+esc(n)+'</option>').join('');
+  hf.style.display = names.length ? '' : 'none';
   renderCal();
   renderUpcoming();
   renderPeople(document.getElementById('q').value);
@@ -271,6 +283,7 @@ document.getElementById('calPrev').onclick = () => { calM--; if(calM<1){calM=12;
 document.getElementById('calNext').onclick = () => { calM++; if(calM>12){calM=1;calY++;} renderCal(); };
 document.getElementById('calToday').onclick = () => { const now=new Date(); calY=now.getFullYear(); calM=now.getMonth()+1; renderCal(); };
 document.getElementById('q').addEventListener('input', e => renderPeople(e.target.value));
+document.getElementById('hFilter').addEventListener('change', () => renderPeople(document.getElementById('q').value));
 
 load();
 setInterval(load, 5*60*1000);

@@ -2450,6 +2450,93 @@ app.delete('/api/groups/:id/calendars/:calId(\\d+)', requireAuth, async (req, re
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── "Tar hand om" — responsible-person edges (generic typed relations) ────────
+// The pair is seeded once per user into the typed-relation system; the labels
+// are ordinary relationship_types, so they can be renamed like any other.
+async function ensureHandlerTypes(userId) {
+  const found = await pool.query(
+    `SELECT rt.id, rt.name FROM relationship_types rt
+     JOIN groups g ON g.id = rt.group_id
+     WHERE g.user_id = $1 AND rt.name IN ('Tar hand om','Tas om hand av')`,
+    [userId]
+  );
+  let a = found.rows.find(r => r.name === 'Tar hand om')?.id;
+  let b = found.rows.find(r => r.name === 'Tas om hand av')?.id;
+  if (a && b) return { a, b };
+  const g = await pool.query(
+    `SELECT id FROM groups WHERE user_id = $1 ORDER BY (name = 'Family') DESC, id LIMIT 1`,
+    [userId]
+  );
+  if (!g.rows.length) throw new Error('No group to anchor relationship types');
+  const gid = g.rows[0].id;
+  if (!a) a = (await pool.query(`INSERT INTO relationship_types (group_id, name) VALUES ($1, 'Tar hand om') RETURNING id`, [gid])).rows[0].id;
+  if (!b) b = (await pool.query(`INSERT INTO relationship_types (group_id, name) VALUES ($1, 'Tas om hand av') RETURNING id`, [gid])).rows[0].id;
+  await pool.query(`UPDATE relationship_types SET mirror_id = $1 WHERE id = $2`, [b, a]);
+  await pool.query(`UPDATE relationship_types SET mirror_id = $1 WHERE id = $2`, [a, b]);
+  return { a, b };
+}
+
+// All handler edges for a group's members: [{customer_id, handler_id, handler_name}]
+app.get('/api/groups/:id/handlers', requireAuth, async (req, res) => {
+  try {
+    const { a } = await ensureHandlerTypes(req.user.id);
+    const subgroups = await pool.query(
+      `SELECT id FROM groups WHERE parent_group_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    const treeIds = [parseInt(req.params.id, 10), ...subgroups.rows.map(s => s.id)];
+    const { rows } = await pool.query(
+      `SELECT DISTINCT cr.contact_b_id AS customer_id, cr.contact_a_id AS handler_id, c.name AS handler_name
+       FROM contact_relationships cr
+       JOIN contacts c ON c.id = cr.contact_a_id
+       WHERE cr.user_id = $1 AND cr.relationship_type_id = $2
+         AND cr.contact_b_id IN (
+           SELECT contact_id FROM contact_group_memberships WHERE user_id = $1 AND group_id = ANY($3)
+         )
+       ORDER BY c.name`,
+      [req.user.id, a, treeIds]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create / remove one handler↔customer pair (both directions).
+app.post('/api/handlers', requireAuth, async (req, res) => {
+  const { handler_id, customer_id } = req.body || {};
+  if (!handler_id || !customer_id) return res.status(400).json({ error: 'handler_id and customer_id are required' });
+  try {
+    const { a, b } = await ensureHandlerTypes(req.user.id);
+    await pool.query(
+      `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
+       VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [req.user.id, handler_id, customer_id, a]
+    );
+    await pool.query(
+      `INSERT INTO contact_relationships (user_id, contact_a_id, contact_b_id, relationship_type_id)
+       VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [req.user.id, customer_id, handler_id, b]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/handlers/:handlerId(\\d+)/:customerId(\\d+)', requireAuth, async (req, res) => {
+  try {
+    const { a, b } = await ensureHandlerTypes(req.user.id);
+    await pool.query(
+      `DELETE FROM contact_relationships WHERE user_id = $1 AND relationship_type_id = $2
+       AND contact_a_id = $3 AND contact_b_id = $4`,
+      [req.user.id, a, req.params.handlerId, req.params.customerId]
+    );
+    await pool.query(
+      `DELETE FROM contact_relationships WHERE user_id = $1 AND relationship_type_id = $2
+       AND contact_a_id = $3 AND contact_b_id = $4`,
+      [req.user.id, b, req.params.customerId, req.params.handlerId]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Staff board data (no auth — internal token is the credential). Full details:
 // this feeds the employee-facing board, so email/phone/birthdays are included.
 app.get('/api/board/:token', async (req, res) => {
@@ -2505,7 +2592,24 @@ app.get('/api/board/:token', async (req, res) => {
       [group_id, user_id]
     );
 
-    res.json({ group_name, tagline, members: members.rows, occasions, calendar_entries: cals.rows });
+    // Who takes care of whom (for the cards + the per-handler filter).
+    let handlerRows = [];
+    if (contactIds.length) {
+      const { a } = await ensureHandlerTypes(user_id);
+      const h = await pool.query(
+        `SELECT DISTINCT cr.contact_b_id AS customer_id, c.name AS handler_name
+         FROM contact_relationships cr JOIN contacts c ON c.id = cr.contact_a_id
+         WHERE cr.user_id = $1 AND cr.relationship_type_id = $2 AND cr.contact_b_id = ANY($3)
+         ORDER BY c.name`,
+        [user_id, a, contactIds]
+      );
+      handlerRows = h.rows;
+    }
+    const handlersBy = {};
+    handlerRows.forEach(r => (handlersBy[r.customer_id] = handlersBy[r.customer_id] || []).push(r.handler_name));
+    const membersOut = members.rows.map(r => ({ ...r, handlers: handlersBy[r.id] || [] }));
+
+    res.json({ group_name, tagline, members: membersOut, occasions, calendar_entries: cals.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

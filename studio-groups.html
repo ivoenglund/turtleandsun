@@ -215,6 +215,9 @@
         <span id="grpTools" class="hide" style="display:inline-flex;gap:8px;align-items:center;">
           <button class="btn pub" id="shareBtn">🔗 Share fill-in link</button>
           <button class="btn gray" id="addMemberBtn">☑ Manage members</button>
+          <label class="flt" style="padding:3px 8px;" title="Pick a person, then tick the customers they take care of">Tar hand om
+            <select id="handlerSel" style="max-width:150px;"><option value="">– show –</option></select>
+          </label>
         </span>
         <button class="btn pub" id="newContactBtn">＋ New contact</button>
         <input class="search" id="conSearch" type="text" placeholder="Search name, email, city…" autocomplete="off">
@@ -890,6 +893,24 @@ function renderMemberEdit(){
   });
 }
 
+// ── "Tar hand om" (handler) edges for the selected group ──
+let handlersCache = { gid: null, rows: [] };  // rows: {customer_id, handler_id, handler_name}
+let handlerSelId = '';                        // '' = show names, otherwise checkbox mode
+async function ensureHandlers(gid){
+  if(handlersCache.gid === gid) return;
+  handlersCache = { gid, rows: await api('/api/groups/'+gid+'/handlers') || [] };
+  renderContactsTable();
+}
+function handlersOf(cid){ return handlersCache.rows.filter(r=>r.customer_id===cid); }
+function fillHandlerSel(){
+  const sel=$('#handlerSel');
+  const keep=handlerSelId;
+  const opts=[...contactsPool].filter(c=>!c.died_on)
+    .sort((x,y)=> (y.is_me?1:0)-(x.is_me?1:0) || String(x.name||'').localeCompare(String(y.name||'')));
+  sel.innerHTML='<option value="">– show –</option>'+opts.map(c=>
+    '<option value="'+c.id+'"'+(String(c.id)===keep?' selected':'')+'>'+esc(c.name||'(unnamed)')+(c.is_me?' (me)':'')+'</option>').join('');
+}
+
 // ── All contacts grid ──
 const CON_COLS = [
   {key:'name',       label:'Name',     type:'text'},
@@ -1080,6 +1101,8 @@ function renderContactsTable(){
   if(groupMode){
     memBy={};
     current.members.forEach(m=>{ if(!memBy[m.contact_id]) memBy[m.contact_id]=m; });
+    fillHandlerSel();
+    ensureHandlers(selected.id); // async: re-renders when edges arrive
   }
   let list = contactsPool.filter(c=>{
     if(groupMode && !memBy[c.id]) return false;
@@ -1096,6 +1119,7 @@ function renderContactsTable(){
       if(s.key==='msub') return memBy[x.id]&&memBy[x.id].subgroup_name||null;
       if(s.key==='mfrom') return memBy[x.id]&&d10(memBy[x.id].from_date)||null;
       if(s.key==='mto') return memBy[x.id]&&d10(memBy[x.id].to_date)||null;
+      if(s.key==='mhand') return handlersOf(x.id).map(h=>h.handler_name).join(', ')||null;
       return x[s.key];
     };
     return s.dir*cmpVals(val(a),val(b));
@@ -1112,7 +1136,10 @@ function renderContactsTable(){
   const headCols=[];
   cols.forEach((c,i)=>{
     headCols.push('<th data-k="'+c.key+'">'+c.label+sortIndicator(sortKey,c.key)+'</th>');
-    if(c.key==='name' && groupMode) MEM_COLS.forEach(mc=>headCols.push('<th data-k="'+mc.key+'">'+mc.label+sortIndicator(sortKey,mc.key)+'</th>'));
+    if(c.key==='name' && groupMode){
+      MEM_COLS.forEach(mc=>headCols.push('<th data-k="'+mc.key+'">'+mc.label+sortIndicator(sortKey,mc.key)+'</th>'));
+      headCols.push('<th data-k="mhand">'+(handlerSelId?'☑ '+esc(($('#handlerSel').selectedOptions[0]||{}).textContent||'')+' tar hand om':'Tar hand om')+sortIndicator(sortKey,'mhand')+'</th>');
+    }
   });
   const selTh = groupMode?'':'<th data-k="sel" style="width:30px;"><input type="checkbox" id="selAll" style="width:auto;"></th>';
   let html = `<table class="grid"><tr><th data-k="pin"></th>${selTh}${headCols.join('')}</tr>`;
@@ -1126,6 +1153,13 @@ function renderContactsTable(){
         cells.push(`<td class="edm">${m.subgroup_name?esc(m.subgroup_name):'<span class="muted">—</span>'}</td>`);
         cells.push(`<td><input type="date" class="mdate mfrom" value="${d10(m.from_date)}"></td>`);
         cells.push(`<td><input type="date" class="mdate mto" value="${d10(m.to_date)}"></td>`);
+        if(handlerSelId){
+          const has=handlersOf(c.id).some(h=>String(h.handler_id)===handlerSelId);
+          cells.push(`<td style="text-align:center;"><input type="checkbox" class="hchk" style="width:auto;"${has?' checked':''}${String(c.id)===handlerSelId?' disabled':''}></td>`);
+        } else {
+          const names=handlersOf(c.id).map(h=>esc(h.handler_name)).join(', ');
+          cells.push(`<td>${names||'<span class="muted">—</span>'}</td>`);
+        }
       }
     });
     const selTd = groupMode?'':`<td style="text-align:center;"><input type="checkbox" class="selChk" style="width:auto;"${bulkSel.has(c.id)?' checked':''}></td>`;
@@ -1138,7 +1172,7 @@ function renderContactsTable(){
   html += '</table>';
   $('#conPanel').innerHTML = html;
   makeResizable('#conPanel', sortKey);
-  wireSort('#conPanel', sortKey, cols.map(c=>c.key).concat(groupMode?MEM_COLS.map(c=>c.key):[]), renderContactsTable);
+  wireSort('#conPanel', sortKey, cols.map(c=>c.key).concat(groupMode?MEM_COLS.map(c=>c.key).concat(['mhand']):[]), renderContactsTable);
   if(conActive) setConActive(conActive.cid, conActive.field); // restore selection after re-render
   updateBulkBar();
 }
@@ -1156,6 +1190,26 @@ $('#newContactBtn').onclick=async()=>{
 // Debounced search: rebuild only after typing pauses (rebuilding on every key was the main slowness)
 function debounce(fn,ms){ let t; return ()=>{ clearTimeout(t); t=setTimeout(fn,ms); }; }
 $('#conSearch').oninput = debounce(renderContactsTable,180);
+
+// Handler mode: pick a person → the column becomes checkboxes for their customers
+$('#handlerSel').onchange=()=>{ handlerSelId=$('#handlerSel').value; renderContactsTable(); };
+$('#conPanel').addEventListener('change', async(e)=>{
+  const cb=e.target.closest('.hchk'); if(!cb||!handlerSelId) return;
+  const tr=e.target.closest('tr[data-cid]'); if(!tr) return;
+  const cid=+tr.dataset.cid;
+  cb.disabled=true;
+  try{
+    if(cb.checked){
+      await api('/api/handlers',{method:'POST',body:JSON.stringify({handler_id:+handlerSelId, customer_id:cid})});
+      handlersCache.rows.push({customer_id:cid, handler_id:+handlerSelId,
+        handler_name:(contactsPool.find(x=>x.id===+handlerSelId)||{}).name||''});
+    } else {
+      await api('/api/handlers/'+handlerSelId+'/'+cid,{method:'DELETE'});
+      handlersCache.rows=handlersCache.rows.filter(r=>!(r.customer_id===cid&&String(r.handler_id)===handlerSelId));
+    }
+  }catch(err){ alert(err.message); cb.checked=!cb.checked; }
+  cb.disabled=false;
+});
 
 // ── Bulk actions ──
 function updateBulkBar(){
