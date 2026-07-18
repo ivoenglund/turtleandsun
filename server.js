@@ -1731,6 +1731,11 @@ app.get('/site/:token', (req, res) => {
   res.sendFile(path.join(__dirname, 'group-site.html'));
 });
 
+// Internal staff board (no auth — gated by its own token; full contact details)
+app.get('/board/:token', (req, res) => {
+  res.sendFile(path.join(__dirname, 'group-board.html'));
+});
+
 app.get('/account/occasions', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'occasions.html'));
 });
@@ -2163,54 +2168,64 @@ app.get('/api/admin/seed-demo-posts', requireAuth, async (req, res) => {
 
 // ── Group websites (the Web tab) ──────────────────────────────────────────────
 
-// Current site status for a group.
+// kind: 'public' = customer website (/site/…), 'internal' = staff board (/board/…)
+function siteKind(v) { return v === 'internal' ? 'internal' : 'public'; }
+function siteUrl(req, kind, token) {
+  return `${req.protocol}://${req.get('host')}/${kind === 'internal' ? 'board' : 'site'}/${token}`;
+}
+
+// Current site status for a group (?kind=public|internal).
 app.get('/api/groups/:id/site', requireAuth, async (req, res) => {
   try {
+    const kind = siteKind(req.query.kind);
     const result = await pool.query(
       `SELECT token, active, tagline, created_at FROM group_sites
-       WHERE group_id = $1 AND user_id = $2 AND active = TRUE
+       WHERE group_id = $1 AND user_id = $2 AND active = TRUE AND kind = $3
        ORDER BY created_at DESC LIMIT 1`,
-      [req.params.id, req.user.id]
+      [req.params.id, req.user.id, kind]
     );
     if (!result.rows.length) return res.json({ token: null });
     const row = result.rows[0];
-    res.json({ ...row, url: `${req.protocol}://${req.get('host')}/site/${row.token}` });
+    res.json({ ...row, url: siteUrl(req, kind, row.token) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Publish (create or reuse) the website for a group.
+// Publish (create or reuse) the website / staff board for a group.
 app.post('/api/groups/:id/site', requireAuth, async (req, res) => {
   try {
     const grp = await pool.query(`SELECT id FROM groups WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     if (!grp.rows.length) return res.status(404).json({ error: 'Group not found' });
 
+    const kind = siteKind((req.body && req.body.kind) || req.query.kind);
     const tagline = (req.body && typeof req.body.tagline === 'string') ? req.body.tagline.slice(0, 200) : null;
     const existing = await pool.query(
-      `SELECT token FROM group_sites WHERE group_id = $1 AND user_id = $2 AND active = TRUE ORDER BY created_at DESC LIMIT 1`,
-      [req.params.id, req.user.id]
+      `SELECT token FROM group_sites WHERE group_id = $1 AND user_id = $2 AND active = TRUE AND kind = $3
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, req.user.id, kind]
     );
     let token = existing.rows[0]?.token;
     if (!token) {
       token = require('crypto').randomBytes(24).toString('hex');
       await pool.query(
-        `INSERT INTO group_sites (user_id, group_id, token, tagline) VALUES ($1, $2, $3, $4)`,
-        [req.user.id, req.params.id, token, tagline]
+        `INSERT INTO group_sites (user_id, group_id, token, tagline, kind) VALUES ($1, $2, $3, $4, $5)`,
+        [req.user.id, req.params.id, token, tagline, kind]
       );
     } else if (tagline !== null) {
       await pool.query(
         `UPDATE group_sites SET tagline = $1 WHERE token = $2`, [tagline, token]
       );
     }
-    res.json({ token, url: `${req.protocol}://${req.get('host')}/site/${token}` });
+    res.json({ token, url: siteUrl(req, kind, token) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Unpublish a group's website.
+// Unpublish a group's website or staff board.
 app.delete('/api/groups/:id/site', requireAuth, async (req, res) => {
   try {
+    const kind = siteKind(req.query.kind);
     await pool.query(
-      `UPDATE group_sites SET active = FALSE WHERE group_id = $1 AND user_id = $2`,
-      [req.params.id, req.user.id]
+      `UPDATE group_sites SET active = FALSE WHERE group_id = $1 AND user_id = $2 AND kind = $3`,
+      [req.params.id, req.user.id, kind]
     );
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2223,7 +2238,7 @@ app.get('/api/site/:token', async (req, res) => {
     const site = await pool.query(
       `SELECT s.group_id, s.user_id, s.tagline, g.name AS group_name
        FROM group_sites s JOIN groups g ON g.id = s.group_id
-       WHERE s.token = $1 AND s.active = TRUE`,
+       WHERE s.token = $1 AND s.active = TRUE AND s.kind = 'public'`,
       [req.params.token]
     );
     if (!site.rows.length) return res.status(404).json({ error: 'This site is not published.' });
@@ -2284,6 +2299,56 @@ app.get('/api/site/:token', async (req, res) => {
       occasions,
       posts: posts.rows,
     });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Staff board data (no auth — internal token is the credential). Full details:
+// this feeds the employee-facing board, so email/phone/birthdays are included.
+app.get('/api/board/:token', async (req, res) => {
+  try {
+    const site = await pool.query(
+      `SELECT s.group_id, s.user_id, s.tagline, g.name AS group_name
+       FROM group_sites s JOIN groups g ON g.id = s.group_id
+       WHERE s.token = $1 AND s.active = TRUE AND s.kind = 'internal'`,
+      [req.params.token]
+    );
+    if (!site.rows.length) return res.status(404).json({ error: 'This board is not published.' });
+    const { group_id, user_id, tagline, group_name } = site.rows[0];
+
+    const subgroups = await pool.query(
+      `SELECT id, name FROM groups WHERE parent_group_id = $1 AND user_id = $2`,
+      [group_id, user_id]
+    );
+    const treeIds = [group_id, ...subgroups.rows.map(s => s.id)];
+
+    const members = await pool.query(
+      `SELECT DISTINCT ON (c.id)
+              c.id, c.name, c.photo_url, c.birthday, c.city, c.country,
+              c.email, c.phone, c.job_title, c.company,
+              m.from_date,
+              CASE WHEN g.parent_group_id = $3 THEN g.name ELSE NULL END AS subgroup_name
+       FROM contact_group_memberships m
+       JOIN contacts c ON c.id = m.contact_id
+       JOIN groups g   ON g.id = m.group_id
+       WHERE m.user_id = $1 AND m.group_id = ANY($2)
+         AND (m.to_date IS NULL OR m.to_date >= CURRENT_DATE)
+       ORDER BY c.id`,
+      [user_id, treeIds, group_id]
+    );
+
+    const contactIds = members.rows.map(r => r.id);
+    let occasions = [];
+    if (contactIds.length) {
+      const occ = await pool.query(
+        `SELECT o.name, o.start_date, o.frequency, o.notes, o.contact_id, c.name AS contact_name
+         FROM occasions o JOIN contacts c ON c.id = o.contact_id
+         WHERE o.user_id = $1 AND o.contact_id = ANY($2)`,
+        [user_id, contactIds]
+      );
+      occasions = occ.rows;
+    }
+
+    res.json({ group_name, tagline, members: members.rows, occasions });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

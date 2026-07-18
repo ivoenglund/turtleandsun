@@ -359,6 +359,9 @@ async function initDb() {
       created_at  TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS group_sites_group_idx ON group_sites(group_id);
+    -- 2026-07-18: 'public' = customer website (/site/:token), 'internal' = staff
+    -- board (/board/:token) with full contact details and the calendar.
+    ALTER TABLE group_sites ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'public';
 
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets

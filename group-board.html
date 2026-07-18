@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turtle &amp; Sun — Board</title>
+<meta name="robots" content="noindex">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink);
+        background:linear-gradient(175deg,#FFFFFF 0%,#FFF5A0 18%,#FFE800 38%,#FFD000 58%,#FFAA00 80%,#FF9500 100%) fixed; }
+  .hero{ background:var(--green); color:#f4efe4; padding:26px 36px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .hero h1{ font-family:Georgia,serif; font-size:clamp(24px,4vw,36px); margin:0; }
+  .hero .int{ font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:#FFE800; font-weight:700; }
+  .hero .tag{ font-size:15px; color:#cdddd2; }
+  .wrap{ width:100%; padding:0 36px 40px; }
+  @media (max-width:600px){ .wrap{ padding:0 16px 32px; } .hero{ padding:20px 16px; } }
+  section{ padding:32px 0 4px; }
+  h2{ font-family:Georgia,serif; color:var(--green); font-size:24px; margin:0 0 4px; }
+  .rule{ border:none; border-top:3px solid var(--gold); width:64px; margin:0 0 18px; }
+
+  .calhead{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .calhead b{ font-size:20px; min-width:190px; text-align:center; }
+  .calhead button{ border:none; background:#fff; border:1px solid #e2dccb; border-radius:8px; font-size:16px; padding:6px 14px; cursor:pointer; font-weight:700; }
+  .cal{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .cal .dow{ font-size:12.5px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:.5px; padding:4px 6px; }
+  .cal .day{ background:#fff; border:1px solid #e2dccb; border-radius:10px; min-height:96px; padding:6px 8px; }
+  .cal .day.out{ opacity:.45; }
+  .cal .day.today{ outline:3px solid var(--gold); }
+  .cal .dnum{ font-size:13px; font-weight:700; color:var(--muted); }
+  .cal .ev{ font-size:12.5px; font-weight:600; background:var(--cream); border-radius:6px; padding:2px 6px; margin-top:4px; line-height:1.3; }
+  .cal .ev.bday{ background:#eef4e7; }
+
+  .updates{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .upd{ background:#fff; border:1px solid #e2dccb; border-radius:10px; padding:12px 14px; }
+  .upd .d{ font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+  .upd .t{ font-size:15px; font-weight:700; margin-top:2px; }
+  .upd .n{ font-size:13.5px; margin-top:3px; }
+
+  .people{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
+  .card{ background:#fff; border:1px solid #e2dccb; border-radius:12px; padding:12px 14px; display:flex; gap:12px; }
+  .card img{ max-width:64px; max-height:80px; height:auto; border-radius:8px; display:block; }
+  .card .init{ width:56px; height:64px; border-radius:8px; background:var(--cream); color:var(--green); display:flex; align-items:center; justify-content:center; font-size:20px; font-family:Georgia,serif; flex-shrink:0; }
+  .card .nm{ font-size:15px; font-weight:700; }
+  .card .role{ font-size:12.5px; color:var(--green); font-weight:600; }
+  .card .ln{ font-size:12.5px; margin-top:2px; }
+  .card .ln a{ color:var(--green); text-decoration:none; word-break:break-all; }
+  .card .mut{ color:var(--muted); }
+  .search{ width:100%; max-width:340px; font-family:inherit; font-size:15px; padding:8px 12px; border:1px solid #e2dccb; border-radius:10px; margin-bottom:14px; }
+  .err{ text-align:center; padding:80px 20px; color:var(--muted); font-size:16px; }
+  .hide{ display:none!important; }
+  footer{ margin-top:40px; padding:20px; text-align:center; font-size:13px; color:var(--green); }
+</style>
+</head>
+<body>
+
+<div id="page" class="hide">
+  <div class="hero">
+    <h1 id="gname"></h1>
+    <span class="int">Internal</span>
+    <span class="tag" id="gtag"></span>
+    <span class="tag" id="gcount" style="margin-left:auto;"></span>
+  </div>
+
+  <div class="wrap">
+    <section>
+      <h2>Calendar</h2><hr class="rule">
+      <div class="calhead">
+        <button id="calPrev" aria-label="Previous month">‹</button>
+        <b id="calTitle"></b>
+        <button id="calNext" aria-label="Next month">›</button>
+        <button id="calToday">Today</button>
+      </div>
+      <div class="cal" id="cal"></div>
+    </section>
+
+    <section id="secUpd" class="hide">
+      <h2>Coming up</h2><hr class="rule">
+      <div class="updates" id="updates"></div>
+    </section>
+
+    <section>
+      <h2>Everyone</h2><hr class="rule">
+      <input class="search" id="q" type="search" placeholder="Search name, company, city…">
+      <div class="people" id="people"></div>
+    </section>
+  </div>
+
+  <footer>Turtle &amp; Sun · internal board · updates by itself</footer>
+</div>
+
+<div id="err" class="err hide">This board is not published.</div>
+
+<script>
+const token = location.pathname.split('/').pop();
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+let DATA = null;
+let calY, calM; // displayed month
+
+function mdOf(s){ const m = String(s||'').match(/(\d{1,2})-(\d{1,2})$/); return m ? [+m[1], +m[2]] : null; }
+
+// All events for a given month: birthdays + occasions (yearly repeat, milestones/one-time on their date).
+function eventsFor(y, m){
+  const out = {}; // day -> [{label, cls}]
+  const add = (d, label, cls) => { (out[d] = out[d] || []).push({label, cls}); };
+  (DATA.members||[]).forEach(p => {
+    const md = mdOf(p.birthday);
+    if(md && md[0] === m) add(md[1], '🎂 ' + (p.name||'').split(' ')[0], 'bday');
+  });
+  (DATA.occasions||[]).forEach(o => {
+    const sd = String(o.start_date).slice(0,10);
+    const oy = +sd.slice(0,4), om = +sd.slice(5,7), od = +sd.slice(8,10);
+    if(o.frequency === 'yearly'){ if(om === m && oy <= y) add(od, o.name + (o.contact_name?' · '+o.contact_name.split(' ')[0]:''), ''); }
+    else if(oy === y && om === m) add(od, o.name + (o.contact_name?' · '+o.contact_name.split(' ')[0]:''), '');
+  });
+  return out;
+}
+
+function renderCal(){
+  const now = new Date();
+  document.getElementById('calTitle').textContent = MON[calM-1] + ' ' + calY;
+  const first = new Date(calY, calM-1, 1);
+  const startDow = (first.getDay() + 6) % 7;           // Monday-first
+  const daysIn = new Date(calY, calM, 0).getDate();
+  const prevDays = new Date(calY, calM-1, 0).getDate();
+  const ev = eventsFor(calY, calM);
+  let html = DOW.map(d => '<div class="dow">'+d+'</div>').join('');
+  const cells = Math.ceil((startDow + daysIn) / 7) * 7;
+  for(let i=0; i<cells; i++){
+    const dnum = i - startDow + 1;
+    if(dnum < 1){ html += '<div class="day out"><div class="dnum">'+(prevDays+dnum)+'</div></div>'; }
+    else if(dnum > daysIn){ html += '<div class="day out"><div class="dnum">'+(dnum-daysIn)+'</div></div>'; }
+    else {
+      const isToday = calY===now.getFullYear() && calM===now.getMonth()+1 && dnum===now.getDate();
+      const evs = (ev[dnum]||[]).map(e => '<div class="ev '+e.cls+'">'+esc(e.label)+'</div>').join('');
+      html += '<div class="day'+(isToday?' today':'')+'"><div class="dnum">'+dnum+'</div>'+evs+'</div>';
+    }
+  }
+  document.getElementById('cal').innerHTML = html;
+}
+
+function renderPeople(filter){
+  const q = (filter||'').toLowerCase();
+  const ppl = (DATA.members||[]).filter(p =>
+    !q || [p.name,p.company,p.city,p.job_title,p.email].some(v => String(v||'').toLowerCase().includes(q)));
+  document.getElementById('people').innerHTML = ppl.map(p => {
+    const init = (p.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    const img = p.photo_url ? '<img src="'+esc(p.photo_url)+'" alt="" loading="lazy">' : '<div class="init">'+esc(init)+'</div>';
+    const lines = [
+      p.job_title || p.company ? '<div class="role">'+esc([p.job_title,p.company].filter(Boolean).join(' · '))+'</div>' : '',
+      p.email ? '<div class="ln"><a href="mailto:'+esc(p.email)+'">'+esc(p.email)+'</a></div>' : '',
+      p.phone ? '<div class="ln"><a href="tel:'+esc(String(p.phone).replace(/[^+\d]/g,''))+'">'+esc(p.phone)+'</a></div>' : '',
+      (p.city||p.subgroup_name) ? '<div class="ln mut">'+esc([p.subgroup_name,p.city].filter(Boolean).join(' · '))+'</div>' : '',
+      p.birthday ? '<div class="ln mut">🎂 '+esc(String(p.birthday))+'</div>' : ''
+    ].join('');
+    return '<div class="card">'+img+'<div><div class="nm">'+esc(p.name||'')+'</div>'+lines+'</div></div>';
+  }).join('') || '<div class="err" style="padding:20px;">No one matches.</div>';
+}
+
+function renderUpcoming(){
+  const ups = [];
+  const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const horizon = new Date(); horizon.setDate(horizon.getDate()+60);
+  const next = md => { if(!md) return null; let d = new Date(now.getFullYear(), md[0]-1, md[1]); if(d < today) d = new Date(now.getFullYear()+1, md[0]-1, md[1]); return d; };
+  (DATA.members||[]).forEach(p => {
+    const d = next(mdOf(p.birthday));
+    if(d && d <= horizon) ups.push({ d, t:'🎂 '+(p.name||''), n:'' });
+  });
+  (DATA.occasions||[]).forEach(o => {
+    const sd = String(o.start_date).slice(0,10);
+    let d = null;
+    if(o.frequency === 'yearly') d = next([+sd.slice(5,7), +sd.slice(8,10)]);
+    else { const t = new Date(sd); if(t >= today) d = t; }
+    if(d && d <= horizon) ups.push({ d, t:o.name+(o.contact_name?' · '+o.contact_name:''), n:o.notes||'' });
+  });
+  ups.sort((a,b)=>a.d-b.d);
+  if(ups.length){
+    document.getElementById('secUpd').classList.remove('hide');
+    document.getElementById('updates').innerHTML = ups.slice(0,12).map(u =>
+      '<div class="upd"><div class="d">'+u.d.getDate()+' '+MON[u.d.getMonth()].slice(0,3)+'</div><div class="t">'+esc(u.t)+'</div>'+(u.n?'<div class="n">'+esc(u.n)+'</div>':'')+'</div>').join('');
+  }
+}
+
+async function load(){
+  const r = await fetch('/api/board/' + token);
+  if(!r.ok){ document.getElementById('err').classList.remove('hide'); return; }
+  DATA = await r.json();
+  document.title = DATA.group_name + ' — board · Turtle & Sun';
+  document.getElementById('gname').textContent = DATA.group_name;
+  document.getElementById('gtag').textContent = DATA.tagline || '';
+  const n = (DATA.members||[]).length;
+  document.getElementById('gcount').textContent = n + (n===1?' person':' people');
+  if(calY === undefined){ const now = new Date(); calY = now.getFullYear(); calM = now.getMonth()+1; }
+  renderCal();
+  renderUpcoming();
+  renderPeople(document.getElementById('q').value);
+  document.getElementById('page').classList.remove('hide');
+}
+
+document.getElementById('calPrev').onclick = () => { calM--; if(calM<1){calM=12;calY--;} renderCal(); };
+document.getElementById('calNext').onclick = () => { calM++; if(calM>12){calM=1;calY++;} renderCal(); };
+document.getElementById('calToday').onclick = () => { const now=new Date(); calY=now.getFullYear(); calM=now.getMonth()+1; renderCal(); };
+document.getElementById('q').addEventListener('input', e => renderPeople(e.target.value));
+
+load();
+setInterval(load, 5*60*1000);
+</script>
+</body>
+</html>

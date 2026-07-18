@@ -2294,51 +2294,69 @@ $('#printCalBtn').onclick=()=>{
   window.open('/print/calendar'+(selected?'?groups='+selected.id:''),'_blank');
 };
 
-// ── Web tab: publish / preview the group's public website ──
+// ── Web tab: publish the group's public website + internal staff board ──
 async function renderWeb(){
   const host=$('#webBody');
   if(!selected){
-    host.innerHTML='<div class="help" style="margin:0;">Select a group in the sidebar to publish its website. The site shows the group’s people, upcoming dates, news posts and map — always current, straight from the living data.</div>';
+    host.innerHTML='<div class="help" style="margin:0;">Select a group in the sidebar to publish its pages. The <b>website</b> is for customers and the reception screen; the <b>staff board</b> is the internal view with full contact details and the calendar.</div>';
     return;
   }
   host.innerHTML='<div class="help" style="margin:0;">Loading…</div>';
   try{
-    const s=await api('/api/groups/'+selected.id+'/site');
-    if(!s || !s.token){
-      host.innerHTML=
-        '<div class="help" style="margin-top:0;">Publish a public website for <b>'+esc(selected.name)+'</b>. '+
-        'One link — works as the group’s web page, and on any screen you point at it. '+
-        'It shows people, upcoming dates, news posts tagged “'+esc(selected.name)+'”, and the map. '+
-        'Email, phone and full birthdays are never shown.</div>'+
-        '<label style="display:block;font-size:13px;margin:10px 0 4px;">Tagline (optional)</label>'+
-        '<input type="text" id="webTagline" placeholder="A short line under the name…" style="width:100%;max-width:420px;padding:6px 8px;">'+
-        '<div style="margin-top:12px;"><button class="btn pub" id="webPublish">🌐 Publish website</button></div>';
-      $('#webPublish').onclick=async()=>{
-        try{
-          await api('/api/groups/'+selected.id+'/site',{method:'POST',body:JSON.stringify({tagline:$('#webTagline').value.trim()||null})});
-          renderWeb();
-        }catch(e){ alert(e.message); }
-      };
-      return;
-    }
-    host.innerHTML=
-      '<div class="selbox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
-        '<b>Live:</b> <a href="'+esc(s.url)+'" target="_blank" id="webUrl">'+esc(s.url)+'</a>'+
-        '<button class="btn sm gray" id="webCopy">Copy link</button>'+
-        '<button class="btn sm gray" id="webOpenDisplay" title="Auto-scrolling screen mode">Open as screen</button>'+
-        '<button class="btn sm danger" id="webUnpub" style="margin-left:auto;">Unpublish</button>'+
-      '</div>'+
-      '<div class="help">Anyone with the link can see it. It updates by itself when the group’s data changes — nothing to re-publish. “Open as screen” adds slow auto-scroll for a TV or shop window.</div>'+
-      '<iframe src="'+esc(s.url)+'" style="width:100%;height:520px;border:1px solid #d9d4c4;border-radius:10px;margin-top:8px;background:#fff;"></iframe>';
-    $('#webCopy').onclick=()=>{ navigator.clipboard.writeText(s.url).then(()=>showToast('Link copied')); };
-    $('#webOpenDisplay').onclick=()=>window.open(s.url+'?display=1','_blank');
-    $('#webUnpub').onclick=async()=>{
-      if(!confirm('Unpublish this website? The link stops working (you can publish again later).')) return;
-      try{ await api('/api/groups/'+selected.id+'/site',{method:'DELETE'}); renderWeb(); }catch(e){ alert(e.message); }
-    };
+    const [site, board] = await Promise.all([
+      api('/api/groups/'+selected.id+'/site'),
+      api('/api/groups/'+selected.id+'/site?kind=internal')
+    ]);
+    host.innerHTML =
+      '<h4 style="margin:0 0 6px;">Customer website</h4><div id="webPub"></div>'+
+      '<h4 style="margin:18px 0 6px;">Staff board (internal)</h4><div id="webInt"></div>';
+    renderSiteBlock($('#webPub'), site, 'public');
+    renderSiteBlock($('#webInt'), board, 'internal');
   }catch(e){
     host.innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>';
   }
+}
+
+function renderSiteBlock(el, s, kind){
+  const isInt = kind==='internal';
+  if(!s || !s.token){
+    el.innerHTML=
+      '<div class="help" style="margin-top:0;">'+
+      (isInt
+        ? 'The internal board for your people: every member with photo, title, email, phone and birthday, upcoming dates, and a big calendar with birthdays and occasions (deadlines you add as occasions land there too). Full details are visible — share the link only inside the company.'
+        : 'The public page for <b>'+esc(selected.name)+'</b>: people, upcoming dates, news posts tagged “'+esc(selected.name)+'”, and the map. Email and phone are shown; full birthdays are not.')+
+      '</div>'+
+      (isInt ? '' :
+        '<label style="display:block;font-size:13px;margin:8px 0 4px;">Tagline (optional)</label>'+
+        '<input type="text" id="webTagline" placeholder="A short line under the name…" style="width:100%;max-width:420px;padding:6px 8px;">')+
+      '<div style="margin-top:10px;"><button class="btn pub" id="pubBtn_'+kind+'">'+(isInt?'🗓 Publish staff board':'🌐 Publish website')+'</button></div>';
+    $('#pubBtn_'+kind).onclick=async()=>{
+      try{
+        const body={kind};
+        if(!isInt) body.tagline=$('#webTagline').value.trim()||null;
+        await api('/api/groups/'+selected.id+'/site',{method:'POST',body:JSON.stringify(body)});
+        renderWeb();
+      }catch(e){ alert(e.message); }
+    };
+    return;
+  }
+  el.innerHTML=
+    '<div class="selbox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
+      '<b>Live:</b> <a href="'+esc(s.url)+'" target="_blank">'+esc(s.url)+'</a>'+
+      '<button class="btn sm gray" id="cp_'+kind+'">Copy link</button>'+
+      (isInt?'':'<button class="btn sm gray" id="scr_'+kind+'" title="Auto-scrolling screen mode">Open as screen</button>')+
+      '<button class="btn sm danger" id="un_'+kind+'" style="margin-left:auto;">Unpublish</button>'+
+    '</div>'+
+    '<div class="help">'+(isInt
+      ? 'Full contact details are visible to anyone with this link — internal use only. Updates by itself.'
+      : 'Anyone with the link can see it. Updates by itself — nothing to re-publish.')+'</div>'+
+    '<iframe src="'+esc(s.url)+'" style="width:100%;height:'+(isInt?'420':'520')+'px;border:1px solid #d9d4c4;border-radius:10px;margin-top:8px;background:#fff;"></iframe>';
+  $('#cp_'+kind).onclick=()=>{ navigator.clipboard.writeText(s.url).then(()=>showToast('Link copied')); };
+  const scr=$('#scr_'+kind); if(scr) scr.onclick=()=>window.open(s.url+'?display=1','_blank');
+  $('#un_'+kind).onclick=async()=>{
+    if(!confirm('Unpublish? The link stops working (you can publish again later).')) return;
+    try{ await api('/api/groups/'+selected.id+'/site?kind='+kind,{method:'DELETE'}); renderWeb(); }catch(e){ alert(e.message); }
+  };
 }
 
 // ── Tabs ──
