@@ -411,7 +411,7 @@ function cardInner(it){
 // An object's font-size follows its width (true zoom), times a text-zoom knob.
 function fsOf(ov){
   const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
-  return Math.max(4, Math.min(120, 13.5*(w/28)*ts));
+  return Math.max(2, 13.5*(w/28)*ts);   // no ceiling — big papers want BIG type
 }
 // Crop geometry is stored as RATIOS of the window width (pwr/phr/ixr/iyr), so
 // it survives paper-size changes and object resizing untouched. cropEms turns
