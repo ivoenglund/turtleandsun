@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Brochure — Turtle &amp; Sun</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Caveat:wght@600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Caveat:wght@600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Oswald:wght@400;600&family=Raleway:wght@400;700&family=Nunito:wght@400;700&family=Roboto+Slab:wght@400;700&family=Dancing+Script:wght@600&family=Pacifico&family=Abril+Fatface&display=swap');
   :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
   *{ box-sizing:border-box; }
   body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; }
@@ -16,39 +16,53 @@
   .block.pos-left img, .block.pos-right img{ width:45%; margin-bottom:0; }
   .block.pos-right{ flex-direction:row-reverse; }
   .block.pos-left > div, .block.pos-right > div{ flex:1; }
-  .block.img-s img{ max-height:55mm; object-fit:cover; }
-  .block.img-m img{ max-height:95mm; object-fit:cover; }
-  .block.img-l img{ max-height:150mm; object-fit:cover; }
-  .block.txt-s p{ font-size:11.5px; } .block.txt-l p{ font-size:16px; line-height:1.5; }
-  .block.txt-l h3{ font-size:25px; }
+  /* All card typography and image caps are in em so a card scales as ONE thing:
+     the wrapper's font-size (set from its width + text-zoom) zooms everything. */
+  .block.img-s img{ max-height:15.4em; object-fit:cover; }
+  .block.img-m img{ max-height:26.6em; object-fit:cover; }
+  .block.img-l img{ max-height:42em; object-fit:cover; }
+  .block.txt-s p{ font-size:.85em; } .block.txt-l p{ font-size:1.2em; line-height:1.5; }
+  .block.txt-l h3{ font-size:1.85em; }
   .block.media{ text-align:center; }
-  .block.media img{ object-fit:contain !important; max-height:80mm; margin:0 auto; }
-  .block.media.img-s img{ max-height:45mm; } .block.media.img-m img{ max-height:80mm; }
-  .block.media.img-l img{ max-height:130mm; } .block.media.big img{ max-height:200mm; }
-  .block.media .cap{ font-size:12px; color:#5c5c4d; margin-top:3mm; }
-  /* One floating panel on the left holds every control; the rest is clean page. */
-  #panel{ position:fixed; right:16px; top:16px; width:236px; max-height:calc(100vh - 32px); overflow:auto;
-          background:#fff; border:2px solid var(--gold); border-radius:12px; padding:12px 14px;
-          box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; }
-  #docCtl .prow{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
-  #docCtl .prow > button{ flex:1; }
-  #docCtl .ph{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:10px 0 4px; }
-  #docCtl button{ font-family:inherit; font-weight:700; font-size:13px; padding:6px 10px; border:1px solid #c9c4b4;
-                  border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
-  #docCtl button:hover{ background:#f4efe4; }
-  #docCtl button:disabled{ opacity:.4; cursor:default; }
-  #docCtl select{ width:100%; font-family:inherit; font-size:13px; padding:6px 8px; border-radius:7px; border:1px solid #c9c4b4; }
-  #zoomWrap input[type=range]{ flex:1; min-width:0; }
+  .block.media img{ object-fit:contain !important; max-height:22.4em; margin:0 auto; }
+  .block.media.img-s img{ max-height:12.6em; } .block.media.img-m img{ max-height:22.4em; }
+  .block.media.img-l img{ max-height:36.4em; } .block.media.big img{ max-height:56em; }
+  .block.media .cap{ font-size:.89em; color:#5c5c4d; margin-top:.85em; }
+  .block.ffo h3, .block.ffo p, .block.ffo .meta, .block.ffo .cap{ font-family:inherit; }
+  /* One floating panel on the right holds every control; the rest is clean page. */
+  #panel{ position:fixed; right:16px; top:16px; width:258px; max-height:calc(100vh - 32px); overflow:auto;
+          background:#fff; border:2px solid var(--gold); border-radius:14px; padding:14px 16px;
+          box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; font-size:13px; }
+  #panel .prow, #panel .krow{ display:flex; gap:5px; align-items:center; margin-bottom:6px; }
+  #panel .prow > button{ flex:1; }
+  #panel .ph, #panel .kh{ font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase;
+                          color:var(--green); margin:12px 0 5px; }
+  #panel .ph:first-child, #panel .kh:first-child{ margin-top:0; }
+  #panel button{ font-family:inherit; font-weight:700; font-size:12.5px; padding:6px 9px; border:1px solid #d9d4c4;
+                 border-radius:8px; background:#fff; cursor:pointer; color:var(--ink); line-height:1.2; }
+  #panel button:hover{ background:#f4efe4; }
+  #panel button:disabled{ opacity:.35; cursor:default; }
+  #panel button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  #panel button.primary:hover{ background:#17403b; }
+  #panel button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  #panel button.danger{ color:#8c2f1b; border-color:#dcc0b5; font-size:11px; padding:3px 8px; }
+  #panel button.danger:hover{ background:#f9ece7; }
+  #panel select{ width:100%; font-family:inherit; font-size:13px; padding:6px 8px; border-radius:8px;
+                 border:1px solid #d9d4c4; background:#fff; color:var(--ink); margin-bottom:4px; }
+  #panel input[type=range]{ width:100%; margin:2px 0 4px; accent-color:var(--gold); }
+  #zoomWrap input[type=range]{ flex:1; min-width:0; width:auto; margin:0; }
   #pgLabel{ flex:1; text-align:center; font-weight:700; }
-  #knobs{ margin-top:12px; padding-top:12px; border-top:2px dashed #e3ddca; }
-  #knobs .kh{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:8px 0 4px; }
+  #knobs{ margin-top:12px; padding-top:12px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
-  #knobs button{ font-family:inherit; font-size:12px; padding:4px 9px; border:1px solid #d9d4c4; background:#fff;
-                 border-radius:7px; cursor:pointer; color:var(--ink); }
-  #knobs button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
+  #knobs .sw{ width:21px; height:21px; border-radius:6px; padding:0; border:1px solid rgba(0,0,0,.18); cursor:pointer; }
+  #knobs input[type=color]{ width:34px; height:26px; padding:0 2px; border:1px solid #d9d4c4; border-radius:6px; background:#fff; cursor:pointer; }
   .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
   .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
-  .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; }
+  .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; cursor:text; }
+  .rszh{ position:absolute; right:-9px; bottom:-9px; width:17px; height:17px; border-radius:50%;
+         background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
+         cursor:nwse-resize; z-index:5; touch-action:none; }
   #out{ position:relative; overflow:hidden; transform-origin:0 0; margin:0 auto; }
   #zoomWrap button, #pageNav button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
   #zoomWrap button:hover, #pageNav button:hover{ background:#f4efe4; }
@@ -58,7 +72,7 @@
   .block.abs{ position:absolute; margin:0; cursor:grab; }
   .block.abs:active{ cursor:grabbing; }
   .block.abs .person{ background:#fff; }
-  @media print{ #panel{ display:none!important; } body{ padding-left:0!important; } .block.sel,.abswrap.sel{ outline:none; }
+  @media print{ #panel{ display:none!important; } .rszh{ display:none!important; } body{ padding-left:0!important; } .block.sel,.abswrap.sel{ outline:none; }
     .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
     .block{ page-break-inside:avoid; }
     #out .page{ cursor:auto; }
@@ -75,19 +89,19 @@
   h2.sect{ font-family:Georgia,serif; color:var(--green); font-size:26px; margin:0 0 3mm; }
   .rule{ border:none; border-top:3px solid var(--gold); width:60px; margin:0 0 6mm; }
   .block{ margin-bottom:8mm; }
-  .block img{ width:100%; height:auto; border-radius:4mm; display:block; margin-bottom:4mm; }
-  .block.big img{ max-height:150mm; object-fit:cover; }
-  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:21px; margin:0 0 2mm; }
-  .block .meta{ font-size:11.5px; color:var(--muted); margin-bottom:2mm; }
-  .block p{ margin:0 0 2.6mm; font-size:13.5px; line-height:1.45; }
+  .block img{ width:100%; height:auto; border-radius:.55em; display:block; margin-bottom:1.1em; }
+  .block.big img{ max-height:42em; object-fit:cover; }
+  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
+  .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
+  .block p{ margin:0 0 .73em; font-size:1em; line-height:1.45; }
   .team{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6mm; }
   .person{ text-align:center; }
-  .person img{ max-width:100%; max-height:52mm; width:auto; border-radius:3mm; display:block; margin:0 auto 2mm; }
-  .person .init{ width:30mm; height:36mm; border-radius:3mm; background:var(--cream); color:var(--green);
-                 display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:22px; margin:0 auto 2mm; }
-  .person b{ font-size:13.5px; display:block; }
-  .person .role{ font-size:11px; color:var(--green); font-weight:700; }
-  .person .ct{ font-size:10.5px; color:var(--muted); line-height:1.4; }
+  .person img{ max-width:100%; max-height:14.6em; width:auto; border-radius:.55em; display:block; margin:0 auto .55em; }
+  .person .init{ width:8.4em; height:10em; border-radius:.55em; background:var(--cream); color:var(--green);
+                 display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:1.63em; margin:0 auto .35em; }
+  .person b{ font-size:1em; display:block; }
+  .person .role{ font-size:.81em; color:var(--green); font-weight:700; }
+  .person .ct{ font-size:.78em; color:var(--muted); line-height:1.4; }
   .backpage{ background:var(--green); color:#f4efe4; align-items:center; justify-content:center; text-align:center; }
   .backpage h2{ font-family:Georgia,serif; font-size:30px; margin:0 0 4mm; color:#f4efe4; }
   .backpage .foot{ position:absolute; bottom:12mm; left:0; right:0; font-size:11.5px; color:#cdddd2; }
@@ -104,7 +118,7 @@
   <div id="docCtl">
     <div class="prow">
       <button onclick="window.print()" title="Print / save as PDF">🖨 PDF</button>
-      <button id="saveBtn">Save</button>
+      <button id="saveBtn" class="primary">Save</button>
     </div>
     <div class="ph">Paper</div>
     <select id="paper"></select>
@@ -132,19 +146,45 @@
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const compId = new URLSearchParams(location.search).get('comp');
 
-// Limited rich text: only harmless formatting survives (text is content; scripts are not).
+// Limited rich text: only harmless formatting survives (text is content; scripts
+// are not). DOM-based: parse into an inert template, drop dangerous elements,
+// unwrap unknown tags, and keep only whitelisted style properties on the rest.
+const STYLE_OK=['font-family','font-size','color','font-weight','font-style','text-decoration'];
+function cleanStyle(s){
+  return String(s||'').split(';').map(d=>{
+    const i=d.indexOf(':'); if(i<0) return '';
+    const p=d.slice(0,i).trim().toLowerCase(), v=d.slice(i+1).trim();
+    if(!STYLE_OK.includes(p)) return '';
+    if(/url\s*\(|expression|javascript|@import|[<>]/i.test(v)) return '';
+    return p+':'+v;
+  }).filter(Boolean).join(';');
+}
 function sanitizeHtml(s){
-  return String(s||'')
-    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?(<\/\s*\1\s*>|$)/gi,'')
-    .replace(/<([a-z0-9]+)([^>]*)>/gi,(m,tag)=>['h3','p','b','strong','u','i','em','br','div','span'].includes(tag.toLowerCase())?'<'+tag.toLowerCase()+'>':'')
-    .replace(/<\/([a-z0-9]+)>/gi,(m,tag)=>['h3','p','b','strong','u','i','em','br','div','span'].includes(tag.toLowerCase())?'</'+tag.toLowerCase()+'>':'');
+  const t=document.createElement('template');
+  t.innerHTML=String(s||'');
+  t.content.querySelectorAll('script,style,iframe,object,embed,link,meta,svg,img,video,audio,form,input,button,textarea,select').forEach(e=>e.remove());
+  const OK=['H3','P','B','STRONG','U','I','EM','BR','DIV','SPAN'];
+  (function walk(node){
+    [...node.children].forEach(el=>{
+      walk(el);
+      if(!OK.includes(el.tagName)){          // unknown (font, a, …) → unwrap, keep content
+        while(el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove(); return;
+      }
+      [...el.attributes].forEach(a=>{ if(a.name.toLowerCase()!=='style') el.removeAttribute(a.name); });
+      const cs=cleanStyle(el.getAttribute('style'));
+      if(cs) el.setAttribute('style',cs); else el.removeAttribute('style');
+    });
+  })(t.content);
+  return t.innerHTML;
 }
 function postBlock(it){
   const c=it.content, ov=it.overrides||{}, big=ov.big;
   const ph=(c.photos||[])[0];
   const d=c.post_date?new Date(c.post_date):null;
   const cls=['block', big?'big':'', ov.pos?'pos-'+ov.pos:'', ov.img?'img-'+ov.img:'',
-             ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:''].filter(Boolean).join(' ');
+             ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'', ov.ff?'ffo':''].filter(Boolean).join(' ');
+  const ffs=ov.ff?' style="font-family:\''+esc(ov.ff)+'\'"':'';
   let inner;
   if(ov.text){ inner='<div class="bd">'+sanitizeHtml(ov.text)+'</div>'; }
   else{
@@ -153,7 +193,7 @@ function postBlock(it){
     inner='<div class="bd">'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
       (d&&!ov.nodate?'<div class="meta">'+d.toLocaleDateString('sv-SE')+(c.author?' · '+esc(c.author):'')+'</div>':'')+paras+'</div>';
   }
-  return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
+  return '<div class="'+cls+'"'+ffs+' data-idx="'+it._idx+'">'+
     (ph?'<img src="'+esc(ph)+'">':'')+inner+'</div>';
 }
 function personCard(it){
@@ -283,11 +323,13 @@ function applyZoom(pct){
   const s=pct/100; curScale=s;
   const {w,h}=contentNat();
   out.style.transformOrigin='0 0';
-  out.style.margin='0 auto';
   if(!w){ out.style.transform=''; out.style.width=''; out.style.height=''; syncZoomLabel(pct); return; }
   out.style.transform = s===1 ? '' : 'scale('+s+')';
   out.style.width=(w*s)+'px';
   out.style.height=(h*s)+'px';
+  // Centre in the space LEFT of the panel (panel ≈ 292px incl. gutters).
+  out.style.marginLeft=Math.max(14, (window.innerWidth-292-w*s)/2)+'px';
+  out.style.marginRight='0';
   syncZoomLabel(pct);
 }
 function syncZoomLabel(pct){
@@ -298,7 +340,7 @@ function syncZoomLabel(pct){
 function fitPct(){
   const {w}=contentNat();
   if(!w) return 100;
-  return clampPct(Math.min(100, (window.innerWidth-40)/w*100));
+  return clampPct(Math.min(100, (window.innerWidth-306)/w*100));
 }
 function syncZoom(){ applyZoom(fitPct()); window.scrollTo(0,0); }
 
@@ -330,10 +372,17 @@ function cardInner(it){
        : it.ref_type==='media'   ? mediaBlock(it)
        : postBlock(it);
 }
+// A card's font-size follows its width (true zoom: text + images scale as one),
+// times an optional text-zoom fine-tune. All inner sizes are em, so this one
+// number scales the whole card.
+function fsOf(ov){
+  const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
+  return Math.max(4, Math.min(120, 13.5*(w/28)*ts));
+}
 function absWrap(it){
   const ov=it.overrides||{};
   const x=ov.x!=null?ov.x:10, y=ov.y!=null?ov.y:10, w=ov.w||28;
-  return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
+  return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;font-size:'+fsOf(ov)+'px;" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
 function markAbs(){ document.querySelectorAll('.abswrap .block,.abswrap .person').forEach(b=>b.classList.add('abs')); }
 
@@ -362,6 +411,7 @@ function wireDrag(){
   document.querySelectorAll('.abswrap').forEach(w=>{
     w.onpointerdown=e=>{
       if(e.target.closest('[contenteditable="true"]')) return;
+      if(editing) commitEdit(false);        // keep the edit — never lose it on a stray click
       const page=w.parentElement, pr=page.getBoundingClientRect();
       const idx=+w.dataset.absidx; selIdx=idx; showKnobs(); markSel();
       const sx=e.clientX, sy=e.clientY;
@@ -436,24 +486,35 @@ function moveCardToPage(idx,n){
   curPage=ov.page; renderCurrent(); showKnobs();   // follow the card
 }
 
-// ── Knobs: click a block → adjust its parameters, live ──
+// ── Knobs: select a card → adjust it, live ──────────────────────────
 let selIdx=null;
-const KN={
-  img:[['s','Small'],['m','Medium'],['l','Large'],['','Full']],
-  pos:[['','Top'],['left','Left'],['right','Right']],
-  txt:[['s','Small'],['','Normal'],['l','Large']],
-  font:[['','Jakarta'],['serif','Georgia'],['hand','Handwritten']],
-  w:[['20','Narrow'],['28','Medium'],['40','Wide'],['60','Huge']],
-};
+let editing=false, savedSel=null;
+const FONTS=[
+  ['Plus Jakarta Sans','Jakarta'],['Georgia','Georgia'],['Playfair Display','Playfair Display'],
+  ['Merriweather','Merriweather'],['Lora','Lora'],['Montserrat','Montserrat'],
+  ['Oswald','Oswald'],['Raleway','Raleway'],['Nunito','Nunito'],['Roboto Slab','Roboto Slab'],
+  ['Caveat','Caveat (hand)'],['Dancing Script','Dancing Script'],['Pacifico','Pacifico'],
+  ['Abril Fatface','Abril Fatface'],['Arial','Arial'],['Courier New','Courier New']
+];
+const SIZES=[10,11,12,13,14,16,18,21,24,28,32,40,48,60,72];
+const SWATCH=['#23291d','#1f4a45','#c9a24b','#7a8470','#8c2f1b','#2a5d8c','#ffffff','#000000'];
+const KN={ img:[['s','Small'],['m','Medium'],['l','Large'],['','Full']] };
 function knobRow(kind,label,cur){
   return '<div class="kh">'+label+'</div><div class="row">'+
     KN[kind].map(([v,t])=>'<button data-k="'+kind+'" data-v="'+v+'" class="'+((cur||'')===v?'on':'')+'">'+t+'</button>').join('')+'</div>';
 }
+// Width/text-zoom apply live to the DOM — no re-render, no lost focus.
+function liveCardStyle(){
+  const wrap=document.querySelector('.abswrap[data-absidx="'+selIdx+'"]');
+  const ov=COMP.items[selIdx].overrides;
+  if(wrap){ wrap.style.width=(ov.w||28)+'%'; wrap.style.fontSize=fsOf(ov)+'px'; }
+}
 function showKnobs(){
   const k=document.getElementById('knobs');
-  k.style.display='block';
   if(selIdx==null){
-    k.innerHTML='<div class="kh">Card</div><div style="font-size:12px;color:var(--muted);line-height:1.4;">Tap a card on the page to adjust it — move it between pages, resize, edit text, or remove it.</div>';
+    editing=false;
+    k.innerHTML='<div class="kh">Card</div><div class="hint">Tap a card to select it. '+
+      'Drag it to move it, drag the gold dot to resize it, double-tap the text to edit it.</div>';
     return;
   }
   const it=COMP.items[selIdx];
@@ -461,66 +522,162 @@ function showKnobs(){
   const isPost=it.ref_type==='post';
   const isMedia=it.ref_type==='media';
   const N=pageCount();
-  k.style.display='block';
-  k.innerHTML='<b style="font-size:13px;">Card '+(selIdx+1)+'</b>'+
-    '<div class="kh">On page</div><div class="row">'+
-      '<button id="knPgPrev" title="Move to the previous page">◀</button>'+
-      '<span style="align-self:center;font-weight:700;">Page '+(ov.page||curPage)+' / '+N+'</span>'+
+  const typeName=isPost?'Post':isMedia?'Logo / graphic':'Person';
+  k.innerHTML=
+    '<div class="kh" style="display:flex;justify-content:space-between;align-items:center;">'+
+      '<span>'+typeName+' card</span>'+
+      '<button id="knUnplace" class="danger" title="Remove from this document (the card stays in your library)">✕ Remove</button></div>'+
+    '<div class="krow"><button id="knPgPrev" title="Move to the previous page">◀</button>'+
+      '<span style="flex:1;text-align:center;font-weight:700;">Page '+(ov.page||curPage)+' / '+N+'</span>'+
       '<button id="knPgNext" title="Move to the next page">▶</button></div>'+
-    '<div class="row"><button id="knUnplace" style="flex:1;">Remove card</button></div>'+
+    '<div class="kh">Size · <span id="szPct">'+Math.round(ov.w||28)+'%</span> of the page</div>'+
+    '<input type="range" id="knW" min="6" max="95" step="0.5" value="'+(ov.w||28)+'">'+
+    '<div class="kh">Text zoom · <span id="tsPct">'+Math.round((ov.ts||1)*100)+'%</span></div>'+
+    '<input type="range" id="knTs" min="40" max="250" step="5" value="'+Math.round((ov.ts||1)*100)+'">'+
     ((isPost||isMedia)?knobRow('img','Picture size',ov.img):'')+
-    knobRow('w','Card width',String(ov.w||28))+
     (isMedia?'<div class="kh">Caption</div><div class="row"><button data-k="caption" data-v="'+(ov.caption?'':'1')+'" class="'+(ov.caption?'on':'')+'">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
-    (isPost?knobRow('txt','Text size',ov.txt):'')+
-    (isPost?knobRow('font','Font',ov.font):'')+
     (isPost?'<div class="kh">Date</div><div class="row"><button data-k="nodate" data-v="'+(ov.nodate?'':'1')+'" class="'+(ov.nodate?'on':'')+'">'+(ov.nodate?'Hidden — show it':'Hide the date')+'</button></div>':'')+
-    (isPost?'<div style="margin-top:8px;"><button id="knEdit" style="width:100%;">✏ Edit the text</button></div>':'')+
-    '<div id="knEditBar" style="display:none;margin-top:6px;" class="row">'+
-      '<button id="knB" style="font-weight:800;">B</button>'+
-      '<button id="knU" style="text-decoration:underline;">U</button>'+
-      '<button id="knReset" title="Back to the original text">↺ Original</button>'+
-      '<button id="knDone" style="flex:1;">✓ Done editing</button></div>'+
-    '<div style="margin-top:10px;"><button id="knClose" style="width:100%;">Done</button></div>';
+    (isPost&&!editing?
+      '<div class="kh">Font (whole card)</div><select id="knFF">'+
+        '<option value="">Jakarta (default)</option>'+
+        FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
+      '</select>'+
+      '<div style="margin-top:8px;"><button id="knEdit" style="width:100%;">✏ Edit the text</button></div>':'')+
+    (isPost&&editing?
+      '<div class="kh">Editing — select text, then style it</div>'+
+      '<select id="tbFont"><option value="">Font for the selection…</option>'+
+        FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'">'+t+'</option>').join('')+'</select>'+
+      '<div class="krow"><select id="tbSize" style="flex:1;margin-bottom:0;"><option value="">Size…</option>'+
+        SIZES.map(s=>'<option value="'+s+'">'+s+' px</option>').join('')+'</select>'+
+        '<input type="color" id="tbColor" value="#23291d" title="Any colour"></div>'+
+      '<div class="krow">'+SWATCH.map(c=>'<button class="sw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+'</div>'+
+      '<div class="krow"><button id="tbB" style="font-weight:800;">B</button>'+
+        '<button id="tbI" style="font-style:italic;">I</button>'+
+        '<button id="tbU" style="text-decoration:underline;">U</button>'+
+        '<button id="tbReset" title="Back to the original text">↺</button>'+
+        '<button id="tbDone" class="primary" style="flex:1;">✓ Done</button></div>':'')+
+    '<div style="margin-top:12px;"><button id="knClose" style="width:100%;">Done with this card</button></div>';
+
+  const q=id=>document.getElementById(id);
   k.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
+    if(editing) commitEdit(false);
     const kk=b.dataset.k, v=b.dataset.v;
     if(kk==='nodate') ov.nodate=!!v;
     else if(kk==='caption') ov.caption=!!v;
-    else if(kk==='w') ov.w=+v;
     else if(v==='') delete ov[kk]; else ov[kk]=v;
     render(); showKnobs(); markSel();
   });
-  document.getElementById('knPgPrev').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)-1);
-  document.getElementById('knPgNext').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)+1);
-  document.getElementById('knUnplace').onclick=()=>removeCard(selIdx);
-  const editBtn=document.getElementById('knEdit');
-  if(editBtn) editBtn.onclick=()=>{
-    const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd');
-    if(!bd) return;
-    bd.setAttribute('contenteditable','true'); bd.focus();
-    document.getElementById('knEditBar').style.display='flex';
-    editBtn.style.display='none';
-  };
-  const q=id=>document.getElementById(id);
-  q('knB').onclick=e=>{ e.preventDefault(); document.execCommand('bold'); };
-  q('knU').onclick=e=>{ e.preventDefault(); document.execCommand('underline'); };
-  q('knReset').onclick=()=>{ delete ov.text; render(); showKnobs(); markSel(); };
-  q('knDone').onclick=()=>{
-    const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd');
-    if(bd){ ov.text=sanitizeHtml(bd.innerHTML); bd.removeAttribute('contenteditable'); }
-    render(); showKnobs(); markSel();
-  };
-  document.getElementById('knClose').onclick=()=>{ selIdx=null; showKnobs(); markSel(); };
+  q('knPgPrev').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)-1);
+  q('knPgNext').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)+1);
+  q('knUnplace').onclick=()=>removeCard(selIdx);
+  q('knClose').onclick=()=>{ if(editing) commitEdit(false); selIdx=null; showKnobs(); markSel(); };
+  q('knW').oninput=e=>{ ov.w=+e.target.value; q('szPct').textContent=Math.round(ov.w)+'%'; liveCardStyle(); };
+  q('knTs').oninput=e=>{ ov.ts=+e.target.value/100; if(ov.ts===1) delete ov.ts; q('tsPct').textContent=e.target.value+'%'; liveCardStyle(); };
+  const ff=q('knFF');
+  if(ff) ff.onchange=e=>{ if(e.target.value) ov.ff=e.target.value; else delete ov.ff; delete ov.font; render(); showKnobs(); markSel(); };
+  const eb=q('knEdit');
+  if(eb) eb.onclick=()=>startEdit();
+  if(editing&&isPost){
+    q('tbFont').onchange=e=>{ if(!e.target.value) return; restoreSel(); document.execCommand('fontName',false,e.target.value); e.target.selectedIndex=0; };
+    q('tbSize').onchange=e=>{
+      const px=e.target.value; if(!px) return; restoreSel();
+      document.execCommand('fontSize',false,'7');      // marker…
+      const bd=curBd();                                 // …then swap for real px
+      if(bd) bd.querySelectorAll('font[size="7"]').forEach(f=>{
+        const sp=document.createElement('span'); sp.style.fontSize=px+'px';
+        while(f.firstChild) sp.appendChild(f.firstChild); f.replaceWith(sp);
+      });
+      e.target.selectedIndex=0;
+    };
+    q('tbColor').onchange=e=>{ restoreSel(); document.execCommand('foreColor',false,e.target.value); };
+    k.querySelectorAll('.sw').forEach(b=>{
+      b.onmousedown=e=>e.preventDefault();
+      b.onclick=()=>{ restoreSel(); document.execCommand('foreColor',false,b.dataset.c); };
+    });
+    [['tbB','bold'],['tbI','italic'],['tbU','underline']].forEach(([id,cmd])=>{
+      const b=q(id); b.onmousedown=e=>e.preventDefault();
+      b.onclick=()=>{ restoreSel(); document.execCommand(cmd); };
+    });
+    q('tbReset').onclick=()=>{ delete ov.text; editing=false; savedSel=null; render(); showKnobs(); markSel(); };
+    q('tbDone').onclick=()=>commitEdit(true);
+  }
 }
+
+// ── In-place text editing ───────────────────────────────────────────
+function curBd(){ return document.querySelector('[contenteditable="true"]'); }
+function startEdit(){
+  const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd'); if(!bd) return;
+  try{ document.execCommand('styleWithCSS',false,true); }catch(e){}
+  bd.setAttribute('contenteditable','true'); bd.focus();
+  editing=true; savedSel=null; showKnobs();
+}
+function commitEdit(rerender){
+  const bd=curBd();
+  if(bd){
+    const bl=bd.closest('[data-idx]');
+    if(bl){ const it=COMP.items[+bl.dataset.idx]; (it.overrides=it.overrides||{}).text=sanitizeHtml(bd.innerHTML); }
+    bd.removeAttribute('contenteditable');
+  }
+  editing=false; savedSel=null;
+  if(rerender){ render(); showKnobs(); markSel(); }
+  else showKnobs();
+}
+// Remember the selection inside the editable and restore it after panel
+// clicks — styling never kicks you out of the editor.
+document.addEventListener('selectionchange',()=>{
+  if(!editing) return;
+  const sel=getSelection(); if(!sel.rangeCount) return;
+  const bd=curBd(); if(!bd) return;
+  if(bd.contains(sel.anchorNode)) savedSel=sel.getRangeAt(0).cloneRange();
+});
+function restoreSel(){
+  const bd=curBd(); if(!bd) return;
+  bd.focus();
+  if(savedSel){ const s=getSelection(); s.removeAllRanges(); s.addRange(savedSel); }
+}
+
+// ── Selection + the resize handle ───────────────────────────────────
 function markSel(){
   document.querySelectorAll('.abswrap.sel,.block.sel').forEach(x=>x.classList.remove('sel'));
-  if(selIdx!=null){
-    const el=document.querySelector('.abswrap[data-absidx="'+selIdx+'"]')||document.querySelector('.block[data-idx="'+selIdx+'"]');
-    if(el) el.classList.add('sel');
+  document.querySelectorAll('.rszh').forEach(h=>h.remove());
+  if(selIdx==null) return;
+  const el=document.querySelector('.abswrap[data-absidx="'+selIdx+'"]')||document.querySelector('.block[data-idx="'+selIdx+'"]');
+  if(!el) return;
+  el.classList.add('sel');
+  if(el.classList.contains('abswrap')){
+    const h=document.createElement('div'); h.className='rszh'; h.title='Drag to resize';
+    el.appendChild(h); wireResize(h,el);
   }
+}
+function wireResize(h,wrap){
+  h.onpointerdown=e=>{
+    e.stopPropagation(); e.preventDefault();
+    const page=wrap.parentElement, pr=page.getBoundingClientRect();
+    const idx=+wrap.dataset.absidx;
+    const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+    const sx=e.clientX, ow=parseFloat(wrap.style.width)||ov.w||28;
+    const mv=ev=>{
+      ov.w=Math.max(6,Math.min(95, ow+(ev.clientX-sx)/pr.width*100));
+      wrap.style.width=ov.w+'%'; wrap.style.fontSize=fsOf(ov)+'px';
+      const s=document.getElementById('knW');
+      if(s){ s.value=ov.w; const p=document.getElementById('szPct'); if(p) p.textContent=Math.round(ov.w)+'%'; }
+    };
+    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up); ov.w=Math.round(ov.w*10)/10; };
+    addEventListener('pointermove',mv); addEventListener('pointerup',up);
+  };
 }
 document.getElementById('out').addEventListener('click',e=>{
   const bl=e.target.closest('.block[data-idx]'); if(!bl) return;
+  if(e.target.closest('[contenteditable="true"]')) return;   // clicks inside the editor stay in the editor
+  if(editing) commitEdit(false);
   selIdx=+bl.dataset.idx; showKnobs(); markSel();
+});
+// Double-click a post's text → edit it right there.
+document.getElementById('out').addEventListener('dblclick',e=>{
+  const bl=e.target.closest('.block[data-idx]'); if(!bl) return;
+  const idx=+bl.dataset.idx;
+  if(COMP.items[idx].ref_type!=='post'||editing) return;
+  selIdx=idx; markSel(); startEdit();
 });
 document.getElementById('paper').onchange=e=>{
   COMP.params=COMP.params||{}; COMP.params.paper=e.target.value;
@@ -557,10 +714,11 @@ document.getElementById('pgAdd').onclick=()=>addPage();
 document.getElementById('pgDel').onclick=()=>deletePage();
 
 // Print = all pages in order; restore the single-page editor afterwards.
-window.addEventListener('beforeprint',()=>renderAllPages());
+window.addEventListener('beforeprint',()=>{ if(editing) commitEdit(false); renderAllPages(); });
 window.addEventListener('afterprint',()=>{ renderCurrent(); applyZoom(curScale*100); });
 
 document.getElementById('saveBtn').onclick=async()=>{
+  if(editing) commitEdit(true);
   COMP.params=COMP.params||{}; COMP.params.pages=pageCount();
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
   const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
