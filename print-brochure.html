@@ -10,11 +10,9 @@
   body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; }
   .toolbar{ padding:10px 16px; display:flex; gap:10px; align-items:center; }
   .toolbar button{ font-family:inherit; font-weight:700; font-size:14px; padding:8px 16px; border:none; border-radius:8px; background:var(--green); color:#f4efe4; cursor:pointer; }
+  /* Page width/height/padding are injected per paper size by applyPaper(). */
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
-  body.fmt-a5 .page{ width:148mm; min-height:209mm; padding:10mm; }
-  body.fmt-a3 .page{ width:297mm; min-height:419mm; padding:22mm; }
-  body.fmt-a5 .cover h1{ font-size:30px; } body.fmt-a3 .cover h1{ font-size:62px; }
   .block.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
   .block.pos-left, .block.pos-right{ display:flex; gap:5mm; align-items:flex-start; }
   .block.pos-left img, .block.pos-right img{ width:45%; margin-bottom:0; }
@@ -40,10 +38,9 @@
   .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
   .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
   .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; }
-  body.fmt-poster #out{ transform-origin:0 0; }
+  #out{ position:relative; overflow:hidden; transform-origin:0 0; margin:0 auto; }
   #zoomWrap button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
   #zoomWrap button:hover{ background:#f4efe4; }
-  body.fmt-poster .page{ width:700mm; height:1000mm; padding:0; }
   .block.abs{ position:absolute; margin:0; cursor:grab; }
   .block.abs:active{ cursor:grabbing; }
   .block.abs .person{ background:#fff; }
@@ -51,7 +48,7 @@
     .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
     .block{ page-break-inside:avoid; } #zoomWrap{ display:none; }
     /* Never print the on-screen zoom transform — always full size. */
-    #out{ transform:none!important; width:auto!important; height:auto!important; margin:0!important; } }
+    #out{ transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; } }
   .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
   .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
   .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
@@ -91,10 +88,7 @@
 <div class="toolbar">
   <button onclick="window.print()">🖨 Print / save as PDF</button>
   <label style="font-size:13.5px;font-weight:700;">Paper
-    <select id="paper" style="font-family:inherit;font-size:13.5px;padding:5px 8px;border-radius:7px;border:1px solid #c9c4b4;">
-      <option value="a5">A5</option><option value="a4" selected>A4</option><option value="a3">A3</option>
-      <option value="poster">Poster 70×100</option>
-    </select></label>
+    <select id="paper" style="font-family:inherit;font-size:13.5px;padding:5px 8px;border-radius:7px;border:1px solid #c9c4b4;"></select></label>
   <span id="zoomWrap" style="font-size:13.5px;font-weight:700;display:none;align-items:center;gap:6px;">Zoom
     <button id="zoomOut" title="Zoom out ( - )" style="min-width:30px;">−</button>
     <input type="range" id="zoom" min="5" max="200" value="18" style="vertical-align:middle;">
@@ -164,59 +158,109 @@ async function load(){
   if(!r.ok){ document.getElementById('out').innerHTML='<div class="err">Could not load the brochure.</div>'; return; }
   COMP=await r.json();
   document.title=COMP.name+' · Turtle & Sun';
+  buildPaperOptions();
+  document.getElementById('zoomWrap').style.display='inline-flex';
   const paper=(COMP.params&&COMP.params.paper)||'a4';
-  document.getElementById('paper').value=paper;
+  document.getElementById('paper').value=paperOf(paper).k;
   applyPaper(paper);
   render();
   syncZoom();
 }
 
-function applyPaper(p){
-  document.body.className='fmt-'+p;
-  let st=document.getElementById('pageSize');
-  if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
-  st.textContent='@page{ size:'+(p==='poster'?'700mm 1000mm':p.toUpperCase()+' portrait')+'; margin:0; }';
-  document.getElementById('zoomWrap').style.display = p==='poster' ? 'inline-flex' : 'none';
+// ── Paper sizes ─────────────────────────────────────────────────────
+// Dimensions in mm (portrait). A-series shown in cm, US sizes in inches.
+// `canvas:true` = the free-placement poster renderer; the rest flow as pages.
+const PAPERS=[
+  {k:'a0',n:'A0',w:841,h:1189,u:'cm'},
+  {k:'a1',n:'A1',w:594,h:841,u:'cm'},
+  {k:'a2',n:'A2',w:420,h:594,u:'cm'},
+  {k:'a3',n:'A3',w:297,h:420,u:'cm'},
+  {k:'a4',n:'A4',w:210,h:297,u:'cm'},
+  {k:'a5',n:'A5',w:148,h:210,u:'cm'},
+  {k:'a6',n:'A6',w:105,h:148,u:'cm'},
+  {k:'letter', n:'US Letter',  w:215.9,h:279.4,u:'in'},
+  {k:'legal',  n:'US Legal',   w:215.9,h:355.6,u:'in'},
+  {k:'tabloid',n:'US Tabloid', w:279.4,h:431.8,u:'in'},
+  {k:'ansic',  n:'US ANSI C',  w:431.8,h:558.8,u:'in'},
+  {k:'ansid',  n:'US ANSI D',  w:558.8,h:863.6,u:'in'},
+  {k:'ansie',  n:'US ANSI E',  w:863.6,h:1117.6,u:'in'},
+  {k:'poster', n:'Poster',     w:700,  h:1000,  u:'cm', canvas:true},
+];
+const paperArea=P=>P.w*P.h;
+const num1=x=>String(Math.round(x*10)/10);
+function paperLabel(P){
+  return P.u==='in'
+    ? P.n+' — '+num1(P.w/25.4)+' × '+num1(P.h/25.4)+' in'
+    : P.n+' — '+num1(P.w/10)+' × '+num1(P.h/10)+' cm';
+}
+function paperOf(k){ return PAPERS.find(x=>x.k===k) || PAPERS.find(x=>x.k==='a4'); }
+function buildPaperOptions(){
+  const sel=document.getElementById('paper');
+  sel.innerHTML=PAPERS.slice().sort((a,b)=>paperArea(b)-paperArea(a))
+    .map(P=>'<option value="'+P.k+'">'+paperLabel(P)+'</option>').join('');
 }
 
-// ── Zoom (poster mode) ──────────────────────────────────────────────
-// The poster canvas is huge, so it's scaled to fit and pannable. Zoom is
-// anchored to a focal point (the mouse, or the viewport centre) so the spot
-// you point at stays put; near the edges the scroll simply clamps.
+function applyPaper(k){
+  const P=paperOf(k);
+  document.body.className = P.canvas ? 'fmt-poster' : 'fmt-doc';
+  let st=document.getElementById('pageSize');
+  if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
+  let css='@page{ size:'+P.w+'mm '+P.h+'mm; margin:0; }';
+  if(P.canvas){
+    css+=' .page{ width:'+P.w+'mm; height:'+P.h+'mm; min-height:0; padding:0; }';
+  }else{
+    const pad=Math.max(8, Math.round(P.w*0.06));
+    css+=' .page{ width:'+P.w+'mm; min-height:'+P.h+'mm; height:auto; padding:'+pad+'mm; }';
+    css+=' .cover h1{ font-size:'+Math.round(P.w*0.209)+'px; }';
+    css+=' .cover .sub{ font-size:'+Math.max(11,Math.round(P.w*0.081))+'px; }';
+  }
+  st.textContent=css;
+}
+
+// ── Zoom ────────────────────────────────────────────────────────────
+// Any paper can be scaled to fit and panned. Zoom is anchored to a focal
+// point (the mouse, or the viewport centre) so the spot you point at stays
+// put; near the edges the scroll simply clamps ("physical constraints").
 const ZMIN=5, ZMAX=200;   // percent
-let curScale=0.18;        // fraction; kept in sync with the slider
+let curScale=1;           // fraction; kept in sync with the slider
 function posterMode(){ return document.body.classList.contains('fmt-poster'); }
 function clampPct(p){ return Math.max(ZMIN, Math.min(ZMAX, p)); }
 
-function applyZoom(pct){
+// Natural (unscaled) size of the rendered content — transform-independent.
+function contentNat(){
   const out=document.getElementById('out');
-  if(!posterMode()){                       // brochures render 1:1, normal flow
-    out.style.transform=''; out.style.width=''; out.style.height='';
-    out.style.margin=''; out.style.transformOrigin=''; curScale=1;
-    syncZoomLabel(100); return;
-  }
+  let w=0,h=0;
+  out.querySelectorAll('.page').forEach(p=>{ w=Math.max(w,p.offsetWidth); h=Math.max(h,p.offsetTop+p.offsetHeight); });
+  return { w, h };
+}
+function applyZoom(pct){
   pct=clampPct(pct);
-  const page=out.querySelector('.page');
+  const out=document.getElementById('out');
   const s=pct/100; curScale=s;
+  const {w,h}=contentNat();
   out.style.transformOrigin='0 0';
-  out.style.transform='scale('+s+')';
-  if(page){                                 // reserve scroll space = scaled footprint
-    out.style.width=(page.offsetWidth*s)+'px';
-    out.style.height=(page.offsetHeight*s)+'px';
-    out.style.margin='0 auto';              // centre while it still fits
-  }
+  out.style.margin='0 auto';
+  if(!w){ out.style.transform=''; out.style.width=''; out.style.height=''; syncZoomLabel(pct); return; }
+  out.style.transform = s===1 ? '' : 'scale('+s+')';
+  out.style.width=(w*s)+'px';
+  out.style.height=(h*s)+'px';
   syncZoomLabel(pct);
 }
 function syncZoomLabel(pct){
   const zi=document.getElementById('zoom'); if(zi) zi.value=Math.round(pct);
   const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
 }
-function syncZoom(){ applyZoom(posterMode()? +document.getElementById('zoom').value : 100); }
+// Scale so the page fits the viewport width (never above 100%).
+function fitPct(){
+  const {w}=contentNat();
+  if(!w) return 100;
+  return clampPct(Math.min(100, (window.innerWidth-48)/w*100));
+}
+function syncZoom(){ applyZoom(fitPct()); window.scrollTo(0,0); }
 
 // Zoom to a new percent while keeping (cx,cy) — a client point — over the
 // same spot on the canvas. Falls back to viewport centre when no point given.
 function zoomToPct(pct, cx, cy){
-  if(!posterMode()) return;
   pct=clampPct(pct);
   const out=document.getElementById('out');
   if(cx==null){ cx=window.innerWidth/2; cy=window.innerHeight/2; }
@@ -416,27 +460,28 @@ document.getElementById('paper').onchange=e=>{
 document.getElementById('zoom').oninput=e=>zoomToPct(+e.target.value);
 document.getElementById('zoomIn').onclick=()=>zoomStep(1.25);
 document.getElementById('zoomOut').onclick=()=>zoomStep(1/1.25);
-document.getElementById('zoomFit').onclick=()=>{ zoomToPct(18); window.scrollTo(0,0); };
+document.getElementById('zoomFit').onclick=()=>syncZoom();
 
 // Track the mouse so keyboard zoom anchors where you're looking.
 let lastMouse=null;
 document.getElementById('out').addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
 
-// Wheel over the canvas zooms (with or without Ctrl/⌘), anchored to the cursor.
+// Wheel over the canvas zooms, anchored to the cursor. On a poster the plain
+// wheel zooms; on a multi-page document the plain wheel scrolls and Ctrl/⌘+wheel
+// zooms (so you can still page through a brochure).
 document.getElementById('out').addEventListener('wheel',e=>{
-  if(!posterMode()) return;                 // brochures scroll normally
+  if(!(posterMode() || e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
 
 // Keyboard: +/= zoom in, -/_ zoom out, 0 fits. Ignore while editing text.
 document.addEventListener('keydown',e=>{
-  if(!posterMode()) return;
   if(e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
   const at=lastMouse||{};
   if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomStep(1.25, at.x, at.y); }
   else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomStep(1/1.25, at.x, at.y); }
-  else if(e.key==='0'){ e.preventDefault(); zoomToPct(18); window.scrollTo(0,0); }
+  else if(e.key==='0'){ e.preventDefault(); syncZoom(); }
 });
 document.getElementById('saveBtn').onclick=async()=>{
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
