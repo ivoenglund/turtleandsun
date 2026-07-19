@@ -40,14 +40,18 @@
   .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
   .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
   .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; }
-  body.fmt-poster #out{ transform-origin:top center; }
+  body.fmt-poster #out{ transform-origin:0 0; }
+  #zoomWrap button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
+  #zoomWrap button:hover{ background:#f4efe4; }
   body.fmt-poster .page{ width:700mm; height:1000mm; padding:0; }
   .block.abs{ position:absolute; margin:0; cursor:grab; }
   .block.abs:active{ cursor:grabbing; }
   .block.abs .person{ background:#fff; }
   @media print{ #knobs{ display:none!important; } .block.sel{ outline:none; }
     .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
-    .block{ page-break-inside:avoid; } #zoomWrap{ display:none; } }
+    .block{ page-break-inside:avoid; } #zoomWrap{ display:none; }
+    /* Never print the on-screen zoom transform — always full size. */
+    #out{ transform:none!important; width:auto!important; height:auto!important; margin:0!important; } }
   .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
   .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
   .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
@@ -91,9 +95,13 @@
       <option value="a5">A5</option><option value="a4" selected>A4</option><option value="a3">A3</option>
       <option value="poster">Poster 70×100</option>
     </select></label>
-  <label id="zoomWrap" style="font-size:13.5px;font-weight:700;display:none;">Zoom
-    <input type="range" id="zoom" min="8" max="100" value="18" style="vertical-align:middle;">
-  </label>
+  <span id="zoomWrap" style="font-size:13.5px;font-weight:700;display:none;align-items:center;gap:6px;">Zoom
+    <button id="zoomOut" title="Zoom out ( - )" style="min-width:30px;">−</button>
+    <input type="range" id="zoom" min="5" max="200" value="18" style="vertical-align:middle;">
+    <button id="zoomIn" title="Zoom in ( + )" style="min-width:30px;">＋</button>
+    <button id="zoomFit" title="Fit to window ( 0 )" style="font-size:12px;">Fit</button>
+    <span id="zoomPct" style="min-width:42px;display:inline-block;text-align:right;color:#5c5c4d;">18%</span>
+  </span>
   <button id="saveBtn" style="background:#fff;color:var(--green);border:2px solid var(--green);">Save layout</button>
   <span style="font-size:13px;color:#5c5c4d;">Click a card in the preview to adjust it · the first card is the cover</span>
 </div>
@@ -160,6 +168,7 @@ async function load(){
   document.getElementById('paper').value=paper;
   applyPaper(paper);
   render();
+  syncZoom();
 }
 
 function applyPaper(p){
@@ -167,16 +176,57 @@ function applyPaper(p){
   let st=document.getElementById('pageSize');
   if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
   st.textContent='@page{ size:'+(p==='poster'?'700mm 1000mm':p.toUpperCase()+' portrait')+'; margin:0; }';
-  const zw=document.getElementById('zoomWrap');
-  zw.style.display = p==='poster' ? 'inline' : 'none';
-  applyZoom(p==='poster' ? +document.getElementById('zoom').value : 100);
+  document.getElementById('zoomWrap').style.display = p==='poster' ? 'inline-flex' : 'none';
 }
+
+// ── Zoom (poster mode) ──────────────────────────────────────────────
+// The poster canvas is huge, so it's scaled to fit and pannable. Zoom is
+// anchored to a focal point (the mouse, or the viewport centre) so the spot
+// you point at stays put; near the edges the scroll simply clamps.
+const ZMIN=5, ZMAX=200;   // percent
+let curScale=0.18;        // fraction; kept in sync with the slider
+function posterMode(){ return document.body.classList.contains('fmt-poster'); }
+function clampPct(p){ return Math.max(ZMIN, Math.min(ZMAX, p)); }
+
 function applyZoom(pct){
   const out=document.getElementById('out');
-  out.style.transform = pct<100 ? 'scale('+(pct/100)+')' : '';
-  out.style.transformOrigin='top center';
-  out.style.height = pct<100 ? (out.scrollHeight*pct/100)+'px' : '';
+  if(!posterMode()){                       // brochures render 1:1, normal flow
+    out.style.transform=''; out.style.width=''; out.style.height='';
+    out.style.margin=''; out.style.transformOrigin=''; curScale=1;
+    syncZoomLabel(100); return;
+  }
+  pct=clampPct(pct);
+  const page=out.querySelector('.page');
+  const s=pct/100; curScale=s;
+  out.style.transformOrigin='0 0';
+  out.style.transform='scale('+s+')';
+  if(page){                                 // reserve scroll space = scaled footprint
+    out.style.width=(page.offsetWidth*s)+'px';
+    out.style.height=(page.offsetHeight*s)+'px';
+    out.style.margin='0 auto';              // centre while it still fits
+  }
+  syncZoomLabel(pct);
 }
+function syncZoomLabel(pct){
+  const zi=document.getElementById('zoom'); if(zi) zi.value=Math.round(pct);
+  const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
+}
+function syncZoom(){ applyZoom(posterMode()? +document.getElementById('zoom').value : 100); }
+
+// Zoom to a new percent while keeping (cx,cy) — a client point — over the
+// same spot on the canvas. Falls back to viewport centre when no point given.
+function zoomToPct(pct, cx, cy){
+  if(!posterMode()) return;
+  pct=clampPct(pct);
+  const out=document.getElementById('out');
+  if(cx==null){ cx=window.innerWidth/2; cy=window.innerHeight/2; }
+  const r0=out.getBoundingClientRect(), s0=curScale;
+  const px=(cx-r0.left)/s0, py=(cy-r0.top)/s0;   // content point under focal
+  applyZoom(pct);
+  const r1=out.getBoundingClientRect();
+  window.scrollBy(r1.left-(cx-px*curScale), r1.top-(cy-py*curScale));
+}
+function zoomStep(factor, cx, cy){ zoomToPct(curScale*100*factor, cx, cy); }
 
 // Poster: one huge canvas, every card freely placed (x/y/w saved as % in overrides).
 function renderPoster(items){
@@ -361,9 +411,33 @@ document.getElementById('out').addEventListener('click',e=>{
 });
 document.getElementById('paper').onchange=e=>{
   COMP.params=COMP.params||{}; COMP.params.paper=e.target.value;
-  applyPaper(e.target.value); render();
+  applyPaper(e.target.value); render(); syncZoom();
 };
-document.getElementById('zoom').oninput=e=>applyZoom(+e.target.value);
+document.getElementById('zoom').oninput=e=>zoomToPct(+e.target.value);
+document.getElementById('zoomIn').onclick=()=>zoomStep(1.25);
+document.getElementById('zoomOut').onclick=()=>zoomStep(1/1.25);
+document.getElementById('zoomFit').onclick=()=>{ zoomToPct(18); window.scrollTo(0,0); };
+
+// Track the mouse so keyboard zoom anchors where you're looking.
+let lastMouse=null;
+document.getElementById('out').addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
+
+// Wheel over the canvas zooms (with or without Ctrl/⌘), anchored to the cursor.
+document.getElementById('out').addEventListener('wheel',e=>{
+  if(!posterMode()) return;                 // brochures scroll normally
+  e.preventDefault();
+  zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
+}, { passive:false });
+
+// Keyboard: +/= zoom in, -/_ zoom out, 0 fits. Ignore while editing text.
+document.addEventListener('keydown',e=>{
+  if(!posterMode()) return;
+  if(e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+  const at=lastMouse||{};
+  if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomStep(1.25, at.x, at.y); }
+  else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomStep(1/1.25, at.x, at.y); }
+  else if(e.key==='0'){ e.preventDefault(); zoomToPct(18); window.scrollTo(0,0); }
+});
 document.getElementById('saveBtn').onclick=async()=>{
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
   const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
