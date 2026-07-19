@@ -184,12 +184,14 @@
 <div class="wrap">
   <div class="side" id="side">
     <div class="splitter" id="sideSplitter"></div>
-    <div style="display:flex;justify-content:flex-end;padding:0 6px 4px;"><button class="btn sm gray" id="pinBtn" title="Pinned: always visible. Auto-hide: folds away, hover the left strip to open.">📌 Pinned</button></div>
+    <div style="display:flex;justify-content:flex-end;gap:6px;padding:0 6px 4px;">
+      <button class="btn sm gray" id="addGroupBtn">＋ New group</button>
+      <button class="btn sm gray" id="pinBtn" title="Pinned: always visible. Auto-hide: folds away, hover the left strip to open.">📌 Pinned</button>
+    </div>
     <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
     <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
-    <div class="addg" id="addGroupBtn">＋ New group / subgroup</div>
     <div class="lbl">Filters (all views)</div>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fLiving" checked> Living</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fDead" checked> Deceased</label>
@@ -200,9 +202,8 @@
       <div class="lbl">On the board</div>
       <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkUngrouped"> Ungrouped</label>
       <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkTimeline"> Timeline</label>
-      <div class="flt" style="padding:3px 10px;display:flex;gap:5px;align-items:center;white-space:nowrap;flex-wrap:nowrap;font-size:12.5px;">
-        <span>Year</span><input type="text" inputmode="numeric" maxlength="4" id="mkY1" style="width:42px;padding:2px 4px;text-align:center;">
-        <span>to</span><input type="text" inputmode="numeric" maxlength="4" id="mkY2" style="width:42px;padding:2px 4px;text-align:center;">
+      <div class="flt" style="padding:3px 10px;display:flex;gap:0;align-items:center;white-space:nowrap;flex-wrap:nowrap;font-size:12.5px;">
+        <span style="margin-right:5px;">Year</span><input type="text" inputmode="numeric" maxlength="4" id="mkY1" style="width:40px;padding:2px 2px;text-align:center;">-<input type="text" inputmode="numeric" maxlength="4" id="mkY2" style="width:40px;padding:2px 2px;text-align:center;">
       </div>
       <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkArchive"> Archive</label>
     </div>
