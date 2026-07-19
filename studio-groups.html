@@ -188,8 +188,8 @@
       <button class="btn sm gray" id="addGroupBtn">＋ New group</button>
       <button class="btn sm gray" id="pinBtn" title="Pinned: always visible. Auto-hide: folds away, hover the left strip to open.">📌 Pinned</button>
     </div>
-    <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></div>
-    <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></div>
+    <div class="row" id="poolRow"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span><span class="del" style="visibility:hidden;pointer-events:none;">✕</span></div>
+    <div class="row" id="dupRow"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span><span class="del" style="visibility:hidden;pointer-events:none;">✕</span></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="lbl">Filters (all views)</div>
@@ -810,7 +810,7 @@ function renderTree(){
     const onBoard=(typeof makView!=='undefined')?(makView.groups[node.id]!==false):true;
     div.innerHTML = `<input type="checkbox" class="mkChk" data-g="${node.id}" ${onBoard?'checked':''} title="Show this group on the Make board">`
       + `<span class="arr">${arrow}</span><span>${depth?'•':'📁'}</span> ${esc(node.name)} <span class="ct">${countFor(node)}</span>`
-      + (isFamily?'':`<span class="del" title="Delete group">✕</span>`);
+      + (isFamily?`<span class="del" style="visibility:hidden;pointer-events:none;">✕</span>`:`<span class="del" title="Delete group">✕</span>`);
     div.onclick = ()=>selectGroup(node);
     const mkc=div.querySelector('.mkChk');
     if(mkc){
