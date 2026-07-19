@@ -10,8 +10,13 @@
   html,body{ height:100%; }
   body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; overflow:hidden; }
   /* Page width/height/padding are injected per paper size by applyPaper(). */
-  .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
+  .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:visible;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
+  /* Objects parked outside the page stay visible but grey — fetch them back
+     any time. (Print clips to the page, so parked objects never print.) */
+  .offpage{ opacity:.35; filter:grayscale(.8); }
+  .marquee{ position:fixed; border:1.5px dashed var(--gold); background:rgba(201,162,75,.12);
+            z-index:50; pointer-events:none; }
   /* ── Objects ──────────────────────────────────────────────────────
      Every picture and every text is its OWN object on the page: freely
      draggable, resizable, rotatable, borderable. All typography is em so
@@ -90,7 +95,7 @@
     .abswrap.sel,.frameobj.sel{ outline:none!important; }
     body{ background:#fff; overflow:visible!important; height:auto!important; }
     #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; }
-    .page{ box-shadow:none; margin:0; page-break-after:always; height:auto; min-height:296mm; }
+    .page{ box-shadow:none; margin:0; page-break-after:always; height:auto; min-height:296mm; overflow:hidden!important; }
     body.fmt-poster .page{ height:1000mm; }
     #out .page{ cursor:auto; }
   }
@@ -123,6 +128,7 @@
       <button id="pgAdd" title="Add a page">＋</button>
       <button id="pgDel" title="Delete this page">🗑</button>
     </div>
+    <div class="prow"><button id="addTextBtn" title="Add a free text object to this page">＋ Text</button></div>
   </div>
   <div id="knobs"></div>
 </aside>
@@ -219,11 +225,12 @@ let COMP=null;
 let curPage=1;
 function render(){ renderCurrent(); }
 function frames(){ COMP.params=COMP.params||{}; return COMP.params.frames=COMP.params.frames||[]; }
+function texts(){ COMP.params=COMP.params||{}; return COMP.params.texts=COMP.params.texts||[]; }
 // Explode posts into separate objects (text + each photo) the first time a
 // document opens under the object model; everything else just gets a place.
 function normalizeItems(){
   COMP.params=COMP.params||{};
-  frames();
+  frames(); texts();
   const out=[]; let n=0;
   const seed=()=>{ const s={x:8+(n%3)*30, y:6+Math.floor(n/3)*24}; n++; return s; };
   (COMP.items||[]).forEach(it=>{
@@ -354,6 +361,7 @@ function pageCount(){
   let n=(COMP.params&&+COMP.params.pages)||1;
   itemsAll().forEach(it=>{ const p=it.overrides&&+it.overrides.page; if(p>n) n=p; });
   frames().forEach(f=>{ if(+f.page>n) n=+f.page; });
+  texts().forEach(t=>{ if(+t.page>n) n=+t.page; });
   return Math.max(1,n);
 }
 function cardInner(it){
@@ -382,11 +390,23 @@ function frameDiv(f,i){
     'z-index:'+(+f.z||0)+';border:'+(+f.bw||2)+'px '+bs+' '+esc(f.bc||'#c9a24b')+';'+
     (+f.r?'transform:rotate('+(+f.r)+'deg);':'')+'"></div>';
 }
+// A free text object — lives in params (like frames), needs no card behind it.
+function txtFreeDiv(t,i){
+  const st='position:absolute;left:'+(+t.x||0)+'%;top:'+(+t.y||0)+'%;width:'+(+t.w||30)+'%;font-size:'+fsOf(t)+'px;z-index:'+(+t.z||0)+';'
+    +(+t.r?'transform:rotate('+(+t.r)+'deg);':'')
+    +borderCss(t,true)
+    +(t.tc?'color:'+esc(t.tc)+';':'');
+  const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
+  const ffs=t.ff?' style="font-family:\''+esc(t.ff)+'\'"':'';
+  return '<div class="abswrap txtfree" style="'+st+'" data-text="'+i+'">'+
+    '<div class="'+cls+'"'+ffs+'><div class="bd">'+sanitizeHtml(t.text||'')+'</div></div></div>';
+}
 function pageHtml(n){
   const on=itemsAll().filter(it=>(it.overrides&&+it.overrides.page)===n);
   const fr=frames().map((f,i)=>({f,i})).filter(x=>(+x.f.page||1)===n);
+  const tx=texts().map((t,i)=>({t,i})).filter(x=>(+x.t.page||1)===n);
   return '<div class="page" data-page="'+n+'" style="position:relative;">'+
-    on.map(absWrap).join('')+fr.map(x=>frameDiv(x.f,x.i)).join('')+'</div>';
+    on.map(absWrap).join('')+tx.map(x=>txtFreeDiv(x.t,x.i)).join('')+fr.map(x=>frameDiv(x.f,x.i)).join('')+'</div>';
 }
 function renderCurrent(){
   const N=pageCount();
@@ -394,6 +414,17 @@ function renderCurrent(){
   document.getElementById('out').innerHTML=pageHtml(curPage);
   wireDrag(); wirePan();
   updatePageNav(); markSel();
+  updateOffpage(); setTimeout(updateOffpage,250);   // again once images have height
+}
+// Grey out anything ENTIRELY outside the page (parked). Partly-off objects
+// stay full colour — bleeding off the edge is design, and print clips it.
+function updateOffpage(){
+  const page=document.querySelector('#out .page'); if(!page) return;
+  const pr=page.getBoundingClientRect();
+  document.querySelectorAll('#out .abswrap, #out .frameobj').forEach(el=>{
+    const r=el.getBoundingClientRect();
+    el.classList.toggle('offpage', r.right<pr.left||r.left>pr.right||r.bottom<pr.top||r.top>pr.bottom);
+  });
 }
 function renderAllPages(){
   const N=pageCount(); let html='';
@@ -406,8 +437,10 @@ let SEL=[];
 function primary(){ return SEL.length?SEL[SEL.length-1]:null; }
 function primItem(){ const p=primary(); return (p&&p[0]==='i')?+p.slice(1):null; }
 function primFrame(){ const p=primary(); return (p&&p[0]==='f')?+p.slice(1):null; }
+function primText(){ const p=primary(); return (p&&p[0]==='t')?+p.slice(1):null; }
 function selItemIdxs(){ return SEL.filter(s=>s[0]==='i').map(s=>+s.slice(1)); }
 function selFrameIdxs(){ return SEL.filter(s=>s[0]==='f').map(s=>+s.slice(1)); }
+function selTextIdxs(){ return SEL.filter(s=>s[0]==='t').map(s=>+s.slice(1)); }
 function setSel(key,additive){
   if(additive){ const i=SEL.indexOf(key); if(i>=0) SEL.splice(i,1); else SEL.push(key); }
   else SEL=[key];
@@ -416,10 +449,12 @@ function setSel(key,additive){
 function clearSel(){ if(!SEL.length) return; SEL=[]; showKnobs(); markSel(); }
 function elOf(key){
   return key[0]==='i' ? document.querySelector('.abswrap[data-absidx="'+key.slice(1)+'"]')
+       : key[0]==='t' ? document.querySelector('.txtfree[data-text="'+key.slice(1)+'"]')
                       : document.querySelector('.frameobj[data-frame="'+key.slice(1)+'"]');
 }
 function ovOf(key){
   return key[0]==='i' ? (COMP.items[+key.slice(1)].overrides=COMP.items[+key.slice(1)].overrides||{})
+       : key[0]==='t' ? texts()[+key.slice(1)]
                       : frames()[+key.slice(1)];
 }
 
@@ -437,15 +472,21 @@ function dragSelFrom(e,w){
     if(Math.abs(dx)+Math.abs(dy)>0.1) dragMoved=true;
     start.forEach(s=>{
       const o=ovOf(s.key);
-      o.x=Math.round(Math.max(-30,Math.min(98,s.x+dx))*10)/10;
-      o.y=Math.round(Math.max(-30,Math.min(99,s.y+dy))*10)/10;
+      o.x=Math.round(Math.max(-150,Math.min(240,s.x+dx))*10)/10;   // park freely off-page
+      o.y=Math.round(Math.max(-150,Math.min(240,s.y+dy))*10)/10;
       const el=elOf(s.key); if(el){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; }
     });
+    updateOffpage();
   };
   const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
     if(dragMoved) pushUndo(pre); };
   addEventListener('pointermove',mv); addEventListener('pointerup',up);
   e.stopPropagation(); e.preventDefault();
+}
+function keyOfEl(w){
+  return w.dataset.absidx!=null ? 'i'+w.dataset.absidx
+       : w.dataset.text!=null   ? 't'+w.dataset.text
+       : 'f'+w.dataset.frame;
 }
 function wireDrag(){
   document.querySelectorAll('.abswrap,.frameobj').forEach(w=>{
@@ -453,7 +494,7 @@ function wireDrag(){
       if(e.target.closest('.rszh')) return;
       if(e.target.closest('[contenteditable="true"]')) return;
       if(editing) commitEdit(false);        // click away = saved, never lost
-      const key=w.dataset.absidx!=null ? 'i'+w.dataset.absidx : 'f'+w.dataset.frame;
+      const key=keyOfEl(w);
       w._wasSel=SEL.includes(key);
       if(e.shiftKey){ setSel(key,true); if(!SEL.includes(key)) return; }
       else if(!w._wasSel) setSel(key,false);
@@ -465,14 +506,17 @@ function wireDrag(){
 document.getElementById('out').addEventListener('click',e=>{
   const w=e.target.closest('.abswrap'); if(!w) return;
   if(e.target.closest('[contenteditable="true"]')) return;
-  const idx=+w.dataset.absidx;
-  if(w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]==='i'+idx){
+  let key=null, isText=false;
+  if(w.dataset.absidx!=null){
+    const idx=+w.dataset.absidx; key='i'+idx;
     const it=COMP.items[idx];
-    if(it.ref_type==='post'&&(it.overrides.part||'txt')==='txt') enterEdit(idx,e.clientX,e.clientY);
-  }
+    isText=it&&it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt';
+  }else if(w.dataset.text!=null){ key='t'+w.dataset.text; isText=true; }
+  if(key&&isText&&w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]===key) enterEdit(key,e.clientX,e.clientY);
 });
-// Drag anywhere that isn't an object or the panel to move the canvas freely;
-// a plain click on empty space deselects.
+// Empty space: drag on the PAGE draws a selection rectangle (everything it
+// touches gets selected); drag on the grey outside pans the canvas.
+// A plain click on either deselects.
 let panWired=false;
 function wirePan(){
   if(panWired) return; panWired=true;
@@ -480,6 +524,7 @@ function wirePan(){
     if(e.button!==0) return;
     if(e.target.closest('#panel')||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
     if(editing) commitEdit(false);
+    if(e.target.closest('.page')){ startMarquee(e); return; }
     clearSel();
     const sx=e.clientX, sy=e.clientY, opx=panX, opy=panY;
     document.body.style.cursor='grabbing';
@@ -488,6 +533,35 @@ function wirePan(){
     addEventListener('pointermove',mv); addEventListener('pointerup',up);
     e.preventDefault();
   });
+}
+function startMarquee(e){
+  const sx=e.clientX, sy=e.clientY;
+  const additive=e.shiftKey;
+  let box=null, moved=false;
+  const mv=ev=>{
+    moved=true;
+    if(!box){ box=document.createElement('div'); box.className='marquee'; document.body.appendChild(box); }
+    Object.assign(box.style,{
+      left:Math.min(sx,ev.clientX)+'px', top:Math.min(sy,ev.clientY)+'px',
+      width:Math.abs(ev.clientX-sx)+'px', height:Math.abs(ev.clientY-sy)+'px' });
+  };
+  const up=ev=>{
+    removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+    if(box) box.remove();
+    if(!moved){ clearSel(); return; }
+    const x1=Math.min(sx,ev.clientX), y1=Math.min(sy,ev.clientY);
+    const x2=Math.max(sx,ev.clientX), y2=Math.max(sy,ev.clientY);
+    const hits=[];
+    document.querySelectorAll('#out .abswrap, #out .frameobj').forEach(el=>{
+      const r=el.getBoundingClientRect();
+      if(r.right>x1&&r.left<x2&&r.bottom>y1&&r.top<y2) hits.push(keyOfEl(el));
+    });
+    if(!additive) SEL=[];
+    hits.forEach(h=>{ if(!SEL.includes(h)) SEL.push(h); });
+    showKnobs(); markSel();
+  };
+  addEventListener('pointermove',mv); addEventListener('pointerup',up);
+  e.preventDefault();
 }
 
 // ── Page navigation ─────────────────────────────────────────────────
@@ -511,6 +585,8 @@ function deletePage(){
   });
   COMP.params.frames=frames().filter(f=>(+f.page||1)!==curPage);
   frames().forEach(f=>{ if(+f.page>curPage) f.page=+f.page-1; });
+  COMP.params.texts=texts().filter(t=>(+t.page||1)!==curPage);
+  texts().forEach(t=>{ if(+t.page>curPage) t.page=+t.page-1; });
   COMP.params.pages=Math.max(1,N-1);
   curPage=Math.min(curPage, pageCount());
   SEL=[]; renderCurrent(); syncZoom(); showKnobs();
@@ -523,6 +599,7 @@ function removeSelected(){
   pushUndo();
   selItemIdxs().sort((a,b)=>b-a).forEach(i=>COMP.items.splice(i,1));
   selFrameIdxs().sort((a,b)=>b-a).forEach(i=>frames().splice(i,1));
+  selTextIdxs().sort((a,b)=>b-a).forEach(i=>texts().splice(i,1));
   SEL=[]; renderCurrent(); showKnobs();
 }
 function moveSelToPage(n){
@@ -536,10 +613,85 @@ function bumpZ(dir){
   if(!SEL.length) return;
   pushUndo();
   const zs=itemsAll().filter(x=>(x.overrides&&+x.overrides.page)===curPage).map(x=>+(x.overrides&&x.overrides.z)||0)
-    .concat(frames().filter(f=>(+f.page||1)===curPage).map(f=>+f.z||0));
+    .concat(frames().filter(f=>(+f.page||1)===curPage).map(f=>+f.z||0))
+    .concat(texts().filter(t=>(+t.page||1)===curPage).map(t=>+t.z||0));
   const z = dir>0 ? Math.max(0,...zs)+1 : Math.min(0,...zs)-1;
   SEL.forEach(key=>{ ovOf(key).z=z; });
   render(); showKnobs(); markSel();
+}
+// A free text object: headline, page number, anything — no card behind it.
+function addText(){
+  pushUndo();
+  texts().push({ page:curPage, x:34, y:40, w:32,
+    text:'<h3>New text</h3><p>Click it again to edit…</p>' });
+  renderCurrent();
+  SEL=['t'+(texts().length-1)]; showKnobs(); markSel();
+}
+// Duplicate every selected object (styling and all), slightly offset.
+function dupSelected(){
+  if(!SEL.length) return;
+  pushUndo();
+  const newSel=[];
+  selItemIdxs().forEach(i=>{
+    const it=COMP.items[i];
+    const c={ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content,
+              overrides:JSON.parse(JSON.stringify(it.overrides||{})) };
+    c.overrides.x=(+c.overrides.x||0)+3; c.overrides.y=(+c.overrides.y||0)+3;
+    COMP.items.push(c); newSel.push('i'+(COMP.items.length-1));
+  });
+  selTextIdxs().forEach(i=>{
+    const t=JSON.parse(JSON.stringify(texts()[i])); t.x=(+t.x||0)+3; t.y=(+t.y||0)+3;
+    texts().push(t); newSel.push('t'+(texts().length-1));
+  });
+  selFrameIdxs().forEach(i=>{
+    const f=JSON.parse(JSON.stringify(frames()[i])); f.x=(+f.x||0)+3; f.y=(+f.y||0)+3;
+    frames().push(f); newSel.push('f'+(frames().length-1));
+  });
+  renderCurrent(); SEL=newSel; showKnobs(); markSel();
+}
+// ── Align & distribute (page-% geometry from the live DOM) ─────────
+function geoSel(){
+  const page=document.querySelector('#out .page'); if(!page) return null;
+  return SEL.map(key=>{
+    const el=elOf(key), o=ovOf(key); if(!el||!o) return null;
+    const wp=+o.w||(key[0]==='f'?20:28);
+    const hp=key[0]==='f' ? (+o.h||20) : el.offsetHeight/page.offsetHeight*100;
+    return { key, o, el, wp, hp, x:+o.x||0, y:+o.y||0 };
+  }).filter(Boolean);
+}
+function alignSel(mode){
+  const g=geoSel(); if(!g||g.length<2) return;
+  pushUndo();
+  const minX=Math.min(...g.map(a=>a.x)),      maxR=Math.max(...g.map(a=>a.x+a.wp));
+  const minY=Math.min(...g.map(a=>a.y)),      maxB=Math.max(...g.map(a=>a.y+a.hp));
+  g.forEach(a=>{
+    if(mode==='l') a.o.x=minX;
+    else if(mode==='r') a.o.x=maxR-a.wp;
+    else if(mode==='c') a.o.x=(minX+maxR)/2-a.wp/2;
+    else if(mode==='t') a.o.y=minY;
+    else if(mode==='b') a.o.y=maxB-a.hp;
+    else if(mode==='m') a.o.y=(minY+maxB)/2-a.hp/2;
+    a.o.x=Math.round(a.o.x*10)/10; a.o.y=Math.round(a.o.y*10)/10;
+    a.el.style.left=a.o.x+'%'; a.el.style.top=a.o.y+'%';
+  });
+  updateOffpage();
+}
+function distSel(axis){
+  const g=geoSel(); if(!g||g.length<3) return;
+  pushUndo();
+  const P=axis==='h'?'x':'y', S=axis==='h'?'wp':'hp';
+  g.sort((a,b)=>a[P]-b[P]);
+  const first=g[0], last=g[g.length-1];
+  const span=(last[P]+last[S])-first[P];
+  const sum=g.reduce((s,a)=>s+a[S],0);
+  const gap=(span-sum)/(g.length-1);
+  let cur=first[P];
+  g.forEach(a=>{
+    a.o[P]=Math.round(cur*10)/10;
+    a.el.style[P==='x'?'left':'top']=a.o[P]+'%';
+    cur+=a[S]+gap;
+  });
+  updateOffpage();
 }
 // A frame = a border AROUND the selection, born as its own object.
 function frameSelection(){
@@ -569,11 +721,13 @@ function pushUndo(pre){
   if(UNDO.length>200) UNDO.shift();
   REDO.length=0;
   updateUndoBtns();
+  scheduleSave();               // every change autosaves shortly after
 }
 function restoreSnap(js){
   const st=JSON.parse(js);
   COMP.params=st.params; COMP.items=st.items;
   SEL=[]; renderCurrent(); showKnobs(); markSel(); updateUndoBtns();
+  scheduleSave();
 }
 function doUndo(){
   if(editing){ try{ document.execCommand('undo'); }catch(e){} return; }
@@ -608,7 +762,7 @@ function liveSelStyle(){
   SEL.forEach(key=>{
     const el=elOf(key); if(!el) return;
     const o=ovOf(key);
-    if(key[0]==='i'){
+    if(key[0]!=='f'){
       el.style.width=(+o.w||28)+'%';
       el.style.fontSize=fsOf(o)+'px';
       el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
@@ -626,19 +780,22 @@ function liveSelStyle(){
 function showKnobs(){
   const k=document.getElementById('knobs');
   const n=SEL.length;
-  const pI=primItem(), pF=primFrame();
+  const pI=primItem(), pF=primFrame(), pT=primText();
   const it=pI!=null?COMP.items[pI]:null;
-  const ov=it?(it.overrides=it.overrides||{}):(pF!=null?frames()[pF]:{});
-  const isTxt=!!it&&it.ref_type==='post'&&(it.overrides.part||'txt')==='txt';
+  const ov=it?(it.overrides=it.overrides||{}):(pT!=null?texts()[pT]:(pF!=null?frames()[pF]:{}));
+  const isTxt=(!!it&&it.ref_type==='post'&&(it.overrides.part||'txt')==='txt')||pT!=null;
   const isMedia=!!it&&it.ref_type==='media';
   const anySel=n>0;
   const N=pageCount();
   const dis=anySel?'':' disabled';
   const disT=isTxt?'':' disabled';       // rich text tools: text objects only
   const disC=anySel?'':' disabled';      // colour: any object (text colour)
+  const dis2=n>=2?'':' disabled';        // align
+  const dis3=n>=3?'':' disabled';        // distribute
   const title=!anySel?'No selection'
     : n>1 ? n+' objects'
     : pF!=null?'Frame'
+    : pT!=null?'Text object'
     : isTxt?'Text object'
     : isMedia?'Logo / graphic'
     : it&&it.ref_type==='contact'?'Person'
@@ -655,6 +812,15 @@ function showKnobs(){
     '<div class="krow"><button id="knFront"'+dis+' style="flex:1;" title="Bring in front">⬆ Front</button>'+
       '<button id="knBack"'+dis+' style="flex:1;" title="Send behind">⬇ Back</button>'+
       '<button id="knFrame"'+dis+' title="Draw a frame around the selection — it becomes its own object">▭ Frame</button></div>'+
+    '<div class="krow"><button id="alL"'+dis2+' title="Align left edges">⇤</button>'+
+      '<button id="alC"'+dis2+' title="Align centres (horizontal)">↔</button>'+
+      '<button id="alR"'+dis2+' title="Align right edges">⇥</button>'+
+      '<button id="alT"'+dis2+' title="Align top edges">⤒</button>'+
+      '<button id="alM"'+dis2+' title="Align middles (vertical)">↕</button>'+
+      '<button id="alB"'+dis2+' title="Align bottom edges">⤓</button>'+
+      '<button id="dsH"'+dis3+' title="Spread evenly left-to-right">⋯</button>'+
+      '<button id="dsV"'+dis3+' title="Spread evenly top-to-bottom">⋮</button>'+
+      '<button id="knDup"'+dis+' title="Duplicate (Ctrl+D)">⧉</button></div>'+
     '<div class="kh">Size · <span id="szPct">'+(anySel?Math.round(+ov.w||28)+'%':'–')+'</span></div>'+
     '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(anySel?(+ov.w||28):28)+'"'+dis+'>'+
     '<div class="kh">Angle · <span id="rDeg">'+(anySel?Math.round(+ov.r||0)+'°':'–')+'</span></div>'+
@@ -691,6 +857,12 @@ function showKnobs(){
   q('knFront').onclick=()=>bumpZ(1);
   q('knBack').onclick=()=>bumpZ(-1);
   q('knFrame').onclick=()=>frameSelection();
+  q('knDup').onclick=()=>dupSelected();
+  [['alL','l'],['alC','c'],['alR','r'],['alT','t'],['alM','m'],['alB','b']].forEach(([id,m])=>{
+    const b=q(id); if(b) b.onclick=()=>alignSel(m);
+  });
+  q('dsH').onclick=()=>distSel('h');
+  q('dsV').onclick=()=>distSel('v');
   const liveSlider=(id,apply,label,fmt)=>{
     const el=q(id); if(!el) return;
     el.oninput=e=>{ if(el._pre==null) el._pre=snap(); apply(+e.target.value);
@@ -699,7 +871,10 @@ function showKnobs(){
   };
   liveSlider('knW', v=>SEL.forEach(key=>{ ovOf(key).w=v; }), 'szPct', v=>Math.round(v)+'%');
   liveSlider('knR', v=>SEL.forEach(key=>{ const o=ovOf(key); if(v) o.r=v; else delete o.r; }), 'rDeg', v=>Math.round(v)+'°');
-  liveSlider('knTs', v=>selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; o.ts=v/100; if(o.ts===1) delete o.ts; }), 'tsPct', v=>Math.round(v)+'%');
+  liveSlider('knTs', v=>{
+    selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; o.ts=v/100; if(o.ts===1) delete o.ts; });
+    selTextIdxs().forEach(i=>{ const t=texts()[i]; t.ts=v/100; if(t.ts===1) delete t.ts; });
+  }, 'tsPct', v=>Math.round(v)+'%');
   q('knBw').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap();
     SEL.forEach(key=>{ const o=ovOf(key); const v=+e.target.value; if(v) o.bw=v; else if(key[0]==='i') delete o.bw; else o.bw=0; }); liveSelStyle(); };
   q('knBw').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
@@ -711,10 +886,11 @@ function showKnobs(){
   const ff=q('knFF');
   if(ff) ff.onchange=e=>{ pushUndo();
     selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font; });
+    selTextIdxs().forEach(i=>{ const t=texts()[i]; if(e.target.value) t.ff=e.target.value; else delete t.ff; });
     render(); showKnobs(); markSel(); };
   // Colour: rich selection while editing; the whole object(s) otherwise.
   const setObjColor=c=>{ pushUndo();
-    SEL.forEach(key=>{ if(key[0]!=='i') return; const o=ovOf(key); if(c) o.tc=c; else delete o.tc; });
+    SEL.forEach(key=>{ if(key[0]==='f') return; const o=ovOf(key); if(c) o.tc=c; else delete o.tc; });
     render(); showKnobs(); markSel(); };
   q('tbColor').oninput=e=>{ if(editing) applyStyle('color',e.target.value); };
   q('tbColor').onchange=e=>{ if(!editing) setObjColor(e.target.value); };
@@ -743,8 +919,9 @@ function showKnobs(){
 // clicked. Any click outside commits automatically; nothing is ever lost.
 function curBd(){ return document.querySelector('[contenteditable="true"]'); }
 let styleSpan=null, holdSel=false;
-function enterEdit(idx,cx,cy){
-  const bd=document.querySelector('.abswrap[data-absidx="'+idx+'"] .bd'); if(!bd) return;
+function enterEdit(key,cx,cy){
+  const el=elOf(key); if(!el) return;
+  const bd=el.querySelector('.bd'); if(!bd) return;
   bd.setAttribute('contenteditable','true');
   bd.focus();
   if(cx!=null&&document.caretRangeFromPoint){
@@ -758,12 +935,15 @@ function enterEdit(idx,cx,cy){
 function commitEdit(rerender){
   const bd=curBd();
   if(bd){
-    const bl=bd.closest('[data-idx]');
-    if(bl){
-      const it=COMP.items[+bl.dataset.idx];
+    const wrap=bd.closest('.abswrap');
+    const nw=sanitizeHtml(bd.innerHTML);
+    if(wrap&&wrap.dataset.absidx!=null){
+      const it=COMP.items[+wrap.dataset.absidx];
       const ov=it.overrides=it.overrides||{};
-      const nw=sanitizeHtml(bd.innerHTML);
       if(nw!==(ov.text||'')){ pushUndo(); ov.text=nw; }   // pre-state pushed BEFORE the change
+    }else if(wrap&&wrap.dataset.text!=null){
+      const t=texts()[+wrap.dataset.text];
+      if(t&&nw!==(t.text||'')){ pushUndo(); t.text=nw; }
     }
     bd.removeAttribute('contenteditable');
   }
@@ -869,7 +1049,8 @@ document.getElementById('zoomOut').onclick=()=>zoomStep(1/1.25);
 document.getElementById('zoomFit').onclick=()=>syncZoom();
 
 // Track the mouse so keyboard zoom anchors where you're looking.
-let lastMouse=null;
+let lastMouse=null, lastNudge=0;
+document.getElementById('addTextBtn').onclick=()=>{ if(editing) commitEdit(false); addText(); };
 document.addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
 
 // The wheel zooms EVERYWHERE (anchored to the cursor, even off the page) —
@@ -886,7 +1067,22 @@ document.addEventListener('keydown',e=>{
   if(e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); doUndo(); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); doRedo(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){ e.preventDefault(); dupSelected(); return; }
   if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
+  // Arrow keys nudge the selection: 0.5% per press, 0.1% with Shift.
+  if(SEL.length&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
+    e.preventDefault();
+    const st=e.shiftKey?0.1:0.5;
+    const dx=e.key==='ArrowLeft'?-st:e.key==='ArrowRight'?st:0;
+    const dy=e.key==='ArrowUp'?-st:e.key==='ArrowDown'?st:0;
+    if(Date.now()-lastNudge>800) pushUndo(); else scheduleSave();   // coalesce bursts into one undo step
+    lastNudge=Date.now();
+    SEL.forEach(kk=>{ const o=ovOf(kk);
+      o.x=Math.round(((+o.x||0)+dx)*10)/10; o.y=Math.round(((+o.y||0)+dy)*10)/10;
+      const el=elOf(kk); if(el){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; } });
+    updateOffpage();
+    return;
+  }
   const at=lastMouse||{};
   if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomStep(1.25, at.x, at.y); }
   else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomStep(1/1.25, at.x, at.y); }
@@ -908,15 +1104,25 @@ updateUndoBtns();
 window.addEventListener('beforeprint',()=>{ if(editing) commitEdit(false); renderAllPages(); });
 window.addEventListener('afterprint',()=>{ renderCurrent(); applyZoom(curScale*100); });
 
-document.getElementById('saveBtn').onclick=async()=>{
-  if(editing) commitEdit(true);
+// ── Autosave: a couple of seconds after the last change, plus the button ──
+let saveTimer=null;
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,2500); }
+async function saveNow(){
+  if(!COMP||!compId) return;
+  clearTimeout(saveTimer);
   COMP.params=COMP.params||{}; COMP.params.pages=pageCount();
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
-  const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({items, params:COMP.params||{}})});
-  document.getElementById('saveBtn').textContent = r.ok ? '✓ Saved' : 'Save failed';
-  setTimeout(()=>document.getElementById('saveBtn').textContent='Save',1500);
-};
+  const btn=document.getElementById('saveBtn');
+  if(btn) btn.textContent='Saving…';
+  let ok=false;
+  try{
+    const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({items, params:COMP.params||{}})});
+    ok=r.ok;
+  }catch(e){}
+  if(btn){ btn.textContent= ok ? '✓ Saved' : 'Save failed'; setTimeout(()=>btn.textContent='Save',1500); }
+}
+document.getElementById('saveBtn').onclick=()=>{ if(editing) commitEdit(true); saveNow(); };
 load();
 </script>
 </body>
