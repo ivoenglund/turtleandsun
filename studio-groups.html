@@ -200,15 +200,13 @@
       <div class="lbl">On the board</div>
       <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkUngrouped"> Ungrouped</label>
       <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkTimeline"> Timeline</label>
-      <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkArchive"> Archive</label>
-      <div class="lbl">Timeline period</div>
-      <label class="flt" style="padding:3px 10px;"><input type="radio" name="mkPer" value="all"> All</label>
-      <label class="flt" style="padding:3px 10px;"><input type="radio" name="mkPer" value="years"> Years:</label>
-      <div style="padding:2px 10px 8px;display:flex;gap:4px;align-items:center;">
-        <input type="number" id="mkY1" placeholder="from" style="width:62px;">
-        <span class="muted">–</span>
-        <input type="number" id="mkY2" placeholder="to" style="width:62px;">
+      <div style="padding:2px 10px 4px;display:flex;gap:4px;align-items:center;font-size:12px;">
+        <span class="muted">Timeline year</span>
+        <input type="number" id="mkY1" style="width:58px;">
+        <span class="muted">to</span>
+        <input type="number" id="mkY2" style="width:58px;">
       </div>
+      <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkArchive"> Archive</label>
     </div>
   </div>
   <div class="sideStrip hide" id="sideStrip" title="Open the panel">»</div>
@@ -363,8 +361,10 @@
       /* Board controls live in the EXISTING sidebar; visible only on the Make tab. */
       .mk-only{display:none;}
       body.makmode .mk-only{display:block;}
-      .mkChk{display:none;width:auto!important;margin-right:2px;}
+      /* The board column: checkboxes on ONE straight left margin, own space. */
+      .mkChk{display:none;width:auto!important;position:absolute;left:8px;top:50%;transform:translateY(-50%);}
       body.makmode .mkChk{display:inline-block;}
+      body.makmode #tree .row{position:relative;padding-left:30px;}
     </style>
     <div id="mak" class="hide">
       <div id="makLib"></div>
@@ -2586,29 +2586,22 @@ let makComp = null;      // the print being composed; null = library view
 let makList = [];
 // What the board shows — persisted. groups: {id:false} = hidden.
 // Living/Deceased/People/Pets come from the EXISTING sidebar filters.
-let makView = { groups:{}, ungrouped:true, timeline:true, archive:true,
-                per:'years', y1:'', y2:'' };
+let makView = { groups:{}, ungrouped:true, timeline:true, archive:true, y1:'', y2:'' };
 try{ Object.assign(makView, JSON.parse(localStorage.getItem('ts_mak_view')||'{}')); }catch(e){}
 if(!makView.y1){ const y=new Date().getFullYear(); makView.y1=String(y); makView.y2=String(y+1); }
 function makViewSave(){ try{ localStorage.setItem('ts_mak_view',JSON.stringify(makView)); }catch(e){} }
 // Wire the sidebar's Make-only controls (static HTML, wired once).
 (function(){
-  const set=()=>{
-    $('#mkUngrouped').checked=!!makView.ungrouped;
-    $('#mkTimeline').checked=!!makView.timeline;
-    $('#mkArchive').checked=!!makView.archive;
-    document.querySelectorAll('input[name=mkPer]').forEach(r=>r.checked=(r.value===makView.per||(r.value==='all'&&makView.per!=='years')));
-    $('#mkY1').value=makView.y1||''; $('#mkY2').value=makView.y2||'';
-  };
-  set();
+  $('#mkUngrouped').checked=!!makView.ungrouped;
+  $('#mkTimeline').checked=!!makView.timeline;
+  $('#mkArchive').checked=!!makView.archive;
+  $('#mkY1').value=makView.y1||''; $('#mkY2').value=makView.y2||'';
   const refresh=()=>{ makViewSave(); if(makComp&&!$('#mak').classList.contains('hide')) renderMakWall(); };
   $('#mkUngrouped').onchange=e=>{ makView.ungrouped=e.target.checked; refresh(); };
   $('#mkTimeline').onchange=e=>{ makView.timeline=e.target.checked; refresh(); };
   $('#mkArchive').onchange=e=>{ makView.archive=e.target.checked; refresh(); };
-  document.querySelectorAll('input[name=mkPer]').forEach(r=>r.onchange=()=>{ makView.per=r.value; refresh(); });
   $('#mkY1').onchange=$('#mkY2').onchange=()=>{
-    makView.y1=$('#mkY1').value; makView.y2=$('#mkY2').value; makView.per='years';
-    document.querySelectorAll('input[name=mkPer]').forEach(r=>r.checked=(r.value==='years'));
+    makView.y1=$('#mkY1').value; makView.y2=$('#mkY2').value;
     refresh();
   };
 })();
@@ -2687,11 +2680,13 @@ function renderMakPick(){
   renderMakWall();
   makWireDrop();
 }
+// Year range only: empty fields mean open-ended (clear both = everything).
 function inPeriod(p){
-  if(makView.per!=='years') return true;
+  const y1=+makView.y1||0, y2=+makView.y2||9999;
+  if(!makView.y1&&!makView.y2) return true;
   const y=+String(p.post_date||'').slice(0,4);
   if(!y) return false;
-  return y>=(+makView.y1||0) && y<=(+makView.y2||9999);
+  return y>=y1&&y<=y2;
 }
 function makCardHtml(rt,id,img,t,sub,extra){
   const on=makHas(rt,id);
