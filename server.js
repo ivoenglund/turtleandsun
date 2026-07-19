@@ -2507,6 +2507,106 @@ app.get('/api/admin/remove-crawl', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Move every member of one group into another (memberships only — the contacts
+// themselves are untouched). Dedupe-safe: already-members are skipped.
+//   /api/admin/move-group-members?from=QCC2&to=QCC
+app.get('/api/admin/move-group-members', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+    const fromName = req.query.from, toName = req.query.to;
+    if (!fromName || !toName) return res.status(400).json({ error: 'from and to are required' });
+    if (fromName.toLowerCase() === toName.toLowerCase()) return res.status(400).json({ error: 'from and to are the same group' });
+
+    const g = async name => {
+      const r = await pool.query(`SELECT id FROM groups WHERE user_id = $1 AND LOWER(name) = LOWER($2)`, [req.user.id, name]);
+      return r.rows[0]?.id;
+    };
+    const fromId = await g(fromName), toId = await g(toName);
+    if (!fromId) return res.status(404).json({ error: `Group "${fromName}" not found` });
+    if (!toId) return res.status(404).json({ error: `Group "${toName}" not found` });
+
+    // Copy memberships into the target (keeping dates/status), skip existing…
+    const copied = await pool.query(
+      `INSERT INTO contact_group_memberships (user_id, contact_id, group_id, from_date, to_date, status)
+       SELECT user_id, contact_id, $3, from_date, to_date, status
+       FROM contact_group_memberships WHERE user_id = $1 AND group_id = $2
+       ON CONFLICT (user_id, contact_id, group_id) DO NOTHING
+       RETURNING contact_id`,
+      [req.user.id, fromId, toId]
+    );
+    // …then empty the source group.
+    const removed = await pool.query(
+      `DELETE FROM contact_group_memberships WHERE user_id = $1 AND group_id = $2 RETURNING contact_id`,
+      [req.user.id, fromId]
+    );
+    res.json({
+      ok: true, v: 1, from: fromName, to: toName,
+      moved: copied.rows.length,
+      alreadyInTarget: removed.rows.length - copied.rows.length,
+      note: `"${fromName}" is now empty — delete it in the sidebar (✕) when you're happy.`,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Remove everything a file import created (mirror of remove-crawl for the
+// import-contacts markers).  /api/admin/remove-import?file=qcc-team
+app.get('/api/admin/remove-import', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+    const file = String(req.query.file || '').replace(/[^a-z0-9_-]/gi, '');
+    if (!file) return res.status(400).json({ error: 'file is required' });
+
+    const old = await pool.query(
+      `SELECT id, name FROM contacts WHERE user_id = $1 AND google_id LIKE $2`,
+      [req.user.id, 'import-' + file + '-%']
+    );
+    const ids = old.rows.map(r => r.id);
+    if (ids.length) {
+      await pool.query(`DELETE FROM contact_group_memberships WHERE user_id = $1 AND contact_id = ANY($2)`, [req.user.id, ids]);
+      await pool.query(`DELETE FROM occasions WHERE user_id = $1 AND contact_id = ANY($2)`, [req.user.id, ids]);
+      await pool.query(`DELETE FROM contact_relationships WHERE user_id = $1 AND (contact_a_id = ANY($2) OR contact_b_id = ANY($2))`, [req.user.id, ids]);
+      await pool.query(`DELETE FROM contacts WHERE user_id = $1 AND id = ANY($2)`, [req.user.id, ids]);
+    }
+    res.json({ ok: true, v: 1, removed: ids.length, names: old.rows.map(r => r.name), note: 'Empty groups can be deleted in the sidebar (✕).' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Read-only truth: every import/crawl marker family with its contact count, and
+// every group with its member count. Run this BEFORE deleting anything.
+//   /api/admin/import-report
+app.get('/api/admin/import-report', requireAuth, async (req, res) => {
+  try {
+    const adm = await pool.query(
+      "SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'", [req.user.id]
+    );
+    if (!adm.rows.length) return res.status(403).json({ error: 'Admin only' });
+
+    const markers = await pool.query(
+      `SELECT CASE WHEN google_id LIKE 'crawl:%' THEN 'crawl:' || SPLIT_PART(google_id, ':', 2)
+                   ELSE REGEXP_REPLACE(google_id, '-[0-9]+$', '') END AS family,
+              COUNT(*)::int AS contacts,
+              ARRAY_AGG(name ORDER BY name) AS names
+       FROM contacts
+       WHERE user_id = $1 AND (google_id LIKE 'import-%' OR google_id LIKE 'crawl:%')
+       GROUP BY 1 ORDER BY 1`,
+      [req.user.id]
+    );
+    const groups = await pool.query(
+      `SELECT g.name, COUNT(m.contact_id)::int AS members
+       FROM groups g LEFT JOIN contact_group_memberships m ON m.group_id = g.id AND m.user_id = g.user_id
+       WHERE g.user_id = $1 GROUP BY g.id, g.name ORDER BY g.name`,
+      [req.user.id]
+    );
+    res.json({ ok: true, v: 1, importFamilies: markers.rows, groups: groups.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Compositions ("everything is a card") ─────────────────────────────────────
 // A composition = template + ordered card references. Cards resolve LIVE at read
 // time (mirror principle): a contact-card always shows current data. Printing
