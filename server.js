@@ -3331,25 +3331,51 @@ app.get('/api/media-cards', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Accepts: multipart file (SVG or raster image) OR JSON { url } — the url
+// branch serves drags from web pages; the server fetches and re-hosts.
+// SVG is always sanitized; rasters upload as-is.
 app.post('/api/media-cards', requireAuth, upload.single('file'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    const clean = sanitizeSvg(req.file.buffer.toString('utf8'));
-    if (!clean) return res.status(400).json({ error: 'Not a valid SVG file' });
-    const buf = Buffer.from(clean, 'utf8');
+    let buf = null, ct = null, origName = 'file';
+    if (req.file) {
+      origName = req.file.originalname || 'file';
+      const isSvg = /svg/i.test(req.file.mimetype || '') || /\.svg$/i.test(origName);
+      if (isSvg) {
+        const clean = sanitizeSvg(req.file.buffer.toString('utf8'));
+        if (!clean) return res.status(400).json({ error: 'Not a valid SVG file' });
+        buf = Buffer.from(clean, 'utf8'); ct = 'image/svg+xml';
+      } else if (/^image\//i.test(req.file.mimetype || '')) {
+        buf = req.file.buffer; ct = req.file.mimetype;
+      } else return res.status(400).json({ error: 'Only SVG or image files' });
+    } else if (req.body && req.body.url && /^https?:\/\//i.test(req.body.url)) {
+      const srcUrl = String(req.body.url).trim();
+      const r = await fetch(srcUrl);
+      if (!r.ok) return res.status(400).json({ error: 'Could not fetch the image: HTTP ' + r.status });
+      ct = (r.headers.get('content-type') || '').split(';')[0].trim();
+      const ab = Buffer.from(await r.arrayBuffer());
+      if (ab.length > 15 * 1024 * 1024) return res.status(400).json({ error: 'Too large (max 15 MB)' });
+      if (/svg/i.test(ct) || /\.svg(\?|$)/i.test(srcUrl)) {
+        const clean = sanitizeSvg(ab.toString('utf8'));
+        if (!clean) return res.status(400).json({ error: 'Not a valid SVG' });
+        buf = Buffer.from(clean, 'utf8'); ct = 'image/svg+xml';
+      } else if (/^image\//i.test(ct)) { buf = ab; }
+      else return res.status(400).json({ error: 'That link is not an image (' + (ct || 'unknown type') + ')' });
+      origName = (decodeURIComponent(srcUrl.split('/').pop() || 'image').split('?')[0]) || 'image';
+    } else return res.status(400).json({ error: 'No file or url provided' });
+
     const { url } = await uploadBuffer({
-      buffer: buf, contentType: 'image/svg+xml', kind: 'media_card',
-      originalName: req.file.originalname || 'logo.svg',
+      buffer: buf, contentType: ct, kind: 'media_card', originalName: origName,
     });
     let tags = [];
     try { tags = JSON.parse(req.body.tags || '[]'); } catch (_) { tags = []; }
     if (!Array.isArray(tags)) tags = [];
     tags = tags.map(t => String(t).trim()).filter(Boolean).slice(0, 20);
-    const title = (req.body.title || req.file.originalname || '').replace(/\.svg$/i, '').trim() || null;
+    const title = (req.body.title || origName || '').replace(/\.(svg|png|jpe?g|webp|gif|avif)$/i, '').trim() || null;
+    const kind = ct === 'image/svg+xml' ? 'svg' : 'image';
     const { rows } = await pool.query(
       `INSERT INTO media_cards (user_id, title, kind, url, tags)
-       VALUES ($1, $2, 'svg', $3, $4) RETURNING id, title, kind, url, tags, created_at`,
-      [req.user.id, title, url, JSON.stringify(tags)]);
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, title, kind, url, tags, created_at`,
+      [req.user.id, title, kind, url, JSON.stringify(tags)]);
     res.json({ ok: true, card: rows[0] });
   } catch (err) { res.status(500).json({ error: 'Upload failed', details: err.message }); }
 });

@@ -344,7 +344,9 @@
                    border:1.5px solid #c9c4b4;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
       .makCard.on .ck{background:#c9a24b;border-color:#c9a24b;}
       .makDelBadge{position:absolute;top:6px;left:6px;}
-      .makPer.act{outline:2px solid #c9a24b;}
+      .mkv{font-size:12.5px;display:flex;gap:6px;align-items:center;cursor:pointer;}
+      .mkv input{width:auto;}
+      #makWall.dropping{outline:3px dashed #c9a24b;outline-offset:-3px;border-radius:10px;}
     </style>
     <div id="mak" class="hide">
       <div id="makLib"></div>
@@ -356,18 +358,18 @@
           <button class="btn sm gray" id="makSaveBtn">Save</button>
           <button class="btn pub" id="makGo">Save &amp; open the editor →</button>
         </div>
-        <div class="panel" style="padding:10px 14px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input class="search" id="makSearch" type="text" placeholder="Search everything…" style="flex:1;min-width:150px;">
-          <span class="muted" style="font-size:12px;">Timeline:</span>
-          <button class="btn sm gray makPer act" data-p="all">All</button>
-          <button class="btn sm gray makPer" data-p="year">This year</button>
-          <button class="btn sm gray makPer" data-p="12m">Last 12 months</button>
-          <input type="date" id="makFrom" style="width:auto;"> <span class="muted">–</span> <input type="date" id="makTo" style="width:auto;">
-          <button class="btn sm gray" id="makAddSvg" title="Upload an SVG logo or graphic">＋ Add SVG</button>
-          <input type="file" id="makSvgFile" accept=".svg,image/svg+xml" style="display:none;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div class="panel" id="makSide" style="width:192px;flex:0 0 auto;padding:10px 12px;max-height:calc(100vh - 250px);overflow:auto;"></div>
+          <div style="flex:1;min-width:0;">
+            <div class="panel" style="padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input class="search" id="makSearch" type="text" placeholder="Search everything…" style="flex:1;min-width:150px;">
+              <button class="btn sm gray" id="makAddSvg" title="Upload a logo or image — or just drop files onto the board">＋ Add SVG / image</button>
+              <input type="file" id="makSvgFile" accept=".svg,image/*" multiple style="display:none;">
+            </div>
+            <div id="makWall" style="max-height:calc(100vh - 320px);overflow:auto;padding:0 2px 10px;"></div>
+          </div>
         </div>
-        <div id="makWall" style="max-height:calc(100vh - 330px);overflow:auto;padding:0 2px 10px;"></div>
-        <div class="help">Click cards to pick them — people by group, timeline posts, your archive. Then open the editor: already-placed cards keep their layout; new picks arrive parked beside the page, ready to drag in.</div>
+        <div class="help">Click cards to pick them. Drag files from your computer (or a picture from a web page) onto the board — they land in the archive. You can also drag any card straight into an open editor window. Already-placed cards keep their layout; new picks arrive parked beside the page.</div>
       </div>
     </div>
 
@@ -2557,7 +2559,11 @@ async function renderCalEntries(calId, calName){
 // layout overrides); this UI is just human hands on the same lever.
 let makComp = null;      // the print being composed; null = library view
 let makList = [];
-let makPeriod = 'all';   // timeline filter: all | year | 12m | custom
+// What the board shows — persisted. groups: {id:false} = hidden.
+let makView = { groups:{}, ungrouped:true, timeline:true, archive:true,
+                living:true, dead:false, pets:true, per:'all', y1:'', y2:'' };
+try{ Object.assign(makView, JSON.parse(localStorage.getItem('ts_mak_view')||'{}')); }catch(e){}
+function makViewSave(){ try{ localStorage.setItem('ts_mak_view',JSON.stringify(makView)); }catch(e){} }
 
 async function ensureMedia(force){
   if(mediaCache && !force) return;
@@ -2629,23 +2635,61 @@ function renderMakPick(){
   $('#makLib').classList.add('hide');
   $('#makPick').classList.remove('hide');
   $('#makName').value=makComp.name||'';
+  renderMakSide();
   renderMakWall();
+  makWireDrop();
+}
+// The left column: which groups/sections the board shows + people filters
+// + the timeline period (all, or year to year).
+function renderMakSide(){
+  const gRows=groups.map(g=>
+    '<label class="mkv"><input type="checkbox" data-k="g:'+g.id+'" '+(makView.groups[g.id]!==false?'checked':'')+'> '+esc(g.name)+'</label>').join('');
+  $('#makSide').innerHTML=
+    '<b style="font-size:12.5px;">On the board</b>'+
+    '<div style="margin:6px 0 10px;display:flex;flex-direction:column;gap:3px;">'+gRows+
+      '<label class="mkv"><input type="checkbox" data-k="ungrouped" '+(makView.ungrouped?'checked':'')+'> Ungrouped</label>'+
+      '<label class="mkv"><input type="checkbox" data-k="timeline" '+(makView.timeline?'checked':'')+'> Timeline</label>'+
+      '<label class="mkv"><input type="checkbox" data-k="archive" '+(makView.archive?'checked':'')+'> Archive</label></div>'+
+    '<b style="font-size:12.5px;">People</b>'+
+    '<div style="margin:6px 0 10px;display:flex;flex-direction:column;gap:3px;">'+
+      '<label class="mkv"><input type="checkbox" data-k="living" '+(makView.living?'checked':'')+'> Living</label>'+
+      '<label class="mkv"><input type="checkbox" data-k="dead" '+(makView.dead?'checked':'')+'> Deceased</label>'+
+      '<label class="mkv"><input type="checkbox" data-k="pets" '+(makView.pets?'checked':'')+'> Pets</label></div>'+
+    '<b style="font-size:12.5px;">Timeline period</b>'+
+    '<div style="margin:6px 0 2px;display:flex;flex-direction:column;gap:4px;">'+
+      '<label class="mkv"><input type="radio" name="mkPer" value="all" '+(makView.per!=='years'?'checked':'')+'> All</label>'+
+      '<label class="mkv"><input type="radio" name="mkPer" value="years" '+(makView.per==='years'?'checked':'')+'> Years:</label>'+
+      '<div style="display:flex;gap:4px;align-items:center;">'+
+        '<input type="number" id="mkY1" placeholder="from" value="'+esc(makView.y1||'')+'" style="width:64px;">'+
+        '<span class="muted">–</span>'+
+        '<input type="number" id="mkY2" placeholder="to" value="'+esc(makView.y2||'')+'" style="width:64px;"></div></div>';
+  $('#makSide').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.onchange=()=>{
+    const k=cb.dataset.k;
+    if(k.slice(0,2)==='g:') makView.groups[+k.slice(2)]=cb.checked?true:false;
+    else makView[k]=cb.checked;
+    makViewSave(); renderMakWall();
+  });
+  $('#makSide').querySelectorAll('input[name=mkPer]').forEach(r=>r.onchange=()=>{
+    makView.per=r.value; makViewSave(); renderMakWall();
+  });
+  $('#mkY1').onchange=$('#mkY2').onchange=()=>{
+    makView.y1=$('#mkY1').value; makView.y2=$('#mkY2').value;
+    makView.per='years'; makViewSave(); renderMakSide(); renderMakWall();
+  };
 }
 function inPeriod(p){
-  if(makPeriod==='all') return true;
-  const d=String(p.post_date||'').slice(0,10);
-  if(!d) return false;
-  const now=new Date();
-  if(makPeriod==='year') return d>=now.getFullYear()+'-01-01';
-  if(makPeriod==='12m') return d>=new Date(now-365*864e5).toISOString().slice(0,10);
-  const f=$('#makFrom').value, t=$('#makTo').value;
-  if(f&&d<f) return false;
-  if(t&&d>t) return false;
-  return true;
+  if(makView.per!=='years') return true;
+  const y=+String(p.post_date||'').slice(0,4);
+  if(!y) return false;
+  return y>=(+makView.y1||0) && y<=(+makView.y2||9999);
+}
+function passLife(c){
+  if(c.is_pet&&!makView.pets) return false;
+  return c.died_on ? makView.dead : makView.living;
 }
 function makCardHtml(rt,id,img,t,sub,extra){
   const on=makHas(rt,id);
-  return '<div class="makCard'+(on?' on':'')+(rt==='media'?' logo':'')+'" data-rt="'+rt+'" data-id="'+id+'">'+
+  return '<div class="makCard'+(on?' on':'')+(rt==='media'?' logo':'')+'" draggable="true" data-rt="'+rt+'" data-id="'+id+'">'+
     '<div class="im">'+(img?'<img src="'+esc(img)+'" loading="lazy">':'<span style="font-size:26px;">'+(rt==='contact'?'👤':rt==='media'?'◆':'📄')+'</span>')+'</div>'+
     '<div class="ck">✓</div>'+(extra||'')+
     '<div class="tt">'+esc(t)+'</div><div class="ss">'+esc(sub||'')+'</div></div>';
@@ -2653,44 +2697,59 @@ function makCardHtml(rt,id,img,t,sub,extra){
 function renderMakWall(){
   const q=($('#makSearch').value||'').toLowerCase();
   const hit=s=>!q||String(s||'').toLowerCase().includes(q);
-  document.querySelectorAll('.makPer').forEach(b=>b.classList.toggle('act',b.dataset.p===makPeriod));
   const byGroup={}, inSome=new Set(), cById={};
   memberships.forEach(m=>{ (byGroup[m.group_id]=byGroup[m.group_id]||[]).push(m.contact_id); inSome.add(m.contact_id); });
   contactsPool.forEach(c=>cById[c.id]=c);
   let html='';
   groups.forEach(g=>{
+    if(makView.groups[g.id]===false) return;
     const ppl=[...new Set(byGroup[g.id]||[])].map(i=>cById[i])
-      .filter(c=>c&&!c.died_on&&hit((c.name||'')+' '+(c.company||'')+' '+(c.job_title||'')));
+      .filter(c=>c&&passLife(c)&&hit((c.name||'')+' '+(c.company||'')+' '+(c.job_title||'')));
     if(!ppl.length) return;
     html+='<div class="makSec">'+esc(g.name)+' <span class="muted" style="font-weight:400;">('+ppl.length+')</span>'+
       '<button class="btn sm gray makAllG" data-g="'+g.id+'">Select all</button></div>'+
       '<div class="makGrid">'+ppl.map(c=>makCardHtml('contact',c.id,c.photo_url,c.name||'(unnamed)',
         [c.job_title,c.company].filter(Boolean).join(' · '))).join('')+'</div>';
   });
-  const loose=contactsPool.filter(c=>!inSome.has(c.id)&&!c.died_on&&hit((c.name||'')+' '+(c.company||'')));
-  if(loose.length) html+='<div class="makSec">Ungrouped <span class="muted" style="font-weight:400;">('+loose.length+')</span></div>'+
-    '<div class="makGrid">'+loose.map(c=>makCardHtml('contact',c.id,c.photo_url,c.name||'(unnamed)',
-      [c.job_title,c.company].filter(Boolean).join(' · '))).join('')+'</div>';
-  const posts=(blogCache||[]).filter(p=>inPeriod(p)&&hit((p.title||'')+' '+(p.body||'')+' '+(p.tags||[]).join(' ')));
-  html+='<div class="makSec">Timeline <span class="muted" style="font-weight:400;">('+posts.length+')</span>'+
-    '<button class="btn sm gray" id="makAllP">Select all shown</button></div>'+
-    (posts.length?'<div class="makGrid">'+posts.map(p=>makCardHtml('post',p.id,(p.photos||[])[0],
-      p.title||(p.body||'').slice(0,40)||'(untitled)',
-      d10(p.post_date)+((p.photos||[]).length>1?' · '+(p.photos||[]).length+' photos':''))).join('')+'</div>'
-    :'<div class="empty">No posts in this period.</div>');
-  const media=(mediaCache||[]).filter(m=>hit((m.title||'')+' '+(m.tags||[]).join(' ')));
-  html+='<div class="makSec">Archive — logos &amp; graphics <span class="muted" style="font-weight:400;">('+media.length+')</span></div>'+
-    (media.length?'<div class="makGrid">'+media.map(m=>makCardHtml('media',m.id,m.url,m.title||'(logo)',
-      (m.tags||[]).slice(0,3).join(', ')||'SVG',
-      '<button class="btn sm danger makDelM makDelBadge" data-id="'+m.id+'" title="Delete this logo">✕</button>')).join('')+'</div>'
-    :'<div class="empty">Nothing in the archive yet — add an SVG.</div>');
+  if(makView.ungrouped){
+    const loose=contactsPool.filter(c=>!inSome.has(c.id)&&passLife(c)&&hit((c.name||'')+' '+(c.company||'')));
+    if(loose.length) html+='<div class="makSec">Ungrouped <span class="muted" style="font-weight:400;">('+loose.length+')</span></div>'+
+      '<div class="makGrid">'+loose.map(c=>makCardHtml('contact',c.id,c.photo_url,c.name||'(unnamed)',
+        [c.job_title,c.company].filter(Boolean).join(' · '))).join('')+'</div>';
+  }
+  let posts=[];
+  if(makView.timeline){
+    posts=(blogCache||[]).filter(p=>inPeriod(p)&&hit((p.title||'')+' '+(p.body||'')+' '+(p.tags||[]).join(' ')));
+    html+='<div class="makSec">Timeline <span class="muted" style="font-weight:400;">('+posts.length+')</span>'+
+      '<button class="btn sm gray" id="makAllP">Select all shown</button></div>'+
+      (posts.length?'<div class="makGrid">'+posts.map(p=>makCardHtml('post',p.id,(p.photos||[])[0],
+        p.title||(p.body||'').slice(0,40)||'(untitled)',
+        d10(p.post_date)+((p.photos||[]).length>1?' · '+(p.photos||[]).length+' photos':''))).join('')+'</div>'
+      :'<div class="empty">No posts in this period.</div>');
+  }
+  if(makView.archive){
+    const media=(mediaCache||[]).filter(m=>hit((m.title||'')+' '+(m.tags||[]).join(' ')));
+    html+='<div class="makSec">Archive — logos &amp; images <span class="muted" style="font-weight:400;">('+media.length+')</span>'+
+      '<span class="muted" style="font-weight:400;font-size:11.5px;">drop files or web pictures here</span></div>'+
+      (media.length?'<div class="makGrid">'+media.map(m=>makCardHtml('media',m.id,m.url,m.title||'(logo)',
+        (m.tags||[]).slice(0,3).join(', ')||(m.kind==='image'?'image':'SVG'),
+        '<button class="btn sm danger makDelM makDelBadge" data-id="'+m.id+'" title="Delete from the archive">✕</button>')).join('')+'</div>'
+      :'<div class="empty">Nothing in the archive yet — drop a file here or use ＋ Add.</div>');
+  }
   $('#makWall').innerHTML=html;
   $('#makCount').textContent=makCountSel()+' selected';
-  $('#makWall').querySelectorAll('.makCard').forEach(cd=>cd.onclick=e=>{
-    if(e.target.closest('button')) return;
-    makToggle(cd.dataset.rt,+cd.dataset.id);
-    cd.classList.toggle('on');
-    $('#makCount').textContent=makCountSel()+' selected';
+  $('#makWall').querySelectorAll('.makCard').forEach(cd=>{
+    cd.onclick=e=>{
+      if(e.target.closest('button')) return;
+      makToggle(cd.dataset.rt,+cd.dataset.id);
+      cd.classList.toggle('on');
+      $('#makCount').textContent=makCountSel()+' selected';
+    };
+    // Drag a card straight into an open editor window (side by side).
+    cd.ondragstart=e=>{
+      e.dataTransfer.setData('text/ts-card',JSON.stringify({ref_type:cd.dataset.rt,ref_id:+cd.dataset.id}));
+      e.dataTransfer.effectAllowed='copy';
+    };
   });
   $('#makWall').querySelectorAll('.makAllG').forEach(b=>b.onclick=()=>{
     [...new Set(byGroup[+b.dataset.g]||[])].forEach(cid=>{
@@ -2735,26 +2794,65 @@ $('#makBack').onclick=async()=>{ await makSave(); makComp=null; renderMak(); };
 $('#makSaveBtn').onclick=async()=>{ await makSave(); showToast('Saved'); };
 $('#makGo').onclick=async()=>{ const id=await makSave(); if(id) window.open('/print/brochure?comp='+id,'_blank'); };
 $('#makSearch').oninput=debounce(renderMakWall,180);
-document.querySelectorAll('.makPer').forEach(b=>b.onclick=()=>{ makPeriod=b.dataset.p; renderMakWall(); });
-$('#makFrom').onchange=$('#makTo').onchange=()=>{ makPeriod='custom'; renderMakWall(); };
 $('#makAddSvg').onclick=()=>$('#makSvgFile').click();
+
+// ── Archive uploads: file picker, dropped files, dropped web pictures ──
+async function makUploadFile(f,askMeta){
+  const isSvg=/svg/i.test(f.type||'')||/\.svg$/i.test(f.name||'');
+  if(!isSvg&&!/^image\//i.test(f.type||'')){ showToast('Skipped '+f.name+' — not an image'); return; }
+  let title=(f.name||'file').replace(/\.(svg|png|jpe?g|webp|gif|avif)$/i,''), tags=[];
+  if(askMeta){
+    title=(prompt('Name this logo/graphic:',title)||'').trim()||title;
+    const tr=(prompt('Tags (comma-separated, optional) — e.g. logo, jul, birthday:','')||'').trim();
+    tags=tr?tr.split(',').map(t=>t.trim()).filter(Boolean):[];
+  }
+  const fd=new FormData(); fd.append('file',f); fd.append('title',title); fd.append('tags',JSON.stringify(tags));
+  const r=await fetch('/api/media-cards',{method:'POST',body:fd});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||d.details||('HTTP '+r.status));
+}
+async function makUploadUrl(u){
+  const r=await fetch('/api/media-cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||d.details||('HTTP '+r.status));
+}
 $('#makSvgFile').onchange=async e=>{
-  const f=e.target.files&&e.target.files[0]; e.target.value='';
-  if(!f) return;
-  if(!/svg/i.test(f.type)&&!/\.svg$/i.test(f.name)){ alert('Please choose an SVG file.'); return; }
-  const title=(prompt('Name this logo/graphic:', f.name.replace(/\.svg$/i,''))||'').trim();
-  const tagsRaw=(prompt('Tags (comma-separated, optional) — e.g. logo, jul, birthday:', '')||'').trim();
-  const tags=tagsRaw?tagsRaw.split(',').map(t=>t.trim()).filter(Boolean):[];
-  const fd=new FormData(); fd.append('file',f); if(title) fd.append('title',title); fd.append('tags',JSON.stringify(tags));
+  const files=[...(e.target.files||[])]; e.target.value='';
+  if(!files.length) return;
   try{
-    const r=await fetch('/api/media-cards',{method:'POST',body:fd});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(d.error||d.details||('HTTP '+r.status));
-    showToast('Logo added');
-    await ensureMedia(true);
-    renderMakWall();
+    for(const f of files) await makUploadFile(f, files.length===1);
+    showToast('Added to the archive');
+    await ensureMedia(true); renderMakWall();
   }catch(err){ alert('Upload failed: '+err.message); }
 };
+let makDropWired=false;
+function makWireDrop(){
+  if(makDropWired) return; makDropWired=true;
+  const wall=$('#makWall');
+  wall.addEventListener('dragover',e=>{
+    const ts=[...(e.dataTransfer.types||[])];
+    if(ts.includes('text/ts-card')) return;        // our own card dragging OUT
+    e.preventDefault(); wall.classList.add('dropping');
+  });
+  wall.addEventListener('dragleave',()=>wall.classList.remove('dropping'));
+  wall.addEventListener('drop',async e=>{
+    wall.classList.remove('dropping');
+    const ts=[...(e.dataTransfer.types||[])];
+    if(ts.includes('text/ts-card')) return;
+    e.preventDefault();
+    try{
+      const files=[...(e.dataTransfer.files||[])];
+      if(files.length){ for(const f of files) await makUploadFile(f,false); }
+      else{
+        const uri=(e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain')||'').split('\n')[0].trim();
+        if(!/^https?:\/\//.test(uri)) return;
+        await makUploadUrl(uri);
+      }
+      showToast('Added to the archive');
+      await ensureMedia(true); renderMakWall();
+    }catch(err){ alert('Upload failed: '+err.message); }
+  });
+}
 
 // ── Tabs ──
 const ids=['kon','kar','tid','tre','bok','exp','web','mak','dup'];

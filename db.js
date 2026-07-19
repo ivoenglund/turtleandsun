@@ -437,6 +437,11 @@ async function initDb() {
     ALTER TABLE composition_items ADD  CONSTRAINT composition_items_ref_type_check
       CHECK (ref_type IN ('post','contact','media'));
 
+    -- 2026-07-19: the archive takes raster images too (drag-and-drop uploads).
+    ALTER TABLE media_cards DROP CONSTRAINT IF EXISTS media_cards_kind_check;
+    ALTER TABLE media_cards ADD  CONSTRAINT media_cards_kind_check
+      CHECK (kind IN ('svg','image'));
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle

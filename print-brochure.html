@@ -1438,6 +1438,36 @@ _ub.onmousedown=e=>e.preventDefault(); _rb.onmousedown=e=>e.preventDefault();
 _ub.onclick=()=>doUndo(); _rb.onclick=()=>doRedo();
 updateUndoBtns();
 
+// Cards dragged in from the Make board (another window) land where dropped.
+// The composition is saved with the new ref, then re-fetched so the card's
+// LIVE content resolves — same mirror rule as everything else.
+document.addEventListener('dragover',e=>{
+  if([...(e.dataTransfer.types||[])].includes('text/ts-card')) e.preventDefault();
+});
+document.addEventListener('drop',async e=>{
+  const raw=e.dataTransfer.getData('text/ts-card'); if(!raw) return;
+  e.preventDefault();
+  let d; try{ d=JSON.parse(raw); }catch(err){ return; }
+  if(!d||!['post','contact','media'].includes(d.ref_type)||!+d.ref_id) return;
+  pushUndo();
+  const ov={ page:curPage, w:24, x:104, y:8 };
+  const page=document.querySelector('#out .page');
+  if(page){
+    const pr=page.getBoundingClientRect();
+    ov.x=Math.round(Math.max(-30,Math.min(98,(e.clientX-pr.left)/pr.width*100-12))*10)/10;
+    ov.y=Math.round(Math.max(-30,Math.min(98,(e.clientY-pr.top)/pr.height*100-4))*10)/10;
+  }
+  COMP.items.push({ ref_type:d.ref_type, ref_id:+d.ref_id, overrides:ov });
+  await saveNow();
+  const r=await fetch('/api/compositions/'+compId);
+  if(r.ok){
+    const fresh=await r.json();
+    COMP.items=fresh.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{},content:i.content}));
+    normalizeItems();
+    SEL=[]; renderCurrent(); showKnobs();
+  }
+});
+
 // Print = all pages in order; restore the single-page editor afterwards.
 window.addEventListener('beforeprint',()=>{ if(editing) commitEdit(false); renderAllPages(); });
 window.addEventListener('afterprint',()=>{ renderCurrent(); applyZoom(curScale*100); });
