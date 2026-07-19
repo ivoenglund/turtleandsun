@@ -12,25 +12,42 @@
   /* Page width/height/padding are injected per paper size by applyPaper(). */
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
-  .block.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
-  .block.pos-left, .block.pos-right{ display:flex; gap:5mm; align-items:flex-start; }
-  .block.pos-left img, .block.pos-right img{ width:45%; margin-bottom:0; }
-  .block.pos-right{ flex-direction:row-reverse; }
-  .block.pos-left > div, .block.pos-right > div{ flex:1; }
-  /* All card typography and image caps are in em so a card scales as ONE thing:
-     the wrapper's font-size (set from its width + text-zoom) zooms everything. */
-  .block.img-s img{ max-height:15.4em; object-fit:cover; }
-  .block.img-m img{ max-height:26.6em; object-fit:cover; }
-  .block.img-l img{ max-height:42em; object-fit:cover; }
+  /* ── Objects ──────────────────────────────────────────────────────
+     Every picture and every text is its OWN object on the page: freely
+     draggable, resizable, rotatable, borderable. All typography is em so
+     the wrapper's font-size zooms the whole object. */
+  .abswrap{ cursor:grab; }
+  .abswrap.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
+  .block{ margin:0; }
+  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
+  .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
+  .block p{ margin:0 0 .73em; font-size:1em; line-height:1.45; }
   .block.txt-s p{ font-size:.85em; } .block.txt-l p{ font-size:1.2em; line-height:1.5; }
   .block.txt-l h3{ font-size:1.85em; }
+  .block img{ width:100%; height:auto; border-radius:.55em; display:block; margin:0; }
   .block.media{ text-align:center; }
-  .block.media img{ object-fit:contain !important; max-height:22.4em; margin:0 auto; }
-  .block.media.img-s img{ max-height:12.6em; } .block.media.img-m img{ max-height:22.4em; }
-  .block.media.img-l img{ max-height:36.4em; } .block.media.big img{ max-height:56em; }
-  .block.media .cap{ font-size:.89em; color:#5c5c4d; margin-top:.85em; }
+  .block.media img{ object-fit:contain; }
+  .block.media .cap{ font-size:.89em; color:#5c5c4d; margin-top:.5em; }
   .block.ffo h3, .block.ffo p, .block.ffo .meta, .block.ffo .cap{ font-family:inherit; }
-  /* One floating panel on the right holds every control; the rest is clean page. */
+  .block.tco h3, .block.tco p, .block.tco .meta, .block.tco .cap, .block.tco b,
+  .block.tco .role, .block.tco .ct{ color:inherit; }
+  .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
+  .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
+  .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; cursor:text; }
+  .person{ text-align:center; }
+  .person img{ max-width:100%; width:auto; border-radius:.55em; display:block; margin:0 auto .55em; }
+  .person .init{ width:8.4em; height:10em; border-radius:.55em; background:var(--cream); color:var(--green);
+                 display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:1.63em; margin:0 auto .35em; }
+  .person b{ font-size:1em; display:block; }
+  .person .role{ font-size:.81em; color:var(--green); font-weight:700; }
+  .person .ct{ font-size:.78em; color:var(--muted); line-height:1.4; }
+  /* A frame = its own object: a border you can drag, resize, restyle. */
+  .frameobj{ cursor:grab; border-radius:6px; }
+  .frameobj.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
+  .rszh{ position:absolute; right:-9px; bottom:-9px; width:17px; height:17px; border-radius:50%;
+         background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
+         cursor:nwse-resize; z-index:6; touch-action:none; }
+  /* ── Panel ────────────────────────────────────────────────────────── */
   #panel{ position:fixed; right:16px; top:16px; width:258px; max-height:calc(100vh - 32px); overflow:auto;
           background:#fff; border:2px solid var(--gold); border-radius:14px; padding:10px 12px;
           box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; font-size:13px; }
@@ -52,6 +69,7 @@
                  border:1px solid #d9d4c4; background:#fff; color:var(--ink); margin-bottom:3px; }
   #panel select:disabled, #panel button:disabled, #panel input:disabled{ opacity:.35; }
   #panel input[type=range]{ width:100%; margin:1px 0 3px; accent-color:var(--gold); }
+  #panel input[type=number]{ font-family:inherit; font-size:13px; padding:5px 8px; border-radius:8px; border:1px solid #d9d4c4; }
   #zoomWrap input[type=range]{ flex:1; min-width:0; width:auto; margin:0; }
   #pgLabel{ flex:1; text-align:center; font-weight:700; }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
@@ -59,71 +77,22 @@
   #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
   #knobs .sw{ width:21px; height:21px; border-radius:6px; padding:0; border:1px solid rgba(0,0,0,.18); cursor:pointer; }
   #knobs input[type=color]{ width:34px; height:26px; padding:0 2px; border:1px solid #d9d4c4; border-radius:6px; background:#fff; cursor:pointer; }
-  .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
-  .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
-  .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; cursor:text; }
-  /* Picture and text are independently movable INSIDE a card; text sits above
-     the picture so it can lie over it. Offsets are em → they scale with the card. */
-  .block img{ position:relative; z-index:1; }
-  .block .bd, .block .cap{ position:relative; z-index:2; }
-  .rszh{ position:absolute; right:-9px; bottom:-9px; width:17px; height:17px; border-radius:50%;
-         background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
-         cursor:nwse-resize; z-index:6; touch-action:none; }
-  .mvh{ position:absolute; left:-9px; top:-9px; width:17px; height:17px; border-radius:50%;
-        background:var(--green); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
-        cursor:move; z-index:6; touch-action:none; }
-  .tdh{ position:absolute; right:-9px; width:18px; height:18px; border-radius:5px; background:#fff;
-        border:2px solid var(--gold); color:var(--gold); font-weight:800; font-size:11px; line-height:14px;
-        text-align:center; cursor:move; z-index:6; touch-action:none; user-select:none; }
   /* The canvas floats free: translate+scale, no anchors, no scrollbars. Fit brings it home. */
   #out{ position:absolute; left:0; top:0; transform-origin:0 0; }
   #zoomWrap button, #pageNav button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
   #zoomWrap button:hover, #pageNav button:hover{ background:#f4efe4; }
   #pageNav button:disabled{ opacity:.4; cursor:default; }
   #out .page{ cursor:grab; }
-  .abswrap.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
-  .block.abs{ position:absolute; margin:0; cursor:grab; }
-  .block.abs:active{ cursor:grabbing; }
-  .block.abs .person{ background:#fff; }
-  @media print{ #panel{ display:none!important; } .rszh,.mvh,.tdh{ display:none!important; }
-    [contenteditable]{ outline:none!important; } body{ padding-left:0!important; } .block.sel,.abswrap.sel{ outline:none; }
-    .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
-    .block{ page-break-inside:avoid; }
-    #out .page{ cursor:auto; }
-    /* Never print the on-screen zoom/pan transform — always full size, in flow. */
-    body{ overflow:visible!important; height:auto!important; }
-    #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; } }
-  .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
-  .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
-  .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
-  .cover .txt{ position:absolute; left:0; right:0; bottom:0; padding:18mm; }
-  .cover h1{ font-family:Georgia,serif; font-size:44px; margin:0 0 6px; line-height:1.1; }
-  .cover .sub{ font-size:17px; color:#ffe8b0; font-weight:600; }
-  .cover .band{ position:absolute; top:0; left:0; right:0; height:9mm;
-                background:linear-gradient(90deg,#FFF5A0,#FFE800,#FFD000,#FFAA00,#FF9500); }
-  h2.sect{ font-family:Georgia,serif; color:var(--green); font-size:26px; margin:0 0 3mm; }
-  .rule{ border:none; border-top:3px solid var(--gold); width:60px; margin:0 0 6mm; }
-  .block{ margin-bottom:8mm; }
-  .block img{ width:100%; height:auto; border-radius:.55em; display:block; margin-bottom:1.1em; }
-  .block.big img{ max-height:42em; object-fit:cover; }
-  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
-  .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
-  .block p{ margin:0 0 .73em; font-size:1em; line-height:1.45; }
-  .team{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6mm; }
-  .person{ text-align:center; }
-  .person img{ max-width:100%; max-height:14.6em; width:auto; border-radius:.55em; display:block; margin:0 auto .55em; }
-  .person .init{ width:8.4em; height:10em; border-radius:.55em; background:var(--cream); color:var(--green);
-                 display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:1.63em; margin:0 auto .35em; }
-  .person b{ font-size:1em; display:block; }
-  .person .role{ font-size:.81em; color:var(--green); font-weight:700; }
-  .person .ct{ font-size:.78em; color:var(--muted); line-height:1.4; }
-  .backpage{ background:var(--green); color:#f4efe4; align-items:center; justify-content:center; text-align:center; }
-  .backpage h2{ font-family:Georgia,serif; font-size:30px; margin:0 0 4mm; color:#f4efe4; }
-  .backpage .foot{ position:absolute; bottom:12mm; left:0; right:0; font-size:11.5px; color:#cdddd2; }
   .err{ text-align:center; padding:60px; color:var(--muted); }
   @media print{
-    body{ background:#fff; padding-left:0; } #panel{ display:none; }
-    .page{ box-shadow:none; margin:0; page-break-after:always; width:auto; min-height:auto; height:296mm; }
+    #panel{ display:none!important; } .rszh{ display:none!important; }
+    [contenteditable]{ outline:none!important; }
+    .abswrap.sel,.frameobj.sel{ outline:none!important; }
+    body{ background:#fff; overflow:visible!important; height:auto!important; }
+    #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; }
+    .page{ box-shadow:none; margin:0; page-break-after:always; height:auto; min-height:296mm; }
+    body.fmt-poster .page{ height:1000mm; }
+    #out .page{ cursor:auto; }
   }
 </style>
 </head>
@@ -195,31 +164,43 @@ function sanitizeHtml(s){
   })(t.content);
   return t.innerHTML;
 }
-// Inline offset (em) for a movable component inside the card.
-function offStyle(x,y){ return (x||y)?'left:'+(+x||0)+'em;top:'+(+y||0)+'em;':''; }
+
+// ── Object renderers ───────────────────────────────────────────────
+// A post decomposes into SEPARATE objects: one text object + one object per
+// photo (part: 'txt' | 'img0','img1',…). They never move together — every
+// piece is dragged, sized, angled and bordered on its own.
+const BORDER_STYLES=['solid','dashed','dotted','double'];
+function borderCss(ov,emScaled){
+  const bw=+ov.bw||0; if(!bw) return '';
+  const bs=BORDER_STYLES.includes(ov.bs)?ov.bs:'solid';
+  const w=emScaled?(bw/13.5)+'em':bw+'px';
+  return 'border:'+w+' '+bs+' '+esc(ov.bc||'#23291d')+';padding:.4em;';
+}
 function postBlock(it){
-  const c=it.content, ov=it.overrides||{}, big=ov.big;
-  const ph=(c.photos||[])[0];
-  const cls=['block', big?'big':'', ov.pos?'pos-'+ov.pos:'', ov.img?'img-'+ov.img:'',
-             ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'', ov.ff?'ffo':''].filter(Boolean).join(' ');
+  const c=it.content||{}, ov=it.overrides||{};
+  const part=ov.part||'txt';
+  if(part.slice(0,3)==='img'){
+    const ph=(c.photos||[])[+part.slice(3)||0];
+    return '<div class="block imgo" data-idx="'+it._idx+'">'+
+      (ph?'<img src="'+esc(ph)+'">':'<div class="hint">picture missing</div>')+'</div>';
+  }
+  const cls=['block','txtobj', ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'',
+             ov.ff?'ffo':'', ov.tc?'tco':''].filter(Boolean).join(' ');
   const ffs=ov.ff?' style="font-family:\''+esc(ov.ff)+'\'"':'';
-  const ist=offStyle(ov.ix,ov.iy)?' style="'+offStyle(ov.ix,ov.iy)+'"':'';
-  const tst=offStyle(ov.tx,ov.ty)?' style="'+offStyle(ov.tx,ov.ty)+'"':'';
   let inner;
-  if(ov.text){ inner='<div class="bd"'+tst+'>'+sanitizeHtml(ov.text)+'</div>'; }
+  if(ov.text){ inner='<div class="bd">'+sanitizeHtml(ov.text)+'</div>'; }
   else{
-    const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0, big?12:4)
+    const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0,12)
       .map(p=>'<p>'+esc(p)+'</p>').join('');
-    inner='<div class="bd"'+tst+'>'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
+    inner='<div class="bd">'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
       (c.author&&!ov.nodate?'<div class="meta">'+esc(c.author)+'</div>':'')+paras+'</div>';
   }
-  return '<div class="'+cls+'"'+ffs+' data-idx="'+it._idx+'">'+
-    (ph?'<img src="'+esc(ph)+'"'+ist+'>':'')+inner+'</div>';
+  return '<div class="'+cls+'"'+ffs+' data-idx="'+it._idx+'">'+inner+'</div>';
 }
 function personCard(it){
-  const c=it.content;
+  const c=it.content, ov=it.overrides||{};
   const init=(c.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
-  return '<div class="person">'+
+  return '<div class="person block'+(ov.tc?' tco':'')+'" data-idx="'+it._idx+'">'+
     (c.photo_url?'<img src="'+esc(c.photo_url)+'">':'<div class="init">'+esc(init)+'</div>')+
     '<b>'+esc(c.name||'')+'</b>'+
     (c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
@@ -228,33 +209,39 @@ function personCard(it){
 // Media card = an SVG (logo/graphic). Rendered via <img> so no script runs.
 function mediaBlock(it){
   const c=it.content||{}, ov=it.overrides||{};
-  const cls=['block','media', ov.big?'big':'', ov.img?'img-'+ov.img:''].filter(Boolean).join(' ');
   const showCap = ov.caption && c.title;
-  const ist=offStyle(ov.ix,ov.iy)?' style="'+offStyle(ov.ix,ov.iy)+'"':'';
-  const tst=offStyle(ov.tx,ov.ty)?' style="'+offStyle(ov.tx,ov.ty)+'"':'';
-  return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
-    (c.url?'<img src="'+esc(c.url)+'"'+ist+'>':'')+
-    (showCap?'<div class="cap"'+tst+'>'+esc(c.title)+'</div>':'')+'</div>';
+  return '<div class="block media'+(ov.tc?' tco':'')+'" data-idx="'+it._idx+'">'+
+    (c.url?'<img src="'+esc(c.url)+'">':'')+
+    (showCap?'<div class="cap">'+esc(c.title)+'</div>':'')+'</div>';
 }
 
 let COMP=null;
 let curPage=1;
 function render(){ renderCurrent(); }
-// Every card lives on a page at a free position (page/x/y/w in its overrides).
-// Legacy: poster items already had x/y → page 1; anything else starts unplaced.
+function frames(){ COMP.params=COMP.params||{}; return COMP.params.frames=COMP.params.frames||[]; }
+// Explode posts into separate objects (text + each photo) the first time a
+// document opens under the object model; everything else just gets a place.
 function normalizeItems(){
   COMP.params=COMP.params||{};
-  let n=0;
+  frames();
+  const out=[]; let n=0;
+  const seed=()=>{ const s={x:8+(n%3)*30, y:6+Math.floor(n/3)*24}; n++; return s; };
   (COMP.items||[]).forEach(it=>{
     const ov=it.overrides=it.overrides||{};
-    if(ov.page==null){                 // unplaced (incl. legacy) → drop onto page 1
-      ov.page=1;
-      if(ov.x==null) ov.x=8+(n%3)*30;
-      if(ov.y==null) ov.y=6+Math.floor(n/3)*24;
-      if(ov.w==null) ov.w=28;
-      n++;
+    delete ov.ix; delete ov.iy; delete ov.tx; delete ov.ty;   // pre-object-model leftovers
+    if(it.ref_type==='post'&&!ov.part){
+      const photos=(it.content&&it.content.photos)||[];
+      const s=(ov.x==null)?seed():{x:+ov.x,y:+ov.y};
+      const page=ov.page==null?1:+ov.page, w=+ov.w||28;
+      out.push({ ...it, overrides:Object.assign({},ov,{part:'txt',page,x:s.x,y:s.y,w}) });
+      photos.forEach((p,i)=> out.push({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content,
+        overrides:{ part:'img'+i, page, x:Math.min(88,s.x+3+i*4), y:Math.min(92,s.y+3+i*4), w } }));
+    } else {
+      if(ov.page==null){ const s=seed(); ov.page=1; if(ov.x==null) ov.x=s.x; if(ov.y==null) ov.y=s.y; if(ov.w==null) ov.w=28; }
+      out.push(it);
     }
   });
+  COMP.items=out;
 }
 
 async function load(){
@@ -274,8 +261,6 @@ async function load(){
 }
 
 // ── Paper sizes ─────────────────────────────────────────────────────
-// Dimensions in mm (portrait). A-series shown in cm, US sizes in inches.
-// `canvas:true` = the free-placement poster renderer; the rest flow as pages.
 const PAPERS=[
   {k:'a0',n:'A0',w:841,h:1189,u:'cm'},
   {k:'a1',n:'A1',w:594,h:841,u:'cm'},
@@ -305,7 +290,6 @@ function buildPaperOptions(){
   sel.innerHTML=PAPERS.slice().sort((a,b)=>paperArea(b)-paperArea(a))
     .map(P=>'<option value="'+P.k+'">'+paperLabel(P)+'</option>').join('');
 }
-
 function applyPaper(k){
   const P=paperOf(k);
   document.body.className = P.canvas ? 'fmt-poster' : 'fmt-doc';
@@ -317,83 +301,59 @@ function applyPaper(k){
   }else{
     const pad=Math.max(8, Math.round(P.w*0.06));
     css+=' .page{ width:'+P.w+'mm; min-height:'+P.h+'mm; height:auto; padding:'+pad+'mm; }';
-    css+=' .cover h1{ font-size:'+Math.round(P.w*0.209)+'px; }';
-    css+=' .cover .sub{ font-size:'+Math.max(11,Math.round(P.w*0.081))+'px; }';
   }
   st.textContent=css;
 }
 
-// ── Zoom ────────────────────────────────────────────────────────────
-// Any paper can be scaled to fit and panned. Zoom is anchored to a focal
-// point (the mouse, or the viewport centre) so the spot you point at stays
-// put; near the edges the scroll simply clamps ("physical constraints").
-const ZMIN=5, ZMAX=200;   // percent
-let curScale=1;           // fraction; kept in sync with the slider
-function posterMode(){ return document.body.classList.contains('fmt-poster'); }
+// ── Zoom + free pan ─────────────────────────────────────────────────
+const ZMIN=5, ZMAX=200;
+let curScale=1;
 function clampPct(p){ return Math.max(ZMIN, Math.min(ZMAX, p)); }
-
-// Natural (unscaled) size of the rendered content — transform-independent.
 function contentNat(){
   const out=document.getElementById('out');
   let w=0,h=0;
   out.querySelectorAll('.page').forEach(p=>{ w=Math.max(w,p.offsetWidth); h=Math.max(h,p.offsetTop+p.offsetHeight); });
   return { w, h };
 }
-// The canvas is free-floating: pan (panX/panY) + scale, no anchors anywhere.
-// Lose it off-screen? The Fit button always brings it back.
 let panX=20, panY=16;
 function setView(){
-  const out=document.getElementById('out');
-  out.style.transform='translate('+panX+'px,'+panY+'px) scale('+curScale+')';
+  document.getElementById('out').style.transform='translate('+panX+'px,'+panY+'px) scale('+curScale+')';
 }
-function applyZoom(pct){
-  pct=clampPct(pct);
-  curScale=pct/100;
-  setView();
-  syncZoomLabel(pct);
-}
+function applyZoom(pct){ pct=clampPct(pct); curScale=pct/100; setView(); syncZoomLabel(pct); }
 function syncZoomLabel(pct){
   const zi=document.getElementById('zoom'); if(zi) zi.value=Math.round(pct);
   const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
 }
-// Scale so the page fits the viewport width (never above 100%).
 function fitPct(){
   const {w}=contentNat();
   if(!w) return 100;
   return clampPct(Math.min(100, (window.innerWidth-306)/w*100));
 }
-// Fit = rescue: scale to the window and centre in the space left of the panel.
 function syncZoom(){
   const {w}=contentNat();
   const pct=fitPct();
   curScale=pct/100;
   panX=Math.max(14, ((window.innerWidth-292)-w*curScale)/2);
   panY=16;
-  setView();
-  syncZoomLabel(pct);
+  setView(); syncZoomLabel(pct);
 }
-
-// Zoom to a new percent while keeping (cx,cy) — a client point — over the
-// same spot on the canvas. Falls back to viewport centre when no point given.
 function zoomToPct(pct, cx, cy){
   pct=clampPct(pct);
   if(cx==null){ cx=(window.innerWidth-292)/2; cy=window.innerHeight/2; }
   const s0=curScale;
-  const px=(cx-panX)/s0, py=(cy-panY)/s0;   // content point under focal
+  const px=(cx-panX)/s0, py=(cy-panY)/s0;
   curScale=pct/100;
   panX=cx-px*curScale; panY=cy-py*curScale;
-  setView();
-  syncZoomLabel(pct);
+  setView(); syncZoomLabel(pct);
 }
 function zoomStep(factor, cx, cy){ zoomToPct(curScale*100*factor, cx, cy); }
 
 // ── Page model ──────────────────────────────────────────────────────
-// A document is N pages. Each card sits on one page at a free position.
-// We edit ONE page at a time; print stitches every page in order.
 function itemsAll(){ return (COMP.items||[]).map((it,i)=>({ ...it, _idx:i })); }
 function pageCount(){
   let n=(COMP.params&&+COMP.params.pages)||1;
   itemsAll().forEach(it=>{ const p=it.overrides&&+it.overrides.page; if(p>n) n=p; });
+  frames().forEach(f=>{ if(+f.page>n) n=+f.page; });
   return Math.max(1,n);
 }
 function cardInner(it){
@@ -401,115 +361,126 @@ function cardInner(it){
        : it.ref_type==='media'   ? mediaBlock(it)
        : postBlock(it);
 }
-// A card's font-size follows its width (true zoom: text + images scale as one),
-// times an optional text-zoom fine-tune. All inner sizes are em, so this one
-// number scales the whole card.
+// An object's font-size follows its width (true zoom), times a text-zoom knob.
 function fsOf(ov){
   const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
   return Math.max(4, Math.min(120, 13.5*(w/28)*ts));
 }
 function absWrap(it){
   const ov=it.overrides||{};
-  const x=ov.x!=null?ov.x:10, y=ov.y!=null?ov.y:10, w=ov.w||28;
-  return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;font-size:'+fsOf(ov)+'px;z-index:'+(+ov.z||0)+';" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
+  const x=ov.x!=null?+ov.x:10, y=ov.y!=null?+ov.y:10, w=+ov.w||28;
+  const st='position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;font-size:'+fsOf(ov)+'px;z-index:'+(+ov.z||0)+';'
+    +(+ov.r?'transform:rotate('+(+ov.r)+'deg);':'')
+    +borderCss(ov,true)
+    +(ov.tc?'color:'+esc(ov.tc)+';':'');
+  return '<div class="abswrap" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
-function markAbs(){ document.querySelectorAll('.abswrap .block,.abswrap .person').forEach(b=>b.classList.add('abs')); }
-
-// The editor view: a single page of freely-placed cards.
+function frameDiv(f,i){
+  const bs=BORDER_STYLES.includes(f.bs)?f.bs:'solid';
+  return '<div class="frameobj" data-frame="'+i+'" style="position:absolute;'+
+    'left:'+(+f.x||0)+'%;top:'+(+f.y||0)+'%;width:'+(+f.w||20)+'%;height:'+(+f.h||20)+'%;'+
+    'z-index:'+(+f.z||0)+';border:'+(+f.bw||2)+'px '+bs+' '+esc(f.bc||'#c9a24b')+';'+
+    (+f.r?'transform:rotate('+(+f.r)+'deg);':'')+'"></div>';
+}
+function pageHtml(n){
+  const on=itemsAll().filter(it=>(it.overrides&&+it.overrides.page)===n);
+  const fr=frames().map((f,i)=>({f,i})).filter(x=>(+x.f.page||1)===n);
+  return '<div class="page" data-page="'+n+'" style="position:relative;">'+
+    on.map(absWrap).join('')+fr.map(x=>frameDiv(x.f,x.i)).join('')+'</div>';
+}
 function renderCurrent(){
   const N=pageCount();
   curPage=Math.max(1,Math.min(N,curPage));
-  const on=itemsAll().filter(it=>(it.overrides&&+it.overrides.page)===curPage);
-  document.getElementById('out').innerHTML=
-    '<div class="page" data-page="'+curPage+'" style="position:relative;">'+on.map(absWrap).join('')+'</div>';
-  markAbs(); wireDrag(); wirePan();
+  document.getElementById('out').innerHTML=pageHtml(curPage);
+  wireDrag(); wirePan();
   updatePageNav(); markSel();
 }
-// Print view: every page, in order.
 function renderAllPages(){
-  const N=pageCount(), all=itemsAll(); let html='';
-  for(let n=1;n<=N;n++){
-    const on=all.filter(it=>(it.overrides&&+it.overrides.page)===n);
-    html+='<div class="page printpage" style="position:relative;">'+on.map(absWrap).join('')+'</div>';
-  }
-  document.getElementById('out').innerHTML=html; markAbs();
+  const N=pageCount(); let html='';
+  for(let n=1;n<=N;n++) html+=pageHtml(n);
+  document.getElementById('out').innerHTML=html;
 }
 
-// Drag the whole card (x/y saved as % of the page).
-function dragCardFrom(e,w,idx){
-  const page=w.closest('.page'), pr=page.getBoundingClientRect();
+// ── Selection: any number of objects; last picked = primary ─────────
+let SEL=[];
+function primary(){ return SEL.length?SEL[SEL.length-1]:null; }
+function primItem(){ const p=primary(); return (p&&p[0]==='i')?+p.slice(1):null; }
+function primFrame(){ const p=primary(); return (p&&p[0]==='f')?+p.slice(1):null; }
+function selItemIdxs(){ return SEL.filter(s=>s[0]==='i').map(s=>+s.slice(1)); }
+function selFrameIdxs(){ return SEL.filter(s=>s[0]==='f').map(s=>+s.slice(1)); }
+function setSel(key,additive){
+  if(additive){ const i=SEL.indexOf(key); if(i>=0) SEL.splice(i,1); else SEL.push(key); }
+  else SEL=[key];
+  showKnobs(); markSel();
+}
+function clearSel(){ if(!SEL.length) return; SEL=[]; showKnobs(); markSel(); }
+function elOf(key){
+  return key[0]==='i' ? document.querySelector('.abswrap[data-absidx="'+key.slice(1)+'"]')
+                      : document.querySelector('.frameobj[data-frame="'+key.slice(1)+'"]');
+}
+function ovOf(key){
+  return key[0]==='i' ? (COMP.items[+key.slice(1)].overrides=COMP.items[+key.slice(1)].overrides||{})
+                      : frames()[+key.slice(1)];
+}
+
+// ── Drag: every selected object moves together ──────────────────────
+let dragMoved=false;
+function dragSelFrom(e,w){
+  const page=w.closest('.page'); if(!page) return;
+  const pr=page.getBoundingClientRect();
   const pre=snap();
   const sx=e.clientX, sy=e.clientY;
-  const ox=parseFloat(w.style.left), oy=parseFloat(w.style.top);
-  let moved=false;
+  const start=SEL.map(key=>{ const o=ovOf(key); return {key, x:+o.x||0, y:+o.y||0}; });
+  dragMoved=false;
   const mv=ev=>{
     const dx=(ev.clientX-sx)/pr.width*100, dy=(ev.clientY-sy)/pr.height*100;
-    if(Math.abs(dx)+Math.abs(dy)>0.1) moved=true;
-    w.style.left=Math.max(0,Math.min(96,ox+dx))+'%';
-    w.style.top=Math.max(0,Math.min(98,oy+dy))+'%';
+    if(Math.abs(dx)+Math.abs(dy)>0.1) dragMoved=true;
+    start.forEach(s=>{
+      const o=ovOf(s.key);
+      o.x=Math.round(Math.max(-30,Math.min(98,s.x+dx))*10)/10;
+      o.y=Math.round(Math.max(-30,Math.min(99,s.y+dy))*10)/10;
+      const el=elOf(s.key); if(el){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; }
+    });
   };
-  const up=()=>{
-    removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
-    if(moved){
-      pushUndo(pre);
-      const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
-      ov.x=Math.round(parseFloat(w.style.left)*10)/10; ov.y=Math.round(parseFloat(w.style.top)*10)/10;
-    }
-  };
-  addEventListener('pointermove',mv); addEventListener('pointerup',up);
-  e.stopPropagation(); e.preventDefault();
-}
-// Drag ONE piece of a card — its picture or its text — anywhere, even over
-// the other piece (text renders above the picture). Offsets are em → they
-// scale with the card.
-function dragComp(e,w,idx,kind){
-  const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
-  const el= kind==='img' ? w.querySelector('img') : (w.querySelector('.bd')||w.querySelector('.cap'));
-  if(!el) return;
-  const pre=snap();
-  const fs=parseFloat(w.style.fontSize)||13.5;
-  const kx=kind==='img'?'ix':'tx', ky=kind==='img'?'iy':'ty';
-  const sx=e.clientX, sy=e.clientY, ox=+ov[kx]||0, oy=+ov[ky]||0;
-  let moved=false;
-  const mv=ev=>{
-    const dx=(ev.clientX-sx)/curScale/fs, dy=(ev.clientY-sy)/curScale/fs;
-    if(Math.abs(dx)+Math.abs(dy)>0.02) moved=true;
-    ov[kx]=Math.round((ox+dx)*100)/100; ov[ky]=Math.round((oy+dy)*100)/100;
-    el.style.left=ov[kx]+'em'; el.style.top=ov[ky]+'em';
-  };
-  const up=()=>{
-    removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
-    if(moved) pushUndo(pre);
-    else { if(ox) ov[kx]=ox; else delete ov[kx]; if(oy) ov[ky]=oy; else delete ov[ky]; }
-  };
+  const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+    if(dragMoved) pushUndo(pre); };
   addEventListener('pointermove',mv); addEventListener('pointerup',up);
   e.stopPropagation(); e.preventDefault();
 }
 function wireDrag(){
-  document.querySelectorAll('.abswrap').forEach(w=>{
+  document.querySelectorAll('.abswrap,.frameobj').forEach(w=>{
     w.onpointerdown=e=>{
-      if(e.target.closest('.rszh,.mvh,.tdh')) return;      // handles run themselves
+      if(e.target.closest('.rszh')) return;
       if(e.target.closest('[contenteditable="true"]')) return;
-      if(editing) commitEdit(false);        // keep the edit — never lose it on a stray click
-      const idx=+w.dataset.absidx;
-      if(selIdx===idx){                     // selected card: pieces move individually
-        if(e.target.closest('img')) return dragComp(e,w,idx,'img');
-        if(e.target.closest('.cap')) return dragComp(e,w,idx,'txt');
-      }
-      selIdx=idx; showKnobs(); markSel();
-      dragCardFrom(e,w,idx);
+      if(editing) commitEdit(false);        // click away = saved, never lost
+      const key=w.dataset.absidx!=null ? 'i'+w.dataset.absidx : 'f'+w.dataset.frame;
+      w._wasSel=SEL.includes(key);
+      if(e.shiftKey){ setSel(key,true); if(!SEL.includes(key)) return; }
+      else if(!w._wasSel) setSel(key,false);
+      dragSelFrom(e,w);
     };
   });
 }
-// Drag anywhere that isn't a card or the panel to move the canvas freely.
-// Any click outside the text editor auto-saves an edit in progress.
+// Click an ALREADY-selected text object again (no drag) → edit right there.
+document.getElementById('out').addEventListener('click',e=>{
+  const w=e.target.closest('.abswrap'); if(!w) return;
+  if(e.target.closest('[contenteditable="true"]')) return;
+  const idx=+w.dataset.absidx;
+  if(w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]==='i'+idx){
+    const it=COMP.items[idx];
+    if(it.ref_type==='post'&&(it.overrides.part||'txt')==='txt') enterEdit(idx,e.clientX,e.clientY);
+  }
+});
+// Drag anywhere that isn't an object or the panel to move the canvas freely;
+// a plain click on empty space deselects.
 let panWired=false;
 function wirePan(){
   if(panWired) return; panWired=true;
   document.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
-    if(e.target.closest('#panel')||e.target.closest('.abswrap')||e.target.closest('[contenteditable="true"]')) return;
-    if(editing) commitEdit(false);          // click away = saved, never lost
+    if(e.target.closest('#panel')||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
+    if(editing) commitEdit(false);
+    clearSel();
     const sx=e.clientX, sy=e.clientY, opx=panX, opy=panY;
     document.body.style.cursor='grabbing';
     const mv=ev=>{ panX=opx+(ev.clientX-sx); panY=opy+(ev.clientY-sy); setView(); };
@@ -526,42 +497,71 @@ function updatePageNav(){
   const prev=document.getElementById('pgPrev'), next=document.getElementById('pgNext'), del=document.getElementById('pgDel');
   if(prev) prev.disabled=curPage<=1;
   if(next) next.disabled=curPage>=N;
-  if(del)  del.disabled=N<=1 && !itemsAll().some(it=>(it.overrides&&+it.overrides.page)===curPage);
+  if(del)  del.disabled=N<=1;
 }
-function setPage(n){ curPage=n; renderCurrent(); syncZoom(); }
+function setPage(n){ curPage=n; SEL=[]; renderCurrent(); syncZoom(); showKnobs(); }
 function addPage(){ pushUndo(); COMP.params.pages=pageCount()+1; setPage(COMP.params.pages); }
 function deletePage(){
   const N=pageCount();
-  if(!confirm('Delete page '+curPage+'? Cards on it go back to the tray.')) return;
+  if(!confirm('Delete page '+curPage+'? Objects on it go back to the tray.')) return;
   pushUndo();
   itemsAll().forEach(it=>{ const ov=it.overrides; if(!ov||ov.page==null) return;
     if(+ov.page===curPage){ delete ov.page; delete ov.x; delete ov.y; }
     else if(+ov.page>curPage){ ov.page=+ov.page-1; }
   });
+  COMP.params.frames=frames().filter(f=>(+f.page||1)!==curPage);
+  frames().forEach(f=>{ if(+f.page>curPage) f.page=+f.page-1; });
   COMP.params.pages=Math.max(1,N-1);
   curPage=Math.min(curPage, pageCount());
-  renderCurrent(); syncZoom();
+  SEL=[]; renderCurrent(); syncZoom(); showKnobs();
 }
 
-// ── Placing / moving cards ──────────────────────────────────────────
-// Remove a card from THIS document (the underlying card stays in the library;
-// re-add it from the Make tab).
-function removeCard(idx){
-  if(!confirm('Remove this card from the document?')) return;
+// ── Object operations ───────────────────────────────────────────────
+function removeSelected(){
+  if(!SEL.length) return;
+  if(!confirm(SEL.length>1?'Remove these '+SEL.length+' objects from the document?':'Remove this object from the document?')) return;
   pushUndo();
-  COMP.items.splice(idx,1);
-  selIdx=null; renderCurrent(); showKnobs();
+  selItemIdxs().sort((a,b)=>b-a).forEach(i=>COMP.items.splice(i,1));
+  selFrameIdxs().sort((a,b)=>b-a).forEach(i=>frames().splice(i,1));
+  SEL=[]; renderCurrent(); showKnobs();
 }
-function moveCardToPage(idx,n){
+function moveSelToPage(n){
+  if(!SEL.length) return;
+  n=Math.max(1,Math.min(pageCount(),n));
   pushUndo();
-  const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
-  ov.page=Math.max(1,Math.min(pageCount(),n));
-  curPage=ov.page; renderCurrent(); showKnobs();   // follow the card
+  SEL.forEach(key=>{ ovOf(key).page=n; });
+  curPage=n; renderCurrent(); showKnobs();
+}
+function bumpZ(dir){
+  if(!SEL.length) return;
+  pushUndo();
+  const zs=itemsAll().filter(x=>(x.overrides&&+x.overrides.page)===curPage).map(x=>+(x.overrides&&x.overrides.z)||0)
+    .concat(frames().filter(f=>(+f.page||1)===curPage).map(f=>+f.z||0));
+  const z = dir>0 ? Math.max(0,...zs)+1 : Math.min(0,...zs)-1;
+  SEL.forEach(key=>{ ovOf(key).z=z; });
+  render(); showKnobs(); markSel();
+}
+// A frame = a border AROUND the selection, born as its own object.
+function frameSelection(){
+  if(!SEL.length) return;
+  const page=document.querySelector('#out .page'); if(!page) return;
+  const pr=page.getBoundingClientRect();
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  SEL.forEach(key=>{ const el=elOf(key); if(!el) return; const r=el.getBoundingClientRect();
+    x1=Math.min(x1,r.left); y1=Math.min(y1,r.top); x2=Math.max(x2,r.right); y2=Math.max(y2,r.bottom); });
+  if(x2<x1) return;
+  pushUndo();
+  const pad=10*curScale;
+  x1-=pad; y1-=pad; x2+=pad; y2+=pad;
+  frames().push({ page:curPage,
+    x:Math.round((x1-pr.left)/pr.width*1000)/10,  y:Math.round((y1-pr.top)/pr.height*1000)/10,
+    w:Math.round((x2-x1)/pr.width*1000)/10,        h:Math.round((y2-y1)/pr.height*1000)/10,
+    bw:2, bs:'solid', bc:'#c9a24b', r:0, z:0 });
+  renderCurrent();
+  SEL=['f'+(frames().length-1)]; showKnobs(); markSel();
 }
 
 // ── Undo / redo ─────────────────────────────────────────────────────
-// Snapshot-based: every change (move, resize, knob, text, page ops) pushes the
-// PRE-state. 200 deep. While typing in the text editor, native undo applies.
 let UNDO=[], REDO=[];
 function snap(){ return JSON.stringify({ params:COMP.params||{}, items:COMP.items||[] }); }
 function pushUndo(pre){
@@ -573,7 +573,7 @@ function pushUndo(pre){
 function restoreSnap(js){
   const st=JSON.parse(js);
   COMP.params=st.params; COMP.items=st.items;
-  selIdx=null; renderCurrent(); showKnobs(); markSel(); updateUndoBtns();
+  SEL=[]; renderCurrent(); showKnobs(); markSel(); updateUndoBtns();
 }
 function doUndo(){
   if(editing){ try{ document.execCommand('undo'); }catch(e){} return; }
@@ -593,8 +593,7 @@ function updateUndoBtns(){
   if(r) r.disabled=!REDO.length&&!editing;
 }
 
-// ── Knobs: select a card → adjust it, live ──────────────────────────
-let selIdx=null;
+// ── The panel: always complete; controls grey out when not applicable ─
 let editing=false, savedSel=null;
 const FONTS=[
   ['Plus Jakarta Sans','Jakarta'],['Georgia','Georgia'],['Playfair Display','Playfair Display'],
@@ -604,126 +603,160 @@ const FONTS=[
   ['Abril Fatface','Abril Fatface'],['Arial','Arial'],['Courier New','Courier New']
 ];
 const SWATCH=['#23291d','#1f4a45','#c9a24b','#7a8470','#8c2f1b','#2a5d8c','#ffffff','#000000'];
-const KN={ img:[['s','Small'],['m','Medium'],['l','Large'],['','Full']] };
-function knobRow(kind,label,cur){
-  return '<div class="kh">'+label+'</div><div class="row">'+
-    KN[kind].map(([v,t])=>'<button data-k="'+kind+'" data-v="'+v+'" class="'+((cur||'')===v?'on':'')+'">'+t+'</button>').join('')+'</div>';
+// Live style refresh for all selected objects, no re-render.
+function liveSelStyle(){
+  SEL.forEach(key=>{
+    const el=elOf(key); if(!el) return;
+    const o=ovOf(key);
+    if(key[0]==='i'){
+      el.style.width=(+o.w||28)+'%';
+      el.style.fontSize=fsOf(o)+'px';
+      el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
+      const bw=+o.bw||0;
+      el.style.border=bw?((bw/13.5)+'em '+(BORDER_STYLES.includes(o.bs)?o.bs:'solid')+' '+(o.bc||'#23291d')):'';
+      el.style.padding=bw?'.4em':'';
+      el.style.color=o.tc||'';
+    }else{
+      el.style.width=(+o.w||20)+'%'; el.style.height=(+o.h||20)+'%';
+      el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
+      el.style.border=(+o.bw||2)+'px '+(BORDER_STYLES.includes(o.bs)?o.bs:'solid')+' '+(o.bc||'#c9a24b');
+    }
+  });
 }
-// Width/text-zoom apply live to the DOM — no re-render, no lost focus.
-function liveCardStyle(){
-  const wrap=document.querySelector('.abswrap[data-absidx="'+selIdx+'"]');
-  const ov=COMP.items[selIdx].overrides;
-  if(wrap){ wrap.style.width=(ov.w||28)+'%'; wrap.style.fontSize=fsOf(ov)+'px'; }
-}
-// The panel is ALWAYS complete — every control visible from the start.
-// With no card selected the card controls are simply disabled (grey).
 function showKnobs(){
   const k=document.getElementById('knobs');
-  const it=selIdx!=null?COMP.items[selIdx]:null;
-  const ov=it?(it.overrides=it.overrides||{}):{};
-  const isPost=!!it&&it.ref_type==='post';
+  const n=SEL.length;
+  const pI=primItem(), pF=primFrame();
+  const it=pI!=null?COMP.items[pI]:null;
+  const ov=it?(it.overrides=it.overrides||{}):(pF!=null?frames()[pF]:{});
+  const isTxt=!!it&&it.ref_type==='post'&&(it.overrides.part||'txt')==='txt';
   const isMedia=!!it&&it.ref_type==='media';
+  const anySel=n>0;
   const N=pageCount();
-  const dis=it?'':' disabled';           // any card
-  const disT=isPost?'':' disabled';      // text tools: posts only
-  const typeName=!it?'No card selected':(isPost?'Post card':isMedia?'Logo / graphic':'Person card');
+  const dis=anySel?'':' disabled';
+  const disT=isTxt?'':' disabled';       // rich text tools: text objects only
+  const disC=anySel?'':' disabled';      // colour: any object (text colour)
+  const title=!anySel?'No selection'
+    : n>1 ? n+' objects'
+    : pF!=null?'Frame'
+    : isTxt?'Text object'
+    : isMedia?'Logo / graphic'
+    : it&&it.ref_type==='contact'?'Person'
+    : 'Picture';
   k.innerHTML=
     '<div class="kh" style="display:flex;justify-content:space-between;align-items:center;">'+
-      '<span>'+typeName+'</span>'+
-      '<button id="knUnplace" class="danger"'+dis+' title="Remove from this document (the card stays in your library)">✕ Remove</button></div>'+
-    (it?'':'<div class="hint" style="margin-bottom:6px;">Tap a card: drag it to move it, the gold dot resizes, '+
-      '✥ moves it once selected, drag the picture or the T-handle to slide the pieces — and just click in the text to edit.</div>')+
+      '<span>'+title+'</span>'+
+      '<button id="knUnplace" class="danger"'+dis+' title="Remove from this document (cards stay in your library)">✕ Remove</button></div>'+
+    (anySel?'':'<div class="hint" style="margin-bottom:6px;">Click an object to select it (Shift-click adds more). '+
+      'Drag to move, gold dot resizes, click a selected text again to edit it.</div>')+
     '<div class="krow"><button id="knPgPrev"'+dis+' title="Move to the previous page">◀</button>'+
-      '<span style="flex:1;text-align:center;font-weight:700;">Page '+(it?(ov.page||curPage):curPage)+' / '+N+'</span>'+
+      '<span style="flex:1;text-align:center;font-weight:700;">Page '+(anySel?(+ov.page||curPage):curPage)+' / '+N+'</span>'+
       '<button id="knPgNext"'+dis+' title="Move to the next page">▶</button></div>'+
-    '<div class="krow"><button id="knFront"'+dis+' style="flex:1;" title="Bring in front of overlapping cards">⬆ Front</button>'+
-      '<button id="knBack"'+dis+' style="flex:1;" title="Send behind overlapping cards">⬇ Back</button>'+
-      '<button id="knLayout"'+dis+' title="Put the picture and text back in their places">↺ Layout</button></div>'+
-    '<div class="kh">Size · <span id="szPct">'+(it?Math.round(ov.w||28)+'%':'–')+'</span></div>'+
-    '<input type="range" id="knW" min="6" max="95" step="0.5" value="'+(it?(ov.w||28):28)+'"'+dis+'>'+
-    '<div class="kh">Text zoom · <span id="tsPct">'+(it?Math.round((ov.ts||1)*100)+'%':'–')+'</span></div>'+
-    '<input type="range" id="knTs" min="40" max="250" step="5" value="'+(it?Math.round((ov.ts||1)*100):100)+'"'+dis+'>'+
-    (isMedia?'<div class="kh">Caption</div><div class="row"><button data-k="caption" data-v="'+(ov.caption?'':'1')+'" class="'+(ov.caption?'on':'')+'">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
-    '<div class="kh">Font (whole card)</div><select id="knFF"'+disT+'>'+
+    '<div class="krow"><button id="knFront"'+dis+' style="flex:1;" title="Bring in front">⬆ Front</button>'+
+      '<button id="knBack"'+dis+' style="flex:1;" title="Send behind">⬇ Back</button>'+
+      '<button id="knFrame"'+dis+' title="Draw a frame around the selection — it becomes its own object">▭ Frame</button></div>'+
+    '<div class="kh">Size · <span id="szPct">'+(anySel?Math.round(+ov.w||28)+'%':'–')+'</span></div>'+
+    '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(anySel?(+ov.w||28):28)+'"'+dis+'>'+
+    '<div class="kh">Angle · <span id="rDeg">'+(anySel?Math.round(+ov.r||0)+'°':'–')+'</span></div>'+
+    '<input type="range" id="knR" min="-180" max="180" step="1" value="'+(anySel?Math.round(+ov.r||0):0)+'"'+dis+'>'+
+    '<div class="kh">Text zoom · <span id="tsPct">'+(isTxt?Math.round((ov.ts||1)*100)+'%':'–')+'</span></div>'+
+    '<input type="range" id="knTs" min="40" max="250" step="5" value="'+(isTxt?Math.round((ov.ts||1)*100):100)+'"'+disT+'>'+
+    '<div class="kh">Border</div>'+
+    '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(anySel?(+ov.bw||0):0)+'"'+dis+' title="Border width (0 = none)" style="width:56px;">'+
+      '<select id="knBs"'+dis+' style="flex:1;margin-bottom:0;">'+
+        BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
+      '<input type="color" id="knBc" value="'+(ov.bc||'#c9a24b')+'"'+dis+' title="Border colour"></div>'+
+    (isMedia?'<div class="kh">Caption</div><div class="row"><button id="knCap">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
+    '<div class="kh">Font (whole object)</div><select id="knFF"'+disT+'>'+
       '<option value="">Jakarta (default)</option>'+
       FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
     '</select>'+
-    '<div class="kh">Text — click in it, select words, style them</div>'+
+    '<div class="kh">Text — click into it, select words, style them</div>'+
     '<select id="tbFont"'+disT+' title="Font at the cursor — arrow keys preview live"><option value="">Font…</option>'+
       FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'">'+t+'</option>').join('')+'</select>'+
-    '<div class="krow"><input type="number" id="tbSize" min="4" max="500" step="1" value="14"'+disT+' title="Size in px — arrow keys step it live" '+
-        'style="flex:1;width:0;font-family:inherit;font-size:13px;padding:5px 8px;border-radius:8px;border:1px solid #d9d4c4;">'+
+    '<div class="krow"><input type="number" id="tbSize" min="4" max="500" step="1" value="14"'+disT+' title="Size in px — arrow keys step it live" style="flex:1;width:0;">'+
       '<span style="font-size:11px;color:var(--muted);">px</span>'+
-      '<input type="color" id="tbColor" value="#23291d"'+disT+' title="Any colour"></div>'+
-    '<div class="krow">'+SWATCH.map(c=>'<button class="sw"'+disT+' data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+'</div>'+
+      '<input type="color" id="tbColor" value="#23291d"'+disC+' title="Text colour — the selection while editing, the whole object otherwise"></div>'+
+    '<div class="krow">'+SWATCH.map(c=>'<button class="sw"'+disC+' data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+'</div>'+
     '<div class="krow"><button id="tbB"'+disT+' style="font-weight:800;">B</button>'+
       '<button id="tbI"'+disT+' style="font-style:italic;">I</button>'+
       '<button id="tbU"'+disT+' style="text-decoration:underline;">U</button>'+
       '<button id="tbReset"'+disT+' style="flex:1;" title="Back to the original text">↺ Original text</button></div>';
-  if(!it) return;
+  if(!anySel) return;
 
   const q=id=>document.getElementById(id);
-  k.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
-    if(editing) commitEdit(false);
-    pushUndo();
-    const kk=b.dataset.k, v=b.dataset.v;
-    if(kk==='caption') ov.caption=!!v;
-    else if(v==='') delete ov[kk]; else ov[kk]=v;
-    render(); showKnobs(); markSel();
-  });
-  q('knPgPrev').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)-1);
-  q('knPgNext').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)+1);
-  q('knUnplace').onclick=()=>removeCard(selIdx);
+  q('knUnplace').onclick=()=>removeSelected();
+  q('knPgPrev').onclick=()=>moveSelToPage((+ov.page||curPage)-1);
+  q('knPgNext').onclick=()=>moveSelToPage((+ov.page||curPage)+1);
   q('knFront').onclick=()=>bumpZ(1);
   q('knBack').onclick=()=>bumpZ(-1);
-  q('knLayout').onclick=()=>{ pushUndo(); delete ov.ix; delete ov.iy; delete ov.tx; delete ov.ty; render(); showKnobs(); markSel(); };
-  q('knW').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); ov.w=+e.target.value; q('szPct').textContent=Math.round(ov.w)+'%'; liveCardStyle(); };
-  q('knW').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
-  q('knTs').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); ov.ts=+e.target.value/100; if(ov.ts===1) delete ov.ts; q('tsPct').textContent=e.target.value+'%'; liveCardStyle(); };
-  q('knTs').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
+  q('knFrame').onclick=()=>frameSelection();
+  const liveSlider=(id,apply,label,fmt)=>{
+    const el=q(id); if(!el) return;
+    el.oninput=e=>{ if(el._pre==null) el._pre=snap(); apply(+e.target.value);
+      const l=q(label); if(l) l.textContent=fmt(+e.target.value); liveSelStyle(); };
+    el.onchange=()=>{ if(el._pre!=null){ pushUndo(el._pre); el._pre=null; } };
+  };
+  liveSlider('knW', v=>SEL.forEach(key=>{ ovOf(key).w=v; }), 'szPct', v=>Math.round(v)+'%');
+  liveSlider('knR', v=>SEL.forEach(key=>{ const o=ovOf(key); if(v) o.r=v; else delete o.r; }), 'rDeg', v=>Math.round(v)+'°');
+  liveSlider('knTs', v=>selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; o.ts=v/100; if(o.ts===1) delete o.ts; }), 'tsPct', v=>Math.round(v)+'%');
+  q('knBw').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap();
+    SEL.forEach(key=>{ const o=ovOf(key); const v=+e.target.value; if(v) o.bw=v; else if(key[0]==='i') delete o.bw; else o.bw=0; }); liveSelStyle(); };
+  q('knBw').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
+  q('knBs').onchange=e=>{ pushUndo(); SEL.forEach(key=>{ ovOf(key).bs=e.target.value; }); liveSelStyle(); };
+  q('knBc').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); SEL.forEach(key=>{ ovOf(key).bc=e.target.value; }); liveSelStyle(); };
+  q('knBc').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
+  const cap=q('knCap');
+  if(cap) cap.onclick=()=>{ pushUndo(); ov.caption=!ov.caption; render(); showKnobs(); markSel(); };
   const ff=q('knFF');
-  if(ff) ff.onchange=e=>{ pushUndo(); if(e.target.value) ov.ff=e.target.value; else delete ov.ff; delete ov.font; render(); showKnobs(); markSel(); };
-  if(isPost){
-    // Font/size/colour restyle ONE reusable span over the saved selection, so
-    // the dropdown/number keep their focus: arrow keys step fonts and sizes
-    // with live preview on the page, without leaving the editor.
-    q('tbFont').onchange=e=>{ if(e.target.value) applyStyle('fontFamily',"'"+e.target.value+"'"); };
-    q('tbSize').oninput=e=>{ const px=+e.target.value; if(px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
-    q('tbColor').oninput=e=>applyStyle('color',e.target.value);
-    k.querySelectorAll('.sw').forEach(b=>{
-      b.onmousedown=e=>e.preventDefault();
-      b.onclick=()=>applyStyle('color',b.dataset.c);
-    });
+  if(ff) ff.onchange=e=>{ pushUndo();
+    selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font; });
+    render(); showKnobs(); markSel(); };
+  // Colour: rich selection while editing; the whole object(s) otherwise.
+  const setObjColor=c=>{ pushUndo();
+    SEL.forEach(key=>{ if(key[0]!=='i') return; const o=ovOf(key); if(c) o.tc=c; else delete o.tc; });
+    render(); showKnobs(); markSel(); };
+  q('tbColor').oninput=e=>{ if(editing) applyStyle('color',e.target.value); };
+  q('tbColor').onchange=e=>{ if(!editing) setObjColor(e.target.value); };
+  k.querySelectorAll('.sw').forEach(b=>{
+    b.onmousedown=e=>e.preventDefault();
+    b.onclick=()=>{ if(editing) applyStyle('color',b.dataset.c); else setObjColor(b.dataset.c); };
+  });
+  if(isTxt){
+    q('tbFont').onchange=e=>{ if(!e.target.value) return;
+      if(editing) applyStyle('fontFamily',"'"+e.target.value+"'");
+      else { pushUndo(); ov.ff=e.target.value; delete ov.font; render(); showKnobs(); markSel(); } };
+    q('tbSize').oninput=e=>{ const px=+e.target.value; if(editing&&px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
     [['tbB','bold'],['tbI','italic'],['tbU','underline']].forEach(([id,cmd])=>{
       const b=q(id); b.onmousedown=e=>e.preventDefault();
-      b.onclick=()=>{ restoreSel(); document.execCommand(cmd); };
+      b.onclick=()=>{ if(editing){ restoreSel(); document.execCommand(cmd); } };
     });
-    q('tbReset').onclick=()=>{ pushUndo(); delete ov.text; editing=false; savedSel=null; styleSpan=null; render(); showKnobs(); markSel(); updateUndoBtns(); };
-    updateTb();
+    q('tbReset').onclick=()=>{ pushUndo();
+      selItemIdxs().forEach(i=>{ delete COMP.items[i].overrides.text; });
+      editing=false; savedSel=null; styleSpan=null; render(); showKnobs(); markSel(); updateUndoBtns(); };
+    if(editing) updateTb();
   }
-}
-// Bring in front of / send behind the other cards on this page.
-function bumpZ(dir){
-  const ov=COMP.items[selIdx].overrides=COMP.items[selIdx].overrides||{};
-  pushUndo();
-  const zs=itemsAll().filter(x=>(x.overrides&&+x.overrides.page)===curPage).map(x=>+(x.overrides&&x.overrides.z)||0);
-  ov.z = dir>0 ? Math.max(0,...zs)+1 : Math.min(0,...zs)-1;
-  render(); showKnobs(); markSel();
 }
 
 // ── In-place text editing ───────────────────────────────────────────
-// The selected post card's text is ALWAYS editable — just click into it.
-// Clicking anywhere else commits automatically; nothing is ever lost.
+// Click a selected text object again → edit right there, caret where you
+// clicked. Any click outside commits automatically; nothing is ever lost.
 function curBd(){ return document.querySelector('[contenteditable="true"]'); }
 let styleSpan=null, holdSel=false;
-function bdFocus(){
+function enterEdit(idx,cx,cy){
+  const bd=document.querySelector('.abswrap[data-absidx="'+idx+'"] .bd'); if(!bd) return;
+  bd.setAttribute('contenteditable','true');
+  bd.focus();
+  if(cx!=null&&document.caretRangeFromPoint){
+    const r=document.caretRangeFromPoint(cx,cy);
+    if(r&&bd.contains(r.startContainer)){ const s=getSelection(); s.removeAllRanges(); s.addRange(r); }
+  }
   editing=true; savedSel=null; styleSpan=null;
   try{ document.execCommand('styleWithCSS',false,true); }catch(e){}
   updateUndoBtns();
 }
 function commitEdit(rerender){
   const bd=curBd();
-  let sameCard=false;
   if(bd){
     const bl=bd.closest('[data-idx]');
     if(bl){
@@ -731,16 +764,12 @@ function commitEdit(rerender){
       const ov=it.overrides=it.overrides||{};
       const nw=sanitizeHtml(bd.innerHTML);
       if(nw!==(ov.text||'')){ pushUndo(); ov.text=nw; }   // pre-state pushed BEFORE the change
-      sameCard=(+bl.dataset.idx===selIdx);
     }
-    if(sameCard&&!rerender) bd.blur();                     // stays armed for the next click
-    else bd.removeAttribute('contenteditable');
+    bd.removeAttribute('contenteditable');
   }
   editing=false; savedSel=null; styleSpan=null; updateUndoBtns();
   if(rerender){ render(); showKnobs(); markSel(); }
 }
-// Remember the selection inside the editable and restore it after panel
-// clicks — styling never kicks you out of the editor.
 document.addEventListener('selectionchange',()=>{
   if(!editing||holdSel) return;
   const sel=getSelection(); if(!sel.rangeCount) return;
@@ -795,63 +824,41 @@ function updateTb(){
   if(document.activeElement!==s) s.value=Math.round(parseFloat(cs.fontSize)||14);
 }
 
-// ── Selection: outline + handles + always-editable text ─────────────
+// ── Selection visuals: outline every selected object, resize dot on primary ─
 function markSel(){
-  document.querySelectorAll('.abswrap.sel,.block.sel').forEach(x=>x.classList.remove('sel'));
-  document.querySelectorAll('.rszh,.mvh,.tdh').forEach(h=>h.remove());
-  document.querySelectorAll('[contenteditable="true"]').forEach(b=>{
-    if(!b.closest('.abswrap[data-absidx="'+selIdx+'"]')) b.removeAttribute('contenteditable');
-  });
-  if(selIdx==null) return;
-  const el=document.querySelector('.abswrap[data-absidx="'+selIdx+'"]')||document.querySelector('.block[data-idx="'+selIdx+'"]');
-  if(!el) return;
-  el.classList.add('sel');
-  if(el.classList.contains('abswrap')){
-    const idx=+el.dataset.absidx;
-    const rz=document.createElement('div'); rz.className='rszh'; rz.title='Drag to resize';
-    el.appendChild(rz); wireResize(rz,el);
-    const mv=document.createElement('div'); mv.className='mvh'; mv.title='Drag to move the card';
-    el.appendChild(mv);
-    mv.onpointerdown=e=>{ if(editing) commitEdit(false); dragCardFrom(e,el,idx); };
-    const bd=el.querySelector('.bd');
-    if(bd&&COMP.items[idx].ref_type==='post'){
-      bd.setAttribute('contenteditable','true');    // click in = edit, no button needed
-      bd.onfocus=bdFocus;
-      const th=document.createElement('div'); th.className='tdh'; th.textContent='T';
-      th.title='Drag to slide the text — over the picture, anywhere';
-      th.style.top=(bd.offsetTop||0)+'px';
-      el.appendChild(th);
-      th.onpointerdown=e=>{ if(editing) commitEdit(false); dragComp(e,el,idx,'txt'); };
-    }
-  }
+  document.querySelectorAll('.abswrap.sel,.frameobj.sel').forEach(x=>x.classList.remove('sel'));
+  document.querySelectorAll('.rszh').forEach(h=>h.remove());
+  document.querySelectorAll('[contenteditable="true"]').forEach(b=>b.removeAttribute('contenteditable'));
+  SEL.forEach(key=>{ const el=elOf(key); if(el) el.classList.add('sel'); });
+  const p=primary(); if(!p) return;
+  const el=elOf(p); if(!el) return;
+  const rz=document.createElement('div'); rz.className='rszh'; rz.title='Drag to resize';
+  el.appendChild(rz); wireResize(rz,el,p);
 }
-function wireResize(h,wrap){
+function wireResize(h,wrap,key){
   h.onpointerdown=e=>{
     e.stopPropagation(); e.preventDefault();
-    const page=wrap.parentElement, pr=page.getBoundingClientRect();
-    const idx=+wrap.dataset.absidx;
-    const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+    const page=wrap.closest('.page'), pr=page.getBoundingClientRect();
+    const o=ovOf(key);
     const pre=snap();
     let resized=false;
-    const sx=e.clientX, ow=parseFloat(wrap.style.width)||ov.w||28;
+    const sx=e.clientX, sy=e.clientY;
+    const ow=+o.w||(key[0]==='f'?20:28), oh=+o.h||20;
     const mv=ev=>{
       resized=true;
-      ov.w=Math.max(6,Math.min(95, ow+(ev.clientX-sx)/pr.width*100));
-      wrap.style.width=ov.w+'%'; wrap.style.fontSize=fsOf(ov)+'px';
+      o.w=Math.round(Math.max(3,Math.min(100, ow+(ev.clientX-sx)/pr.width*100))*10)/10;
+      if(key[0]==='f') o.h=Math.round(Math.max(2,Math.min(100, oh+(ev.clientY-sy)/pr.height*100))*10)/10;
+      liveSelStyle();
       const s=document.getElementById('knW');
-      if(s){ s.value=ov.w; const p=document.getElementById('szPct'); if(p) p.textContent=Math.round(ov.w)+'%'; }
+      if(s){ s.value=o.w; const pl=document.getElementById('szPct'); if(pl) pl.textContent=Math.round(o.w)+'%'; }
     };
     const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
-      if(resized){ ov.w=Math.round(ov.w*10)/10; pushUndo(pre); } };
+      if(resized) pushUndo(pre); };
     addEventListener('pointermove',mv); addEventListener('pointerup',up);
   };
 }
-document.getElementById('out').addEventListener('click',e=>{
-  const bl=e.target.closest('.block[data-idx]'); if(!bl) return;
-  if(e.target.closest('[contenteditable="true"]')) return;   // clicks inside the editor stay in the editor
-  if(editing) commitEdit(false);
-  selIdx=+bl.dataset.idx; showKnobs(); markSel();
-});
+
+// ── Global controls ─────────────────────────────────────────────────
 document.getElementById('paper').onchange=e=>{
   COMP.params=COMP.params||{}; COMP.params.paper=e.target.value;
   applyPaper(e.target.value); render(); syncZoom();
@@ -873,12 +880,13 @@ document.addEventListener('wheel',e=>{
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
 
-// Keyboard: +/= zoom in, -/_ zoom out, 0 fits, Ctrl+Z/Y undo/redo.
-// While editing text or in a field, the browser's own behaviour applies.
+// Keyboard: +/= zoom in, -/_ zoom out, 0 fits, Ctrl+Z/Y undo/redo,
+// Delete removes the selection. While typing, the browser behaves normally.
 document.addEventListener('keydown',e=>{
   if(e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); doUndo(); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); doRedo(); return; }
+  if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
   const at=lastMouse||{};
   if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomStep(1.25, at.x, at.y); }
   else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomStep(1/1.25, at.x, at.y); }
@@ -907,7 +915,7 @@ document.getElementById('saveBtn').onclick=async()=>{
   const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({items, params:COMP.params||{}})});
   document.getElementById('saveBtn').textContent = r.ok ? '✓ Saved' : 'Save failed';
-  setTimeout(()=>document.getElementById('saveBtn').textContent='Save layout',1500);
+  setTimeout(()=>document.getElementById('saveBtn').textContent='Save',1500);
 };
 load();
 </script>
