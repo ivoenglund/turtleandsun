@@ -8,8 +8,6 @@
   :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
   *{ box-sizing:border-box; }
   body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; }
-  .toolbar{ padding:10px 16px; display:flex; gap:10px; align-items:center; }
-  .toolbar button{ font-family:inherit; font-weight:700; font-size:14px; padding:8px 16px; border:none; border-radius:8px; background:var(--green); color:#f4efe4; cursor:pointer; }
   /* Page width/height/padding are injected per paper size by applyPaper(). */
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
@@ -28,8 +26,21 @@
   .block.media.img-s img{ max-height:45mm; } .block.media.img-m img{ max-height:80mm; }
   .block.media.img-l img{ max-height:130mm; } .block.media.big img{ max-height:200mm; }
   .block.media .cap{ font-size:12px; color:#5c5c4d; margin-top:3mm; }
-  #knobs{ position:fixed; right:14px; top:64px; width:220px; background:#fff; border:2px solid var(--gold);
-          border-radius:12px; padding:12px 14px; box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; }
+  /* Everything lives in one fixed panel on the left; the rest is clean page. */
+  #panel{ position:fixed; left:0; top:0; bottom:0; width:238px; background:#fff; border-right:2px solid var(--gold);
+          padding:12px 14px; overflow:auto; z-index:10; box-shadow:2px 0 12px rgba(0,0,0,.12); }
+  body{ padding-left:238px; }
+  #docCtl .prow{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  #docCtl .prow > button{ flex:1; }
+  #docCtl .ph{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:10px 0 4px; }
+  #docCtl button{ font-family:inherit; font-weight:700; font-size:13px; padding:6px 10px; border:1px solid #c9c4b4;
+                  border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
+  #docCtl button:hover{ background:#f4efe4; }
+  #docCtl button:disabled{ opacity:.4; cursor:default; }
+  #docCtl select{ width:100%; font-family:inherit; font-size:13px; padding:6px 8px; border-radius:7px; border:1px solid #c9c4b4; }
+  #zoomWrap input[type=range]{ flex:1; min-width:0; }
+  #pgLabel{ flex:1; text-align:center; font-weight:700; }
+  #knobs{ margin-top:12px; padding-top:12px; border-top:2px dashed #e3ddca; }
   #knobs .kh{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:8px 0 4px; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
   #knobs button{ font-family:inherit; font-size:12px; padding:4px 9px; border:1px solid #d9d4c4; background:#fff;
@@ -42,28 +53,14 @@
   #zoomWrap button, #pageNav button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
   #zoomWrap button:hover, #pageNav button:hover{ background:#f4efe4; }
   #pageNav button:disabled{ opacity:.4; cursor:default; }
-  /* Card tray — the document's cards; tap to place on the current page. */
-  #tray{ position:fixed; left:0; top:56px; bottom:0; width:210px; background:#fff; border-right:2px solid var(--gold);
-         overflow:auto; z-index:9; box-shadow:2px 0 10px rgba(0,0,0,.08); }
-  #tray.collapsed{ transform:translateX(-100%); }
-  .trayhead{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green);
-             padding:10px 12px 6px; position:sticky; top:0; background:#fff; }
-  .trayrow{ display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid #eee8d8; cursor:pointer; }
-  .trayrow:hover{ background:#f7f3e8; }
-  .trayrow.on{ background:#eef5ee; }
-  .trayrow img, .trayrow .ph{ width:30px; height:30px; object-fit:contain; border-radius:5px; background:#f0ead8; flex-shrink:0; }
-  .trayrow .tt{ flex:1; min-width:0; font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .trayrow .badge{ font-size:11px; font-weight:800; color:#7a8470; min-width:20px; text-align:right; }
-  .trayrow.on .badge{ color:var(--green); }
-  .trayempty{ padding:14px 12px; font-size:12px; color:var(--muted); }
   #out .page{ cursor:grab; }
   .abswrap.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
   .block.abs{ position:absolute; margin:0; cursor:grab; }
   .block.abs:active{ cursor:grabbing; }
   .block.abs .person{ background:#fff; }
-  @media print{ #knobs{ display:none!important; } .block.sel,.abswrap.sel{ outline:none; }
+  @media print{ #panel{ display:none!important; } body{ padding-left:0!important; } .block.sel,.abswrap.sel{ outline:none; }
     .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
-    .block{ page-break-inside:avoid; } #zoomWrap,#pageNav,#tray{ display:none!important; }
+    .block{ page-break-inside:avoid; }
     #out .page{ cursor:auto; }
     /* Never print the on-screen zoom transform — always full size. */
     #out{ transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; } }
@@ -96,36 +93,39 @@
   .backpage .foot{ position:absolute; bottom:12mm; left:0; right:0; font-size:11.5px; color:#cdddd2; }
   .err{ text-align:center; padding:60px; color:var(--muted); }
   @media print{
-    body{ background:#fff; } .toolbar{ display:none; }
+    body{ background:#fff; padding-left:0; } #panel{ display:none; }
     .page{ box-shadow:none; margin:0; page-break-after:always; width:auto; min-height:auto; height:296mm; }
   }
 </style>
 </head>
 <body>
 
-<div class="toolbar">
-  <button onclick="window.print()">🖨 Print / save as PDF</button>
-  <label style="font-size:13.5px;font-weight:700;">Paper
-    <select id="paper" style="font-family:inherit;font-size:13.5px;padding:5px 8px;border-radius:7px;border:1px solid #c9c4b4;"></select></label>
-  <span id="zoomWrap" style="font-size:13.5px;font-weight:700;display:none;align-items:center;gap:6px;">Zoom
-    <button id="zoomOut" title="Zoom out ( - )" style="min-width:30px;">−</button>
-    <input type="range" id="zoom" min="5" max="200" value="18" style="vertical-align:middle;">
-    <button id="zoomIn" title="Zoom in ( + )" style="min-width:30px;">＋</button>
-    <button id="zoomFit" title="Fit to window ( 0 )" style="font-size:12px;">Fit</button>
-    <span id="zoomPct" style="min-width:42px;display:inline-block;text-align:right;color:#5c5c4d;">18%</span>
-  </span>
-  <span id="pageNav" style="font-size:13.5px;font-weight:700;display:none;align-items:center;gap:6px;">
-    <button id="pgPrev" title="Previous page" style="min-width:30px;">◀</button>
-    <span id="pgLabel" style="min-width:74px;text-align:center;">Page 1 / 1</span>
-    <button id="pgNext" title="Next page" style="min-width:30px;">▶</button>
-    <button id="pgAdd" title="Add a page">＋ Page</button>
-    <button id="pgDel" title="Delete this page">🗑</button>
-  </span>
-  <button id="saveBtn" style="background:#fff;color:var(--green);border:2px solid var(--green);">Save layout</button>
-  <span style="font-size:13px;color:#5c5c4d;">Tap a card on the left to place it · drag to move · scroll to zoom · drag empty space to pan</span>
-</div>
-<aside id="tray"><div class="trayhead">Cards</div><div id="trayList"></div></aside>
-<div id="knobs" class="hidden" style="display:none;"></div>
+<aside id="panel">
+  <div id="docCtl">
+    <div class="prow">
+      <button onclick="window.print()" title="Print / save as PDF">🖨 PDF</button>
+      <button id="saveBtn">Save</button>
+    </div>
+    <div class="ph">Paper</div>
+    <select id="paper"></select>
+    <div class="ph">Zoom · <span id="zoomPct">100%</span></div>
+    <div id="zoomWrap" class="prow">
+      <button id="zoomOut" title="Zoom out ( - )">−</button>
+      <input type="range" id="zoom" min="5" max="200" value="18">
+      <button id="zoomIn" title="Zoom in ( + )">＋</button>
+      <button id="zoomFit" title="Fit to window ( 0 )">Fit</button>
+    </div>
+    <div class="ph">Page</div>
+    <div id="pageNav" class="prow">
+      <button id="pgPrev" title="Previous page">◀</button>
+      <span id="pgLabel">1 / 1</span>
+      <button id="pgNext" title="Next page">▶</button>
+      <button id="pgAdd" title="Add a page">＋</button>
+      <button id="pgDel" title="Delete this page">🗑</button>
+    </div>
+  </div>
+  <div id="knobs" style="display:none;"></div>
+</aside>
 <div id="out"><div class="err">Loading…</div></div>
 
 <script>
@@ -181,11 +181,18 @@ function render(){ renderCurrent(); }
 // Every card lives on a page at a free position (page/x/y/w in its overrides).
 // Legacy: poster items already had x/y → page 1; anything else starts unplaced.
 function normalizeItems(){
+  COMP.params=COMP.params||{};
+  let n=0;
   (COMP.items||[]).forEach(it=>{
     const ov=it.overrides=it.overrides||{};
-    if(ov.page==null && ov.x!=null) ov.page=1;
+    if(ov.page==null){                 // unplaced (incl. legacy) → drop onto page 1
+      ov.page=1;
+      if(ov.x==null) ov.x=8+(n%3)*30;
+      if(ov.y==null) ov.y=6+Math.floor(n/3)*24;
+      if(ov.w==null) ov.w=28;
+      n++;
+    }
   });
-  COMP.params=COMP.params||{};
 }
 
 async function load(){
@@ -196,8 +203,6 @@ async function load(){
   document.title=COMP.name+' · Turtle & Sun';
   normalizeItems();
   buildPaperOptions();
-  document.getElementById('zoomWrap').style.display='inline-flex';
-  document.getElementById('pageNav').style.display='inline-flex';
   const paper=(COMP.params&&COMP.params.paper)||'a4';
   document.getElementById('paper').value=paperOf(paper).k;
   applyPaper(paper);
@@ -288,11 +293,12 @@ function syncZoomLabel(pct){
   const zi=document.getElementById('zoom'); if(zi) zi.value=Math.round(pct);
   const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
 }
-// Scale so the page fits the viewport width (never above 100%).
+// Scale so the page fits the visible area (viewport minus the left panel).
+const PANEL_W=238;
 function fitPct(){
   const {w}=contentNat();
   if(!w) return 100;
-  return clampPct(Math.min(100, (window.innerWidth-48)/w*100));
+  return clampPct(Math.min(100, (window.innerWidth-PANEL_W-40)/w*100));
 }
 function syncZoom(){ applyZoom(fitPct()); window.scrollTo(0,0); }
 
@@ -339,7 +345,7 @@ function renderCurrent(){
   document.getElementById('out').innerHTML=
     '<div class="page" data-page="'+curPage+'" style="position:relative;">'+on.map(absWrap).join('')+'</div>';
   markAbs(); wireDrag(); wirePan();
-  updatePageNav(); renderTray(); markSel();
+  updatePageNav(); markSel();
 }
 // Print view: every page, in order.
 function renderAllPages(){
@@ -416,50 +422,12 @@ function deletePage(){
   renderCurrent(); syncZoom();
 }
 
-// ── Card tray (placing/moving cards) ────────────────────────────────
-function trayThumb(it){
-  const c=it.content||{};
-  return it.ref_type==='post' ? (c.photos||[])[0]
-       : it.ref_type==='media' ? c.url
-       : c.photo_url;
-}
-function trayText(it){
-  const c=it.content||{};
-  return it.ref_type==='post' ? (c.title||(c.body||'').slice(0,32)||'(post)')
-       : it.ref_type==='media' ? (c.title||'(logo)')
-       : (c.name||'(person)');
-}
-function renderTray(){
-  const host=document.getElementById('trayList'); if(!host) return;
-  const all=itemsAll();
-  if(!all.length){ host.innerHTML='<div class="trayempty">No cards yet. Add them from the Make tab, then place them here.</div>'; return; }
-  host.innerHTML=all.map(it=>{
-    const p=it.overrides&&+it.overrides.page, img=trayThumb(it);
-    return '<div class="trayrow'+(p===curPage?' on':'')+'" data-idx="'+it._idx+'">'+
-      (img?'<img src="'+esc(img)+'">':'<span class="ph"></span>')+
-      '<span class="tt">'+esc(trayText(it))+'</span>'+
-      '<span class="badge">'+(p?('p'+p):'—')+'</span></div>';
-  }).join('');
-  host.querySelectorAll('.trayrow').forEach(row=>row.onclick=()=>{
-    const idx=+row.dataset.idx, ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
-    const p=+ov.page;
-    if(!p) placeCard(idx);                              // unplaced → drop on this page
-    else if(p!==curPage){ curPage=p; renderCurrent(); } // elsewhere → go to its page
-    else { selIdx=idx; showKnobs(); markSel(); }        // here → just select it
-  });
-}
-function placeCard(idx){
-  const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
-  const n=itemsAll().filter(it=>(it.overrides&&+it.overrides.page)===curPage).length;
-  ov.page=curPage;
-  if(ov.x==null) ov.x=8+(n%3)*30;
-  if(ov.y==null) ov.y=6+Math.floor(n/3)*24;
-  if(ov.w==null) ov.w=28;
-  selIdx=idx; renderCurrent(); showKnobs();
-}
-function unplaceCard(idx){
-  const ov=COMP.items[idx].overrides||{};
-  delete ov.page; delete ov.x; delete ov.y;
+// ── Placing / moving cards ──────────────────────────────────────────
+// Remove a card from THIS document (the underlying card stays in the library;
+// re-add it from the Make tab).
+function removeCard(idx){
+  if(!confirm('Remove this card from the document?')) return;
+  COMP.items.splice(idx,1);
   selIdx=null; document.getElementById('knobs').style.display='none'; renderCurrent();
 }
 function moveCardToPage(idx,n){
@@ -495,7 +463,7 @@ function showKnobs(){
       '<button id="knPgPrev" title="Move to the previous page">◀</button>'+
       '<span style="align-self:center;font-weight:700;">Page '+(ov.page||curPage)+' / '+N+'</span>'+
       '<button id="knPgNext" title="Move to the next page">▶</button></div>'+
-    '<div class="row"><button id="knUnplace" style="flex:1;">Remove from page</button></div>'+
+    '<div class="row"><button id="knUnplace" style="flex:1;">Remove card</button></div>'+
     ((isPost||isMedia)?knobRow('img','Picture size',ov.img):'')+
     knobRow('w','Card width',String(ov.w||28))+
     (isMedia?'<div class="kh">Caption</div><div class="row"><button data-k="caption" data-v="'+(ov.caption?'':'1')+'" class="'+(ov.caption?'on':'')+'">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
@@ -519,7 +487,7 @@ function showKnobs(){
   });
   document.getElementById('knPgPrev').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)-1);
   document.getElementById('knPgNext').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)+1);
-  document.getElementById('knUnplace').onclick=()=>unplaceCard(selIdx);
+  document.getElementById('knUnplace').onclick=()=>removeCard(selIdx);
   const editBtn=document.getElementById('knEdit');
   if(editBtn) editBtn.onclick=()=>{
     const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd');
