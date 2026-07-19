@@ -52,6 +52,12 @@
   .rszh{ position:absolute; right:-9px; bottom:-9px; width:17px; height:17px; border-radius:50%;
          background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
          cursor:nwse-resize; z-index:6; touch-action:none; }
+  /* Picture height handle (bottom centre) — dragging it crops the picture. */
+  .rszv{ position:absolute; left:50%; bottom:-9px; margin-left:-9px; width:17px; height:17px; border-radius:4px;
+         background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
+         cursor:ns-resize; z-index:6; touch-action:none; }
+  .abswrap.cropping{ outline-color:#7FB36F; }
+  .abswrap.cropping img{ cursor:move; }
   /* ── Panel ────────────────────────────────────────────────────────── */
   #panel{ position:fixed; right:16px; top:16px; width:258px; max-height:calc(100vh - 32px); overflow:auto;
           background:#fff; border:2px solid var(--gold); border-radius:14px; padding:10px 12px;
@@ -90,7 +96,7 @@
   #out .page{ cursor:grab; }
   .err{ text-align:center; padding:60px; color:var(--muted); }
   @media print{
-    #panel{ display:none!important; } .rszh{ display:none!important; }
+    #panel{ display:none!important; } .rszh,.rszv{ display:none!important; }
     [contenteditable]{ outline:none!important; }
     .abswrap.sel,.frameobj.sel{ outline:none!important; }
     body{ background:#fff; overflow:visible!important; height:auto!important; }
@@ -187,8 +193,11 @@ function postBlock(it){
   const part=ov.part||'txt';
   if(part.slice(0,3)==='img'){
     const ph=(c.photos||[])[+part.slice(3)||0];
+    // Crop = a fixed box height (em) + cover + a pan position. No crop keys → natural aspect.
+    const ist=+ov.ph?' style="height:'+(+ov.ph)+'em;object-fit:cover;object-position:'+
+      (ov.px!=null?+ov.px:50)+'% '+(ov.py!=null?+ov.py:50)+'%;"':'';
     return '<div class="block imgo" data-idx="'+it._idx+'">'+
-      (ph?'<img src="'+esc(ph)+'">':'<div class="hint">picture missing</div>')+'</div>';
+      (ph?'<img src="'+esc(ph)+'"'+ist+'>':'<div class="hint">picture missing</div>')+'</div>';
   }
   const cls=['block','txtobj', ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'',
              ov.ff?'ffo':'', ov.tc?'tco':''].filter(Boolean).join(' ');
@@ -444,9 +453,10 @@ function selTextIdxs(){ return SEL.filter(s=>s[0]==='t').map(s=>+s.slice(1)); }
 function setSel(key,additive){
   if(additive){ const i=SEL.indexOf(key); if(i>=0) SEL.splice(i,1); else SEL.push(key); }
   else SEL=[key];
+  if(cropKey&&cropKey!==primary()) cropKey=null;
   showKnobs(); markSel();
 }
-function clearSel(){ if(!SEL.length) return; SEL=[]; showKnobs(); markSel(); }
+function clearSel(){ cropKey=null; if(!SEL.length) return; SEL=[]; showKnobs(); markSel(); }
 function elOf(key){
   return key[0]==='i' ? document.querySelector('.abswrap[data-absidx="'+key.slice(1)+'"]')
        : key[0]==='t' ? document.querySelector('.txtfree[data-text="'+key.slice(1)+'"]')
@@ -488,13 +498,26 @@ function keyOfEl(w){
        : w.dataset.text!=null   ? 't'+w.dataset.text
        : 'f'+w.dataset.frame;
 }
+// What kind of object is behind a key?
+function isTextKey(key){
+  if(key[0]==='t') return true;
+  if(key[0]!=='i') return false;
+  const it=COMP.items[+key.slice(1)];
+  return !!it&&it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt';
+}
+function isPicKey(key){
+  if(key[0]!=='i') return false;
+  const it=COMP.items[+key.slice(1)];
+  return !!it&&it.ref_type==='post'&&String((it.overrides||{}).part||'').slice(0,3)==='img';
+}
 function wireDrag(){
   document.querySelectorAll('.abswrap,.frameobj').forEach(w=>{
     w.onpointerdown=e=>{
-      if(e.target.closest('.rszh')) return;
+      if(e.target.closest('.rszh,.rszv')) return;
       if(e.target.closest('[contenteditable="true"]')) return;
       if(editing) commitEdit(false);        // click away = saved, never lost
       const key=keyOfEl(w);
+      if(cropKey===key&&e.target.closest('img')) return cropDrag(e,w,key);
       w._wasSel=SEL.includes(key);
       if(e.shiftKey){ setSel(key,true); if(!SEL.includes(key)) return; }
       else if(!w._wasSel) setSel(key,false);
@@ -821,7 +844,7 @@ function showKnobs(){
       '<button id="dsH"'+dis3+' title="Spread evenly left-to-right">⋯</button>'+
       '<button id="dsV"'+dis3+' title="Spread evenly top-to-bottom">⋮</button>'+
       '<button id="knDup"'+dis+' title="Duplicate (Ctrl+D)">⧉</button></div>'+
-    '<div class="kh">Size · <span id="szPct">'+(anySel?Math.round(+ov.w||28)+'%':'–')+'</span></div>'+
+    '<div class="kh">Width · <span id="szPct">'+(anySel?Math.round(+ov.w||28)+'%':'–')+'</span></div>'+
     '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(anySel?(+ov.w||28):28)+'"'+dis+'>'+
     '<div class="kh">Angle · <span id="rDeg">'+(anySel?Math.round(+ov.r||0)+'°':'–')+'</span></div>'+
     '<input type="range" id="knR" min="-180" max="180" step="1" value="'+(anySel?Math.round(+ov.r||0):0)+'"'+dis+'>'+
@@ -833,6 +856,10 @@ function showKnobs(){
         BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
       '<input type="color" id="knBc" value="'+(ov.bc||'#c9a24b')+'"'+dis+' title="Border colour"></div>'+
     (isMedia?'<div class="kh">Caption</div><div class="row"><button id="knCap">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
+    ((n===1&&primary()&&isPicKey(primary()))?
+      '<div class="kh">Picture</div><div class="krow">'+
+        '<button id="knCrop" class="'+(cropKey===primary()?'on':'')+'" style="flex:1;" title="Crop: drag the square handle for height, drag inside the picture to choose what shows">'+(cropKey===primary()?'✓ Done cropping':'✂ Crop')+'</button>'+
+        '<button id="knUncrop"'+(+ov.ph?'':' disabled')+' title="Back to the whole picture">↺ Uncrop</button></div>':'')+
     '<div class="kh">Font (whole object)</div><select id="knFF"'+disT+'>'+
       '<option value="">Jakarta (default)</option>'+
       FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
@@ -869,7 +896,14 @@ function showKnobs(){
       const l=q(label); if(l) l.textContent=fmt(+e.target.value); liveSelStyle(); };
     el.onchange=()=>{ if(el._pre!=null){ pushUndo(el._pre); el._pre=null; } };
   };
-  liveSlider('knW', v=>SEL.forEach(key=>{ ovOf(key).w=v; }), 'szPct', v=>Math.round(v)+'%');
+  liveSlider('knW', v=>SEL.forEach(key=>{
+    const o=ovOf(key);
+    if(isTextKey(key)){    // text reshapes: keep the letters the same size
+      const f0=fsOf(o); o.w=v;
+      o.ts=Math.round(f0/(13.5*(v/28))*1000)/1000;
+      if(Math.abs(o.ts-1)<0.002) delete o.ts;
+    } else o.w=v;
+  }), 'szPct', v=>Math.round(v)+'%');
   liveSlider('knR', v=>SEL.forEach(key=>{ const o=ovOf(key); if(v) o.r=v; else delete o.r; }), 'rDeg', v=>Math.round(v)+'°');
   liveSlider('knTs', v=>{
     selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; o.ts=v/100; if(o.ts===1) delete o.ts; });
@@ -883,6 +917,22 @@ function showKnobs(){
   q('knBc').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
   const cap=q('knCap');
   if(cap) cap.onclick=()=>{ pushUndo(); ov.caption=!ov.caption; render(); showKnobs(); markSel(); };
+  const cr=q('knCrop');
+  if(cr) cr.onclick=()=>{
+    const key=primary();
+    if(cropKey===key){ cropKey=null; }
+    else{
+      cropKey=key;
+      if(!+ov.ph){   // start from the natural height so panning works right away
+        const el=elOf(key), img=el&&el.querySelector('img');
+        if(img){ const fs=parseFloat(el.style.fontSize)||13.5;
+          pushUndo(); ov.ph=Math.round(img.offsetHeight/fs*100)/100; }
+      }
+    }
+    showKnobs(); markSel();
+  };
+  const uc=q('knUncrop');
+  if(uc) uc.onclick=()=>{ pushUndo(); delete ov.ph; delete ov.px; delete ov.py; cropKey=null; render(); showKnobs(); markSel(); };
   const ff=q('knFF');
   if(ff) ff.onchange=e=>{ pushUndo();
     selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font; });
@@ -1007,13 +1057,19 @@ function updateTb(){
 // ── Selection visuals: outline every selected object, resize dot on primary ─
 function markSel(){
   document.querySelectorAll('.abswrap.sel,.frameobj.sel').forEach(x=>x.classList.remove('sel'));
-  document.querySelectorAll('.rszh').forEach(h=>h.remove());
+  document.querySelectorAll('.abswrap.cropping').forEach(x=>x.classList.remove('cropping'));
+  document.querySelectorAll('.rszh,.rszv').forEach(h=>h.remove());
   document.querySelectorAll('[contenteditable="true"]').forEach(b=>b.removeAttribute('contenteditable'));
   SEL.forEach(key=>{ const el=elOf(key); if(el) el.classList.add('sel'); });
   const p=primary(); if(!p) return;
   const el=elOf(p); if(!el) return;
   const rz=document.createElement('div'); rz.className='rszh'; rz.title='Drag to resize';
   el.appendChild(rz); wireResize(rz,el,p);
+  if(isPicKey(p)&&SEL.length===1){
+    const rv=document.createElement('div'); rv.className='rszv'; rv.title='Drag up/down to crop the height';
+    el.appendChild(rv); wireResizeV(rv,el,p);
+    if(cropKey===p) el.classList.add('cropping');
+  }
 }
 function wireResize(h,wrap,key){
   h.onpointerdown=e=>{
@@ -1024,18 +1080,68 @@ function wireResize(h,wrap,key){
     let resized=false;
     const sx=e.clientX, sy=e.clientY;
     const ow=+o.w||(key[0]==='f'?20:28), oh=+o.h||20;
+    // Text boxes RESHAPE: wider box = longer lines, fewer rows — the text
+    // itself keeps its size (ts compensates for the width-linked font).
+    const reflow=isTextKey(key), fs0=fsOf(o);
     const mv=ev=>{
       resized=true;
       o.w=Math.round(Math.max(3,Math.min(100, ow+(ev.clientX-sx)/pr.width*100))*10)/10;
+      if(reflow){ o.ts=Math.round(fs0/(13.5*(o.w/28))*1000)/1000; if(Math.abs(o.ts-1)<0.002) delete o.ts; }
       if(key[0]==='f') o.h=Math.round(Math.max(2,Math.min(100, oh+(ev.clientY-sy)/pr.height*100))*10)/10;
       liveSelStyle();
       const s=document.getElementById('knW');
       if(s){ s.value=o.w; const pl=document.getElementById('szPct'); if(pl) pl.textContent=Math.round(o.w)+'%'; }
+      updateOffpage();
     };
     const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
       if(resized) pushUndo(pre); };
     addEventListener('pointermove',mv); addEventListener('pointerup',up);
   };
+}
+// Picture height handle: drag down/up → the box height (em). The picture
+// cover-fills the box, so this IS cropping; pan it in crop mode.
+function wireResizeV(h,wrap,key){
+  h.onpointerdown=e=>{
+    e.stopPropagation(); e.preventDefault();
+    const o=ovOf(key);
+    const img=wrap.querySelector('img'); if(!img) return;
+    const pre=snap();
+    let done=false;
+    const fs=parseFloat(wrap.style.fontSize)||13.5;
+    const sy=e.clientY;
+    const oh=+o.ph||(img.offsetHeight/fs);
+    const mv=ev=>{
+      done=true;
+      o.ph=Math.round(Math.max(2, oh+(ev.clientY-sy)/curScale/fs)*100)/100;
+      img.style.height=o.ph+'em'; img.style.objectFit='cover';
+      img.style.objectPosition=(o.px!=null?o.px:50)+'% '+(o.py!=null?o.py:50)+'%';
+      updateOffpage();
+    };
+    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+      if(done) pushUndo(pre); };
+    addEventListener('pointermove',mv); addEventListener('pointerup',up);
+  };
+}
+// Crop mode: dragging inside the picture pans WHICH PART of it shows.
+let cropKey=null;
+function cropDrag(e,wrap,key){
+  const o=ovOf(key);
+  const img=wrap.querySelector('img'); if(!img||!+o.ph) return;
+  const pre=snap();
+  const r=img.getBoundingClientRect();
+  const sx=e.clientX, sy=e.clientY;
+  const ox=o.px!=null?+o.px:50, oy=o.py!=null?+o.py:50;
+  let moved=false;
+  const mv=ev=>{
+    moved=true;
+    o.px=Math.round(Math.max(0,Math.min(100, ox-(ev.clientX-sx)/r.width*100))*10)/10;
+    o.py=Math.round(Math.max(0,Math.min(100, oy-(ev.clientY-sy)/r.height*100))*10)/10;
+    img.style.objectPosition=o.px+'% '+o.py+'%';
+  };
+  const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+    if(moved) pushUndo(pre); };
+  addEventListener('pointermove',mv); addEventListener('pointerup',up);
+  e.stopPropagation(); e.preventDefault();
 }
 
 // ── Global controls ─────────────────────────────────────────────────
@@ -1069,6 +1175,8 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); doRedo(); return; }
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){ e.preventDefault(); dupSelected(); return; }
   if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
+  if(e.key==='Escape'){ e.preventDefault();
+    if(cropKey){ cropKey=null; showKnobs(); markSel(); } else clearSel(); return; }
   // Arrow keys nudge the selection: 0.5% per press, 0.1% with Shift.
   if(SEL.length&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
     e.preventDefault();
