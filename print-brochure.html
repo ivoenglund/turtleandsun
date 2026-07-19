@@ -111,6 +111,8 @@
     [contenteditable]{ outline:none!important; }
     .abswrap.sel,.frameobj.sel{ outline:none!important; }
     body{ background:#fff; overflow:visible!important; height:auto!important; }
+    /* Backgrounds and shadows must actually print. */
+    .abswrap,.frameobj,.block,.txtfree{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; }
     .page{ box-shadow:none; margin:0; page-break-after:always; height:auto; min-height:296mm; overflow:hidden!important; }
     body.fmt-poster .page{ height:1000mm; }
@@ -193,6 +195,20 @@ function sanitizeHtml(s){
 // photo (part: 'txt' | 'img0','img1',…). They never move together — every
 // piece is dragged, sized, angled and bordered on its own.
 const BORDER_STYLES=['solid','dashed','dotted','double'];
+// Shadow presets (em-based → they scale with the object). Bare text (no
+// background, no border) gets a LETTER shadow; everything else a box shadow.
+const SHADOWS=['','0 .15em .5em rgba(0,0,0,.25)','0 .25em 1em rgba(0,0,0,.35)','0 .5em 1.8em rgba(0,0,0,.5)'];
+const TSHADOWS=['','0 .06em .18em rgba(0,0,0,.35)','0 .09em .3em rgba(0,0,0,.5)','0 .12em .45em rgba(0,0,0,.65)'];
+function decoCss(ov,isBareText){
+  let s='';
+  if(ov.bg) s+='background:'+esc(ov.bg)+';border-radius:.55em;'+(!+ov.bw?'padding:.4em;':'');
+  const sh=+ov.sh||0;
+  if(sh){
+    if(isBareText&&!ov.bg&&!+ov.bw) s+='text-shadow:'+TSHADOWS[sh]+';';
+    else s+='box-shadow:'+SHADOWS[sh]+';'+(ov.sq||ov.bg?'':'border-radius:.55em;');
+  }
+  return s;
+}
 function borderCss(ov,emScaled){
   const bw=+ov.bw||0; if(!bw) return '';
   const bs=BORDER_STYLES.includes(ov.bs)?ov.bs:'solid';
@@ -427,9 +443,11 @@ function cropEms(ov){
 function absWrap(it){
   const ov=it.overrides||{};
   const x=ov.x!=null?+ov.x:10, y=ov.y!=null?+ov.y:10, w=+ov.w||28;
+  const bareText=it.ref_type==='post'&&(ov.part||'txt')==='txt';
   const st='position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;font-size:'+fsOf(ov)+'px;z-index:'+(+ov.z||0)+';'
     +(+ov.r?'transform:rotate('+(+ov.r)+'deg);':'')
     +borderCss(ov,true)
+    +decoCss(ov,bareText)
     +(ov.tc?'color:'+esc(ov.tc)+';':'');
   return '<div class="abswrap" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
@@ -438,6 +456,8 @@ function frameDiv(f,i){
   return '<div class="frameobj" data-frame="'+i+'" style="position:absolute;'+
     'left:'+(+f.x||0)+'%;top:'+(+f.y||0)+'%;width:'+(+f.w||20)+'%;height:'+(+f.h||20)+'%;'+
     'z-index:'+(+f.z||0)+';border:'+(+f.bw||2)+'px '+bs+' '+esc(f.bc||'#c9a24b')+';'+
+    (f.bg?'background:'+esc(f.bg)+';':'')+
+    (+f.sh?'box-shadow:'+SHADOWS[+f.sh]+';':'')+
     (+f.r?'transform:rotate('+(+f.r)+'deg);':'')+'"></div>';
 }
 // A free text object — lives in params (like frames), needs no card behind it.
@@ -445,6 +465,7 @@ function txtFreeDiv(t,i){
   const st='position:absolute;left:'+(+t.x||0)+'%;top:'+(+t.y||0)+'%;width:'+(+t.w||30)+'%;font-size:'+fsOf(t)+'px;z-index:'+(+t.z||0)+';'
     +(+t.r?'transform:rotate('+(+t.r)+'deg);':'')
     +borderCss(t,true)
+    +decoCss(t,true)
     +(t.tc?'color:'+esc(t.tc)+';':'');
   const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
   const ffs=t.ff?' style="font-family:\''+esc(t.ff)+'\'"':'';
@@ -832,12 +853,20 @@ function liveSelStyle(){
       el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
       const bw=+o.bw||0;
       el.style.border=bw?((bw/13.5)+'em '+(BORDER_STYLES.includes(o.bs)?o.bs:'solid')+' '+(o.bc||'#23291d')):'';
-      el.style.padding=bw?'.4em':'';
+      el.style.padding=(bw||o.bg)?'.4em':'';
       el.style.color=o.tc||'';
+      el.style.background=o.bg||'';
+      const sh=+o.sh||0;
+      const bare=isTextKey(key)&&!o.bg&&!bw;
+      el.style.textShadow=(sh&&bare)?TSHADOWS[sh]:'';
+      el.style.boxShadow=(sh&&!bare)?SHADOWS[sh]:'';
+      el.style.borderRadius=(o.bg||(sh&&!bare&&!o.sq))?'.55em':'';
     }else{
       el.style.width=(+o.w||20)+'%'; el.style.height=(+o.h||20)+'%';
       el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
       el.style.border=(+o.bw||2)+'px '+(BORDER_STYLES.includes(o.bs)?o.bs:'solid')+' '+(o.bc||'#c9a24b');
+      el.style.background=o.bg||'';
+      el.style.boxShadow=+o.sh?SHADOWS[+o.sh]:'';
     }
   });
 }
@@ -956,6 +985,13 @@ function showKnobs(){
       '<select id="knBs" style="flex:1;margin-bottom:0;">'+
         BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
       '<input type="color" id="knBc" value="'+(ov.bc||'#c9a24b')+'" title="Border colour"></div>'+
+    '<div class="kh">Background</div>'+
+    '<div class="krow"><button id="knBgNone" class="'+(ov.bg?'':'on')+'">None</button>'+
+      ['#ffffff','#f7f3e8','#1f4a45','#c9a24b'].map(c=>'<button class="sw bgsw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+
+      '<input type="color" id="knBg" value="'+(ov.bg&&/^#/.test(ov.bg)?ov.bg:'#ffffff')+'" title="Any background colour"></div>'+
+    '<div class="kh">Shadow</div>'+
+    '<div class="row">'+['None','Soft','Medium','Strong'].map((t,i)=>
+      '<button class="shBtn'+((+ov.sh||0)===i?' on':'')+'" data-sh="'+i+'">'+t+'</button>').join('')+'</div>'+
     ((singlePic||singleMedia)?
       '<div class="kh">Picture</div><div class="krow">'+
         (singlePic?'<button id="knCrop" style="flex:1;" title="Crop: drag any edge in or out, drag inside to slide the picture">✂ Crop</button>':'')+
@@ -1013,6 +1049,16 @@ function showKnobs(){
   q('knBs').onchange=e=>{ pushUndo(); SEL.forEach(key=>{ ovOf(key).bs=e.target.value; }); liveSelStyle(); };
   q('knBc').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); SEL.forEach(key=>{ ovOf(key).bc=e.target.value; }); liveSelStyle(); };
   q('knBc').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
+  q('knBgNone').onclick=()=>{ pushUndo(); SEL.forEach(key=>{ delete ovOf(key).bg; }); liveSelStyle(); showKnobs(); };
+  k.querySelectorAll('.bgsw').forEach(b=>b.onclick=()=>{ pushUndo();
+    SEL.forEach(key=>{ ovOf(key).bg=b.dataset.c; }); liveSelStyle(); showKnobs(); });
+  q('knBg').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap();
+    SEL.forEach(key=>{ ovOf(key).bg=e.target.value; }); liveSelStyle(); };
+  q('knBg').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
+  k.querySelectorAll('.shBtn').forEach(b=>b.onclick=()=>{ pushUndo();
+    const v=+b.dataset.sh;
+    SEL.forEach(key=>{ const o=ovOf(key); if(v) o.sh=v; else delete o.sh; });
+    liveSelStyle(); showKnobs(); });
   const cap=q('knCap');
   if(cap) cap.onclick=()=>{ pushUndo(); ov.caption=!ov.caption; render(); showKnobs(); markSel(); };
   const sq=q('knSq');
@@ -1054,7 +1100,7 @@ function showKnobs(){
     render(); showKnobs(); markSel(); };
   const tc=q('knTc');
   if(tc) tc.onchange=e=>setObjColor(e.target.value);
-  k.querySelectorAll('.sw').forEach(b=>{
+  k.querySelectorAll('.sw:not(.bgsw)').forEach(b=>{
     b.onmousedown=e=>e.preventDefault();
     b.onclick=()=>setObjColor(b.dataset.c);
   });
