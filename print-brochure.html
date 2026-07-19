@@ -39,14 +39,32 @@
   .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
   .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; }
   #out{ position:relative; overflow:hidden; transform-origin:0 0; margin:0 auto; }
-  #zoomWrap button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
-  #zoomWrap button:hover{ background:#f4efe4; }
+  #zoomWrap button, #pageNav button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
+  #zoomWrap button:hover, #pageNav button:hover{ background:#f4efe4; }
+  #pageNav button:disabled{ opacity:.4; cursor:default; }
+  /* Card tray — the document's cards; tap to place on the current page. */
+  #tray{ position:fixed; left:0; top:56px; bottom:0; width:210px; background:#fff; border-right:2px solid var(--gold);
+         overflow:auto; z-index:9; box-shadow:2px 0 10px rgba(0,0,0,.08); }
+  #tray.collapsed{ transform:translateX(-100%); }
+  .trayhead{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green);
+             padding:10px 12px 6px; position:sticky; top:0; background:#fff; }
+  .trayrow{ display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid #eee8d8; cursor:pointer; }
+  .trayrow:hover{ background:#f7f3e8; }
+  .trayrow.on{ background:#eef5ee; }
+  .trayrow img, .trayrow .ph{ width:30px; height:30px; object-fit:contain; border-radius:5px; background:#f0ead8; flex-shrink:0; }
+  .trayrow .tt{ flex:1; min-width:0; font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trayrow .badge{ font-size:11px; font-weight:800; color:#7a8470; min-width:20px; text-align:right; }
+  .trayrow.on .badge{ color:var(--green); }
+  .trayempty{ padding:14px 12px; font-size:12px; color:var(--muted); }
+  #out .page{ cursor:grab; }
+  .abswrap.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
   .block.abs{ position:absolute; margin:0; cursor:grab; }
   .block.abs:active{ cursor:grabbing; }
   .block.abs .person{ background:#fff; }
-  @media print{ #knobs{ display:none!important; } .block.sel{ outline:none; }
+  @media print{ #knobs{ display:none!important; } .block.sel,.abswrap.sel{ outline:none; }
     .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
-    .block{ page-break-inside:avoid; } #zoomWrap{ display:none; }
+    .block{ page-break-inside:avoid; } #zoomWrap,#pageNav,#tray{ display:none!important; }
+    #out .page{ cursor:auto; }
     /* Never print the on-screen zoom transform — always full size. */
     #out{ transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; } }
   .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
@@ -96,9 +114,17 @@
     <button id="zoomFit" title="Fit to window ( 0 )" style="font-size:12px;">Fit</button>
     <span id="zoomPct" style="min-width:42px;display:inline-block;text-align:right;color:#5c5c4d;">18%</span>
   </span>
+  <span id="pageNav" style="font-size:13.5px;font-weight:700;display:none;align-items:center;gap:6px;">
+    <button id="pgPrev" title="Previous page" style="min-width:30px;">◀</button>
+    <span id="pgLabel" style="min-width:74px;text-align:center;">Page 1 / 1</span>
+    <button id="pgNext" title="Next page" style="min-width:30px;">▶</button>
+    <button id="pgAdd" title="Add a page">＋ Page</button>
+    <button id="pgDel" title="Delete this page">🗑</button>
+  </span>
   <button id="saveBtn" style="background:#fff;color:var(--green);border:2px solid var(--green);">Save layout</button>
-  <span style="font-size:13px;color:#5c5c4d;">Click a card in the preview to adjust it · the first card is the cover</span>
+  <span style="font-size:13px;color:#5c5c4d;">Tap a card on the left to place it · drag to move · scroll to zoom · drag empty space to pan</span>
 </div>
+<aside id="tray"><div class="trayhead">Cards</div><div id="trayList"></div></aside>
 <div id="knobs" class="hidden" style="display:none;"></div>
 <div id="out"><div class="err">Loading…</div></div>
 
@@ -150,7 +176,17 @@ function mediaBlock(it){
 }
 
 let COMP=null;
-function render(){ renderPages(COMP); }
+let curPage=1;
+function render(){ renderCurrent(); }
+// Every card lives on a page at a free position (page/x/y/w in its overrides).
+// Legacy: poster items already had x/y → page 1; anything else starts unplaced.
+function normalizeItems(){
+  (COMP.items||[]).forEach(it=>{
+    const ov=it.overrides=it.overrides||{};
+    if(ov.page==null && ov.x!=null) ov.page=1;
+  });
+  COMP.params=COMP.params||{};
+}
 
 async function load(){
   if(!compId){ document.getElementById('out').innerHTML='<div class="err">No composition given (?comp=ID).</div>'; return; }
@@ -158,8 +194,10 @@ async function load(){
   if(!r.ok){ document.getElementById('out').innerHTML='<div class="err">Could not load the brochure.</div>'; return; }
   COMP=await r.json();
   document.title=COMP.name+' · Turtle & Sun';
+  normalizeItems();
   buildPaperOptions();
   document.getElementById('zoomWrap').style.display='inline-flex';
+  document.getElementById('pageNav').style.display='inline-flex';
   const paper=(COMP.params&&COMP.params.paper)||'a4';
   document.getElementById('paper').value=paperOf(paper).k;
   applyPaper(paper);
@@ -272,20 +310,48 @@ function zoomToPct(pct, cx, cy){
 }
 function zoomStep(factor, cx, cy){ zoomToPct(curScale*100*factor, cx, cy); }
 
-// Poster: one huge canvas, every card freely placed (x/y/w saved as % in overrides).
-function renderPoster(items){
-  const blocks=items.map((it,i)=>{
-    const ov=it.overrides||{};
-    const x=ov.x!=null?ov.x:8+(i%3)*30, y=ov.y!=null?ov.y:6+Math.floor(i/3)*22, w=ov.w||28;
-    const inner = it.ref_type==='contact' ? personCard(it)
-                : it.ref_type==='media'   ? mediaBlock(it)
-                : postBlock(it);
-    return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;" data-absidx="'+it._idx+'">'+inner+'</div>';
-  }).join('');
-  document.getElementById('out').innerHTML='<div class="page poster" style="position:relative;">'+blocks+'</div>';
-  document.querySelectorAll('.abswrap .block,.abswrap .person').forEach(b=>b.classList.add('abs'));
-  wireDrag();
+// ── Page model ──────────────────────────────────────────────────────
+// A document is N pages. Each card sits on one page at a free position.
+// We edit ONE page at a time; print stitches every page in order.
+function itemsAll(){ return (COMP.items||[]).map((it,i)=>({ ...it, _idx:i })); }
+function pageCount(){
+  let n=(COMP.params&&+COMP.params.pages)||1;
+  itemsAll().forEach(it=>{ const p=it.overrides&&+it.overrides.page; if(p>n) n=p; });
+  return Math.max(1,n);
 }
+function cardInner(it){
+  return it.ref_type==='contact' ? personCard(it)
+       : it.ref_type==='media'   ? mediaBlock(it)
+       : postBlock(it);
+}
+function absWrap(it){
+  const ov=it.overrides||{};
+  const x=ov.x!=null?ov.x:10, y=ov.y!=null?ov.y:10, w=ov.w||28;
+  return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
+}
+function markAbs(){ document.querySelectorAll('.abswrap .block,.abswrap .person').forEach(b=>b.classList.add('abs')); }
+
+// The editor view: a single page of freely-placed cards.
+function renderCurrent(){
+  const N=pageCount();
+  curPage=Math.max(1,Math.min(N,curPage));
+  const on=itemsAll().filter(it=>(it.overrides&&+it.overrides.page)===curPage);
+  document.getElementById('out').innerHTML=
+    '<div class="page" data-page="'+curPage+'" style="position:relative;">'+on.map(absWrap).join('')+'</div>';
+  markAbs(); wireDrag(); wirePan();
+  updatePageNav(); renderTray(); markSel();
+}
+// Print view: every page, in order.
+function renderAllPages(){
+  const N=pageCount(), all=itemsAll(); let html='';
+  for(let n=1;n<=N;n++){
+    const on=all.filter(it=>(it.overrides&&+it.overrides.page)===n);
+    html+='<div class="page printpage" style="position:relative;">'+on.map(absWrap).join('')+'</div>';
+  }
+  document.getElementById('out').innerHTML=html; markAbs();
+}
+
+// Drag a card to reposition it (x/y saved as % of the page).
 function wireDrag(){
   document.querySelectorAll('.abswrap').forEach(w=>{
     w.onpointerdown=e=>{
@@ -298,8 +364,8 @@ function wireDrag(){
       const mv=ev=>{
         const dx=(ev.clientX-sx)/pr.width*100, dy=(ev.clientY-sy)/pr.height*100;
         if(Math.abs(dx)+Math.abs(dy)>0.1) moved=true;
-        w.style.left=Math.max(0,Math.min(92,ox+dx))+'%';
-        w.style.top=Math.max(0,Math.min(96,oy+dy))+'%';
+        w.style.left=Math.max(0,Math.min(96,ox+dx))+'%';
+        w.style.top=Math.max(0,Math.min(98,oy+dy))+'%';
       };
       const up=()=>{
         removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
@@ -309,74 +375,97 @@ function wireDrag(){
         }
       };
       addEventListener('pointermove',mv); addEventListener('pointerup',up);
-      e.preventDefault();
+      e.stopPropagation(); e.preventDefault();
     };
   });
 }
-
-function renderPages(comp){
-  const items=(comp.items||[]).map((it,i)=>({ ...it, _idx:i }));
-  if(((comp.params&&comp.params.paper)||'a4')==='poster'){ renderPoster(items); return; }
-  if(!items.length){ document.getElementById('out').innerHTML='<div class="err">This brochure has no cards yet.</div>'; return; }
-
-  const pages=[];
-
-  // Cover = first item.
-  const cov=items[0];
-  const covImg = cov.ref_type==='post' ? ((cov.content.photos||[])[0]||'')
-               : cov.ref_type==='media' ? (cov.content.url||'')
-               : (cov.content.photo_url||'');
-  const covTitle = cov.ref_type==='post' ? (cov.content.title||comp.name) : comp.name;
-  pages.push('<div class="page cover"><div class="band"></div>'+
-    (covImg?'<div class="img" style="background-image:url(\''+esc(covImg)+'\')"></div>':'')+
-    '<div class="scrim"></div><div class="txt"><h1>'+esc(covTitle)+'</h1>'+
-    '<div class="sub">'+esc(comp.name)+'</div></div></div>');
-
-  // Body: group runs of contacts into team pages (6/page); posts flow 2/page (big = own page).
-  let buf=[], bufKind=null;
-  const flush=()=>{
-    if(!buf.length) return;
-    if(bufKind==='contact'){
-      for(let i=0;i<buf.length;i+=6){
-        pages.push('<div class="page"><h2 class="sect">Teamet</h2><hr class="rule"><div class="team">'+
-          buf.slice(i,i+6).map(personCard).join('')+'</div></div>');
-      }
-    } else if(bufKind==='media'){
-      // Logos/graphics: a "big" one gets its own page; others pack two per page.
-      for(let i=0;i<buf.length;){
-        const it=buf[i];
-        if(it.overrides&&it.overrides.big){ pages.push('<div class="page">'+mediaBlock(it)+'</div>'); i++; }
-        else{
-          const two=buf.slice(i,i+2).filter(x=>!(x.overrides&&x.overrides.big)||x===it);
-          pages.push('<div class="page">'+two.map(mediaBlock).join('')+'</div>');
-          i+=two.length;
-        }
-      }
-    } else {
-      for(let i=0;i<buf.length;){
-        const it=buf[i];
-        if(it.overrides&&it.overrides.big){ pages.push('<div class="page">'+postBlock(it)+'</div>'); i++; }
-        else{
-          const two=buf.slice(i,i+2).filter(x=>!(x.overrides&&x.overrides.big)||x===it);
-          pages.push('<div class="page">'+two.map(postBlock).join('')+'</div>');
-          i+=two.length;
-        }
-      }
-    }
-    buf=[]; bufKind=null;
-  };
-  items.slice(1).forEach(it=>{
-    if(bufKind && it.ref_type!==bufKind) flush();
-    bufKind=it.ref_type; buf.push(it);
+// Drag empty page background to pan the zoomed view.
+function wirePan(){
+  const page=document.querySelector('#out .page'); if(!page) return;
+  page.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.abswrap')) return;
+    const sx=e.clientX, sy=e.clientY, ox=window.scrollX, oy=window.scrollY;
+    page.style.cursor='grabbing';
+    const mv=ev=>window.scrollTo(ox-(ev.clientX-sx), oy-(ev.clientY-sy));
+    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up); page.style.cursor=''; };
+    addEventListener('pointermove',mv); addEventListener('pointerup',up);
+    e.preventDefault();
   });
-  flush();
+}
 
-  // Back page.
-  pages.push('<div class="page backpage"><div><h2>'+esc(comp.name)+'</h2>'+
-    '<div style="font-size:14px;color:#cdddd2;">Alltid aktuell — gjord från levande data.</div></div>'+
-    '<div class="foot">Made with Turtle &amp; Sun · turtleandsun.com</div></div>');
+// ── Page navigation ─────────────────────────────────────────────────
+function updatePageNav(){
+  const N=pageCount();
+  const lab=document.getElementById('pgLabel'); if(lab) lab.textContent='Page '+curPage+' / '+N;
+  const prev=document.getElementById('pgPrev'), next=document.getElementById('pgNext'), del=document.getElementById('pgDel');
+  if(prev) prev.disabled=curPage<=1;
+  if(next) next.disabled=curPage>=N;
+  if(del)  del.disabled=N<=1 && !itemsAll().some(it=>(it.overrides&&+it.overrides.page)===curPage);
+}
+function setPage(n){ curPage=n; renderCurrent(); syncZoom(); }
+function addPage(){ COMP.params.pages=pageCount()+1; setPage(COMP.params.pages); }
+function deletePage(){
+  const N=pageCount();
+  if(!confirm('Delete page '+curPage+'? Cards on it go back to the tray.')) return;
+  itemsAll().forEach(it=>{ const ov=it.overrides; if(!ov||ov.page==null) return;
+    if(+ov.page===curPage){ delete ov.page; delete ov.x; delete ov.y; }
+    else if(+ov.page>curPage){ ov.page=+ov.page-1; }
+  });
+  COMP.params.pages=Math.max(1,N-1);
+  curPage=Math.min(curPage, pageCount());
+  renderCurrent(); syncZoom();
+}
 
-  document.getElementById('out').innerHTML=pages.join('');
+// ── Card tray (placing/moving cards) ────────────────────────────────
+function trayThumb(it){
+  const c=it.content||{};
+  return it.ref_type==='post' ? (c.photos||[])[0]
+       : it.ref_type==='media' ? c.url
+       : c.photo_url;
+}
+function trayText(it){
+  const c=it.content||{};
+  return it.ref_type==='post' ? (c.title||(c.body||'').slice(0,32)||'(post)')
+       : it.ref_type==='media' ? (c.title||'(logo)')
+       : (c.name||'(person)');
+}
+function renderTray(){
+  const host=document.getElementById('trayList'); if(!host) return;
+  const all=itemsAll();
+  if(!all.length){ host.innerHTML='<div class="trayempty">No cards yet. Add them from the Make tab, then place them here.</div>'; return; }
+  host.innerHTML=all.map(it=>{
+    const p=it.overrides&&+it.overrides.page, img=trayThumb(it);
+    return '<div class="trayrow'+(p===curPage?' on':'')+'" data-idx="'+it._idx+'">'+
+      (img?'<img src="'+esc(img)+'">':'<span class="ph"></span>')+
+      '<span class="tt">'+esc(trayText(it))+'</span>'+
+      '<span class="badge">'+(p?('p'+p):'—')+'</span></div>';
+  }).join('');
+  host.querySelectorAll('.trayrow').forEach(row=>row.onclick=()=>{
+    const idx=+row.dataset.idx, ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+    const p=+ov.page;
+    if(!p) placeCard(idx);                              // unplaced → drop on this page
+    else if(p!==curPage){ curPage=p; renderCurrent(); } // elsewhere → go to its page
+    else { selIdx=idx; showKnobs(); markSel(); }        // here → just select it
+  });
+}
+function placeCard(idx){
+  const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+  const n=itemsAll().filter(it=>(it.overrides&&+it.overrides.page)===curPage).length;
+  ov.page=curPage;
+  if(ov.x==null) ov.x=8+(n%3)*30;
+  if(ov.y==null) ov.y=6+Math.floor(n/3)*24;
+  if(ov.w==null) ov.w=28;
+  selIdx=idx; renderCurrent(); showKnobs();
+}
+function unplaceCard(idx){
+  const ov=COMP.items[idx].overrides||{};
+  delete ov.page; delete ov.x; delete ov.y;
+  selIdx=null; document.getElementById('knobs').style.display='none'; renderCurrent();
+}
+function moveCardToPage(idx,n){
+  const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+  ov.page=Math.max(1,Math.min(pageCount(),n));
+  curPage=ov.page; renderCurrent(); showKnobs();   // follow the card
 }
 
 // ── Knobs: click a block → adjust its parameters, live ──
@@ -397,19 +486,22 @@ function showKnobs(){
   if(selIdx==null){ k.style.display='none'; return; }
   const it=COMP.items[selIdx];
   const ov=it.overrides=it.overrides||{};
-  const poster=((COMP.params&&COMP.params.paper)||'a4')==='poster';
   const isPost=it.ref_type==='post';
   const isMedia=it.ref_type==='media';
+  const N=pageCount();
   k.style.display='block';
   k.innerHTML='<b style="font-size:13px;">Card '+(selIdx+1)+'</b>'+
+    '<div class="kh">On page</div><div class="row">'+
+      '<button id="knPgPrev" title="Move to the previous page">◀</button>'+
+      '<span style="align-self:center;font-weight:700;">Page '+(ov.page||curPage)+' / '+N+'</span>'+
+      '<button id="knPgNext" title="Move to the next page">▶</button></div>'+
+    '<div class="row"><button id="knUnplace" style="flex:1;">Remove from page</button></div>'+
     ((isPost||isMedia)?knobRow('img','Picture size',ov.img):'')+
+    knobRow('w','Card width',String(ov.w||28))+
     (isMedia?'<div class="kh">Caption</div><div class="row"><button data-k="caption" data-v="'+(ov.caption?'':'1')+'" class="'+(ov.caption?'on':'')+'">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
-    (isPost&&!poster?knobRow('pos','Picture placement',ov.pos):'')+
     (isPost?knobRow('txt','Text size',ov.txt):'')+
     (isPost?knobRow('font','Font',ov.font):'')+
-    (poster?knobRow('w','Card width',String(ov.w||28)):'')+
     (isPost?'<div class="kh">Date</div><div class="row"><button data-k="nodate" data-v="'+(ov.nodate?'':'1')+'" class="'+(ov.nodate?'on':'')+'">'+(ov.nodate?'Hidden — show it':'Hide the date')+'</button></div>':'')+
-    (!poster?'<div class="kh">Own page</div><div class="row"><button data-k="big" data-v="'+(ov.big?'':'1')+'" class="'+(ov.big?'on':'')+'">'+(ov.big?'Yes — turn off':'Make it a full page')+'</button></div>':'')+
     (isPost?'<div style="margin-top:8px;"><button id="knEdit" style="width:100%;">✏ Edit the text</button></div>':'')+
     '<div id="knEditBar" style="display:none;margin-top:6px;" class="row">'+
       '<button id="knB" style="font-weight:800;">B</button>'+
@@ -419,13 +511,15 @@ function showKnobs(){
     '<div style="margin-top:10px;"><button id="knClose" style="width:100%;">Done</button></div>';
   k.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
     const kk=b.dataset.k, v=b.dataset.v;
-    if(kk==='big') ov.big=!!v;
-    else if(kk==='nodate') ov.nodate=!!v;
+    if(kk==='nodate') ov.nodate=!!v;
     else if(kk==='caption') ov.caption=!!v;
     else if(kk==='w') ov.w=+v;
     else if(v==='') delete ov[kk]; else ov[kk]=v;
     render(); showKnobs(); markSel();
   });
+  document.getElementById('knPgPrev').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)-1);
+  document.getElementById('knPgNext').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)+1);
+  document.getElementById('knUnplace').onclick=()=>unplaceCard(selIdx);
   const editBtn=document.getElementById('knEdit');
   if(editBtn) editBtn.onclick=()=>{
     const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd');
@@ -446,8 +540,11 @@ function showKnobs(){
   document.getElementById('knClose').onclick=()=>{ selIdx=null; showKnobs(); markSel(); };
 }
 function markSel(){
-  document.querySelectorAll('.block.sel').forEach(x=>x.classList.remove('sel'));
-  if(selIdx!=null){ const el=document.querySelector('.block[data-idx="'+selIdx+'"]'); if(el) el.classList.add('sel'); }
+  document.querySelectorAll('.abswrap.sel,.block.sel').forEach(x=>x.classList.remove('sel'));
+  if(selIdx!=null){
+    const el=document.querySelector('.abswrap[data-absidx="'+selIdx+'"]')||document.querySelector('.block[data-idx="'+selIdx+'"]');
+    if(el) el.classList.add('sel');
+  }
 }
 document.getElementById('out').addEventListener('click',e=>{
   const bl=e.target.closest('.block[data-idx]'); if(!bl) return;
@@ -466,11 +563,9 @@ document.getElementById('zoomFit').onclick=()=>syncZoom();
 let lastMouse=null;
 document.getElementById('out').addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
 
-// Wheel over the canvas zooms, anchored to the cursor. On a poster the plain
-// wheel zooms; on a multi-page document the plain wheel scrolls and Ctrl/⌘+wheel
-// zooms (so you can still page through a brochure).
+// One page is shown at a time, so the plain wheel always zooms (anchored to the
+// cursor). Pan a zoomed page by dragging an empty part of it.
 document.getElementById('out').addEventListener('wheel',e=>{
-  if(!(posterMode() || e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
@@ -483,7 +578,18 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomStep(1/1.25, at.x, at.y); }
   else if(e.key==='0'){ e.preventDefault(); syncZoom(); }
 });
+// Page navigation buttons.
+document.getElementById('pgPrev').onclick=()=>setPage(curPage-1);
+document.getElementById('pgNext').onclick=()=>setPage(curPage+1);
+document.getElementById('pgAdd').onclick=()=>addPage();
+document.getElementById('pgDel').onclick=()=>deletePage();
+
+// Print = all pages in order; restore the single-page editor afterwards.
+window.addEventListener('beforeprint',()=>renderAllPages());
+window.addEventListener('afterprint',()=>{ renderCurrent(); applyZoom(curScale*100); });
+
 document.getElementById('saveBtn').onclick=async()=>{
+  COMP.params=COMP.params||{}; COMP.params.pages=pageCount();
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
   const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({items, params:COMP.params||{}})});
