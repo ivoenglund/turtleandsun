@@ -199,7 +199,6 @@
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
     <!-- Make tab only: what the board shows (the ☐ column in the tree picks groups) -->
     <div class="mk-only">
-      <div class="lbl">On the board</div>
       <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkUngrouped"> Ungrouped</label>
       <div class="flt" style="padding:3px 10px;display:flex;gap:0;align-items:center;white-space:nowrap;flex-wrap:nowrap;">
         <label style="display:flex;gap:5px;align-items:center;margin:0 6px 0 0;white-space:nowrap;cursor:pointer;"><input type="checkbox" id="mkTimeline" style="width:auto;"> Timeline</label><input type="text" inputmode="numeric" maxlength="4" id="mkY1" style="width:38px;padding:2px 1px;text-align:center;">-<input type="text" inputmode="numeric" maxlength="4" id="mkY2" style="width:38px;padding:2px 1px;text-align:center;">
@@ -359,12 +358,15 @@
       /* Board controls live in the EXISTING sidebar; visible only on the Make tab. */
       .mk-only{display:none;}
       body.makmode .mk-only{display:block;}
-      /* Make mode: TWO straight columns — checkboxes at one fixed left edge,
-         row content at another, gap = double the filter-row gap (8px). */
+      /* The sidebar's alignment REFERENCE: filter rows — checkbox at 10px,
+         8px gap (double the old 4px), so text starts at 31px. Everything
+         else lines up to those two edges. */
+      #side .flt{gap:8px;}
       .mkChk{display:none;width:auto!important;position:absolute;left:10px;top:50%;transform:translateY(-50%);}
       body.makmode .mkChk{display:inline-block;}
       body.makmode #tree .row{position:relative;padding-left:31px;}
       body.makmode #tree .row.sub{padding-left:31px;}
+      body.makmode #poolRow, body.makmode #dupRow{padding-left:31px;}
     </style>
     <div id="mak" class="hide">
       <div id="makLib"></div>
