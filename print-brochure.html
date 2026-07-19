@@ -21,8 +21,10 @@
      Every picture and every text is its OWN object on the page: freely
      draggable, resizable, rotatable, borderable. All typography is em so
      the wrapper's font-size zooms the whole object. */
+  /* --ui (set per zoom) keeps selection outlines and handles the SAME SCREEN
+     SIZE at any zoom — on an A0 at fit-zoom they used to shrink to nothing. */
   .abswrap{ cursor:grab; }
-  .abswrap.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
+  .abswrap.sel{ outline:calc(3px*var(--ui,1)) dashed var(--gold); outline-offset:calc(3px*var(--ui,1)); }
   .block{ margin:0; }
   .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
   .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
@@ -38,7 +40,7 @@
   .block.tco .role, .block.tco .ct{ color:inherit; }
   .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
   .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
-  .block .bd[contenteditable="true"]{ outline:2px solid #7FB36F; outline-offset:2px; border-radius:2mm; cursor:text; }
+  .block .bd[contenteditable="true"]{ outline:calc(2px*var(--ui,1)) solid #7FB36F; outline-offset:calc(2px*var(--ui,1)); border-radius:2mm; cursor:text; }
   .person{ text-align:center; }
   .person img{ max-width:100%; width:auto; border-radius:.55em; display:block; margin:0 auto .55em; }
   .person .init{ width:8.4em; height:10em; border-radius:.55em; background:var(--cream); color:var(--green);
@@ -48,16 +50,23 @@
   .person .ct{ font-size:.78em; color:var(--muted); line-height:1.4; }
   /* A frame = its own object: a border you can drag, resize, restyle. */
   .frameobj{ cursor:grab; border-radius:6px; }
-  .frameobj.sel{ outline:3px dashed var(--gold); outline-offset:3px; }
-  .rszh{ position:absolute; right:-9px; bottom:-9px; width:17px; height:17px; border-radius:50%;
-         background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
+  .frameobj.sel{ outline:calc(3px*var(--ui,1)) dashed var(--gold); outline-offset:calc(3px*var(--ui,1)); }
+  .rszh{ position:absolute; right:calc(-9px*var(--ui,1)); bottom:calc(-9px*var(--ui,1));
+         width:calc(17px*var(--ui,1)); height:calc(17px*var(--ui,1)); border-radius:50%;
+         background:var(--gold); border:calc(2px*var(--ui,1)) solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
          cursor:nwse-resize; z-index:6; touch-action:none; }
-  /* Picture height handle (bottom centre) — dragging it crops the picture. */
-  .rszv{ position:absolute; left:50%; bottom:-9px; margin-left:-9px; width:17px; height:17px; border-radius:4px;
-         background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
-         cursor:ns-resize; z-index:6; touch-action:none; }
+  /* Crop mode: four edge handles — drag any edge to shape the window, drag
+     inside the picture to choose what shows. */
   .abswrap.cropping{ outline-color:#7FB36F; }
   .abswrap.cropping img{ cursor:move; }
+  .crE{ position:absolute; background:var(--gold); border:calc(2px*var(--ui,1)) solid #fff;
+        box-shadow:0 1px 5px rgba(0,0,0,.4); z-index:6; touch-action:none; }
+  .crE[data-edge="l"],.crE[data-edge="r"]{ top:50%; width:calc(11px*var(--ui,1)); height:calc(30px*var(--ui,1));
+        margin-top:calc(-15px*var(--ui,1)); border-radius:calc(6px*var(--ui,1)); cursor:ew-resize; }
+  .crE[data-edge="l"]{ left:calc(-6px*var(--ui,1)); } .crE[data-edge="r"]{ right:calc(-6px*var(--ui,1)); }
+  .crE[data-edge="t"],.crE[data-edge="b"]{ left:50%; height:calc(11px*var(--ui,1)); width:calc(30px*var(--ui,1));
+        margin-left:calc(-15px*var(--ui,1)); border-radius:calc(6px*var(--ui,1)); cursor:ns-resize; }
+  .crE[data-edge="t"]{ top:calc(-6px*var(--ui,1)); } .crE[data-edge="b"]{ bottom:calc(-6px*var(--ui,1)); }
   /* ── Panel ────────────────────────────────────────────────────────── */
   #panel{ position:fixed; right:16px; top:16px; width:258px; max-height:calc(100vh - 32px); overflow:auto;
           background:#fff; border:2px solid var(--gold); border-radius:14px; padding:10px 12px;
@@ -96,7 +105,7 @@
   #out .page{ cursor:grab; }
   .err{ text-align:center; padding:60px; color:var(--muted); }
   @media print{
-    #panel{ display:none!important; } .rszh,.rszv{ display:none!important; }
+    #panel{ display:none!important; } .rszh,.crE{ display:none!important; }
     [contenteditable]{ outline:none!important; }
     .abswrap.sel,.frameobj.sel{ outline:none!important; }
     body{ background:#fff; overflow:visible!important; height:auto!important; }
@@ -193,10 +202,18 @@ function postBlock(it){
   const part=ov.part||'txt';
   if(part.slice(0,3)==='img'){
     const ph=(c.photos||[])[+part.slice(3)||0];
-    // Crop = a fixed box height (em) + cover + a pan position. No crop keys → natural aspect.
-    const ist=+ov.ph?' style="height:'+(+ov.ph)+'em;object-fit:cover;object-position:'+
-      (ov.px!=null?+ov.px:50)+'% '+(ov.py!=null?+ov.py:50)+'%;"':'';
-    return '<div class="block imgo" data-idx="'+it._idx+'">'+
+    // Crop = a WINDOW (box height ph em, overflow hidden) over the picture,
+    // which keeps its own size (pw em) and offset (ix/iy em). Legacy cover
+    // crops (ph+px, no pw) still render; they convert on next crop entry.
+    let bs='', ist='';
+    if(+ov.pw){
+      bs=' style="position:relative;overflow:hidden;height:'+(+ov.ph||10)+'em;border-radius:.55em;"';
+      ist=' style="position:absolute;width:'+(+ov.pw)+'em;max-width:none;left:'+(+ov.ix||0)+'em;top:'+(+ov.iy||0)+'em;border-radius:0;"';
+    }else if(+ov.ph){
+      ist=' style="height:'+(+ov.ph)+'em;object-fit:cover;object-position:'+
+        (ov.px!=null?+ov.px:50)+'% '+(ov.py!=null?+ov.py:50)+'%;"';
+    }
+    return '<div class="block imgo"'+bs+' data-idx="'+it._idx+'">'+
       (ph?'<img src="'+esc(ph)+'"'+ist+'>':'<div class="hint">picture missing</div>')+'</div>';
   }
   const cls=['block','txtobj', ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'',
@@ -333,7 +350,9 @@ function contentNat(){
 }
 let panX=20, panY=16;
 function setView(){
-  document.getElementById('out').style.transform='translate('+panX+'px,'+panY+'px) scale('+curScale+')';
+  const out=document.getElementById('out');
+  out.style.transform='translate('+panX+'px,'+panY+'px) scale('+curScale+')';
+  out.style.setProperty('--ui', String(1/curScale));   // constant-screen-size handles/outlines
 }
 function applyZoom(pct){ pct=clampPct(pct); curScale=pct/100; setView(); syncZoomLabel(pct); }
 function syncZoomLabel(pct){
@@ -513,7 +532,7 @@ function isPicKey(key){
 function wireDrag(){
   document.querySelectorAll('.abswrap,.frameobj').forEach(w=>{
     w.onpointerdown=e=>{
-      if(e.target.closest('.rszh,.rszv')) return;
+      if(e.target.closest('.rszh,.crE')) return;
       if(e.target.closest('[contenteditable="true"]')) return;
       if(editing) commitEdit(false);        // click away = saved, never lost
       const key=keyOfEl(w);
@@ -858,8 +877,7 @@ function showKnobs(){
     (isMedia?'<div class="kh">Caption</div><div class="row"><button id="knCap">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
     ((n===1&&primary()&&isPicKey(primary()))?
       '<div class="kh">Picture</div><div class="krow">'+
-        '<button id="knCrop" class="'+(cropKey===primary()?'on':'')+'" style="flex:1;" title="Crop: drag the square handle for height, drag inside the picture to choose what shows">'+(cropKey===primary()?'✓ Done cropping':'✂ Crop')+'</button>'+
-        '<button id="knUncrop"'+(+ov.ph?'':' disabled')+' title="Back to the whole picture">↺ Uncrop</button></div>':'')+
+        '<button id="knCrop" class="'+(cropKey===primary()?'on':'')+'" style="flex:1;" title="Crop: drag any edge in or out, drag inside the picture to slide it. Click again when done.">'+(cropKey===primary()?'✓ Done cropping':'✂ Crop')+'</button></div>':'')+
     '<div class="kh">Font (whole object)</div><select id="knFF"'+disT+'>'+
       '<option value="">Jakarta (default)</option>'+
       FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
@@ -920,19 +938,31 @@ function showKnobs(){
   const cr=q('knCrop');
   if(cr) cr.onclick=()=>{
     const key=primary();
-    if(cropKey===key){ cropKey=null; }
-    else{
-      cropKey=key;
-      if(!+ov.ph){   // start from the natural height so panning works right away
-        const el=elOf(key), img=el&&el.querySelector('img');
-        if(img){ const fs=parseFloat(el.style.fontSize)||13.5;
-          pushUndo(); ov.ph=Math.round(img.offsetHeight/fs*100)/100; }
+    if(cropKey===key){ cropKey=null; showKnobs(); markSel(); return; }
+    cropKey=key;
+    const el=elOf(key), img=el&&el.querySelector('img');
+    if(el&&img&&!+ov.pw){
+      // First crop on this picture: freeze its current size as the picture
+      // size (pw) and make the box a window. Legacy cover-crops convert exactly.
+      pushUndo();
+      const fs0=fsOf(ov);
+      const Wem=el.offsetWidth/fs0;
+      const a=(img.naturalHeight/img.naturalWidth)||0.75;
+      if(+ov.ph&&ov.px!=null){
+        const pw=Math.max(Wem, ov.ph/a);
+        ov.pw=Math.round(pw*100)/100;
+        ov.ix=Math.round(-(+ov.px/100)*(pw-Wem)*100)/100;
+        ov.iy=Math.round(-(+ov.py||0)/100*(pw*a-ov.ph)*100)/100;
+      }else{
+        ov.pw=Math.round(Wem*100)/100;
+        ov.ph=+ov.ph||Math.round(img.offsetHeight/fs0*100)/100;
+        ov.ix=0; ov.iy=0;
       }
+      delete ov.px; delete ov.py;
+      render();
     }
     showKnobs(); markSel();
   };
-  const uc=q('knUncrop');
-  if(uc) uc.onclick=()=>{ pushUndo(); delete ov.ph; delete ov.px; delete ov.py; cropKey=null; render(); showKnobs(); markSel(); };
   const ff=q('knFF');
   if(ff) ff.onchange=e=>{ pushUndo();
     selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font; });
@@ -1058,18 +1088,24 @@ function updateTb(){
 function markSel(){
   document.querySelectorAll('.abswrap.sel,.frameobj.sel').forEach(x=>x.classList.remove('sel'));
   document.querySelectorAll('.abswrap.cropping').forEach(x=>x.classList.remove('cropping'));
-  document.querySelectorAll('.rszh,.rszv').forEach(h=>h.remove());
+  document.querySelectorAll('.rszh,.crE').forEach(h=>h.remove());
   document.querySelectorAll('[contenteditable="true"]').forEach(b=>b.removeAttribute('contenteditable'));
   SEL.forEach(key=>{ const el=elOf(key); if(el) el.classList.add('sel'); });
   const p=primary(); if(!p) return;
   const el=elOf(p); if(!el) return;
+  if(cropKey===p&&isPicKey(p)){
+    // Crop mode: four edge handles, no resize dot; drag inside = slide picture.
+    el.classList.add('cropping');
+    ['t','b','l','r'].forEach(edge=>{
+      const h=document.createElement('div'); h.className='crE'; h.dataset.edge=edge;
+      h.title='Drag to crop this edge (drag back out to restore)';
+      el.appendChild(h);
+      h.onpointerdown=e=>cropEdgeDrag(e,el,p,edge);
+    });
+    return;
+  }
   const rz=document.createElement('div'); rz.className='rszh'; rz.title='Drag to resize';
   el.appendChild(rz); wireResize(rz,el,p);
-  if(isPicKey(p)&&SEL.length===1){
-    const rv=document.createElement('div'); rv.className='rszv'; rv.title='Drag up/down to crop the height';
-    el.appendChild(rv); wireResizeV(rv,el,p);
-    if(cropKey===p) el.classList.add('cropping');
-  }
 }
 function wireResize(h,wrap,key){
   h.onpointerdown=e=>{
@@ -1098,50 +1134,87 @@ function wireResize(h,wrap,key){
     addEventListener('pointermove',mv); addEventListener('pointerup',up);
   };
 }
-// Picture height handle: drag down/up → the box height (em). The picture
-// cover-fills the box, so this IS cropping; pan it in crop mode.
-function wireResizeV(h,wrap,key){
-  h.onpointerdown=e=>{
-    e.stopPropagation(); e.preventDefault();
-    const o=ovOf(key);
-    const img=wrap.querySelector('img'); if(!img) return;
-    const pre=snap();
-    let done=false;
-    const fs=parseFloat(wrap.style.fontSize)||13.5;
-    const sy=e.clientY;
-    const oh=+o.ph||(img.offsetHeight/fs);
-    const mv=ev=>{
-      done=true;
-      o.ph=Math.round(Math.max(2, oh+(ev.clientY-sy)/curScale/fs)*100)/100;
-      img.style.height=o.ph+'em'; img.style.objectFit='cover';
-      img.style.objectPosition=(o.px!=null?o.px:50)+'% '+(o.py!=null?o.py:50)+'%';
-      updateOffpage();
-    };
-    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
-      if(done) pushUndo(pre); };
-    addEventListener('pointermove',mv); addEventListener('pointerup',up);
-  };
-}
-// Crop mode: dragging inside the picture pans WHICH PART of it shows.
+// ── Crop (window model) ─────────────────────────────────────────────
+// The picture keeps its own size (pw em); the object box is a WINDOW onto it.
+// In crop mode: drag any of the four edges to shape the window (the picture
+// does not move on the page), drag inside to slide the picture. Dragging
+// edges back OUT restores the hidden parts — that's the "uncrop".
 let cropKey=null;
+function applyCrop(wrap,o){
+  wrap.style.left=(+o.x||0)+'%'; wrap.style.top=(+o.y||0)+'%';
+  wrap.style.width=(+o.w||28)+'%';
+  wrap.style.fontSize=fsOf(o)+'px';
+  const blk=wrap.querySelector('.imgo'), img=wrap.querySelector('img');
+  if(blk){ blk.style.position='relative'; blk.style.overflow='hidden'; blk.style.height=(+o.ph||10)+'em'; }
+  if(img){ img.style.position='absolute'; img.style.width=(+o.pw)+'em'; img.style.maxWidth='none';
+           img.style.height='auto'; img.style.objectFit=''; img.style.objectPosition='';
+           img.style.left=(+o.ix||0)+'em'; img.style.top=(+o.iy||0)+'em'; }
+}
 function cropDrag(e,wrap,key){
   const o=ovOf(key);
-  const img=wrap.querySelector('img'); if(!img||!+o.ph) return;
+  const img=wrap.querySelector('img'); if(!img||!+o.pw) return;
   const pre=snap();
-  const r=img.getBoundingClientRect();
-  const sx=e.clientX, sy=e.clientY;
-  const ox=o.px!=null?+o.px:50, oy=o.py!=null?+o.py:50;
+  const page=wrap.closest('.page');
+  const fs0=fsOf(o);
+  const a=(img.naturalHeight/img.naturalWidth)||0.75;
+  const Wem=page.offsetWidth*(+o.w||28)/100/fs0;
+  const imgH=o.pw*a;
+  const sx=e.clientX, sy=e.clientY, ox=+o.ix||0, oy=+o.iy||0;
   let moved=false;
   const mv=ev=>{
     moved=true;
-    o.px=Math.round(Math.max(0,Math.min(100, ox-(ev.clientX-sx)/r.width*100))*10)/10;
-    o.py=Math.round(Math.max(0,Math.min(100, oy-(ev.clientY-sy)/r.height*100))*10)/10;
-    img.style.objectPosition=o.px+'% '+o.py+'%';
+    const dxE=(ev.clientX-sx)/curScale/fs0, dyE=(ev.clientY-sy)/curScale/fs0;
+    o.ix=Math.round(Math.max(Wem-o.pw, Math.min(0, ox+dxE))*100)/100;
+    o.iy=Math.round(Math.max((+o.ph||10)-imgH, Math.min(0, oy+dyE))*100)/100;
+    img.style.left=o.ix+'em'; img.style.top=o.iy+'em';
   };
   const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
     if(moved) pushUndo(pre); };
   addEventListener('pointermove',mv); addEventListener('pointerup',up);
   e.stopPropagation(); e.preventDefault();
+}
+function cropEdgeDrag(e,wrap,key,edge){
+  e.stopPropagation(); e.preventDefault();
+  const o=ovOf(key);
+  const page=wrap.closest('.page'), pr=page.getBoundingClientRect();
+  const img=wrap.querySelector('img'); if(!img||!+o.pw) return;
+  const pre=snap();
+  let moved=false;
+  const fs0=fsOf(o);                                  // stays constant (ts compensates)
+  const a=(img.naturalHeight/img.naturalWidth)||0.75;
+  const emPerPctW=page.offsetWidth/100/fs0;           // em per 1% page width
+  const emPerPctH=page.offsetHeight/100/fs0;
+  const imgH=o.pw*a;
+  const sx=e.clientX, sy=e.clientY;
+  const st={x:+o.x||0, y:+o.y||0, w:+o.w||28, ph:+o.ph||10, ix:+o.ix||0, iy:+o.iy||0};
+  const mv=ev=>{
+    moved=true;
+    const dxPct=(ev.clientX-sx)/pr.width*100;
+    const dyEm=(ev.clientY-sy)/curScale/fs0;
+    let x=st.x, y=st.y, w=st.w, ph=st.ph, ix=st.ix, iy=st.iy;
+    if(edge==='r'){
+      const maxW=(o.pw+st.ix)/emPerPctW;              // window can't outgrow the picture
+      w=Math.max(3, Math.min(maxW, st.w+dxPct));
+    }else if(edge==='l'){
+      let d=Math.max(st.ix/emPerPctW, Math.min(st.w-3, dxPct));   // + = crop in, − = restore
+      x=st.x+d; w=st.w-d; ix=st.ix-d*emPerPctW;
+    }else if(edge==='b'){
+      ph=Math.max(2, Math.min(imgH+st.iy, st.ph+dyEm));
+    }else{                                            // top
+      let d=Math.max(st.iy, Math.min(st.ph-2, dyEm));
+      y=st.y+d/emPerPctH; ph=st.ph-d; iy=st.iy-d;
+    }
+    o.x=Math.round(x*10)/10; o.y=Math.round(y*10)/10;
+    o.w=Math.round(w*100)/100; o.ph=Math.round(ph*100)/100;
+    o.ix=Math.round(ix*100)/100; o.iy=Math.round(iy*100)/100;
+    o.ts=Math.round(fs0/(13.5*(o.w/28))*1000)/1000;
+    if(Math.abs(o.ts-1)<0.002) delete o.ts;
+    applyCrop(wrap,o);
+    updateOffpage();
+  };
+  const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+    if(moved){ pushUndo(pre); markSel(); } };
+  addEventListener('pointermove',mv); addEventListener('pointerup',up);
 }
 
 // ── Global controls ─────────────────────────────────────────────────
