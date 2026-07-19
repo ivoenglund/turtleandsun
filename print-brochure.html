@@ -7,7 +7,8 @@
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Caveat:wght@600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Oswald:wght@400;600&family=Raleway:wght@400;700&family=Nunito:wght@400;700&family=Roboto+Slab:wght@400;700&family=Dancing+Script:wght@600&family=Pacifico&family=Abril+Fatface&display=swap');
   :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
   *{ box-sizing:border-box; }
-  body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; }
+  html,body{ height:100%; }
+  body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; overflow:hidden; }
   /* Page width/height/padding are injected per paper size by applyPaper(). */
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:hidden;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
@@ -63,7 +64,8 @@
   .rszh{ position:absolute; right:-9px; bottom:-9px; width:17px; height:17px; border-radius:50%;
          background:var(--gold); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4);
          cursor:nwse-resize; z-index:5; touch-action:none; }
-  #out{ position:relative; overflow:hidden; transform-origin:0 0; margin:0 auto; }
+  /* The canvas floats free: translate+scale, no anchors, no scrollbars. Fit brings it home. */
+  #out{ position:absolute; left:0; top:0; transform-origin:0 0; }
   #zoomWrap button, #pageNav button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
   #zoomWrap button:hover, #pageNav button:hover{ background:#f4efe4; }
   #pageNav button:disabled{ opacity:.4; cursor:default; }
@@ -76,8 +78,9 @@
     .page{ height:auto; min-height:296mm; } body.fmt-poster .page{ height:1000mm; }
     .block{ page-break-inside:avoid; }
     #out .page{ cursor:auto; }
-    /* Never print the on-screen zoom transform — always full size. */
-    #out{ transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; } }
+    /* Never print the on-screen zoom/pan transform — always full size, in flow. */
+    body{ overflow:visible!important; height:auto!important; }
+    #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; } }
   .page.cover{ padding:0; background:var(--green); color:#f4efe4; }
   .cover .img{ position:absolute; inset:0; background-size:cover; background-position:center; }
   .cover .scrim{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(31,74,69,0) 30%,rgba(31,74,69,.88) 78%); }
@@ -119,6 +122,8 @@
     <div class="prow">
       <button onclick="window.print()" title="Print / save as PDF">🖨 PDF</button>
       <button id="saveBtn" class="primary">Save</button>
+      <button id="undoBtn" title="Undo (Ctrl+Z)" style="flex:0 0 auto;">↶</button>
+      <button id="redoBtn" title="Redo (Ctrl+Y)" style="flex:0 0 auto;">↷</button>
     </div>
     <div class="ph">Paper</div>
     <select id="paper"></select>
@@ -317,19 +322,17 @@ function contentNat(){
   out.querySelectorAll('.page').forEach(p=>{ w=Math.max(w,p.offsetWidth); h=Math.max(h,p.offsetTop+p.offsetHeight); });
   return { w, h };
 }
+// The canvas is free-floating: pan (panX/panY) + scale, no anchors anywhere.
+// Lose it off-screen? The Fit button always brings it back.
+let panX=20, panY=16;
+function setView(){
+  const out=document.getElementById('out');
+  out.style.transform='translate('+panX+'px,'+panY+'px) scale('+curScale+')';
+}
 function applyZoom(pct){
   pct=clampPct(pct);
-  const out=document.getElementById('out');
-  const s=pct/100; curScale=s;
-  const {w,h}=contentNat();
-  out.style.transformOrigin='0 0';
-  if(!w){ out.style.transform=''; out.style.width=''; out.style.height=''; syncZoomLabel(pct); return; }
-  out.style.transform = s===1 ? '' : 'scale('+s+')';
-  out.style.width=(w*s)+'px';
-  out.style.height=(h*s)+'px';
-  // Centre in the space LEFT of the panel (panel ≈ 292px incl. gutters).
-  out.style.marginLeft=Math.max(14, (window.innerWidth-292-w*s)/2)+'px';
-  out.style.marginRight='0';
+  curScale=pct/100;
+  setView();
   syncZoomLabel(pct);
 }
 function syncZoomLabel(pct){
@@ -342,19 +345,28 @@ function fitPct(){
   if(!w) return 100;
   return clampPct(Math.min(100, (window.innerWidth-306)/w*100));
 }
-function syncZoom(){ applyZoom(fitPct()); window.scrollTo(0,0); }
+// Fit = rescue: scale to the window and centre in the space left of the panel.
+function syncZoom(){
+  const {w}=contentNat();
+  const pct=fitPct();
+  curScale=pct/100;
+  panX=Math.max(14, ((window.innerWidth-292)-w*curScale)/2);
+  panY=16;
+  setView();
+  syncZoomLabel(pct);
+}
 
 // Zoom to a new percent while keeping (cx,cy) — a client point — over the
 // same spot on the canvas. Falls back to viewport centre when no point given.
 function zoomToPct(pct, cx, cy){
   pct=clampPct(pct);
-  const out=document.getElementById('out');
-  if(cx==null){ cx=window.innerWidth/2; cy=window.innerHeight/2; }
-  const r0=out.getBoundingClientRect(), s0=curScale;
-  const px=(cx-r0.left)/s0, py=(cy-r0.top)/s0;   // content point under focal
-  applyZoom(pct);
-  const r1=out.getBoundingClientRect();
-  window.scrollBy(r1.left-(cx-px*curScale), r1.top-(cy-py*curScale));
+  if(cx==null){ cx=(window.innerWidth-292)/2; cy=window.innerHeight/2; }
+  const s0=curScale;
+  const px=(cx-panX)/s0, py=(cy-panY)/s0;   // content point under focal
+  curScale=pct/100;
+  panX=cx-px*curScale; panY=cy-py*curScale;
+  setView();
+  syncZoomLabel(pct);
 }
 function zoomStep(factor, cx, cy){ zoomToPct(curScale*100*factor, cx, cy); }
 
@@ -414,6 +426,7 @@ function wireDrag(){
       if(editing) commitEdit(false);        // keep the edit — never lose it on a stray click
       const page=w.parentElement, pr=page.getBoundingClientRect();
       const idx=+w.dataset.absidx; selIdx=idx; showKnobs(); markSel();
+      const pre=snap();
       const sx=e.clientX, sy=e.clientY;
       const ox=parseFloat(w.style.left), oy=parseFloat(w.style.top);
       let moved=false;
@@ -426,6 +439,7 @@ function wireDrag(){
       const up=()=>{
         removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
         if(moved){
+          pushUndo(pre);
           const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
           ov.x=Math.round(parseFloat(w.style.left)*10)/10; ov.y=Math.round(parseFloat(w.style.top)*10)/10;
         }
@@ -435,15 +449,19 @@ function wireDrag(){
     };
   });
 }
-// Drag empty page background to pan the zoomed view.
+// Drag anywhere that isn't a card or the panel to move the canvas freely.
+// Any click outside the text editor auto-saves an edit in progress.
+let panWired=false;
 function wirePan(){
-  const page=document.querySelector('#out .page'); if(!page) return;
-  page.addEventListener('pointerdown',e=>{
-    if(e.target.closest('.abswrap')) return;
-    const sx=e.clientX, sy=e.clientY, ox=window.scrollX, oy=window.scrollY;
-    page.style.cursor='grabbing';
-    const mv=ev=>window.scrollTo(ox-(ev.clientX-sx), oy-(ev.clientY-sy));
-    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up); page.style.cursor=''; };
+  if(panWired) return; panWired=true;
+  document.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    if(e.target.closest('#panel')||e.target.closest('.abswrap')||e.target.closest('[contenteditable="true"]')) return;
+    if(editing) commitEdit(false);          // click away = saved, never lost
+    const sx=e.clientX, sy=e.clientY, opx=panX, opy=panY;
+    document.body.style.cursor='grabbing';
+    const mv=ev=>{ panX=opx+(ev.clientX-sx); panY=opy+(ev.clientY-sy); setView(); };
+    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up); document.body.style.cursor=''; };
     addEventListener('pointermove',mv); addEventListener('pointerup',up);
     e.preventDefault();
   });
@@ -459,10 +477,11 @@ function updatePageNav(){
   if(del)  del.disabled=N<=1 && !itemsAll().some(it=>(it.overrides&&+it.overrides.page)===curPage);
 }
 function setPage(n){ curPage=n; renderCurrent(); syncZoom(); }
-function addPage(){ COMP.params.pages=pageCount()+1; setPage(COMP.params.pages); }
+function addPage(){ pushUndo(); COMP.params.pages=pageCount()+1; setPage(COMP.params.pages); }
 function deletePage(){
   const N=pageCount();
   if(!confirm('Delete page '+curPage+'? Cards on it go back to the tray.')) return;
+  pushUndo();
   itemsAll().forEach(it=>{ const ov=it.overrides; if(!ov||ov.page==null) return;
     if(+ov.page===curPage){ delete ov.page; delete ov.x; delete ov.y; }
     else if(+ov.page>curPage){ ov.page=+ov.page-1; }
@@ -477,13 +496,49 @@ function deletePage(){
 // re-add it from the Make tab).
 function removeCard(idx){
   if(!confirm('Remove this card from the document?')) return;
+  pushUndo();
   COMP.items.splice(idx,1);
   selIdx=null; renderCurrent(); showKnobs();
 }
 function moveCardToPage(idx,n){
+  pushUndo();
   const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
   ov.page=Math.max(1,Math.min(pageCount(),n));
   curPage=ov.page; renderCurrent(); showKnobs();   // follow the card
+}
+
+// ── Undo / redo ─────────────────────────────────────────────────────
+// Snapshot-based: every change (move, resize, knob, text, page ops) pushes the
+// PRE-state. 200 deep. While typing in the text editor, native undo applies.
+let UNDO=[], REDO=[];
+function snap(){ return JSON.stringify({ params:COMP.params||{}, items:COMP.items||[] }); }
+function pushUndo(pre){
+  UNDO.push(pre!=null?pre:snap());
+  if(UNDO.length>200) UNDO.shift();
+  REDO.length=0;
+  updateUndoBtns();
+}
+function restoreSnap(js){
+  const st=JSON.parse(js);
+  COMP.params=st.params; COMP.items=st.items;
+  selIdx=null; renderCurrent(); showKnobs(); markSel(); updateUndoBtns();
+}
+function doUndo(){
+  if(editing){ try{ document.execCommand('undo'); }catch(e){} return; }
+  if(!UNDO.length) return;
+  REDO.push(snap());
+  restoreSnap(UNDO.pop());
+}
+function doRedo(){
+  if(editing){ try{ document.execCommand('redo'); }catch(e){} return; }
+  if(!REDO.length) return;
+  UNDO.push(snap());
+  restoreSnap(REDO.pop());
+}
+function updateUndoBtns(){
+  const u=document.getElementById('undoBtn'), r=document.getElementById('redoBtn');
+  if(u) u.disabled=!UNDO.length&&!editing;
+  if(r) r.disabled=!REDO.length&&!editing;
 }
 
 // ── Knobs: select a card → adjust it, live ──────────────────────────
@@ -496,7 +551,6 @@ const FONTS=[
   ['Caveat','Caveat (hand)'],['Dancing Script','Dancing Script'],['Pacifico','Pacifico'],
   ['Abril Fatface','Abril Fatface'],['Arial','Arial'],['Courier New','Courier New']
 ];
-const SIZES=[10,11,12,13,14,16,18,21,24,28,32,40,48,60,72];
 const SWATCH=['#23291d','#1f4a45','#c9a24b','#7a8470','#8c2f1b','#2a5d8c','#ffffff','#000000'];
 const KN={ img:[['s','Small'],['m','Medium'],['l','Large'],['','Full']] };
 function knobRow(kind,label,cur){
@@ -545,10 +599,11 @@ function showKnobs(){
       '<div style="margin-top:8px;"><button id="knEdit" style="width:100%;">✏ Edit the text</button></div>':'')+
     (isPost&&editing?
       '<div class="kh">Editing — select text, then style it</div>'+
-      '<select id="tbFont"><option value="">Font for the selection…</option>'+
+      '<select id="tbFont" title="Font at the cursor — arrow keys preview live"><option value="">Font…</option>'+
         FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'">'+t+'</option>').join('')+'</select>'+
-      '<div class="krow"><select id="tbSize" style="flex:1;margin-bottom:0;"><option value="">Size…</option>'+
-        SIZES.map(s=>'<option value="'+s+'">'+s+' px</option>').join('')+'</select>'+
+      '<div class="krow"><input type="number" id="tbSize" min="4" max="500" step="1" value="14" title="Size in px — arrow keys step it live" '+
+          'style="flex:1;width:0;font-family:inherit;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #d9d4c4;">'+
+        '<span style="font-size:11px;color:var(--muted);">px</span>'+
         '<input type="color" id="tbColor" value="#23291d" title="Any colour"></div>'+
       '<div class="krow">'+SWATCH.map(c=>'<button class="sw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+'</div>'+
       '<div class="krow"><button id="tbB" style="font-weight:800;">B</button>'+
@@ -561,6 +616,7 @@ function showKnobs(){
   const q=id=>document.getElementById(id);
   k.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
     if(editing) commitEdit(false);
+    pushUndo();
     const kk=b.dataset.k, v=b.dataset.v;
     if(kk==='nodate') ov.nodate=!!v;
     else if(kk==='caption') ov.caption=!!v;
@@ -571,69 +627,114 @@ function showKnobs(){
   q('knPgNext').onclick=()=>moveCardToPage(selIdx,(ov.page||curPage)+1);
   q('knUnplace').onclick=()=>removeCard(selIdx);
   q('knClose').onclick=()=>{ if(editing) commitEdit(false); selIdx=null; showKnobs(); markSel(); };
-  q('knW').oninput=e=>{ ov.w=+e.target.value; q('szPct').textContent=Math.round(ov.w)+'%'; liveCardStyle(); };
-  q('knTs').oninput=e=>{ ov.ts=+e.target.value/100; if(ov.ts===1) delete ov.ts; q('tsPct').textContent=e.target.value+'%'; liveCardStyle(); };
+  q('knW').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); ov.w=+e.target.value; q('szPct').textContent=Math.round(ov.w)+'%'; liveCardStyle(); };
+  q('knW').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
+  q('knTs').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); ov.ts=+e.target.value/100; if(ov.ts===1) delete ov.ts; q('tsPct').textContent=e.target.value+'%'; liveCardStyle(); };
+  q('knTs').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
   const ff=q('knFF');
-  if(ff) ff.onchange=e=>{ if(e.target.value) ov.ff=e.target.value; else delete ov.ff; delete ov.font; render(); showKnobs(); markSel(); };
+  if(ff) ff.onchange=e=>{ pushUndo(); if(e.target.value) ov.ff=e.target.value; else delete ov.ff; delete ov.font; render(); showKnobs(); markSel(); };
   const eb=q('knEdit');
   if(eb) eb.onclick=()=>startEdit();
   if(editing&&isPost){
-    q('tbFont').onchange=e=>{ if(!e.target.value) return; restoreSel(); document.execCommand('fontName',false,e.target.value); e.target.selectedIndex=0; };
-    q('tbSize').onchange=e=>{
-      const px=e.target.value; if(!px) return; restoreSel();
-      document.execCommand('fontSize',false,'7');      // marker…
-      const bd=curBd();                                 // …then swap for real px
-      if(bd) bd.querySelectorAll('font[size="7"]').forEach(f=>{
-        const sp=document.createElement('span'); sp.style.fontSize=px+'px';
-        while(f.firstChild) sp.appendChild(f.firstChild); f.replaceWith(sp);
-      });
-      e.target.selectedIndex=0;
-    };
-    q('tbColor').onchange=e=>{ restoreSel(); document.execCommand('foreColor',false,e.target.value); };
+    // Font/size/colour restyle ONE reusable span over the saved selection, so
+    // the dropdown/number keep their focus: arrow keys step fonts and sizes
+    // with live preview on the page, without leaving the editor.
+    q('tbFont').onchange=e=>{ if(e.target.value) applyStyle('fontFamily',"'"+e.target.value+"'"); };
+    q('tbSize').oninput=e=>{ const px=+e.target.value; if(px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
+    q('tbColor').oninput=e=>applyStyle('color',e.target.value);
     k.querySelectorAll('.sw').forEach(b=>{
       b.onmousedown=e=>e.preventDefault();
-      b.onclick=()=>{ restoreSel(); document.execCommand('foreColor',false,b.dataset.c); };
+      b.onclick=()=>applyStyle('color',b.dataset.c);
     });
     [['tbB','bold'],['tbI','italic'],['tbU','underline']].forEach(([id,cmd])=>{
       const b=q(id); b.onmousedown=e=>e.preventDefault();
       b.onclick=()=>{ restoreSel(); document.execCommand(cmd); };
     });
-    q('tbReset').onclick=()=>{ delete ov.text; editing=false; savedSel=null; render(); showKnobs(); markSel(); };
+    q('tbReset').onclick=()=>{ pushUndo(); delete ov.text; editing=false; savedSel=null; styleSpan=null; render(); showKnobs(); markSel(); updateUndoBtns(); };
     q('tbDone').onclick=()=>commitEdit(true);
+    updateTb();
   }
 }
 
 // ── In-place text editing ───────────────────────────────────────────
 function curBd(){ return document.querySelector('[contenteditable="true"]'); }
+let styleSpan=null, holdSel=false;
 function startEdit(){
   const bd=document.querySelector('[data-idx="'+selIdx+'"] .bd'); if(!bd) return;
   try{ document.execCommand('styleWithCSS',false,true); }catch(e){}
   bd.setAttribute('contenteditable','true'); bd.focus();
-  editing=true; savedSel=null; showKnobs();
+  editing=true; savedSel=null; styleSpan=null; showKnobs(); updateUndoBtns();
 }
 function commitEdit(rerender){
   const bd=curBd();
   if(bd){
     const bl=bd.closest('[data-idx]');
-    if(bl){ const it=COMP.items[+bl.dataset.idx]; (it.overrides=it.overrides||{}).text=sanitizeHtml(bd.innerHTML); }
+    if(bl){
+      const it=COMP.items[+bl.dataset.idx];
+      const ov=it.overrides=it.overrides||{};
+      const nw=sanitizeHtml(bd.innerHTML);
+      if(nw!==(ov.text||'')){ pushUndo(); ov.text=nw; }   // pre-state pushed BEFORE the change
+    }
     bd.removeAttribute('contenteditable');
   }
-  editing=false; savedSel=null;
+  editing=false; savedSel=null; styleSpan=null; updateUndoBtns();
   if(rerender){ render(); showKnobs(); markSel(); }
   else showKnobs();
 }
 // Remember the selection inside the editable and restore it after panel
 // clicks — styling never kicks you out of the editor.
 document.addEventListener('selectionchange',()=>{
-  if(!editing) return;
+  if(!editing||holdSel) return;
   const sel=getSelection(); if(!sel.rangeCount) return;
   const bd=curBd(); if(!bd) return;
-  if(bd.contains(sel.anchorNode)) savedSel=sel.getRangeAt(0).cloneRange();
+  if(bd.contains(sel.anchorNode)){
+    savedSel=sel.getRangeAt(0).cloneRange();
+    styleSpan=null;              // a NEW selection gets a fresh style span
+    updateTb();                  // …and the toolbar shows its font + size
+  }
 });
 function restoreSel(){
   const bd=curBd(); if(!bd) return;
   bd.focus();
   if(savedSel){ const s=getSelection(); s.removeAllRanges(); s.addRange(savedSel); }
+}
+// Style the saved selection by wrapping it ONCE in a span; repeated calls
+// (arrow-stepping fonts/sizes) restyle the SAME span — live preview, no
+// nesting, and focus stays where it is (the dropdown keeps taking arrows).
+function applyStyle(prop,val){
+  const bd=curBd(); if(!bd) return;
+  if(styleSpan&&bd.contains(styleSpan)){ styleSpan.style[prop]=val; return; }
+  if(!savedSel||savedSel.collapsed){       // caret only → set the typing style
+    restoreSel();
+    try{
+      document.execCommand('styleWithCSS',false,true);
+      if(prop==='fontFamily') document.execCommand('fontName',false,String(val).replace(/'/g,''));
+      else if(prop==='color') document.execCommand('foreColor',false,val);
+    }catch(e){}
+    return;
+  }
+  holdSel=true;
+  const sp=document.createElement('span'); sp.style[prop]=val;
+  const r=savedSel;
+  try{ r.surroundContents(sp); }
+  catch(e){ const frag=r.extractContents(); sp.appendChild(frag); r.insertNode(sp); }
+  styleSpan=sp;
+  const r2=document.createRange(); r2.selectNodeContents(sp); savedSel=r2;
+  setTimeout(()=>holdSel=false,0);
+}
+// Show the font + size AT the cursor/selection in the toolbar.
+function updateTb(){
+  const f=document.getElementById('tbFont'), s=document.getElementById('tbSize');
+  if(!f||!s) return;
+  const bd=curBd(); if(!bd) return;
+  const sel=getSelection(); if(!sel.rangeCount||!sel.anchorNode) return;
+  const el=sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement;
+  if(!el||!bd.contains(el)) return;
+  const cs=getComputedStyle(el);
+  const fam=(cs.fontFamily||'').split(',')[0].replace(/["']/g,'').trim();
+  const m=FONTS.find(([v])=>v.toLowerCase()===fam.toLowerCase());
+  if(document.activeElement!==f){ f.value=m?m[0]:''; f.options[0].textContent=m?'Font…':(fam||'Font…'); }
+  if(document.activeElement!==s) s.value=Math.round(parseFloat(cs.fontSize)||14);
 }
 
 // ── Selection + the resize handle ───────────────────────────────────
@@ -655,14 +756,18 @@ function wireResize(h,wrap){
     const page=wrap.parentElement, pr=page.getBoundingClientRect();
     const idx=+wrap.dataset.absidx;
     const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
+    const pre=snap();
+    let resized=false;
     const sx=e.clientX, ow=parseFloat(wrap.style.width)||ov.w||28;
     const mv=ev=>{
+      resized=true;
       ov.w=Math.max(6,Math.min(95, ow+(ev.clientX-sx)/pr.width*100));
       wrap.style.width=ov.w+'%'; wrap.style.fontSize=fsOf(ov)+'px';
       const s=document.getElementById('knW');
       if(s){ s.value=ov.w; const p=document.getElementById('szPct'); if(p) p.textContent=Math.round(ov.w)+'%'; }
     };
-    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up); ov.w=Math.round(ov.w*10)/10; };
+    const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+      if(resized){ ov.w=Math.round(ov.w*10)/10; pushUndo(pre); } };
     addEventListener('pointermove',mv); addEventListener('pointerup',up);
   };
 }
@@ -699,9 +804,12 @@ document.getElementById('out').addEventListener('wheel',e=>{
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
 
-// Keyboard: +/= zoom in, -/_ zoom out, 0 fits. Ignore while editing text.
+// Keyboard: +/= zoom in, -/_ zoom out, 0 fits, Ctrl+Z/Y undo/redo.
+// While editing text or in a field, the browser's own behaviour applies.
 document.addEventListener('keydown',e=>{
   if(e.target && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); doUndo(); return; }
+  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); doRedo(); return; }
   const at=lastMouse||{};
   if(e.key==='+'||e.key==='='){ e.preventDefault(); zoomStep(1.25, at.x, at.y); }
   else if(e.key==='-'||e.key==='_'){ e.preventDefault(); zoomStep(1/1.25, at.x, at.y); }
@@ -712,6 +820,12 @@ document.getElementById('pgPrev').onclick=()=>setPage(curPage-1);
 document.getElementById('pgNext').onclick=()=>setPage(curPage+1);
 document.getElementById('pgAdd').onclick=()=>addPage();
 document.getElementById('pgDel').onclick=()=>deletePage();
+// Undo / redo buttons (mousedown-preventDefault keeps the text editor focused,
+// so while editing they drive the browser's native text undo).
+const _ub=document.getElementById('undoBtn'), _rb=document.getElementById('redoBtn');
+_ub.onmousedown=e=>e.preventDefault(); _rb.onmousedown=e=>e.preventDefault();
+_ub.onclick=()=>doUndo(); _rb.onclick=()=>doRedo();
+updateUndoBtns();
 
 // Print = all pages in order; restore the single-page editor afterwards.
 window.addEventListener('beforeprint',()=>{ if(editing) commitEdit(false); renderAllPages(); });
