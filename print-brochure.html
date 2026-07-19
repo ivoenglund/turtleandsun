@@ -117,6 +117,7 @@
     .abswrap,.frameobj,.block,.txtfree{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; }
     .page{ box-shadow:none; margin:0; page-break-after:always; height:auto; min-height:296mm; overflow:hidden!important; }
+    .page:last-child{ page-break-after:auto; break-after:auto; }   /* no phantom empty sheet */
     body.fmt-poster .page{ height:1000mm; }
     #out .page{ cursor:auto; }
   }
@@ -410,7 +411,7 @@ function syncZoomLabel(pct){
 function fitPct(){
   const {w}=contentNat();
   if(!w) return 100;
-  return clampPct(Math.min(100, (window.innerWidth-306)/w*100));
+  return clampPct((window.innerWidth-306)/w*100);   // fill the window, small papers too
 }
 function syncZoom(){
   const {w}=contentNat();
@@ -1018,9 +1019,9 @@ function showKnobs(){
     '<div class="krow"><button id="knBgNone" class="'+(ov.bg?'':'on')+'">None</button>'+
       ['#ffffff','#f7f3e8','#1f4a45','#c9a24b'].map(c=>'<button class="sw bgsw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+
       '<input type="color" id="knBg" value="'+(ov.bg&&/^#/.test(ov.bg)?ov.bg:'#ffffff')+'" title="Any background colour"></div>'+
-    '<div class="krow" style="margin-top:8px;"><button id="knSh" style="flex:1;" title="Click to step the shadow: 0 = none, then 1–2–3">Shadow: '+(+ov.sh||0)+'</button>'+
-      '<button id="knSq" style="flex:1;" title="Click to toggle — pictures, background, border and shadow together">'+
-      (ov.sq?'Square corners':'Rounded corners')+'</button></div>'+
+    '<div class="krow" style="margin-top:8px;"><button id="knSh" style="flex:0 0 auto;white-space:nowrap;" title="Click to step the shadow: 0 = none, then 1–2–3">Shadow '+(+ov.sh||0)+'</button>'+
+      '<button id="knSq" style="flex:1;white-space:nowrap;" title="Click to switch to this — pictures, background, border and shadow together">'+
+      (ov.sq?'Rounded corners':'Square corners')+'</button></div>'+
     (singlePic?
       '<div class="kh">Picture</div><div class="krow">'+
         '<button id="knCrop" style="flex:1;" title="Crop: drag any edge in or out, drag inside to slide the picture">✂ Crop</button></div>':'')+
