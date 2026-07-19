@@ -2586,7 +2586,9 @@ let makList = [];
 // Living/Deceased/People/Pets come from the EXISTING sidebar filters.
 let makView = { groups:{}, ungrouped:true, timeline:true, archive:true, y1:'', y2:'' };
 try{ Object.assign(makView, JSON.parse(localStorage.getItem('ts_mak_view')||'{}')); }catch(e){}
-if(!makView.y1){ const y=new Date().getFullYear(); makView.y1=String(y); makView.y2=String(y+1); }
+{ const y=new Date().getFullYear();
+  if(!/^\d{4}$/.test(String(makView.y1||''))) makView.y1=String(y);
+  if(!/^\d{4}$/.test(String(makView.y2||''))||+makView.y2<+makView.y1) makView.y2=String(+makView.y1+1); }
 function makViewSave(){ try{ localStorage.setItem('ts_mak_view',JSON.stringify(makView)); }catch(e){} }
 // Wire the sidebar's Make-only controls (static HTML, wired once).
 (function(){
@@ -2609,10 +2611,14 @@ async function ensureMedia(force){
   if(mediaCache && !force) return;
   mediaCache = await api('/api/media-cards') || [];
 }
+function yearOK(v){ return /^\d{4}$/.test(String(v||'').trim()); }
 async function renderMak(){
-  // Belt and braces: the year fields are ALWAYS populated when the tab opens.
-  if(!makView.y1){ const y=new Date().getFullYear(); makView.y1=String(y); makView.y2=String(y+1); }
-  if(!makView.y2) makView.y2=String(+makView.y1+1);
+  // The year fields are ALWAYS sane when the tab opens: anything that isn't
+  // a real 4-digit year (old junk like "-7") is replaced by this/next year.
+  const yNow=new Date().getFullYear();
+  if(!yearOK(makView.y1)) makView.y1=String(yNow);
+  if(!yearOK(makView.y2)||+makView.y2<+makView.y1) makView.y2=String(+makView.y1+1);
+  makViewSave();
   $('#mkY1').value=makView.y1; $('#mkY2').value=makView.y2;
   $('#mkUngrouped').checked=!!makView.ungrouped;
   $('#mkTimeline').checked=!!makView.timeline;
