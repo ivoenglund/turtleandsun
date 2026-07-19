@@ -40,7 +40,7 @@
   /* Sidebar rows are a REAL two-column grid: col 1 = checkbox (14px),
      8px gap, col 2 = content. One geometry for every row, every mode. */
   .row{display:grid;grid-template-columns:14px 1fr;column-gap:8px;align-items:center;
-       padding:6px 10px;border-radius:8px;cursor:pointer;color:#33402a;}
+       padding:3px 10px;border-radius:8px;cursor:pointer;color:#33402a;position:relative;}
   .row .mkChk{grid-column:1;}
   .row .c2{grid-column:2;display:flex;align-items:center;gap:8px;min-width:0;}
   .row:hover{background:#F4F1E6;}
@@ -49,7 +49,10 @@
   .sub .c2{padding-left:18px;}
   .arr{color:var(--mut);font-size:11px;}
   .addg{color:var(--green2);font-weight:700;padding:7px 10px;cursor:pointer;font-size:13.5px;}
-  .row .del{margin-left:6px;color:#a12a1a;font-weight:700;opacity:0;cursor:pointer;padding:0 5px;border-radius:5px;font-size:12px;}
+  /* The ✕ overlays on hover — it takes NO flow space, so every count ends
+     at the same 10px right margin as the buttons above. */
+  .row .del{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#F4F1E6;
+            color:#a12a1a;font-weight:700;opacity:0;cursor:pointer;padding:0 5px;border-radius:5px;font-size:12px;}
   .row:hover .del{opacity:.7;}
   .row .del:hover{opacity:1;background:#f6e3df;}
   .row.dragover{outline:2px dashed var(--leaf2);outline-offset:-2px;background:#eef6e6;}
@@ -193,8 +196,8 @@
       <button class="btn sm gray" id="addGroupBtn">＋ New group</button>
       <button class="btn sm gray" id="pinBtn" title="Pinned: always visible. Auto-hide: folds away, hover the left strip to open.">📌 Pinned</button>
     </div>
-    <div class="row" id="poolRow"><span class="c2"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span><span class="del" style="visibility:hidden;pointer-events:none;">✕</span></span></div>
-    <div class="row" id="dupRow"><span class="c2"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span><span class="del" style="visibility:hidden;pointer-events:none;">✕</span></span></div>
+    <div class="row" id="poolRow"><span class="c2"><span>🗂️</span> All contacts <span class="ct" id="poolCount">–</span></span></div>
+    <div class="row" id="dupRow"><span class="c2"><span>⚠️</span> Duplicates <span class="ct" id="dupCount">–</span></span></div>
     <div class="lbl">Groups</div>
     <div id="tree"></div>
     <div class="lbl">Filters (all views)</div>
@@ -366,7 +369,11 @@
       body.makmode .mk-only{display:block;}
       /* Sidebar filter rows share the row grid: checkbox 14px + 8px gap. */
       #side .flt{display:grid;grid-template-columns:14px 1fr;column-gap:8px;align-items:center;padding:3px 10px;}
-      .mkChk{display:none;width:auto!important;}
+      /* Hard reset: the global input styling (padding/border/radius) must NOT
+         touch these — they are plain native 14px checkboxes. */
+      .mkChk{display:none;appearance:auto;-webkit-appearance:checkbox;width:14px!important;height:14px;
+             padding:0!important;margin:0!important;border:none!important;background:none!important;
+             border-radius:0!important;accent-color:#1f4a45;}
       body.makmode .mkChk{display:inline-block;}
     </style>
     <div id="mak" class="hide">
@@ -815,7 +822,7 @@ function renderTree(){
     const onBoard=(typeof makView!=='undefined')?(makView.groups[node.id]!==false):true;
     div.innerHTML = `<input type="checkbox" class="mkChk" data-g="${node.id}" ${onBoard?'checked':''} title="Show this group on the Make board">`
       + `<span class="c2"><span>${depth?'•':'📁'}</span> ${esc(node.name)}${arrow?` <span class="arr">${arrow}</span>`:''} <span class="ct">${countFor(node)}</span>`
-      + (isFamily?`<span class="del" style="visibility:hidden;pointer-events:none;">✕</span>`:`<span class="del" title="Delete group">✕</span>`)
+      + (isFamily?'':`<span class="del" title="Delete group">✕</span>`)
       + `</span>`;
     div.onclick = ()=>selectGroup(node);
     const mkc=div.querySelector('.mkChk');
