@@ -1115,9 +1115,14 @@ function restoreSel(){
 // Style the saved selection by wrapping it ONCE in a span; repeated calls
 // (arrow-stepping fonts/sizes) restyle the SAME span — live preview, no
 // nesting, and focus stays where it is (the dropdown keeps taking arrows).
+// Everything INSIDE the styled selection is flattened to `inherit` for that
+// property, so mixed sizes/fonts/colours all take the new value uniformly.
+function flattenProp(sp,prop){
+  sp.querySelectorAll('*').forEach(el=>{ try{ el.style[prop]='inherit'; }catch(e){} });
+}
 function applyStyle(prop,val){
   const bd=curBd(); if(!bd) return;
-  if(styleSpan&&bd.contains(styleSpan)){ styleSpan.style[prop]=val; return; }
+  if(styleSpan&&bd.contains(styleSpan)){ styleSpan.style[prop]=val; flattenProp(styleSpan,prop); return; }
   if(!savedSel||savedSel.collapsed){       // caret only → set the typing style
     restoreSel();
     try{
@@ -1132,6 +1137,7 @@ function applyStyle(prop,val){
   const r=savedSel;
   try{ r.surroundContents(sp); }
   catch(e){ const frag=r.extractContents(); sp.appendChild(frag); r.insertNode(sp); }
+  flattenProp(sp,prop);
   styleSpan=sp;
   const r2=document.createRange(); r2.selectNodeContents(sp); savedSel=r2;
   setTimeout(()=>holdSel=false,0);
