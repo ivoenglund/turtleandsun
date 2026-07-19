@@ -26,10 +26,10 @@
   .block.media.img-s img{ max-height:45mm; } .block.media.img-m img{ max-height:80mm; }
   .block.media.img-l img{ max-height:130mm; } .block.media.big img{ max-height:200mm; }
   .block.media .cap{ font-size:12px; color:#5c5c4d; margin-top:3mm; }
-  /* Everything lives in one fixed panel on the left; the rest is clean page. */
-  #panel{ position:fixed; left:0; top:0; bottom:0; width:238px; background:#fff; border-right:2px solid var(--gold);
-          padding:12px 14px; overflow:auto; z-index:10; box-shadow:2px 0 12px rgba(0,0,0,.12); }
-  body{ padding-left:238px; }
+  /* One floating panel on the left holds every control; the rest is clean page. */
+  #panel{ position:fixed; left:16px; top:16px; width:236px; max-height:calc(100vh - 32px); overflow:auto;
+          background:#fff; border:2px solid var(--gold); border-radius:12px; padding:12px 14px;
+          box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; }
   #docCtl .prow{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
   #docCtl .prow > button{ flex:1; }
   #docCtl .ph{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:10px 0 4px; }
@@ -293,12 +293,11 @@ function syncZoomLabel(pct){
   const zi=document.getElementById('zoom'); if(zi) zi.value=Math.round(pct);
   const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
 }
-// Scale so the page fits the visible area (viewport minus the left panel).
-const PANEL_W=238;
+// Scale so the page fits the viewport width (never above 100%).
 function fitPct(){
   const {w}=contentNat();
   if(!w) return 100;
-  return clampPct(Math.min(100, (window.innerWidth-PANEL_W-40)/w*100));
+  return clampPct(Math.min(100, (window.innerWidth-40)/w*100));
 }
 function syncZoom(){ applyZoom(fitPct()); window.scrollTo(0,0); }
 
