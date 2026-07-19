@@ -409,9 +409,10 @@ function syncZoomLabel(pct){
   const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
 }
 function fitPct(){
-  const {w}=contentNat();
+  const {w,h}=contentNat();
   if(!w) return 100;
-  return clampPct((window.innerWidth-306)/w*100);   // fill the window, small papers too
+  // The WHOLE page must fit: whichever of width and height is tighter wins.
+  return clampPct(Math.min((window.innerWidth-306)/w, (window.innerHeight-32)/h)*100);
 }
 function syncZoom(){
   const {w}=contentNat();
