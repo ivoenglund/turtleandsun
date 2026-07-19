@@ -47,7 +47,7 @@
   .row.active{background:#EAF3E2;color:var(--green2);font-weight:700;}
   .row .ct{margin-left:auto;font-size:12px;color:var(--mut);}
   .sub .c2{padding-left:18px;}
-  .arr{width:14px;display:inline-block;color:var(--mut);font-size:11px;}
+  .arr{color:var(--mut);font-size:11px;}
   .addg{color:var(--green2);font-weight:700;padding:7px 10px;cursor:pointer;font-size:13.5px;}
   .row .del{margin-left:6px;color:#a12a1a;font-weight:700;opacity:0;cursor:pointer;padding:0 5px;border-radius:5px;font-size:12px;}
   .row:hover .del{opacity:.7;}
@@ -814,7 +814,7 @@ function renderTree(){
     const isFamily = node.name==='Family';
     const onBoard=(typeof makView!=='undefined')?(makView.groups[node.id]!==false):true;
     div.innerHTML = `<input type="checkbox" class="mkChk" data-g="${node.id}" ${onBoard?'checked':''} title="Show this group on the Make board">`
-      + `<span class="c2"><span class="arr">${arrow}</span><span>${depth?'•':'📁'}</span> ${esc(node.name)} <span class="ct">${countFor(node)}</span>`
+      + `<span class="c2"><span>${depth?'•':'📁'}</span> ${esc(node.name)}${arrow?` <span class="arr">${arrow}</span>`:''} <span class="ct">${countFor(node)}</span>`
       + (isFamily?`<span class="del" style="visibility:hidden;pointer-events:none;">✕</span>`:`<span class="del" title="Delete group">✕</span>`)
       + `</span>`;
     div.onclick = ()=>selectGroup(node);
