@@ -27,7 +27,7 @@
   .block.media.img-l img{ max-height:130mm; } .block.media.big img{ max-height:200mm; }
   .block.media .cap{ font-size:12px; color:#5c5c4d; margin-top:3mm; }
   /* One floating panel on the left holds every control; the rest is clean page. */
-  #panel{ position:fixed; left:16px; top:16px; width:236px; max-height:calc(100vh - 32px); overflow:auto;
+  #panel{ position:fixed; right:16px; top:16px; width:236px; max-height:calc(100vh - 32px); overflow:auto;
           background:#fff; border:2px solid var(--gold); border-radius:12px; padding:12px 14px;
           box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; }
   #docCtl .prow{ display:flex; gap:6px; align-items:center; margin-bottom:6px; }
@@ -124,7 +124,7 @@
       <button id="pgDel" title="Delete this page">🗑</button>
     </div>
   </div>
-  <div id="knobs" style="display:none;"></div>
+  <div id="knobs"></div>
 </aside>
 <div id="out"><div class="err">Loading…</div></div>
 
@@ -208,6 +208,7 @@ async function load(){
   applyPaper(paper);
   render();
   syncZoom();
+  showKnobs();
 }
 
 // ── Paper sizes ─────────────────────────────────────────────────────
@@ -427,7 +428,7 @@ function deletePage(){
 function removeCard(idx){
   if(!confirm('Remove this card from the document?')) return;
   COMP.items.splice(idx,1);
-  selIdx=null; document.getElementById('knobs').style.display='none'; renderCurrent();
+  selIdx=null; renderCurrent(); showKnobs();
 }
 function moveCardToPage(idx,n){
   const ov=COMP.items[idx].overrides=COMP.items[idx].overrides||{};
@@ -450,7 +451,11 @@ function knobRow(kind,label,cur){
 }
 function showKnobs(){
   const k=document.getElementById('knobs');
-  if(selIdx==null){ k.style.display='none'; return; }
+  k.style.display='block';
+  if(selIdx==null){
+    k.innerHTML='<div class="kh">Card</div><div style="font-size:12px;color:var(--muted);line-height:1.4;">Tap a card on the page to adjust it — move it between pages, resize, edit text, or remove it.</div>';
+    return;
+  }
   const it=COMP.items[selIdx];
   const ov=it.overrides=it.overrides||{};
   const isPost=it.ref_type==='post';
