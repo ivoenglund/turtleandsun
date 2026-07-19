@@ -996,18 +996,19 @@ function showKnobs(){
       '<button id="alB" title="Align bottom edges">⤓</button>'+
       (n>=3?'<button id="dsH" title="Spread evenly left-to-right">⋯</button>'+
             '<button id="dsV" title="Spread evenly top-to-bottom">⋮</button>':'')+'</div>':'')+
-    '<div class="kh">Width · <span id="szPct">'+Math.round(+ov.w||28)+'%</span></div>'+
-    '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(+ov.w||28)+'">'+
-    '<div class="kh">Angle · <span id="rDeg">'+Math.round(+ov.r||0)+'°</span></div>'+
-    '<input type="range" id="knR" min="-180" max="180" step="1" value="'+Math.round(+ov.r||0)+'">'+
+    '<div class="krow" style="margin-top:8px;"><span style="width:16px;font-weight:800;color:var(--green);" title="Width">W</span>'+
+      '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(+ov.w||28)+'" style="flex:1;width:auto;margin:0;">'+
+      '<span id="szPct" style="width:40px;text-align:right;font-size:11px;font-weight:700;">'+Math.round(+ov.w||28)+'%</span></div>'+
+    '<div class="krow"><span style="width:16px;font-weight:800;color:var(--green);" title="Angle">∠</span>'+
+      '<input type="range" id="knR" min="-180" max="180" step="1" value="'+Math.round(+ov.r||0)+'" style="flex:1;width:auto;margin:0;">'+
+      '<span id="rDeg" style="width:40px;text-align:right;font-size:11px;font-weight:700;">'+Math.round(+ov.r||0)+'°</span></div>'+
     (anyText?
-      '<div class="kh">Font size · <span id="pxLbl">'+px0+' px</span></div>'+
-      '<div class="krow"><input type="number" id="knPx" min="4" max="500" step="1" value="'+px0+'" style="flex:1;width:0;" title="Text size — arrow keys step it live">'+
-        '<span style="font-size:11px;color:var(--muted);">px</span></div>'+
-      '<div class="kh">Font</div><select id="knFF">'+
-        '<option value="">Jakarta (default)</option>'+
-        FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
-      '</select>':'')+
+      '<div class="kh">Text</div>'+
+      '<div class="krow"><input type="number" id="knPx" min="4" max="500" step="1" value="'+px0+'" style="width:62px;" title="Text size in px — arrow keys step it live">'+
+        '<select id="knFF" style="flex:1;margin-bottom:0;">'+
+          '<option value="">Jakarta (default)</option>'+
+          FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
+        '</select></div>':'')+
     '<div class="kh">Border</div>'+
     '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(+ov.bw||0)+'" title="Border width (0 = none)" style="width:56px;">'+
       '<select id="knBs" style="flex:1;margin-bottom:0;">'+
@@ -1017,11 +1018,9 @@ function showKnobs(){
     '<div class="krow"><button id="knBgNone" class="'+(ov.bg?'':'on')+'">None</button>'+
       ['#ffffff','#f7f3e8','#1f4a45','#c9a24b'].map(c=>'<button class="sw bgsw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+
       '<input type="color" id="knBg" value="'+(ov.bg&&/^#/.test(ov.bg)?ov.bg:'#ffffff')+'" title="Any background colour"></div>'+
-    '<div class="kh">Shadow</div>'+
-    '<div class="row">'+['None','Soft','Medium','Strong'].map((t,i)=>
-      '<button class="shBtn'+((+ov.sh||0)===i?' on':'')+'" data-sh="'+i+'">'+t+'</button>').join('')+'</div>'+
-    '<div class="krow" style="margin-top:5px;"><button id="knSq" style="flex:1;" title="One rule for the whole object: pictures, background, border and shadow together">'+
-      (ov.sq?'Corners: square — round them':'Corners: rounded — square them')+'</button></div>'+
+    '<div class="krow" style="margin-top:8px;"><button id="knSh" style="flex:1;" title="Click to step the shadow: 0 = none, then 1–2–3">Shadow: '+(+ov.sh||0)+'</button>'+
+      '<button id="knSq" style="flex:1;" title="Click to toggle — pictures, background, border and shadow together">'+
+      (ov.sq?'Square corners':'Rounded corners')+'</button></div>'+
     (singlePic?
       '<div class="kh">Picture</div><div class="krow">'+
         '<button id="knCrop" style="flex:1;" title="Crop: drag any edge in or out, drag inside to slide the picture">✂ Crop</button></div>':'')+
@@ -1067,7 +1066,6 @@ function showKnobs(){
       SEL.forEach(key=>{ if(!isTextKey(key)) return; const o=ovOf(key);
         o.ts=Math.round(px/(13.5*((+o.w||28)/28))*1000)/1000;
         if(Math.abs(o.ts-1)<0.002) delete o.ts; });
-      const l=q('pxLbl'); if(l) l.textContent=px+' px';
       liveSelStyle();
     };
     kp.onchange=()=>{ if(kp._pre!=null){ pushUndo(kp._pre); kp._pre=null; } };
@@ -1084,10 +1082,10 @@ function showKnobs(){
   q('knBg').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap();
     SEL.forEach(key=>{ ovOf(key).bg=e.target.value; }); liveSelStyle(); };
   q('knBg').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
-  k.querySelectorAll('.shBtn').forEach(b=>b.onclick=()=>{ pushUndo();
-    const v=+b.dataset.sh;
+  q('knSh').onclick=()=>{ pushUndo();
+    const v=((+ov.sh||0)+1)%4;
     SEL.forEach(key=>{ const o=ovOf(key); if(v) o.sh=v; else delete o.sh; });
-    liveSelStyle(); showKnobs(); });
+    liveSelStyle(); showKnobs(); };
   const cap=q('knCap');
   if(cap) cap.onclick=()=>{ pushUndo(); ov.caption=!ov.caption; render(); showKnobs(); markSel(); };
   const sq=q('knSq');
