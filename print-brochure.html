@@ -37,6 +37,8 @@
   .block.media .cap{ font-size:.89em; color:#5c5c4d; margin-top:.5em; }
   .imgo.cropped{ border-radius:.55em; }
   .sqc img, .imgo.sqc, .imgo.cropped.sqc{ border-radius:0!important; }
+  /* Square corners = EVERYTHING square: pictures, background, border, shadow. */
+  .sqo, .sqo img, .sqo .imgo, .sqo .person img, .sqo .init{ border-radius:0!important; }
   .block.ffo h3, .block.ffo p, .block.ffo .meta, .block.ffo .cap{ font-family:inherit; }
   .block.tco h3, .block.tco p, .block.tco .meta, .block.tco .cap, .block.tco b,
   .block.tco .role, .block.tco .ct{ color:inherit; }
@@ -197,15 +199,16 @@ function sanitizeHtml(s){
 const BORDER_STYLES=['solid','dashed','dotted','double'];
 // Shadow presets (em-based → they scale with the object). Bare text (no
 // background, no border) gets a LETTER shadow; everything else a box shadow.
-const SHADOWS=['','0 .15em .5em rgba(0,0,0,.25)','0 .25em 1em rgba(0,0,0,.35)','0 .5em 1.8em rgba(0,0,0,.5)'];
-const TSHADOWS=['','0 .06em .18em rgba(0,0,0,.35)','0 .09em .3em rgba(0,0,0,.5)','0 .12em .45em rgba(0,0,0,.65)'];
+// Tight, close shadows: short gradient, more density — hugs the card.
+const SHADOWS=['','0 .1em .25em rgba(0,0,0,.35)','0 .15em .4em rgba(0,0,0,.5)','0 .2em .6em rgba(0,0,0,.65)'];
+const TSHADOWS=['','0 .05em .1em rgba(0,0,0,.45)','0 .07em .16em rgba(0,0,0,.6)','0 .1em .22em rgba(0,0,0,.75)'];
 function decoCss(ov,isBareText){
   let s='';
-  if(ov.bg) s+='background:'+esc(ov.bg)+';border-radius:.55em;'+(!+ov.bw?'padding:.4em;':'');
+  if(ov.bg) s+='background:'+esc(ov.bg)+';'+(!+ov.bw?'padding:.4em;':'');
   const sh=+ov.sh||0;
   if(sh){
     if(isBareText&&!ov.bg&&!+ov.bw) s+='text-shadow:'+TSHADOWS[sh]+';';
-    else s+='box-shadow:'+SHADOWS[sh]+';'+(ov.sq||ov.bg?'':'border-radius:.55em;');
+    else s+='box-shadow:'+SHADOWS[sh]+';';
   }
   return s;
 }
@@ -444,12 +447,15 @@ function absWrap(it){
   const ov=it.overrides||{};
   const x=ov.x!=null?+ov.x:10, y=ov.y!=null?+ov.y:10, w=+ov.w||28;
   const bareText=it.ref_type==='post'&&(ov.part||'txt')==='txt';
+  // One corner rule for the WHOLE object: rounded (default) or square —
+  // the wrapper radius rounds background, border and box-shadow together.
   const st='position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;font-size:'+fsOf(ov)+'px;z-index:'+(+ov.z||0)+';'
+    +'border-radius:'+(ov.sq?'0':'.55em')+';'
     +(+ov.r?'transform:rotate('+(+ov.r)+'deg);':'')
     +borderCss(ov,true)
     +decoCss(ov,bareText)
     +(ov.tc?'color:'+esc(ov.tc)+';':'');
-  return '<div class="abswrap" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
+  return '<div class="abswrap'+(ov.sq?' sqo':'')+'" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
 function frameDiv(f,i){
   const bs=BORDER_STYLES.includes(f.bs)?f.bs:'solid';
@@ -458,18 +464,20 @@ function frameDiv(f,i){
     'z-index:'+(+f.z||0)+';border:'+(+f.bw||2)+'px '+bs+' '+esc(f.bc||'#c9a24b')+';'+
     (f.bg?'background:'+esc(f.bg)+';':'')+
     (+f.sh?'box-shadow:'+SHADOWS[+f.sh]+';':'')+
+    (f.sq?'border-radius:0;':'')+
     (+f.r?'transform:rotate('+(+f.r)+'deg);':'')+'"></div>';
 }
 // A free text object — lives in params (like frames), needs no card behind it.
 function txtFreeDiv(t,i){
   const st='position:absolute;left:'+(+t.x||0)+'%;top:'+(+t.y||0)+'%;width:'+(+t.w||30)+'%;font-size:'+fsOf(t)+'px;z-index:'+(+t.z||0)+';'
+    +'border-radius:'+(t.sq?'0':'.55em')+';'
     +(+t.r?'transform:rotate('+(+t.r)+'deg);':'')
     +borderCss(t,true)
     +decoCss(t,true)
     +(t.tc?'color:'+esc(t.tc)+';':'');
   const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
   const ffs=t.ff?' style="font-family:\''+esc(t.ff)+'\'"':'';
-  return '<div class="abswrap txtfree" style="'+st+'" data-text="'+i+'">'+
+  return '<div class="abswrap txtfree'+(t.sq?' sqo':'')+'" style="'+st+'" data-text="'+i+'">'+
     '<div class="'+cls+'"'+ffs+'><div class="bd">'+sanitizeHtml(t.text||'')+'</div></div></div>';
 }
 function pageHtml(n){
@@ -860,13 +868,15 @@ function liveSelStyle(){
       const bare=isTextKey(key)&&!o.bg&&!bw;
       el.style.textShadow=(sh&&bare)?TSHADOWS[sh]:'';
       el.style.boxShadow=(sh&&!bare)?SHADOWS[sh]:'';
-      el.style.borderRadius=(o.bg||(sh&&!bare&&!o.sq))?'.55em':'';
+      el.style.borderRadius=o.sq?'0':'.55em';
+      el.classList.toggle('sqo',!!o.sq);
     }else{
       el.style.width=(+o.w||20)+'%'; el.style.height=(+o.h||20)+'%';
       el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
       el.style.border=(+o.bw||2)+'px '+(BORDER_STYLES.includes(o.bs)?o.bs:'solid')+' '+(o.bc||'#c9a24b');
       el.style.background=o.bg||'';
       el.style.boxShadow=+o.sh?SHADOWS[+o.sh]:'';
+      el.style.borderRadius=o.sq?'0':'';
     }
   });
 }
@@ -992,10 +1002,11 @@ function showKnobs(){
     '<div class="kh">Shadow</div>'+
     '<div class="row">'+['None','Soft','Medium','Strong'].map((t,i)=>
       '<button class="shBtn'+((+ov.sh||0)===i?' on':'')+'" data-sh="'+i+'">'+t+'</button>').join('')+'</div>'+
-    ((singlePic||singleMedia)?
+    '<div class="krow" style="margin-top:5px;"><button id="knSq" style="flex:1;" title="One rule for the whole object: pictures, background, border and shadow together">'+
+      (ov.sq?'Corners: square — round them':'Corners: rounded — square them')+'</button></div>'+
+    (singlePic?
       '<div class="kh">Picture</div><div class="krow">'+
-        (singlePic?'<button id="knCrop" style="flex:1;" title="Crop: drag any edge in or out, drag inside to slide the picture">✂ Crop</button>':'')+
-        '<button id="knSq" style="flex:1;">'+(ov.sq?'Corners: square':'Corners: rounded')+'</button></div>':'')+
+        '<button id="knCrop" style="flex:1;" title="Crop: drag any edge in or out, drag inside to slide the picture">✂ Crop</button></div>':'')+
     (singleMedia?'<div class="krow"><button id="knCap" style="flex:1;">'+(ov.caption?'Caption: shown':'Caption: hidden')+'</button></div>':'')+
     (anyColor?
       '<div class="kh">Text colour (whole object)</div>'+
@@ -1062,7 +1073,9 @@ function showKnobs(){
   const cap=q('knCap');
   if(cap) cap.onclick=()=>{ pushUndo(); ov.caption=!ov.caption; render(); showKnobs(); markSel(); };
   const sq=q('knSq');
-  if(sq) sq.onclick=()=>{ pushUndo(); if(ov.sq) delete ov.sq; else ov.sq=1; render(); showKnobs(); markSel(); };
+  if(sq) sq.onclick=()=>{ pushUndo(); const v=!ov.sq;
+    SEL.forEach(key=>{ const o=ovOf(key); if(v) o.sq=1; else delete o.sq; });
+    render(); showKnobs(); markSel(); };
   const cr=q('knCrop');
   if(cr) cr.onclick=()=>{
     const key=primary();
