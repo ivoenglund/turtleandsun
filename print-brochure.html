@@ -204,7 +204,7 @@ const BORDER_STYLES=['solid','dashed','dotted','double'];
 function pScale(){
   return paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4').w*MMPX/794;   // 794px = A4 width
 }
-const RADpx=()=>(7.4*pScale());
+const RADpx=()=>(4.5*pScale());
 const PADpx=()=>(5.4*pScale());
 // Tight, close shadows — short gradient, real density. Values are A4 px.
 const SHB=[[0,0,0],[2,5,.4],[4,9,.55],[6,14,.75]];
@@ -366,8 +366,8 @@ function buildPaperOptions(){
 function applyPaper(k){
   const P=paperOf(k);
   document.body.className = P.canvas ? 'fmt-poster' : 'fmt-doc';
-  // Paper-proportional corner radius for pictures etc. (A4 ⇒ ~7.4px).
-  document.body.style.setProperty('--pr',(7.4*P.w*MMPX/794).toFixed(1)+'px');
+  // Paper-proportional corner radius for pictures etc. (A4 ⇒ ~4.5px).
+  document.body.style.setProperty('--pr',(4.5*P.w*MMPX/794).toFixed(1)+'px');
   let st=document.getElementById('pageSize');
   if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
   let css='@page{ size:'+P.w+'mm '+P.h+'mm; margin:0; }';
@@ -381,9 +381,15 @@ function applyPaper(k){
 }
 
 // ── Zoom + free pan ─────────────────────────────────────────────────
-const ZMIN=5, ZMAX=200;
+const ZMIN=5;
 let curScale=1;
-function clampPct(p){ return Math.max(ZMIN, Math.min(ZMAX, p)); }
+// Small papers may zoom far further: the limit is "page ≈ 3× window width",
+// so an A6 goes to ~1000%+ while an A0 keeps a sane range.
+function zmax(){
+  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
+  return Math.max(200, Math.round(window.innerWidth*3/(P.w*MMPX)*100));
+}
+function clampPct(p){ return Math.max(ZMIN, Math.min(zmax(), p)); }
 function contentNat(){
   const out=document.getElementById('out');
   let w=0,h=0;
@@ -398,7 +404,7 @@ function setView(){
 }
 function applyZoom(pct){ pct=clampPct(pct); curScale=pct/100; setView(); syncZoomLabel(pct); }
 function syncZoomLabel(pct){
-  const zi=document.getElementById('zoom'); if(zi) zi.value=Math.round(pct);
+  const zi=document.getElementById('zoom'); if(zi){ zi.max=zmax(); zi.value=Math.round(pct); }
   const zp=document.getElementById('zoomPct'); if(zp) zp.textContent=Math.round(pct)+'%';
 }
 function fitPct(){
