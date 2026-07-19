@@ -359,10 +359,12 @@
       /* Board controls live in the EXISTING sidebar; visible only on the Make tab. */
       .mk-only{display:none;}
       body.makmode .mk-only{display:block;}
-      /* The board column: checkboxes on ONE straight left margin, own space. */
-      .mkChk{display:none;width:auto!important;position:absolute;left:8px;top:50%;transform:translateY(-50%);}
+      /* Make mode: TWO straight columns — checkboxes at one fixed left edge,
+         row content at another, gap = double the filter-row gap (8px). */
+      .mkChk{display:none;width:auto!important;position:absolute;left:10px;top:50%;transform:translateY(-50%);}
       body.makmode .mkChk{display:inline-block;}
-      body.makmode #tree .row{position:relative;padding-left:30px;}
+      body.makmode #tree .row{position:relative;padding-left:31px;}
+      body.makmode #tree .row.sub{padding-left:31px;}
     </style>
     <div id="mak" class="hide">
       <div id="makLib"></div>
