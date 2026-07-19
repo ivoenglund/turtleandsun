@@ -335,9 +335,12 @@
         <div class="panel" style="flex:1;min-width:340px;padding:12px 14px;">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
             <b style="font-size:14px;">Your cards</b>
-            <input class="search" id="makSearch" type="text" placeholder="Search posts and people…" style="flex:1;min-width:140px;">
+            <input class="search" id="makSearch" type="text" placeholder="Search posts, people, logos…" style="flex:1;min-width:140px;">
             <label class="flt" style="padding:3px 8px;"><input type="checkbox" id="makPosts" checked> Posts</label>
             <label class="flt" style="padding:3px 8px;"><input type="checkbox" id="makPeople" checked> People</label>
+            <label class="flt" style="padding:3px 8px;"><input type="checkbox" id="makMedia" checked> Logos</label>
+            <button class="btn sm gray" id="makAddSvg" title="Upload an SVG logo or graphic">＋ Add SVG</button>
+            <input type="file" id="makSvgFile" accept=".svg,image/svg+xml" style="display:none;">
           </div>
           <div id="makShelf" style="max-height:520px;overflow:auto;"></div>
         </div>
@@ -509,6 +512,7 @@ const fmtD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'
 let groups = [];
 let memberships = [];
 let contactsPool = [];
+let mediaCache = null;
 let selected = null;
 let current = null;
 let mapObj = null;
@@ -2545,8 +2549,16 @@ function makLabel(it){
     const p=(blogCache||[]).find(x=>x.id===it.ref_id);
     return p ? {t:(p.title||(p.body||'').slice(0,40)||'(untitled)'), img:(p.photos||[])[0]||null, sub:d10(p.post_date)} : null;
   }
+  if(it.ref_type==='media'){
+    const m=(mediaCache||[]).find(x=>x.id===it.ref_id);
+    return m ? {t:m.title||'(logo)', img:m.url||null, sub:(m.tags||[]).slice(0,3).join(', ')||'SVG'} : null;
+  }
   const c=contactsPool.find(x=>x.id===it.ref_id);
   return c ? {t:c.name||'(unnamed)', img:c.photo_url||null, sub:c.job_title||'person'} : null;
+}
+async function ensureMedia(force){
+  if(mediaCache && !force) return;
+  mediaCache = await api('/api/media-cards') || [];
 }
 function makThumb(img){
   return img?'<img src="'+esc(img)+'" style="width:34px;height:34px;object-fit:cover;border-radius:6px;flex-shrink:0;">'
@@ -2554,6 +2566,7 @@ function makThumb(img){
 }
 async function renderMak(){
   try{ await ensureBlog(); }catch(e){}
+  try{ await ensureMedia(); }catch(e){}
   const sel=$('#makSel');
   makList=await api('/api/compositions')||[];
   sel.innerHTML=makList.length
@@ -2585,13 +2598,21 @@ function renderMakShelf(){
       rows.push({rt:'contact',id:c.id,t:c.name||'(unnamed)',img:c.photo_url,sub:[c.job_title,c.company].filter(Boolean).join(' · ')||'person'});
     });
   }
+  if($('#makMedia').checked){
+    (mediaCache||[]).forEach(m=>{
+      const hay=((m.title||'')+' '+(m.tags||[]).join(' ')).toLowerCase();
+      if(q&&!hay.includes(q)) return;
+      rows.push({rt:'media',id:m.id,t:m.title||'(logo)',img:m.url,sub:(m.tags||[]).slice(0,3).join(', ')||'SVG',del:true});
+    });
+  }
   $('#makShelf').innerHTML=rows.slice(0,200).map(r=>{
     const on=makHas(r.rt,r.id);
     return '<div style="display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid #eee8d8;">'+
       '<input type="checkbox" class="makTick" data-rt="'+r.rt+'" data-id="'+r.id+'" '+(on?'checked':'')+' style="width:auto;">'+
       makThumb(r.img)+
-      '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(r.t)+'</div>'+
-      '<div class="muted" style="font-size:12px;">'+esc(r.sub)+'</div></div></div>';
+      '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(r.t)+'</div>'+
+      '<div class="muted" style="font-size:12px;">'+esc(r.sub)+'</div></div>'+
+      (r.del?'<button class="btn sm danger makMediaDel" data-id="'+r.id+'" title="Delete this logo">✕</button>':'')+'</div>';
   }).join('')||'<div class="empty">Nothing matches.</div>';
   $('#makShelf').querySelectorAll('.makTick').forEach(cb=>cb.onchange=()=>{
     if(!makComp){ alert('Create a brochure first (＋ New brochure).'); cb.checked=false; return; }
@@ -2599,6 +2620,13 @@ function renderMakShelf(){
     if(cb.checked){ if(!makHas(rt,rid)) makComp.items.push({ref_type:rt,ref_id:rid,overrides:{}}); }
     else makComp.items=makComp.items.filter(i=>!(i.ref_type===rt&&i.ref_id===rid));
     renderMakItems();
+  });
+  $('#makShelf').querySelectorAll('.makMediaDel').forEach(b=>b.onclick=async()=>{
+    const id=+b.dataset.id;
+    if(!confirm('Delete this logo? It will be removed from any brochures using it.')) return;
+    try{ await api('/api/media-cards/'+id,{method:'DELETE'}); }catch(e){ alert('Delete failed: '+e.message); return; }
+    if(makComp) makComp.items=makComp.items.filter(i=>!(i.ref_type==='media'&&i.ref_id===id));
+    await ensureMedia(true); renderMakShelf(); renderMakItems();
   });
 }
 function renderMakItems(){
@@ -2621,7 +2649,26 @@ function renderMakItems(){
   host.querySelectorAll('.makBig').forEach(cb=>cb.onchange=()=>{makComp.items[+cb.dataset.i].overrides.big=cb.checked;});
 }
 $('#makSearch') && ($('#makSearch').oninput=debounce(renderMakShelf,180));
-$('#makPosts').onchange=renderMakShelf; $('#makPeople').onchange=renderMakShelf;
+$('#makPosts').onchange=renderMakShelf; $('#makPeople').onchange=renderMakShelf; $('#makMedia').onchange=renderMakShelf;
+$('#makAddSvg').onclick=()=>$('#makSvgFile').click();
+$('#makSvgFile').onchange=async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value='';
+  if(!f) return;
+  if(!/svg/i.test(f.type)&&!/\.svg$/i.test(f.name)){ alert('Please choose an SVG file.'); return; }
+  const title=(prompt('Name this logo/graphic:', f.name.replace(/\.svg$/i,''))||'').trim();
+  const tagsRaw=(prompt('Tags (comma-separated, optional) — e.g. logo, jul, birthday:', '')||'').trim();
+  const tags=tagsRaw?tagsRaw.split(',').map(t=>t.trim()).filter(Boolean):[];
+  const fd=new FormData(); fd.append('file',f); if(title) fd.append('title',title); fd.append('tags',JSON.stringify(tags));
+  try{
+    const r=await fetch('/api/media-cards',{method:'POST',body:fd});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error||d.details||('HTTP '+r.status));
+    showToast('Logo added');
+    await ensureMedia(true);
+    if(!$('#makMedia').checked) $('#makMedia').checked=true;
+    renderMakShelf();
+  }catch(err){ alert('Upload failed: '+err.message); }
+};
 $('#makSel').onchange=async()=>{ if($('#makSel').value){ await makLoad(+$('#makSel').value); renderMakShelf(); renderMakItems(); } };
 $('#makNew').onclick=async()=>{
   const name=prompt('Name of the brochure (e.g. "QCC broschyr"):'); if(!name||!name.trim()) return;

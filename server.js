@@ -20,7 +20,7 @@ const { fal } = require('@fal-ai/client');
 const Stripe = require('stripe');
 const { Resend } = require('resend');
 const { initDb, pool, seedGallery } = require('./db');
-const { uploadStream, downloadAndStore, deleteFromR2 } = require('./storage');
+const { uploadStream, uploadBuffer, downloadAndStore, deleteFromR2 } = require('./storage');
 const { google } = require('googleapis');
 const gelato = require('./gelato');
 const generation = require('./generation');
@@ -2562,6 +2562,11 @@ app.get('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
           `SELECT name, job_title, company, email, phone, photo_url, city FROM contacts WHERE id = $1 AND user_id = $2`,
           [it.ref_id, req.user.id]);
         content = r.rows[0] || null;
+      } else if (it.ref_type === 'media') {
+        const r = await pool.query(
+          `SELECT title, url, tags, kind FROM media_cards WHERE id = $1 AND user_id = $2`,
+          [it.ref_id, req.user.id]);
+        content = r.rows[0] || null;
       }
       if (content) out.push({ ...it, content });
     }
@@ -2586,7 +2591,7 @@ app.put('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
         [req.params.id, req.user.id]);
       let pos = 0;
       for (const it of items) {
-        if (!it || !['post','contact'].includes(it.ref_type) || !it.ref_id) continue;
+        if (!it || !['post','contact','media'].includes(it.ref_type) || !it.ref_id) continue;
         await pool.query(
           `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
            VALUES ($1,$2,$3,$4,$5,$6)`,
@@ -3189,6 +3194,74 @@ app.put('/api/blog-posts/:id(\\d+)', requireAuth, async (req, res) => {
 app.delete('/api/blog-posts/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM blog_posts WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Media cards (SVG logos / decoration) ──────────────────────────────────
+// "Everything is a card." An SVG is stored once, tagged, and reused as a
+// mirror card in any composition. Two safety layers: (1) sanitize on upload —
+// strip scripts, event handlers, foreignObject, javascript: URIs and DOCTYPE;
+// (2) always render via <img>, which never executes script in an embedded SVG.
+function sanitizeSvg(raw) {
+  if (typeof raw !== 'string') return null;
+  let s = raw.replace(/^﻿/, '').trim();
+  if (!/<svg[\s>]/i.test(s)) return null;                 // must actually be SVG
+  s = s.replace(/<!DOCTYPE[^>]*>/gi, '');                 // no DOCTYPE (XXE)
+  s = s.replace(/<!ENTITY[\s\S]*?>/gi, '');               // no entity definitions
+  s = s.replace(/^[\s\S]*?(?=<svg[\s>])/i, '');           // drop XML decl / DOCTYPE remnants before root
+  s = s.replace(/<script[\s\S]*?<\/script\s*>/gi, '');    // no scripts
+  s = s.replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, ''); // no embedded HTML
+  s = s.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '');         // no on* handlers ("...")
+  s = s.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '');         // no on* handlers ('...')
+  s = s.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');         // no on* handlers (bare)
+  s = s.replace(/(href|xlink:href|src)\s*=\s*"\s*javascript:[^"]*"/gi, '$1="#"');
+  s = s.replace(/(href|xlink:href|src)\s*=\s*'\s*javascript:[^']*'/gi, "$1='#'");
+  s = s.replace(/javascript:/gi, '');                     // belt-and-suspenders
+  return s.trim();
+}
+
+app.get('/api/media-cards', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, kind, url, tags, created_at
+       FROM media_cards WHERE user_id = $1 ORDER BY created_at DESC, id DESC`,
+      [req.user.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/media-cards', requireAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const clean = sanitizeSvg(req.file.buffer.toString('utf8'));
+    if (!clean) return res.status(400).json({ error: 'Not a valid SVG file' });
+    const buf = Buffer.from(clean, 'utf8');
+    const { url } = await uploadBuffer({
+      buffer: buf, contentType: 'image/svg+xml', kind: 'media_card',
+      originalName: req.file.originalname || 'logo.svg',
+    });
+    let tags = [];
+    try { tags = JSON.parse(req.body.tags || '[]'); } catch (_) { tags = []; }
+    if (!Array.isArray(tags)) tags = [];
+    tags = tags.map(t => String(t).trim()).filter(Boolean).slice(0, 20);
+    const title = (req.body.title || req.file.originalname || '').replace(/\.svg$/i, '').trim() || null;
+    const { rows } = await pool.query(
+      `INSERT INTO media_cards (user_id, title, kind, url, tags)
+       VALUES ($1, $2, 'svg', $3, $4) RETURNING id, title, kind, url, tags, created_at`,
+      [req.user.id, title, url, JSON.stringify(tags)]);
+    res.json({ ok: true, card: rows[0] });
+  } catch (err) { res.status(500).json({ error: 'Upload failed', details: err.message }); }
+});
+
+app.delete('/api/media-cards/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    // Remove the card and any composition items that reference it.
+    await pool.query(
+      `DELETE FROM composition_items WHERE ref_type = 'media' AND ref_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
+    await pool.query(`DELETE FROM media_cards WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

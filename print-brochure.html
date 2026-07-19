@@ -25,6 +25,11 @@
   .block.img-l img{ max-height:150mm; object-fit:cover; }
   .block.txt-s p{ font-size:11.5px; } .block.txt-l p{ font-size:16px; line-height:1.5; }
   .block.txt-l h3{ font-size:25px; }
+  .block.media{ text-align:center; }
+  .block.media img{ object-fit:contain !important; max-height:80mm; margin:0 auto; }
+  .block.media.img-s img{ max-height:45mm; } .block.media.img-m img{ max-height:80mm; }
+  .block.media.img-l img{ max-height:130mm; } .block.media.big img{ max-height:200mm; }
+  .block.media .cap{ font-size:12px; color:#5c5c4d; margin-top:3mm; }
   #knobs{ position:fixed; right:14px; top:64px; width:220px; background:#fff; border:2px solid var(--gold);
           border-radius:12px; padding:12px 14px; box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:10; }
   #knobs .kh{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--green); margin:8px 0 4px; }
@@ -132,6 +137,15 @@ function personCard(it){
     (c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
     '<div class="ct">'+[c.email,c.phone].filter(Boolean).map(esc).join('<br>')+'</div></div>';
 }
+// Media card = an SVG (logo/graphic). Rendered via <img> so no script runs.
+function mediaBlock(it){
+  const c=it.content||{}, ov=it.overrides||{};
+  const cls=['block','media', ov.big?'big':'', ov.img?'img-'+ov.img:''].filter(Boolean).join(' ');
+  const showCap = ov.caption && c.title;
+  return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
+    (c.url?'<img src="'+esc(c.url)+'">':'')+
+    (showCap?'<div class="cap">'+esc(c.title)+'</div>':'')+'</div>';
+}
 
 let COMP=null;
 function render(){ renderPages(COMP); }
@@ -169,7 +183,9 @@ function renderPoster(items){
   const blocks=items.map((it,i)=>{
     const ov=it.overrides||{};
     const x=ov.x!=null?ov.x:8+(i%3)*30, y=ov.y!=null?ov.y:6+Math.floor(i/3)*22, w=ov.w||28;
-    const inner = it.ref_type==='contact' ? personCard(it) : postBlock(it);
+    const inner = it.ref_type==='contact' ? personCard(it)
+                : it.ref_type==='media'   ? mediaBlock(it)
+                : postBlock(it);
     return '<div class="abswrap" style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+w+'%;" data-absidx="'+it._idx+'">'+inner+'</div>';
   }).join('');
   document.getElementById('out').innerHTML='<div class="page poster" style="position:relative;">'+blocks+'</div>';
@@ -213,7 +229,9 @@ function renderPages(comp){
 
   // Cover = first item.
   const cov=items[0];
-  const covImg = cov.ref_type==='post' ? ((cov.content.photos||[])[0]||'') : (cov.content.photo_url||'');
+  const covImg = cov.ref_type==='post' ? ((cov.content.photos||[])[0]||'')
+               : cov.ref_type==='media' ? (cov.content.url||'')
+               : (cov.content.photo_url||'');
   const covTitle = cov.ref_type==='post' ? (cov.content.title||comp.name) : comp.name;
   pages.push('<div class="page cover"><div class="band"></div>'+
     (covImg?'<div class="img" style="background-image:url(\''+esc(covImg)+'\')"></div>':'')+
@@ -228,6 +246,17 @@ function renderPages(comp){
       for(let i=0;i<buf.length;i+=6){
         pages.push('<div class="page"><h2 class="sect">Teamet</h2><hr class="rule"><div class="team">'+
           buf.slice(i,i+6).map(personCard).join('')+'</div></div>');
+      }
+    } else if(bufKind==='media'){
+      // Logos/graphics: a "big" one gets its own page; others pack two per page.
+      for(let i=0;i<buf.length;){
+        const it=buf[i];
+        if(it.overrides&&it.overrides.big){ pages.push('<div class="page">'+mediaBlock(it)+'</div>'); i++; }
+        else{
+          const two=buf.slice(i,i+2).filter(x=>!(x.overrides&&x.overrides.big)||x===it);
+          pages.push('<div class="page">'+two.map(mediaBlock).join('')+'</div>');
+          i+=two.length;
+        }
       }
     } else {
       for(let i=0;i<buf.length;){
@@ -276,9 +305,11 @@ function showKnobs(){
   const ov=it.overrides=it.overrides||{};
   const poster=((COMP.params&&COMP.params.paper)||'a4')==='poster';
   const isPost=it.ref_type==='post';
+  const isMedia=it.ref_type==='media';
   k.style.display='block';
   k.innerHTML='<b style="font-size:13px;">Card '+(selIdx+1)+'</b>'+
-    (isPost?knobRow('img','Picture size',ov.img):'')+
+    ((isPost||isMedia)?knobRow('img','Picture size',ov.img):'')+
+    (isMedia?'<div class="kh">Caption</div><div class="row"><button data-k="caption" data-v="'+(ov.caption?'':'1')+'" class="'+(ov.caption?'on':'')+'">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
     (isPost&&!poster?knobRow('pos','Picture placement',ov.pos):'')+
     (isPost?knobRow('txt','Text size',ov.txt):'')+
     (isPost?knobRow('font','Font',ov.font):'')+
@@ -296,6 +327,7 @@ function showKnobs(){
     const kk=b.dataset.k, v=b.dataset.v;
     if(kk==='big') ov.big=!!v;
     else if(kk==='nodate') ov.nodate=!!v;
+    else if(kk==='caption') ov.caption=!!v;
     else if(kk==='w') ov.w=+v;
     else if(v==='') delete ov[kk]; else ov[kk]=v;
     render(); showKnobs(); markSel();

@@ -412,12 +412,30 @@ async function initDb() {
       id             SERIAL PRIMARY KEY,
       user_id        INTEGER REFERENCES users(id),
       composition_id INTEGER REFERENCES compositions(id) ON DELETE CASCADE,
-      ref_type       TEXT NOT NULL CHECK (ref_type IN ('post','contact')),
+      ref_type       TEXT NOT NULL CHECK (ref_type IN ('post','contact','media')),
       ref_id         INTEGER NOT NULL,
       position       INTEGER NOT NULL DEFAULT 0,
       overrides      JSONB NOT NULL DEFAULT '{}'::jsonb
     );
     CREATE INDEX IF NOT EXISTS composition_items_comp_idx ON composition_items(composition_id);
+
+    -- 2026-07-19: media cards — SVG (logos, decoration) as first-class cards.
+    -- Stored sanitized (scripts stripped) and rendered via <img>. Tagged so the
+    -- decoration layer / AI picker can select by occasion later. ref_type 'media'.
+    CREATE TABLE IF NOT EXISTS media_cards (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      title      TEXT,
+      kind       TEXT NOT NULL DEFAULT 'svg' CHECK (kind IN ('svg')),
+      url        TEXT NOT NULL,
+      tags       JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_cards_user ON media_cards(user_id, created_at DESC);
+    -- Widen the existing ref_type constraint in place (table predates 'media').
+    ALTER TABLE composition_items DROP CONSTRAINT IF EXISTS composition_items_ref_type_check;
+    ALTER TABLE composition_items ADD  CONSTRAINT composition_items_ref_type_check
+      CHECK (ref_type IN ('post','contact','media'));
 
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets

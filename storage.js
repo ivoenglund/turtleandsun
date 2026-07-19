@@ -45,6 +45,7 @@ function folderFor(kind) {
     case 'gallery':             return 'gallery';           // public gallery items
     case 'order':               return 'orders';            // rehosted order outputs (future)
     case 'tiktok-thumbnail':    return 'tiktok-thumbnails'; // branded TikTok thumbnail JPEGs
+    case 'media_card':          return 'media-cards';       // SVG logos/decoration cards
     default:                    return 'misc';
   }
 }
@@ -56,6 +57,7 @@ function extFromContentType(ct) {
   if (ct.includes('webp')) return '.webp';
   if (ct.includes('gif'))  return '.gif';
   if (ct.includes('avif')) return '.avif';
+  if (ct.includes('svg'))  return '.svg';
   if (ct.includes('mp4'))  return '.mp4';
   if (ct.includes('quicktime') || ct.includes('mov')) return '.mov';
   if (ct.includes('webm')) return '.webm';
