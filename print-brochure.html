@@ -35,6 +35,8 @@
   .block.media{ text-align:center; }
   .block.media img{ object-fit:contain; }
   .block.media .cap{ font-size:.89em; color:#5c5c4d; margin-top:.5em; }
+  .imgo.cropped{ border-radius:.55em; }
+  .sqc img, .imgo.sqc, .imgo.cropped.sqc{ border-radius:0!important; }
   .block.ffo h3, .block.ffo p, .block.ffo .meta, .block.ffo .cap{ font-family:inherit; }
   .block.tco h3, .block.tco p, .block.tco .meta, .block.tco .cap, .block.tco b,
   .block.tco .role, .block.tco .ct{ color:inherit; }
@@ -202,18 +204,20 @@ function postBlock(it){
   const part=ov.part||'txt';
   if(part.slice(0,3)==='img'){
     const ph=(c.photos||[])[+part.slice(3)||0];
-    // Crop = a WINDOW (box height ph em, overflow hidden) over the picture,
-    // which keeps its own size (pw em) and offset (ix/iy em). Legacy cover
-    // crops (ph+px, no pw) still render; they convert on next crop entry.
+    // Crop = a WINDOW (height phr, overflow hidden) over the picture, which
+    // keeps its own size (pwr) and offset (ixr/iyr) — all ratios of the
+    // window width, so paper changes and resizing leave the crop intact.
     let bs='', ist='';
-    if(+ov.pw){
-      bs=' style="position:relative;overflow:hidden;height:'+(+ov.ph||10)+'em;border-radius:.55em;"';
-      ist=' style="position:absolute;width:'+(+ov.pw)+'em;max-width:none;left:'+(+ov.ix||0)+'em;top:'+(+ov.iy||0)+'em;border-radius:0;"';
-    }else if(+ov.ph){
+    if(+ov.pwr){
+      const cr=cropEms(ov);
+      bs=' style="position:relative;overflow:hidden;height:'+r4(cr.ph)+'em;"';
+      ist=' style="position:absolute;width:'+r4(cr.pw)+'em;max-width:none;left:'+r4(cr.ix)+'em;top:'+r4(cr.iy)+'em;border-radius:0;"';
+    }else if(+ov.ph){   // ancient cover-crop: still renders; converts on crop entry
       ist=' style="height:'+(+ov.ph)+'em;object-fit:cover;object-position:'+
         (ov.px!=null?+ov.px:50)+'% '+(ov.py!=null?+ov.py:50)+'%;"';
     }
-    return '<div class="block imgo"'+bs+' data-idx="'+it._idx+'">'+
+    const icls='block imgo'+(+ov.pwr?' cropped':'')+(ov.sq?' sqc':'');
+    return '<div class="'+icls+'"'+bs+' data-idx="'+it._idx+'">'+
       (ph?'<img src="'+esc(ph)+'"'+ist+'>':'<div class="hint">picture missing</div>')+'</div>';
   }
   const cls=['block','txtobj', ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'',
@@ -242,7 +246,7 @@ function personCard(it){
 function mediaBlock(it){
   const c=it.content||{}, ov=it.overrides||{};
   const showCap = ov.caption && c.title;
-  return '<div class="block media'+(ov.tc?' tco':'')+'" data-idx="'+it._idx+'">'+
+  return '<div class="block media'+(ov.tc?' tco':'')+(ov.sq?' sqc':'')+'" data-idx="'+it._idx+'">'+
     (c.url?'<img src="'+esc(c.url)+'">':'')+
     (showCap?'<div class="cap">'+esc(c.title)+'</div>':'')+'</div>';
 }
@@ -261,6 +265,13 @@ function normalizeItems(){
   const seed=()=>{ const s={x:8+(n%3)*30, y:6+Math.floor(n/3)*24}; n++; return s; };
   (COMP.items||[]).forEach(it=>{
     const ov=it.overrides=it.overrides||{};
+    if(+ov.pw&&!+ov.pwr){   // absolute-em window crop (one deploy old) → ratios
+      const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
+      const Wem=P.w*MMPX*((+ov.w||28)/100)/fsOf(ov);
+      ov.pwr=r4(+ov.pw/Wem); ov.phr=r4((+ov.ph||10)/Wem);
+      ov.ixr=r4((+ov.ix||0)/Wem); ov.iyr=r4((+ov.iy||0)/Wem);
+      delete ov.pw; delete ov.ph;
+    }
     delete ov.ix; delete ov.iy; delete ov.tx; delete ov.ty;   // pre-object-model leftovers
     if(it.ref_type==='post'&&!ov.part){
       const photos=(it.content&&it.content.photos)||[];
@@ -401,6 +412,17 @@ function cardInner(it){
 function fsOf(ov){
   const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
   return Math.max(4, Math.min(120, 13.5*(w/28)*ts));
+}
+// Crop geometry is stored as RATIOS of the window width (pwr/phr/ixr/iyr), so
+// it survives paper-size changes and object resizing untouched. cropEms turns
+// them into em values for the CURRENT paper.
+const MMPX=96/25.4;
+const r4=v=>Math.round(v*10000)/10000;
+function cropEms(ov){
+  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
+  const fs=fsOf(ov);
+  const Wem=P.w*MMPX*((+ov.w||28)/100)/fs;
+  return { Wem, pw:(+ov.pwr||1)*Wem, ph:(+ov.phr||0.6)*Wem, ix:(+ov.ixr||0)*Wem, iy:(+ov.iyr||0)*Wem };
 }
 function absWrap(it){
   const ov=it.overrides||{};
@@ -819,83 +841,132 @@ function liveSelStyle(){
     }
   });
 }
+// The panel is CONTEXTUAL: it shows only what applies to the current mode —
+// editing text, cropping, a selection, or nothing.
 function showKnobs(){
   const k=document.getElementById('knobs');
+  const q=id=>document.getElementById(id);
   const n=SEL.length;
+  const p=primary();
   const pI=primItem(), pF=primFrame(), pT=primText();
   const it=pI!=null?COMP.items[pI]:null;
   const ov=it?(it.overrides=it.overrides||{}):(pT!=null?texts()[pT]:(pF!=null?frames()[pF]:{}));
-  const isTxt=(!!it&&it.ref_type==='post'&&(it.overrides.part||'txt')==='txt')||pT!=null;
-  const isMedia=!!it&&it.ref_type==='media';
-  const anySel=n>0;
+
+  // ── MODE: editing text ────────────────────────────────────────────
+  if(editing){
+    k.innerHTML=
+      '<div class="kh">Editing text — select words, style them</div>'+
+      '<select id="tbFont" title="Font at the cursor — arrow keys preview live"><option value="">Font…</option>'+
+        FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'">'+t+'</option>').join('')+'</select>'+
+      '<div class="krow"><input type="number" id="tbSize" min="4" max="500" step="1" value="14" title="Size in px — arrow keys step it live" style="flex:1;width:0;">'+
+        '<span style="font-size:11px;color:var(--muted);">px</span>'+
+        '<input type="color" id="tbColor" value="#23291d" title="Colour of the selection"></div>'+
+      '<div class="krow">'+SWATCH.map(c=>'<button class="sw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+'</div>'+
+      '<div class="krow"><button id="tbB" style="font-weight:800;">B</button>'+
+        '<button id="tbI" style="font-style:italic;">I</button>'+
+        '<button id="tbU" style="text-decoration:underline;">U</button>'+
+        (pI!=null?'<button id="tbReset" title="Back to the original text">↺</button>':'')+
+        '<button id="tbDone" class="primary" style="flex:1;">✓ Done</button></div>'+
+      '<div class="hint" style="margin-top:6px;">Clicking anywhere outside also finishes — it saves by itself.</div>';
+    q('tbFont').onchange=e=>{ if(e.target.value) applyStyle('fontFamily',"'"+e.target.value+"'"); };
+    q('tbSize').oninput=e=>{ const px=+e.target.value; if(px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
+    q('tbColor').oninput=e=>applyStyle('color',e.target.value);
+    k.querySelectorAll('.sw').forEach(b=>{
+      b.onmousedown=e=>e.preventDefault();
+      b.onclick=()=>applyStyle('color',b.dataset.c);
+    });
+    [['tbB','bold'],['tbI','italic'],['tbU','underline']].forEach(([id,cmd])=>{
+      const b=q(id); b.onmousedown=e=>e.preventDefault();
+      b.onclick=()=>{ restoreSel(); document.execCommand(cmd); };
+    });
+    const rs=q('tbReset');
+    if(rs) rs.onclick=()=>{ pushUndo(); delete COMP.items[pI].overrides.text;
+      editing=false; savedSel=null; styleSpan=null; render(); showKnobs(); markSel(); updateUndoBtns(); };
+    q('tbDone').onclick=()=>commitEdit(true);
+    updateTb();
+    return;
+  }
+
+  // ── MODE: cropping ────────────────────────────────────────────────
+  if(cropKey&&p===cropKey){
+    k.innerHTML=
+      '<div class="kh">Cropping the picture</div>'+
+      '<div class="hint">Drag the four gold edges in — or back out to restore. '+
+        'Drag inside the picture to slide it. Nothing is ever lost.</div>'+
+      '<div style="margin-top:8px;"><button id="knCropDone" class="primary" style="width:100%;">✓ Done cropping</button></div>';
+    q('knCropDone').onclick=()=>{ cropKey=null; showKnobs(); markSel(); };
+    return;
+  }
+
+  // ── MODE: nothing selected ────────────────────────────────────────
+  if(!n){
+    k.innerHTML='<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
+      'Shift-click or drag a rectangle on the page for several. Drag to move, gold dot to resize, '+
+      'click a selected text again to edit it.</div>';
+    return;
+  }
+
+  // ── MODE: selection ───────────────────────────────────────────────
+  const anyText=SEL.some(isTextKey);
+  const anyColor=SEL.some(kk=>kk[0]!=='f');
+  const singlePic=n===1&&isPicKey(p);
+  const singleMedia=n===1&&it&&it.ref_type==='media';
   const N=pageCount();
-  const dis=anySel?'':' disabled';
-  const disT=isTxt?'':' disabled';       // rich text tools: text objects only
-  const disC=anySel?'':' disabled';      // colour: any object (text colour)
-  const dis2=n>=2?'':' disabled';        // align
-  const dis3=n>=3?'':' disabled';        // distribute
-  const title=!anySel?'No selection'
-    : n>1 ? n+' objects'
+  const title= n>1?n+' objects'
     : pF!=null?'Frame'
-    : pT!=null?'Text object'
-    : isTxt?'Text object'
-    : isMedia?'Logo / graphic'
-    : it&&it.ref_type==='contact'?'Person'
-    : 'Picture';
+    : anyText?'Text'
+    : singlePic?'Picture'
+    : singleMedia?'Logo / graphic'
+    : it&&it.ref_type==='contact'?'Person':'Object';
+  const firstTextKey=SEL.find(isTextKey);
+  const px0=firstTextKey?Math.round(fsOf(ovOf(firstTextKey))):14;
   k.innerHTML=
     '<div class="kh" style="display:flex;justify-content:space-between;align-items:center;">'+
       '<span>'+title+'</span>'+
-      '<button id="knUnplace" class="danger"'+dis+' title="Remove from this document (cards stay in your library)">✕ Remove</button></div>'+
-    (anySel?'':'<div class="hint" style="margin-bottom:6px;">Click an object to select it (Shift-click adds more). '+
-      'Drag to move, gold dot resizes, click a selected text again to edit it.</div>')+
-    '<div class="krow"><button id="knPgPrev"'+dis+' title="Move to the previous page">◀</button>'+
-      '<span style="flex:1;text-align:center;font-weight:700;">Page '+(anySel?(+ov.page||curPage):curPage)+' / '+N+'</span>'+
-      '<button id="knPgNext"'+dis+' title="Move to the next page">▶</button></div>'+
-    '<div class="krow"><button id="knFront"'+dis+' style="flex:1;" title="Bring in front">⬆ Front</button>'+
-      '<button id="knBack"'+dis+' style="flex:1;" title="Send behind">⬇ Back</button>'+
-      '<button id="knFrame"'+dis+' title="Draw a frame around the selection — it becomes its own object">▭ Frame</button></div>'+
-    '<div class="krow"><button id="alL"'+dis2+' title="Align left edges">⇤</button>'+
-      '<button id="alC"'+dis2+' title="Align centres (horizontal)">↔</button>'+
-      '<button id="alR"'+dis2+' title="Align right edges">⇥</button>'+
-      '<button id="alT"'+dis2+' title="Align top edges">⤒</button>'+
-      '<button id="alM"'+dis2+' title="Align middles (vertical)">↕</button>'+
-      '<button id="alB"'+dis2+' title="Align bottom edges">⤓</button>'+
-      '<button id="dsH"'+dis3+' title="Spread evenly left-to-right">⋯</button>'+
-      '<button id="dsV"'+dis3+' title="Spread evenly top-to-bottom">⋮</button>'+
-      '<button id="knDup"'+dis+' title="Duplicate (Ctrl+D)">⧉</button></div>'+
-    '<div class="kh">Width · <span id="szPct">'+(anySel?Math.round(+ov.w||28)+'%':'–')+'</span></div>'+
-    '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(anySel?(+ov.w||28):28)+'"'+dis+'>'+
-    '<div class="kh">Angle · <span id="rDeg">'+(anySel?Math.round(+ov.r||0)+'°':'–')+'</span></div>'+
-    '<input type="range" id="knR" min="-180" max="180" step="1" value="'+(anySel?Math.round(+ov.r||0):0)+'"'+dis+'>'+
-    '<div class="kh">Text zoom · <span id="tsPct">'+(isTxt?Math.round((ov.ts||1)*100)+'%':'–')+'</span></div>'+
-    '<input type="range" id="knTs" min="40" max="250" step="5" value="'+(isTxt?Math.round((ov.ts||1)*100):100)+'"'+disT+'>'+
+      '<button id="knUnplace" class="danger" title="Remove from this document (cards stay in your library)">✕ Remove</button></div>'+
+    '<div class="krow"><button id="knPgPrev" title="Move to the previous page">◀</button>'+
+      '<span style="flex:1;text-align:center;font-weight:700;">Page '+(+ov.page||curPage)+' / '+N+'</span>'+
+      '<button id="knPgNext" title="Move to the next page">▶</button></div>'+
+    '<div class="krow"><button id="knFront" style="flex:1;" title="Bring in front">⬆ Front</button>'+
+      '<button id="knBack" style="flex:1;" title="Send behind">⬇ Back</button>'+
+      '<button id="knFrame" title="Draw a frame around the selection — it becomes its own object">▭ Frame</button>'+
+      '<button id="knDup" title="Duplicate (Ctrl+D)">⧉</button></div>'+
+    (n>=2?'<div class="krow"><button id="alL" title="Align left edges">⇤</button>'+
+      '<button id="alC" title="Align centres (horizontal)">↔</button>'+
+      '<button id="alR" title="Align right edges">⇥</button>'+
+      '<button id="alT" title="Align top edges">⤒</button>'+
+      '<button id="alM" title="Align middles (vertical)">↕</button>'+
+      '<button id="alB" title="Align bottom edges">⤓</button>'+
+      (n>=3?'<button id="dsH" title="Spread evenly left-to-right">⋯</button>'+
+            '<button id="dsV" title="Spread evenly top-to-bottom">⋮</button>':'')+'</div>':'')+
+    '<div class="kh">Width · <span id="szPct">'+Math.round(+ov.w||28)+'%</span></div>'+
+    '<input type="range" id="knW" min="4" max="100" step="0.5" value="'+(+ov.w||28)+'">'+
+    '<div class="kh">Angle · <span id="rDeg">'+Math.round(+ov.r||0)+'°</span></div>'+
+    '<input type="range" id="knR" min="-180" max="180" step="1" value="'+Math.round(+ov.r||0)+'">'+
+    (anyText?
+      '<div class="kh">Font size · <span id="pxLbl">'+px0+' px</span></div>'+
+      '<div class="krow"><input type="number" id="knPx" min="4" max="500" step="1" value="'+px0+'" style="flex:1;width:0;" title="Text size — arrow keys step it live">'+
+        '<span style="font-size:11px;color:var(--muted);">px</span></div>'+
+      '<div class="kh">Font</div><select id="knFF">'+
+        '<option value="">Jakarta (default)</option>'+
+        FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
+      '</select>':'')+
     '<div class="kh">Border</div>'+
-    '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(anySel?(+ov.bw||0):0)+'"'+dis+' title="Border width (0 = none)" style="width:56px;">'+
-      '<select id="knBs"'+dis+' style="flex:1;margin-bottom:0;">'+
+    '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(+ov.bw||0)+'" title="Border width (0 = none)" style="width:56px;">'+
+      '<select id="knBs" style="flex:1;margin-bottom:0;">'+
         BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
-      '<input type="color" id="knBc" value="'+(ov.bc||'#c9a24b')+'"'+dis+' title="Border colour"></div>'+
-    (isMedia?'<div class="kh">Caption</div><div class="row"><button id="knCap">'+(ov.caption?'Showing name — hide it':'Show the name')+'</button></div>':'')+
-    ((n===1&&primary()&&isPicKey(primary()))?
+      '<input type="color" id="knBc" value="'+(ov.bc||'#c9a24b')+'" title="Border colour"></div>'+
+    ((singlePic||singleMedia)?
       '<div class="kh">Picture</div><div class="krow">'+
-        '<button id="knCrop" class="'+(cropKey===primary()?'on':'')+'" style="flex:1;" title="Crop: drag any edge in or out, drag inside the picture to slide it. Click again when done.">'+(cropKey===primary()?'✓ Done cropping':'✂ Crop')+'</button></div>':'')+
-    '<div class="kh">Font (whole object)</div><select id="knFF"'+disT+'>'+
-      '<option value="">Jakarta (default)</option>'+
-      FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
-    '</select>'+
-    '<div class="kh">Text — click into it, select words, style them</div>'+
-    '<select id="tbFont"'+disT+' title="Font at the cursor — arrow keys preview live"><option value="">Font…</option>'+
-      FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'">'+t+'</option>').join('')+'</select>'+
-    '<div class="krow"><input type="number" id="tbSize" min="4" max="500" step="1" value="14"'+disT+' title="Size in px — arrow keys step it live" style="flex:1;width:0;">'+
-      '<span style="font-size:11px;color:var(--muted);">px</span>'+
-      '<input type="color" id="tbColor" value="#23291d"'+disC+' title="Text colour — the selection while editing, the whole object otherwise"></div>'+
-    '<div class="krow">'+SWATCH.map(c=>'<button class="sw"'+disC+' data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+'</div>'+
-    '<div class="krow"><button id="tbB"'+disT+' style="font-weight:800;">B</button>'+
-      '<button id="tbI"'+disT+' style="font-style:italic;">I</button>'+
-      '<button id="tbU"'+disT+' style="text-decoration:underline;">U</button>'+
-      '<button id="tbReset"'+disT+' style="flex:1;" title="Back to the original text">↺ Original text</button></div>';
-  if(!anySel) return;
+        (singlePic?'<button id="knCrop" style="flex:1;" title="Crop: drag any edge in or out, drag inside to slide the picture">✂ Crop</button>':'')+
+        '<button id="knSq" style="flex:1;">'+(ov.sq?'Corners: square':'Corners: rounded')+'</button></div>':'')+
+    (singleMedia?'<div class="krow"><button id="knCap" style="flex:1;">'+(ov.caption?'Caption: shown':'Caption: hidden')+'</button></div>':'')+
+    (anyColor?
+      '<div class="kh">Text colour (whole object)</div>'+
+      '<div class="krow">'+SWATCH.map(c=>'<button class="sw" data-c="'+c+'" style="background:'+c+'" title="'+c+'"></button>').join('')+
+        '<input type="color" id="knTc" value="'+(ov.tc||'#23291d')+'"></div>':'')+
+    (n===1&&isTextKey(p)?'<div class="hint" style="margin-top:6px;">Click the text again to edit the words — mixed fonts, sizes and colours per selection.</div>':'');
 
-  const q=id=>document.getElementById(id);
   q('knUnplace').onclick=()=>removeSelected();
   q('knPgPrev').onclick=()=>moveSelToPage((+ov.page||curPage)-1);
   q('knPgNext').onclick=()=>moveSelToPage((+ov.page||curPage)+1);
@@ -906,8 +977,8 @@ function showKnobs(){
   [['alL','l'],['alC','c'],['alR','r'],['alT','t'],['alM','m'],['alB','b']].forEach(([id,m])=>{
     const b=q(id); if(b) b.onclick=()=>alignSel(m);
   });
-  q('dsH').onclick=()=>distSel('h');
-  q('dsV').onclick=()=>distSel('v');
+  const dh=q('dsH'); if(dh) dh.onclick=()=>distSel('h');
+  const dv=q('dsV'); if(dv) dv.onclick=()=>distSel('v');
   const liveSlider=(id,apply,label,fmt)=>{
     const el=q(id); if(!el) return;
     el.oninput=e=>{ if(el._pre==null) el._pre=snap(); apply(+e.target.value);
@@ -916,49 +987,59 @@ function showKnobs(){
   };
   liveSlider('knW', v=>SEL.forEach(key=>{
     const o=ovOf(key);
-    if(isTextKey(key)){    // text reshapes: keep the letters the same size
+    if(isTextKey(key)){    // text reshapes: wider box = longer lines, same letters
       const f0=fsOf(o); o.w=v;
       o.ts=Math.round(f0/(13.5*(v/28))*1000)/1000;
       if(Math.abs(o.ts-1)<0.002) delete o.ts;
     } else o.w=v;
   }), 'szPct', v=>Math.round(v)+'%');
   liveSlider('knR', v=>SEL.forEach(key=>{ const o=ovOf(key); if(v) o.r=v; else delete o.r; }), 'rDeg', v=>Math.round(v)+'°');
-  liveSlider('knTs', v=>{
-    selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; o.ts=v/100; if(o.ts===1) delete o.ts; });
-    selTextIdxs().forEach(i=>{ const t=texts()[i]; t.ts=v/100; if(t.ts===1) delete t.ts; });
-  }, 'tsPct', v=>Math.round(v)+'%');
+  const kp=q('knPx');
+  if(kp){
+    kp.oninput=e=>{
+      const px=+e.target.value; if(!(px>=4&&px<=500)) return;
+      if(kp._pre==null) kp._pre=snap();
+      SEL.forEach(key=>{ if(!isTextKey(key)) return; const o=ovOf(key);
+        o.ts=Math.round(px/(13.5*((+o.w||28)/28))*1000)/1000;
+        if(Math.abs(o.ts-1)<0.002) delete o.ts; });
+      const l=q('pxLbl'); if(l) l.textContent=px+' px';
+      liveSelStyle();
+    };
+    kp.onchange=()=>{ if(kp._pre!=null){ pushUndo(kp._pre); kp._pre=null; } };
+  }
   q('knBw').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap();
-    SEL.forEach(key=>{ const o=ovOf(key); const v=+e.target.value; if(v) o.bw=v; else if(key[0]==='i') delete o.bw; else o.bw=0; }); liveSelStyle(); };
+    SEL.forEach(key=>{ const o=ovOf(key); const v=+e.target.value; if(v) o.bw=v; else if(key[0]!=='f') delete o.bw; else o.bw=0; }); liveSelStyle(); };
   q('knBw').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
   q('knBs').onchange=e=>{ pushUndo(); SEL.forEach(key=>{ ovOf(key).bs=e.target.value; }); liveSelStyle(); };
   q('knBc').oninput=e=>{ if(e.target._pre==null) e.target._pre=snap(); SEL.forEach(key=>{ ovOf(key).bc=e.target.value; }); liveSelStyle(); };
   q('knBc').onchange=e=>{ if(e.target._pre!=null){ pushUndo(e.target._pre); e.target._pre=null; } };
   const cap=q('knCap');
   if(cap) cap.onclick=()=>{ pushUndo(); ov.caption=!ov.caption; render(); showKnobs(); markSel(); };
+  const sq=q('knSq');
+  if(sq) sq.onclick=()=>{ pushUndo(); if(ov.sq) delete ov.sq; else ov.sq=1; render(); showKnobs(); markSel(); };
   const cr=q('knCrop');
   if(cr) cr.onclick=()=>{
     const key=primary();
-    if(cropKey===key){ cropKey=null; showKnobs(); markSel(); return; }
     cropKey=key;
     const el=elOf(key), img=el&&el.querySelector('img');
-    if(el&&img&&!+ov.pw){
-      // First crop on this picture: freeze its current size as the picture
-      // size (pw) and make the box a window. Legacy cover-crops convert exactly.
+    if(el&&img&&!+ov.pwr){
+      // First crop: freeze the current size as the picture size (ratio 1)
+      // and make the box a window. Ancient cover-crops convert exactly.
       pushUndo();
       const fs0=fsOf(ov);
       const Wem=el.offsetWidth/fs0;
       const a=(img.naturalHeight/img.naturalWidth)||0.75;
       if(+ov.ph&&ov.px!=null){
         const pw=Math.max(Wem, ov.ph/a);
-        ov.pw=Math.round(pw*100)/100;
-        ov.ix=Math.round(-(+ov.px/100)*(pw-Wem)*100)/100;
-        ov.iy=Math.round(-(+ov.py||0)/100*(pw*a-ov.ph)*100)/100;
+        ov.pwr=r4(pw/Wem); ov.phr=r4(ov.ph/Wem);
+        ov.ixr=r4(-(+ov.px/100)*(pw-Wem)/Wem);
+        ov.iyr=r4(-((+ov.py||0)/100)*(pw*a-ov.ph)/Wem);
       }else{
-        ov.pw=Math.round(Wem*100)/100;
-        ov.ph=+ov.ph||Math.round(img.offsetHeight/fs0*100)/100;
-        ov.ix=0; ov.iy=0;
+        ov.pwr=1;
+        ov.phr=r4((+ov.ph||img.offsetHeight/fs0)/Wem);
+        ov.ixr=0; ov.iyr=0;
       }
-      delete ov.px; delete ov.py;
+      delete ov.ph; delete ov.px; delete ov.py;
       render();
     }
     showKnobs(); markSel();
@@ -968,30 +1049,15 @@ function showKnobs(){
     selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font; });
     selTextIdxs().forEach(i=>{ const t=texts()[i]; if(e.target.value) t.ff=e.target.value; else delete t.ff; });
     render(); showKnobs(); markSel(); };
-  // Colour: rich selection while editing; the whole object(s) otherwise.
   const setObjColor=c=>{ pushUndo();
     SEL.forEach(key=>{ if(key[0]==='f') return; const o=ovOf(key); if(c) o.tc=c; else delete o.tc; });
     render(); showKnobs(); markSel(); };
-  q('tbColor').oninput=e=>{ if(editing) applyStyle('color',e.target.value); };
-  q('tbColor').onchange=e=>{ if(!editing) setObjColor(e.target.value); };
+  const tc=q('knTc');
+  if(tc) tc.onchange=e=>setObjColor(e.target.value);
   k.querySelectorAll('.sw').forEach(b=>{
     b.onmousedown=e=>e.preventDefault();
-    b.onclick=()=>{ if(editing) applyStyle('color',b.dataset.c); else setObjColor(b.dataset.c); };
+    b.onclick=()=>setObjColor(b.dataset.c);
   });
-  if(isTxt){
-    q('tbFont').onchange=e=>{ if(!e.target.value) return;
-      if(editing) applyStyle('fontFamily',"'"+e.target.value+"'");
-      else { pushUndo(); ov.ff=e.target.value; delete ov.font; render(); showKnobs(); markSel(); } };
-    q('tbSize').oninput=e=>{ const px=+e.target.value; if(editing&&px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
-    [['tbB','bold'],['tbI','italic'],['tbU','underline']].forEach(([id,cmd])=>{
-      const b=q(id); b.onmousedown=e=>e.preventDefault();
-      b.onclick=()=>{ if(editing){ restoreSel(); document.execCommand(cmd); } };
-    });
-    q('tbReset').onclick=()=>{ pushUndo();
-      selItemIdxs().forEach(i=>{ delete COMP.items[i].overrides.text; });
-      editing=false; savedSel=null; styleSpan=null; render(); showKnobs(); markSel(); updateUndoBtns(); };
-    if(editing) updateTb();
-  }
 }
 
 // ── In-place text editing ───────────────────────────────────────────
@@ -1010,7 +1076,7 @@ function enterEdit(key,cx,cy){
   }
   editing=true; savedSel=null; styleSpan=null;
   try{ document.execCommand('styleWithCSS',false,true); }catch(e){}
-  updateUndoBtns();
+  updateUndoBtns(); showKnobs();
 }
 function commitEdit(rerender){
   const bd=curBd();
@@ -1029,6 +1095,7 @@ function commitEdit(rerender){
   }
   editing=false; savedSel=null; styleSpan=null; updateUndoBtns();
   if(rerender){ render(); showKnobs(); markSel(); }
+  else showKnobs();
 }
 document.addEventListener('selectionchange',()=>{
   if(!editing||holdSel) return;
@@ -1144,29 +1211,31 @@ function applyCrop(wrap,o){
   wrap.style.left=(+o.x||0)+'%'; wrap.style.top=(+o.y||0)+'%';
   wrap.style.width=(+o.w||28)+'%';
   wrap.style.fontSize=fsOf(o)+'px';
+  const fs=fsOf(o), Wem=wrap.offsetWidth/fs;
   const blk=wrap.querySelector('.imgo'), img=wrap.querySelector('img');
-  if(blk){ blk.style.position='relative'; blk.style.overflow='hidden'; blk.style.height=(+o.ph||10)+'em'; }
-  if(img){ img.style.position='absolute'; img.style.width=(+o.pw)+'em'; img.style.maxWidth='none';
+  if(blk){ blk.style.position='relative'; blk.style.overflow='hidden'; blk.style.height=r4((+o.phr||0.6)*Wem)+'em'; }
+  if(img){ img.style.position='absolute'; img.style.width=r4((+o.pwr||1)*Wem)+'em'; img.style.maxWidth='none';
            img.style.height='auto'; img.style.objectFit=''; img.style.objectPosition='';
-           img.style.left=(+o.ix||0)+'em'; img.style.top=(+o.iy||0)+'em'; }
+           img.style.left=r4((+o.ixr||0)*Wem)+'em'; img.style.top=r4((+o.iyr||0)*Wem)+'em'; }
 }
 function cropDrag(e,wrap,key){
   const o=ovOf(key);
-  const img=wrap.querySelector('img'); if(!img||!+o.pw) return;
+  const img=wrap.querySelector('img'); if(!img||!+o.pwr) return;
   const pre=snap();
-  const page=wrap.closest('.page');
   const fs0=fsOf(o);
   const a=(img.naturalHeight/img.naturalWidth)||0.75;
-  const Wem=page.offsetWidth*(+o.w||28)/100/fs0;
-  const imgH=o.pw*a;
-  const sx=e.clientX, sy=e.clientY, ox=+o.ix||0, oy=+o.iy||0;
+  const Wem=wrap.offsetWidth/fs0;
+  const pw=o.pwr*Wem, ph=(+o.phr||0.6)*Wem, imgH=pw*a;
+  const sx=e.clientX, sy=e.clientY;
+  const ox=(+o.ixr||0)*Wem, oy=(+o.iyr||0)*Wem;
   let moved=false;
   const mv=ev=>{
     moved=true;
     const dxE=(ev.clientX-sx)/curScale/fs0, dyE=(ev.clientY-sy)/curScale/fs0;
-    o.ix=Math.round(Math.max(Wem-o.pw, Math.min(0, ox+dxE))*100)/100;
-    o.iy=Math.round(Math.max((+o.ph||10)-imgH, Math.min(0, oy+dyE))*100)/100;
-    img.style.left=o.ix+'em'; img.style.top=o.iy+'em';
+    const ix=Math.max(Wem-pw, Math.min(0, ox+dxE));
+    const iy=Math.max(ph-imgH, Math.min(0, oy+dyE));
+    o.ixr=r4(ix/Wem); o.iyr=r4(iy/Wem);
+    img.style.left=r4(ix)+'em'; img.style.top=r4(iy)+'em';
   };
   const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
     if(moved) pushUndo(pre); };
@@ -1177,23 +1246,26 @@ function cropEdgeDrag(e,wrap,key,edge){
   e.stopPropagation(); e.preventDefault();
   const o=ovOf(key);
   const page=wrap.closest('.page'), pr=page.getBoundingClientRect();
-  const img=wrap.querySelector('img'); if(!img||!+o.pw) return;
+  const img=wrap.querySelector('img'); if(!img||!+o.pwr) return;
   const pre=snap();
   let moved=false;
   const fs0=fsOf(o);                                  // stays constant (ts compensates)
   const a=(img.naturalHeight/img.naturalWidth)||0.75;
   const emPerPctW=page.offsetWidth/100/fs0;           // em per 1% page width
   const emPerPctH=page.offsetHeight/100/fs0;
-  const imgH=o.pw*a;
+  const Wem0=(+o.w||28)*emPerPctW;
+  const pw=o.pwr*Wem0;                                // picture size is FIXED during the drag
+  const imgH=pw*a;
   const sx=e.clientX, sy=e.clientY;
-  const st={x:+o.x||0, y:+o.y||0, w:+o.w||28, ph:+o.ph||10, ix:+o.ix||0, iy:+o.iy||0};
+  const st={x:+o.x||0, y:+o.y||0, w:+o.w||28,
+            ph:(+o.phr||0.6)*Wem0, ix:(+o.ixr||0)*Wem0, iy:(+o.iyr||0)*Wem0};
   const mv=ev=>{
     moved=true;
     const dxPct=(ev.clientX-sx)/pr.width*100;
     const dyEm=(ev.clientY-sy)/curScale/fs0;
     let x=st.x, y=st.y, w=st.w, ph=st.ph, ix=st.ix, iy=st.iy;
     if(edge==='r'){
-      const maxW=(o.pw+st.ix)/emPerPctW;              // window can't outgrow the picture
+      const maxW=(pw+st.ix)/emPerPctW;                // window can't outgrow the picture
       w=Math.max(3, Math.min(maxW, st.w+dxPct));
     }else if(edge==='l'){
       let d=Math.max(st.ix/emPerPctW, Math.min(st.w-3, dxPct));   // + = crop in, − = restore
@@ -1204,9 +1276,11 @@ function cropEdgeDrag(e,wrap,key,edge){
       let d=Math.max(st.iy, Math.min(st.ph-2, dyEm));
       y=st.y+d/emPerPctH; ph=st.ph-d; iy=st.iy-d;
     }
+    const WemN=w*emPerPctW;
     o.x=Math.round(x*10)/10; o.y=Math.round(y*10)/10;
-    o.w=Math.round(w*100)/100; o.ph=Math.round(ph*100)/100;
-    o.ix=Math.round(ix*100)/100; o.iy=Math.round(iy*100)/100;
+    o.w=Math.round(w*100)/100;
+    o.pwr=r4(pw/WemN); o.phr=r4(ph/WemN);
+    o.ixr=r4(ix/WemN); o.iyr=r4(iy/WemN);
     o.ts=Math.round(fs0/(13.5*(o.w/28))*1000)/1000;
     if(Math.abs(o.ts-1)<0.002) delete o.ts;
     applyCrop(wrap,o);
