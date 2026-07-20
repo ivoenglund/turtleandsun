@@ -170,8 +170,12 @@
       <button id="pgPrev" title="Previous page">◀</button>
       <span id="pgLabel">1 / 1</span>
       <button id="pgNext" title="Next page">▶</button>
-      <button id="pgAdd" title="Add a page">＋</button>
+      <button id="pgAdd" title="Insert a page after this one">＋</button>
       <button id="pgDel" title="Delete this page">🗑</button>
+    </div>
+    <div id="pgMove" class="prow">
+      <button id="pgUp" title="Move this page earlier">⇦ Move</button>
+      <button id="pgDown" title="Move this page later">Move ⇨</button>
     </div>
     <div class="prow"><button id="addTextBtn" title="Add a free text object to this page">＋ Text</button></div>
     <div class="ph">Print blocks</div>
@@ -320,6 +324,42 @@ let curPage=1;
 function render(){ renderCurrent(); }
 function frames(){ COMP.params=COMP.params||{}; return COMP.params.frames=COMP.params.frames||[]; }
 function texts(){ COMP.params=COMP.params||{}; return COMP.params.texts=COMP.params.texts||[]; }
+
+// ── A DOCUMENT IS AN ORDERED LIST OF CARDS ──────────────────────────
+// params.cards = [{id}, {id}, …]. Every object carries overrides.card = the id
+// of the card it lives on. The card id is STABLE; the page number is NOT — it is
+// a derived cache, recomputed by syncPages() from the card's position in the list.
+//
+// That's the whole trick. Reordering pages is a splice of params.cards followed
+// by syncPages(); no object is touched and nothing has to be renumbered. All the
+// existing rendering code goes on reading overrides.page exactly as before.
+function cards(){ COMP.params=COMP.params||{}; return COMP.params.cards=COMP.params.cards||[]; }
+function newCardId(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function cardIdAt(n){ const c=cards(); return (c[n-1]&&c[n-1].id)||null; }
+function ensureCards(n){ const c=cards(); while(c.length<n) c.push({id:newCardId()}); }
+// Recompute every object's page from where its card now sits in the list.
+function syncPages(){
+  const idx=new Map(); cards().forEach((c,i)=>idx.set(c.id,i+1));
+  const put=o=>{ if(!o||!o.card) return; const p=idx.get(o.card); if(p) o.page=p; };
+  (COMP.items||[]).forEach(it=>put(it.overrides));
+  frames().forEach(put); texts().forEach(put);
+  COMP.params.pages=Math.max(1,cards().length);
+}
+// Documents made before cards existed are keyed by page number only: mint one
+// card per page, in page order, and hand every object the matching id.
+function migrateCards(){
+  if(!cards().length){
+    let maxP=Math.max(1,+((COMP.params||{}).pages)||1);
+    const scan=o=>{ if(o&&+o.page>maxP) maxP=+o.page; };
+    (COMP.items||[]).forEach(it=>scan(it.overrides));
+    frames().forEach(scan); texts().forEach(scan);
+    ensureCards(maxP);
+  }
+  const give=o=>{ if(!o) return; if(!o.card){ const n=Math.max(1,+o.page||1); ensureCards(n); o.card=cardIdAt(n); } };
+  (COMP.items||[]).forEach(it=>give(it.overrides));
+  frames().forEach(give); texts().forEach(give);
+  syncPages();
+}
 // Explode posts into separate objects (text + each photo) the first time a
 // document opens under the object model; everything else just gets a place.
 function normalizeItems(){
@@ -350,6 +390,7 @@ function normalizeItems(){
     }
   });
   COMP.items=out;
+  migrateCards();
 }
 
 async function load(){
@@ -469,7 +510,10 @@ function zoomStep(factor, cx, cy){ zoomToPct(curScale*100*factor, cx, cy); }
 
 // ── Page model ──────────────────────────────────────────────────────
 function itemsAll(){ return (COMP.items||[]).map((it,i)=>({ ...it, _idx:i })); }
+// The card list is the truth. (The scan is a belt-and-braces fallback for a
+// document opened before migrateCards() has run.)
 function pageCount(){
+  const c=cards(); if(c.length) return c.length;
   let n=(COMP.params&&+COMP.params.pages)||1;
   itemsAll().forEach(it=>{ const p=it.overrides&&+it.overrides.page; if(p>n) n=p; });
   frames().forEach(f=>{ if(+f.page>n) n=+f.page; });
@@ -719,24 +763,43 @@ function updatePageNav(){
   if(prev) prev.disabled=curPage<=1;
   if(next) next.disabled=curPage>=N;
   if(del)  del.disabled=N<=1;
+  const up=document.getElementById('pgUp'), dn=document.getElementById('pgDown');
+  if(up) up.disabled=curPage<=1;
+  if(dn) dn.disabled=curPage>=N;
 }
 function setPage(n){ curPage=n; SEL=[]; renderCurrent(); syncZoom(); showKnobs(); }
-function addPage(){ pushUndo(); COMP.params.pages=pageCount()+1; setPage(COMP.params.pages); }
-function deletePage(){
-  const N=pageCount();
-  if(!confirm('Delete page '+curPage+'? Objects on it go back to the tray.')) return;
+// Insert a new card AFTER the current one — a yearbook is built by inserting,
+// not only by appending.
+function addPage(){
   pushUndo();
-  itemsAll().forEach(it=>{ const ov=it.overrides; if(!ov||ov.page==null) return;
-    if(+ov.page===curPage){ delete ov.page; delete ov.x; delete ov.y; }
-    else if(+ov.page>curPage){ ov.page=+ov.page-1; }
-  });
-  COMP.params.frames=frames().filter(f=>(+f.page||1)!==curPage);
-  frames().forEach(f=>{ if(+f.page>curPage) f.page=+f.page-1; });
-  COMP.params.texts=texts().filter(t=>(+t.page||1)!==curPage);
-  texts().forEach(t=>{ if(+t.page>curPage) t.page=+t.page-1; });
-  COMP.params.pages=Math.max(1,N-1);
-  curPage=Math.min(curPage, pageCount());
+  cards().splice(curPage,0,{id:newCardId()});
+  syncPages();
+  setPage(curPage+1);
+}
+function deletePage(){
+  if(pageCount()<=1){ alert('This is the only page — a document needs at least one.'); return; }
+  if(!confirm('Delete page '+curPage+'? The objects on it go too (Ctrl+Z brings them back).')) return;
+  pushUndo();
+  const id=cardIdAt(curPage);
+  COMP.items=(COMP.items||[]).filter(it=>!(it.overrides&&it.overrides.card===id));
+  COMP.params.frames=frames().filter(f=>f.card!==id);
+  COMP.params.texts =texts().filter(t=>t.card!==id);
+  cards().splice(curPage-1,1);
+  syncPages();
+  curPage=Math.min(curPage,pageCount());
   SEL=[]; renderCurrent(); syncZoom(); showKnobs();
+}
+// Reorder: splice the card list, resync. No object is touched — this is exactly
+// what the card list was introduced for.
+function movePage(d){
+  const N=pageCount(), to=curPage+d;
+  if(to<1||to>N) return;
+  pushUndo();
+  const c=cards();
+  const [m]=c.splice(curPage-1,1);
+  c.splice(to-1,0,m);
+  syncPages();
+  setPage(to);
 }
 
 // ── Object operations ───────────────────────────────────────────────
@@ -753,7 +816,7 @@ function moveSelToPage(n){
   if(!SEL.length) return;
   n=Math.max(1,Math.min(pageCount(),n));
   pushUndo();
-  SEL.forEach(key=>{ ovOf(key).page=n; });
+  SEL.forEach(key=>{ const o=ovOf(key); o.card=cardIdAt(n); o.page=n; });
   curPage=n; renderCurrent(); showKnobs();
 }
 function bumpZ(dir){
@@ -769,7 +832,7 @@ function bumpZ(dir){
 // A free text object: headline, page number, anything — no card behind it.
 function addText(){
   pushUndo();
-  texts().push({ page:curPage, x:34, y:40, w:32,
+  texts().push({ page:curPage, card:cardIdAt(curPage), x:34, y:40, w:32,
     text:'<h3>New text</h3><p>Click it again to edit…</p>' });
   renderCurrent();
   SEL=['t'+(texts().length-1)]; showKnobs(); markSel();
@@ -852,7 +915,7 @@ function frameSelection(){
   pushUndo();
   const pad=10*curScale;
   x1-=pad; y1-=pad; x2+=pad; y2+=pad;
-  frames().push({ page:curPage,
+  frames().push({ page:curPage, card:cardIdAt(curPage),
     x:Math.round((x1-pr.left)/pr.width*1000)/10,  y:Math.round((y1-pr.top)/pr.height*1000)/10,
     w:Math.round((x2-x1)/pr.width*1000)/10,        h:Math.round((y2-y1)/pr.height*1000)/10,
     bw:2, bs:'solid', bc:'#c9a24b', r:0, z:0 });
@@ -1467,6 +1530,8 @@ document.getElementById('pgPrev').onclick=()=>setPage(curPage-1);
 document.getElementById('pgNext').onclick=()=>setPage(curPage+1);
 document.getElementById('pgAdd').onclick=()=>addPage();
 document.getElementById('pgDel').onclick=()=>deletePage();
+document.getElementById('pgUp').onclick=()=>movePage(-1);
+document.getElementById('pgDown').onclick=()=>movePage(1);
 // Undo / redo buttons (mousedown-preventDefault keeps the text editor focused,
 // so while editing they drive the browser's native text undo).
 const _ub=document.getElementById('undoBtn'), _rb=document.getElementById('redoBtn');
@@ -1486,7 +1551,7 @@ document.addEventListener('drop',async e=>{
   let d; try{ d=JSON.parse(raw); }catch(err){ return; }
   if(!d||!['post','contact','media'].includes(d.ref_type)||!+d.ref_id) return;
   pushUndo();
-  const ov={ page:curPage, w:24, x:104, y:8 };
+  const ov={ page:curPage, card:cardIdAt(curPage), w:24, x:104, y:8 };
   const page=document.querySelector('#out .page');
   if(page){
     const pr=page.getBoundingClientRect();
@@ -1548,7 +1613,9 @@ async function savePageAsBlock(){
   if(!onPage.length && !fr.length && !tx.length){ alert('This page is empty — nothing to save.'); return; }
   const name = prompt('Name this block (e.g. "Our team", "Standard letter"):', COMP.name ? (COMP.name+' — page '+curPage) : '');
   if(!name || !name.trim()) return;
-  const rebase = o => { const c=JSON.parse(JSON.stringify(o||{})); c.page=1; return c; };
+  // Blocks are page-relative and card-identity-free: the card id belongs to the
+  // document it came from, not to the block.
+  const rebase = o => { const c=JSON.parse(JSON.stringify(o||{})); c.page=1; delete c.card; delete c.blk; return c; };
   const body = {
     name: name.trim(), kind:'page', pages:1,
     params: { frames: fr.map(rebase), texts: tx.map(rebase) },
@@ -1574,12 +1641,13 @@ function stampBlock(b){
   const need = off + Math.max(1, +b.pages || 1);
   pushUndo();
   COMP.params = COMP.params || {};
-  COMP.params.pages = Math.max(pageCount(), need);
+  ensureCards(need);                 // grow the card list if the block is longer
   const newSel=[];
   // c.blk records WHICH BLOCK each object came from. Nothing reads it yet — it is
   // the groundwork for swapping a customer on a finished document: marked objects
   // can be re-pointed, hand-added ones have no marker and survive untouched.
-  const shift = o => { const c=JSON.parse(JSON.stringify(o||{})); c.page=(+c.page||1)+off; c.blk=b.id; return c; };
+  const shift = o => { const c=JSON.parse(JSON.stringify(o||{}));
+    const p=(+c.page||1)+off; c.page=p; c.card=cardIdAt(p); c.blk=b.id; return c; };
   (b.items||[]).forEach(it=>{
     COMP.items.push({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content,
                       overrides:shift(it.overrides) });
@@ -1587,6 +1655,7 @@ function stampBlock(b){
   });
   (((b.params||{}).frames)||[]).forEach(f=>{ frames().push(shift(f)); newSel.push('f'+(frames().length-1)); });
   (((b.params||{}).texts) ||[]).forEach(t=>{ texts().push(shift(t));  newSel.push('t'+(texts().length-1)); });
+  syncPages();
   SEL = newSel.filter(k=>{ const ov=ovOf(k); return ov && (+ov.page||1)===curPage; });
   renderCurrent(); syncZoom(); showKnobs(); markSel();
   if(b.dropped) alert('Placed — but '+b.dropped+' card'+(b.dropped>1?'s are':' is')+

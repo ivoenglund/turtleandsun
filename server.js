@@ -2853,15 +2853,27 @@ app.post('/api/compositions/from-blocks', requireAuth, async (req, res) => {
     const chosen = ids.map(id => byId.get(id)).filter(Boolean);
     if (!chosen.length) return res.status(400).json({ error: 'None of those blocks exist' });
 
+    // A document is an ordered list of CARDS; page numbers are derived from a
+    // card's position in that list. Mint the cards up front so the editor gets a
+    // document already in the new shape (it can migrate old ones, but there is no
+    // reason to hand it one that needs migrating).
+    const cardList = [];
+    const newCardId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const cardIdAt = n => (cardList[n - 1] || {}).id || null;
+    const ensureCards = n => { while (cardList.length < n) cardList.push({ id: newCardId() }); };
+
     const items = [], frames = [], texts = [], madeFrom = [];
     let offset = 0, totalDropped = 0;
     for (const b of chosen) {
       const bp = b.params || {};
       const { items: ok, dropped } = await resolveBlockItems(b.items, req.user.id);
       totalDropped += dropped;
+      ensureCards(offset + Math.max(1, +b.pages || 1));
       const shift = o => {
         const c = JSON.parse(JSON.stringify(o || {}));
-        c.page = (+c.page || 1) + offset;
+        const p = (+c.page || 1) + offset;
+        c.page = p;
+        c.card = cardIdAt(p);
         return c;
       };
       for (const it of ok) {
@@ -2877,7 +2889,8 @@ app.post('/api/compositions/from-blocks', requireAuth, async (req, res) => {
 
     const params = {
       paper: paper || 'a4',
-      pages: Math.max(1, offset),
+      cards: cardList,                       // the document IS this ordered list
+      pages: Math.max(1, cardList.length),   // derived; kept for older readers
       frames, texts,
       made_from: madeFrom,
       roles: {}                              // reserved: {customer: <contact_id>, …}
