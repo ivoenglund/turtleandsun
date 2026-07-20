@@ -343,11 +343,22 @@ function personCard(it){
     '<div class="bd">'+inner+'</div></div>';
 }
 // Media card = an SVG (logo/graphic). Rendered via <img> so no script runs.
+// A media picture crops exactly like a post photo: the .imgo wrapper is always
+// present (that is what the crop code measures and drags), and when ov.pwr is set
+// it becomes a window over a larger, offset image. The caption stays outside the
+// window so cropping never clips it.
 function mediaBlock(it){
   const c=it.content||{}, ov=it.overrides||{};
   const showCap = ov.caption && c.title;
+  let bs='', ist='';
+  if(+ov.pwr){
+    const cr=cropEms(ov);
+    bs=' style="position:relative;overflow:hidden;height:'+r4(cr.ph)+'em;"';
+    ist=' style="position:absolute;width:'+r4(cr.pw)+'em;max-width:none;left:'+r4(cr.ix)+'em;top:'+r4(cr.iy)+'em;border-radius:0;object-fit:fill;"';
+  }
+  const wcls='imgo'+(+ov.pwr?' cropped':'')+(ov.sq?' sqc':'');
   return '<div class="block media'+(ov.tc?' tco':'')+(ov.sq?' sqc':'')+'" data-idx="'+it._idx+'">'+
-    (c.url?'<img src="'+esc(c.url)+'">':'')+
+    (c.url?'<div class="'+wcls+'"'+bs+'><img src="'+esc(c.url)+'"'+ist+'></div>':'')+
     (showCap?'<div class="cap">'+esc(c.title)+'</div>':'')+'</div>';
 }
 
@@ -714,7 +725,11 @@ function isTextKey(key){
 function isPicKey(key){
   if(key[0]!=='i') return false;
   const it=COMP.items[+key.slice(1)];
-  return !!it&&it.ref_type==='post'&&String((it.overrides||{}).part||'').slice(0,3)==='img';
+  if(!it) return false;
+  if(it.ref_type==='post')  return String((it.overrides||{}).part||'').slice(0,3)==='img';
+  // Dragged-in and uploaded pictures crop too. SVG logos don't — they scale.
+  if(it.ref_type==='media') return (it.content||{}).kind!=='svg';
+  return false;
 }
 function wireDrag(){
   document.querySelectorAll('#out .abswrap,#out .frameobj').forEach(w=>{
@@ -931,15 +946,68 @@ function selAsHtml(){
 function htmlToText(h){ const d=document.createElement('div'); d.innerHTML=h; return (d.textContent||'').trim(); }
 function nativeSelection(){ try{ return (window.getSelection()||'').toString(); }catch(e){ return ''; } }
 
+// Google Docs (and Word) refuse WebP/AVIF — the formats modern sites serve — and
+// show "unsupported format" for a linked image they can't decode. So on copy we
+// redraw every picture through a canvas and inline it as a PNG data URI. That also
+// removes any dependency on the receiving app being able to reach our URLs at all.
+function imgToPng(src){
+  return new Promise(res=>{
+    const im=new Image();
+    im.crossOrigin='anonymous';                    // needed or the canvas is tainted
+    im.onload=()=>{
+      try{
+        const max=1600, k=Math.min(1, max/Math.max(im.naturalWidth||1, im.naturalHeight||1));
+        const cv=document.createElement('canvas');
+        cv.width =Math.max(1,Math.round((im.naturalWidth ||1)*k));
+        cv.height=Math.max(1,Math.round((im.naturalHeight||1)*k));
+        cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+        res(cv.toDataURL('image/png'));
+      }catch(err){ res(null); }                    // tainted canvas → keep the URL
+    };
+    im.onerror=()=>res(null);
+    im.src=src;
+  });
+}
+async function inlineImages(html){
+  const d=document.createElement('div'); d.innerHTML=html;
+  for(const im of [...d.querySelectorAll('img')]){
+    const u=im.getAttribute('src');
+    if(!u||/^data:/i.test(u)) continue;
+    const png=await imgToPng(u);
+    if(png) im.setAttribute('src',png);
+  }
+  return d.innerHTML;
+}
 function onCopy(e, cut){
   if(editing) return;                       // typing: let the browser copy the text
   if(nativeSelection()) return;             // a real text selection: leave it alone
   if(!SEL.length) return;
   copySel();                                // our own object clipboard
   const html=selAsHtml();
-  if(e.clipboardData){
+  if(!html){ if(cut) cutSel(); return; }
+  const plain=htmlToText(html);
+  const hasImg=/<img\b/i.test(html);
+
+  // With pictures we need the async canvas pass, so we write the clipboard
+  // ourselves (ClipboardItem accepts a promise). Text-only stays on the simple
+  // synchronous path.
+  if(hasImg && navigator.clipboard && window.ClipboardItem){
+    e.preventDefault();
+    try{
+      navigator.clipboard.write([ new ClipboardItem({
+        'text/html' : inlineImages(html).then(h=>new Blob([CLIPMARK+h],{type:'text/html'}))
+                        .catch(()=>new Blob([CLIPMARK+html],{type:'text/html'})),
+        'text/plain': new Blob([plain],{type:'text/plain'})
+      })]).catch(()=>{});
+    }catch(err){
+      if(e.clipboardData){                  // ClipboardItem promises unsupported
+        e.clipboardData.setData('text/html', CLIPMARK+html);
+        e.clipboardData.setData('text/plain', plain);
+      }
+    }
+  }else if(e.clipboardData){
     e.clipboardData.setData('text/html', CLIPMARK+html);
-    e.clipboardData.setData('text/plain', htmlToText(html));
+    e.clipboardData.setData('text/plain', plain);
     e.preventDefault();
   }
   if(cut) cutSel();
