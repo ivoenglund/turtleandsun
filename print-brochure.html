@@ -159,45 +159,56 @@
   .sact button:hover{ border-color:var(--gold); }
   .sact button.danger{ color:#8c2f1b; border-color:#dcc0b5; }
   @media print{ #strip,#stripTab{ display:none!important; } }
-  /* ── Resource panel: filters on top, resources at full size below ──
-     A plain panel. You open it, you drag its width where you want it, you drag
-     things out of it, you close it. Nothing moves on its own. */
-  #res{ position:fixed; left:0; top:0; bottom:0; width:340px; z-index:12; display:none;
-        flex-direction:column; background:#fbf9f2; border-right:2px solid var(--gold);
-        box-shadow:3px 0 18px rgba(0,0,0,.16); }
+  /* ── Content panel: same feeling as the right panel — white, gold border,
+     rounded, drop shadow. A vertical tab slides it out. Plain: you open it, you
+     size it, you drag things out of it, you close it. ── */
+  #res{ position:fixed; left:16px; top:16px; bottom:16px; width:360px; z-index:12; display:none;
+        flex-direction:column; background:#fff; border:2px solid var(--gold); border-radius:14px;
+        box-shadow:0 4px 18px rgba(0,0,0,.2); font-size:13px; overflow:hidden; }
   #res.open{ display:flex; }
-  #resHead{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid #e6e0cf; }
-  #resHead b{ font-size:12px; letter-spacing:.5px; text-transform:uppercase; color:var(--green); }
+  #resHead{ display:flex; align-items:center; gap:6px; padding:9px 12px; border-bottom:1px solid #ece7d9; }
+  #resHead b{ font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--green); }
   #resHead .sp{ flex:1; }
-  #res select, #res input[type=number], #res button{ font-family:inherit; font-size:12.5px;
-        padding:4px 7px; border:1px solid #d9d4c4; border-radius:7px; background:#fff; color:var(--ink); }
-  #res button{ font-weight:700; cursor:pointer; }
+  #res button{ font-family:inherit; font-weight:700; font-size:12px; padding:3px 8px;
+               border:1px solid #d9d4c4; border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
   #res button:hover{ background:#f4efe4; }
   #res button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #resFilters{ padding:8px 10px; border-bottom:1px solid #e6e0cf; display:flex; flex-direction:column; gap:6px; }
-  #resFilters .frow{ display:flex; gap:5px; align-items:center; }
-  #resFilters .frow > *{ min-width:0; }
-  #resFilters select{ flex:1; }
-  #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px;
-              border:1px solid #d9d4c4; border-radius:7px; }
-  #resList{ flex:1; overflow-y:auto; padding:10px; }
-  #resList .rcount{ font-size:11.5px; color:var(--muted); margin-bottom:8px; }
-  /* Resources render at full size with the SAME renderers the page uses, so what
-     you see here is what lands on the card. */
-  .rcard{ background:#fff; border:1px solid #e2dccb; border-radius:9px; padding:10px;
-          margin-bottom:9px; cursor:grab; position:relative; }
+  #resFilters{ padding:9px 12px; border-bottom:1px solid #ece7d9; max-height:46%; overflow-y:auto; }
+  #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px; margin-top:8px;
+              border:1px solid #d9d4c4; border-radius:8px; }
+  #resBody{ flex:1; overflow-y:auto; padding:10px 12px; }
+  #resBody .sechd{ display:flex; align-items:baseline; gap:8px; margin:12px 0 6px; }
+  #resBody .sechd:first-child{ margin-top:0; }
+  #resBody .sechd b{ font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--green); }
+  #resBody .sechd .n{ font-size:11px; color:var(--muted); }
+  #resBody .sechd .more{ margin-left:auto; font-size:11px; }
+  #resBody .empty{ color:var(--muted); padding:10px 2px; line-height:1.5; }
+  .rgrid{ display:flex; flex-wrap:wrap; gap:8px; }
+  /* Everything in the card renderers is em, so the container's font-size scales a
+     faithful preview at any size — no separate thumbnail code. */
+  .rcard{ background:#fff; border:1px solid #e2dccb; border-radius:9px; padding:8px;
+          cursor:grab; position:relative; overflow:hidden; }
   .rcard:hover{ border-color:var(--gold); box-shadow:0 2px 10px rgba(0,0,0,.10); }
   .rcard:active{ cursor:grabbing; }
-  .rcard .block{ font-size:13.5px; }
-  .rcard .rtag{ position:absolute; top:6px; right:8px; font-size:9.5px; font-weight:800;
-                letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
-  #resSplit{ position:absolute; top:0; right:-3px; width:7px; height:100%; cursor:col-resize; z-index:2; }
+  .rcard .block{ margin:0; }
+  .rcard img{ pointer-events:none; }
+  #resSplit{ position:absolute; top:0; right:-4px; width:9px; height:100%; cursor:col-resize; z-index:2; }
   #resSplit:hover{ background:rgba(201,162,75,.35); }
-  #resTab{ position:fixed; left:10px; top:14px; z-index:11; font-family:inherit; font-weight:700;
-           font-size:11.5px; padding:4px 11px; border:1px solid #cfc9b8; border-radius:8px;
-           background:rgba(255,255,255,.8); cursor:pointer; color:var(--muted); }
+  /* Vertical slide-out tab. */
+  #resTab{ position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:11;
+           font-family:inherit; font-weight:800; font-size:11px; letter-spacing:1.2px;
+           text-transform:uppercase; padding:14px 5px; border:1px solid #cfc9b8; border-left:0;
+           border-radius:0 9px 9px 0; background:rgba(255,255,255,.9); cursor:pointer;
+           color:var(--muted); writing-mode:vertical-rl; }
   #resTab:hover{ background:#fff; color:var(--ink); }
-  @media print{ #res,#resTab{ display:none!important; } }
+  /* Click a thumbnail to see it big. */
+  #resPrev{ display:none; position:fixed; inset:0; z-index:70; background:rgba(35,41,29,.45);
+            align-items:center; justify-content:center; padding:40px; }
+  #resPrev.open{ display:flex; }
+  #resPrevBox{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:22px;
+               max-width:620px; max-height:88vh; overflow:auto; font-size:20px;
+               box-shadow:0 8px 30px rgba(0,0,0,.3); }
+  @media print{ #res,#resTab,#resPrev{ display:none!important; } }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
   #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
@@ -223,6 +234,7 @@
     #out .page{ cursor:auto; }
   }
 </style>
+<link rel="stylesheet" href="/filter-tree.css">
 </head>
 <body>
 
@@ -260,28 +272,21 @@
   </div>
 </div>
 <div id="out"><div class="err">Loading…</div></div>
-<button id="resTab" title="Show or hide your resources">◧ Resources</button>
+<button id="resTab" title="Show or hide your content">Content</button>
 <aside id="res">
   <div id="resSplit" title="Drag to set the width"></div>
-  <div id="resHead"><b>Resources</b><span class="sp"></span>
+  <div id="resHead"><b>Content</b><span class="sp"></span>
+    <button id="resS" title="Small thumbnails">S</button>
+    <button id="resM" class="on" title="Medium">M</button>
+    <button id="resL" title="Large">L</button>
     <button id="resClose" title="Close">✕</button></div>
   <div id="resFilters">
-    <div class="frow">
-      <button class="rkind on" data-kind="contact" style="flex:1;">People</button>
-      <button class="rkind on" data-kind="post"    style="flex:1;">Posts</button>
-      <button class="rkind on" data-kind="media"   style="flex:1;">Pictures</button>
-    </div>
-    <div class="frow"><select id="resGroup"></select></div>
-    <div class="frow">
-      <span style="font-size:11.5px;color:var(--muted);">Years</span>
-      <input type="number" id="resY1" placeholder="from" style="width:72px;">
-      <input type="number" id="resY2" placeholder="to" style="width:72px;">
-      <button id="resYClear" title="Any year">✕</button>
-    </div>
-    <input type="text" id="resSearch" placeholder="Search…" autocomplete="off">
+    <div class="ftree" id="resTree"></div>
+    <input type="text" id="resSearch" placeholder="Search a name…" autocomplete="off">
   </div>
-  <div id="resList">Loading…</div>
+  <div id="resBody">Loading…</div>
 </aside>
+<div id="resPrev"><div id="resPrevBox"></div></div>
 <button id="stripTab" title="Show or hide the row of cards">▤ Cards</button>
 <div id="strip"><div id="stripInner"></div></div>
 
@@ -2170,120 +2175,182 @@ function toggleStrip(){
   if(stripOpen) renderStrip();
   syncZoom();          // Fit has more (or less) room now
 }
-// ── Resource panel ──────────────────────────────────────────────────
-// Filters on top, resources below at FULL SIZE, drawn with the very same
-// renderers the page uses — what you see is what lands on the card. Drag one out
-// onto a card; the editor's existing text/ts-card drop handler places it.
-const RES={ loaded:false, contacts:[], posts:[], media:[], groups:[], members:[],
-            kinds:{contact:true,post:true,media:true}, group:'', y1:'', y2:'', q:'' };
-function resOpen(){ return document.getElementById('res').classList.contains('open'); }
-// Keep the filmstrip beside the panel rather than under it, and let Fit know the
-// canvas just got narrower (or wider).
+// ── Content panel ───────────────────────────────────────────────────
+// Filters on top (the same tree geometry as the studio sidebar, via the shared
+// filter-tree.css), content below. SECTIONED by group: a person in three groups
+// appears under all three, because that is how you look for them.
+//
+// Filtering and paging happen on the SERVER — the panel never buffers the whole
+// database. One group can hold a hundred people.
+const RES={
+  loaded:false, groups:[], counts:{}, sections:[],
+  on:{},                          // 'g:5' -> true   which groups are ticked
+  ungrouped:true, timeline:true, archive:true,
+  living:true, deceased:true, people:true, pets:true,
+  y1:'', y2:'', q:'', size:13.5, busy:false, seq:0
+};
+const RSIZES={S:9.5, M:13.5, L:19};
+
+function resQuery(extra){
+  const p=new URLSearchParams();
+  p.set('groups', Object.keys(RES.on).filter(k=>RES.on[k]).map(k=>k.slice(2)).join(','));
+  p.set('ungrouped',RES.ungrouped?'1':'0');
+  p.set('timeline', RES.timeline?'1':'0');
+  p.set('archive',  RES.archive?'1':'0');
+  p.set('living',   RES.living?'1':'0');
+  p.set('deceased', RES.deceased?'1':'0');
+  p.set('people',   RES.people?'1':'0');
+  p.set('pets',     RES.pets?'1':'0');
+  if(RES.y1) p.set('y1',RES.y1);
+  if(RES.y2) p.set('y2',RES.y2);
+  if(RES.q)  p.set('q',RES.q);
+  Object.keys(extra||{}).forEach(k=>p.set(k,extra[k]));
+  return p.toString();
+}
+
+function resOpenPanel(){ return document.getElementById('res').classList.contains('open'); }
 function syncResLayout(){
   const el=document.getElementById('res');
-  const w=el.classList.contains('open')?el.offsetWidth:0;
+  const w=el.classList.contains('open')?(el.offsetWidth+32):0;
   const st=document.getElementById('strip'); if(st) st.style.left=w+'px';
   syncZoom();
 }
 function toggleRes(){
   const el=document.getElementById('res');
   el.classList.toggle('open');
-  if(el.classList.contains('open')) loadResources();
+  if(el.classList.contains('open')){ if(!RES.loaded) initContent(); else fetchContent(); }
   syncResLayout();
 }
-async function loadResources(){
-  if(RES.loaded){ renderRes(); return; }
-  const list=document.getElementById('resList');
-  list.textContent='Loading…';
-  const get=async u=>{ try{ const r=await fetch(u); return r.ok?await r.json():[]; }catch(e){ return []; } };
-  const [contacts,posts,media,groups,members]=await Promise.all([
-    get('/api/contacts'), get('/api/blog-posts'), get('/api/media-cards'),
-    get('/api/groups'),   get('/api/group-memberships')
-  ]);
-  RES.contacts=Array.isArray(contacts)?contacts:[];
-  RES.posts   =Array.isArray(posts)?posts:[];
-  RES.media   =Array.isArray(media)?media:[];
-  RES.members =Array.isArray(members)?members:[];
-  // /api/groups comes back nested — flatten it, keeping the hierarchy in the label.
+
+async function initContent(){
+  const get=async u=>{ try{ const r=await fetch(u); return r.ok?await r.json():null; }catch(e){ return null; } };
+  const [groups,counts]=await Promise.all([get('/api/groups'), get('/api/content/counts')]);
   const flat=[]; (function walk(list,depth){ (list||[]).forEach(g=>{
-    flat.push({id:g.id,name:(depth?'— '.repeat(depth):'')+g.name}); walk(g.subgroups,depth+1); }); })(groups,0);
+    flat.push({id:g.id,name:g.name,depth:depth}); walk(g.subgroups,depth+1); }); })(groups||[],0);
   RES.groups=flat;
+  RES.counts=(counts&&counts.counts)||{};
+  flat.forEach(g=>{ if(RES.on['g:'+g.id]===undefined) RES.on['g:'+g.id]=true; });
   RES.loaded=true;
-  const gs=document.getElementById('resGroup');
-  gs.innerHTML='<option value="">All groups</option>'+
-    flat.map(g=>'<option value="'+g.id+'">'+esc(g.name)+'</option>').join('');
-  renderRes();
+  renderTree();
+  fetchContent();
 }
-function resYear(p){
-  const d=p&&(p.post_date||p.created_at); if(!d) return null;
-  const y=+String(d).slice(0,4); return y||null;
-}
-function resMatches(kind,o){
-  if(!RES.kinds[kind]) return false;
-  const q=RES.q.trim().toLowerCase();
-  if(RES.group && kind==='contact'){
-    const gid=+RES.group;
-    if(!RES.members.some(m=>+m.contact_id===+o.id && +m.group_id===gid)) return false;
-  }
-  if(kind==='post'){
-    const y=resYear(o);
-    if(RES.y1 && (!y||y<+RES.y1)) return false;
-    if(RES.y2 && (!y||y>+RES.y2)) return false;
-  }
-  if(q){
-    const hay=[o.name,o.title,o.job_title,o.company,o.body,(o.tags||[]).join(' ')]
-      .filter(Boolean).join(' ').toLowerCase();
-    if(hay.indexOf(q)<0) return false;
-  }
-  return true;
-}
-function renderRes(){
-  const list=document.getElementById('resList');
-  if(!list) return;
-  const rows=[];
-  if(RES.kinds.contact) RES.contacts.filter(c=>resMatches('contact',c))
-    .forEach(c=>rows.push({kind:'contact',id:c.id,label:'Person',
-      html:personCard({_idx:-1,ref_type:'contact',content:c,overrides:{}})}));
-  if(RES.kinds.post) RES.posts.filter(p=>resMatches('post',p))
-    .forEach(p=>rows.push({kind:'post',id:p.id,label:'Post',
-      // text block + first photo, so the preview shows what the post actually is
-      html:((p.photos||[]).length?postBlock({_idx:-1,ref_type:'post',content:p,overrides:{part:'img0'}}):'')+
-           postBlock({_idx:-1,ref_type:'post',content:p,overrides:{}})}));
-  if(RES.kinds.media) RES.media.filter(m=>resMatches('media',m))
-    .forEach(m=>rows.push({kind:'media',id:m.id,label:m.kind==='svg'?'Logo':'Picture',
-      html:mediaBlock({_idx:-1,ref_type:'media',content:m,overrides:{caption:1}})}));
-  list.innerHTML='<div class="rcount">'+rows.length+' resource'+(rows.length===1?'':'s')+
-    ' — drag one onto the card</div>'+
-    rows.map(r=>'<div class="rcard" draggable="true" data-rt="'+r.kind+'" data-ri="'+r.id+'">'+
-      '<span class="rtag">'+esc(r.label)+'</span>'+r.html+'</div>').join('');
-  list.querySelectorAll('.rcard').forEach(el=>{
-    el.ondragstart=e=>{
-      // Same payload the Make board sends, so the existing drop handler places it.
-      const p=JSON.stringify({ref_type:el.dataset.rt, ref_id:+el.dataset.ri});
-      try{ e.dataTransfer.setData('text/ts-card',p); }catch(err){}
-      try{ e.dataTransfer.setData('text/plain','');  }catch(err){}
-      e.dataTransfer.effectAllowed='copy';
+
+function renderTree(){
+  const t=document.getElementById('resTree');
+  const row=(id,label,checked,count,extra,sub)=>
+    '<label class="frow'+(sub?' sub':'')+'"><input type="checkbox" data-f="'+id+'"'+(checked?' checked':'')+'>'+
+      '<span class="c2"><span class="nm">'+esc(label)+'</span>'+(extra||'')+
+      (count!=null?'<span class="ct">'+count+'</span>':'')+'</span></label>';
+  let h='<div class="fh">Groups</div>';
+  h+=RES.groups.map(g=>row('g:'+g.id, g.name, !!RES.on['g:'+g.id], RES.counts['g:'+g.id]||0, '', g.depth>0)).join('');
+  h+=row('ungrouped','Ungrouped',RES.ungrouped,RES.counts.ungrouped||0);
+  h+='<div class="fh">Sources</div>';
+  // Timeline is NOT a <label>: the year fields live on the same row, and inside a
+  // label every click on them would toggle the checkbox.
+  h+='<div class="frow"><input type="checkbox" data-f="timeline"'+(RES.timeline?' checked':'')+'>'+
+       '<span class="c2"><span class="nm" id="rTlLbl" style="cursor:pointer;">Timeline</span>'+
+       '<span class="yrs"><input type="number" id="rY1" placeholder="from" value="'+esc(RES.y1)+'">'+
+       '<span>–</span><input type="number" id="rY2" placeholder="to" value="'+esc(RES.y2)+'"></span></span></div>';
+  h+=row('archive','Archive',RES.archive);
+  h+='<div class="fh">Filter</div>';
+  h+=row('living','Living',RES.living)+row('deceased','Deceased',RES.deceased)+
+     row('people','People',RES.people)+row('pets','Pets',RES.pets);
+  t.innerHTML=h;
+  t.querySelectorAll('input[data-f]').forEach(cb=>{
+    cb.onchange=()=>{
+      const f=cb.dataset.f;
+      if(f.slice(0,2)==='g:') RES.on[f]=cb.checked; else RES[f]=cb.checked;
+      fetchContent();
     };
   });
+  ['rY1','rY2'].forEach((id,i)=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.oninput=()=>{ RES[i?'y2':'y1']=el.value; resDebounced(); };
+  });
+  const tl=document.getElementById('rTlLbl');
+  if(tl) tl.onclick=()=>{ const cb=t.querySelector('input[data-f="timeline"]');
+    cb.checked=!cb.checked; RES.timeline=cb.checked; fetchContent(); };
+}
+
+let resTimer=null;
+function resDebounced(){ clearTimeout(resTimer); resTimer=setTimeout(fetchContent,350); }
+
+async function fetchContent(){
+  if(!resOpenPanel()) return;
+  const body=document.getElementById('resBody');
+  const mine=++RES.seq;
+  try{
+    const r=await fetch('/api/content?'+resQuery({preview:12}));
+    if(mine!==RES.seq) return;                  // a newer request has overtaken this one
+    if(!r.ok){ body.textContent='Could not load your content.'; return; }
+    RES.sections=(await r.json()).sections||[];
+    renderContent();
+  }catch(e){ if(mine===RES.seq) body.textContent='Could not load your content.'; }
+}
+
+function resItemHtml(kind,o){
+  if(kind==='contact') return personCard({_idx:-1,ref_type:'contact',content:o,overrides:{}});
+  if(kind==='media')   return mediaBlock({_idx:-1,ref_type:'media',content:o,overrides:{caption:1}});
+  return ((o.photos||[]).length?postBlock({_idx:-1,ref_type:'post',content:o,overrides:{part:'img0'}}):'')+
+         postBlock({_idx:-1,ref_type:'post',content:o,overrides:{}});
+}
+function renderContent(){
+  const body=document.getElementById('resBody');
+  if(!RES.sections.length){ body.innerHTML='<div class="empty">Nothing ticked — choose a group, or Timeline or Archive above.</div>'; return; }
+  const W=Math.round(RES.size*11);              // thumbnail column width follows the size
+  body.innerHTML=RES.sections.map(sec=>{
+    const shown=sec.items.length, more=sec.total-shown;
+    return '<div class="sechd"><b>'+esc(sec.title)+'</b><span class="n">'+sec.total+'</span>'+
+      (more>0?'<button class="more" data-more="'+esc(sec.key)+'">Show all '+sec.total+'</button>':'')+'</div>'+
+      (shown?'<div class="rgrid">'+sec.items.map(o=>
+        '<div class="rcard" draggable="true" data-rt="'+sec.kind+'" data-ri="'+o.id+'" data-sec="'+esc(sec.key)+'"'+
+        ' style="width:'+W+'px;font-size:'+RES.size+'px;">'+resItemHtml(sec.kind,o)+'</div>').join('')+'</div>'
+       :'<div class="empty">Nothing here with these filters.</div>');
+  }).join('');
+  body.querySelectorAll('.rcard').forEach(el=>{
+    el.ondragstart=e=>{
+      // The same payload the Make board sends, so the existing drop handler places it.
+      try{ e.dataTransfer.setData('text/ts-card',
+        JSON.stringify({ref_type:el.dataset.rt, ref_id:+el.dataset.ri})); }catch(err){}
+      e.dataTransfer.effectAllowed='copy';
+    };
+    el.onclick=()=>{                            // click = look at it big, drag = place it
+      const box=document.getElementById('resPrevBox');
+      box.innerHTML=el.innerHTML;
+      document.getElementById('resPrev').classList.add('open');
+    };
+  });
+  body.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
+    const key=b.dataset.more;
+    b.textContent='Loading…';
+    try{
+      const r=await fetch('/api/content?'+resQuery({section:key,limit:500,offset:0}));
+      if(!r.ok) return;
+      const got=((await r.json()).sections||[])[0];
+      if(got){ const i=RES.sections.findIndex(s=>s.key===key); if(i>=0) RES.sections[i]=got; renderContent(); }
+    }catch(e){ b.textContent='Failed'; }
+  });
+}
+
+function setResSize(k){
+  RES.size=RSIZES[k];
+  ['S','M','L'].forEach(x=>document.getElementById('res'+x).classList.toggle('on',x===k));
+  renderContent();
 }
 document.getElementById('resTab').onclick=toggleRes;
 document.getElementById('resClose').onclick=toggleRes;
-document.getElementById('resGroup').onchange=e=>{ RES.group=e.target.value; renderRes(); };
-document.getElementById('resY1').oninput=e=>{ RES.y1=e.target.value; renderRes(); };
-document.getElementById('resY2').oninput=e=>{ RES.y2=e.target.value; renderRes(); };
-document.getElementById('resYClear').onclick=()=>{
-  RES.y1=RES.y2=''; document.getElementById('resY1').value=''; document.getElementById('resY2').value=''; renderRes(); };
-document.getElementById('resSearch').oninput=e=>{ RES.q=e.target.value; renderRes(); };
-document.querySelectorAll('.rkind').forEach(b=>b.onclick=()=>{
-  const k=b.dataset.kind; RES.kinds[k]=!RES.kinds[k];
-  b.classList.toggle('on',RES.kinds[k]); renderRes(); });
+document.getElementById('resS').onclick=()=>setResSize('S');
+document.getElementById('resM').onclick=()=>setResSize('M');
+document.getElementById('resL').onclick=()=>setResSize('L');
+document.getElementById('resSearch').oninput=e=>{ RES.q=e.target.value; resDebounced(); };
+document.getElementById('resPrev').onclick=()=>document.getElementById('resPrev').classList.remove('open');
 // Drag the edge to whatever width suits the monitor. Nothing automatic.
 (function(){
   const sp=document.getElementById('resSplit'), el=document.getElementById('res');
   sp.onpointerdown=e=>{
     e.preventDefault();
-    const move=ev=>{ el.style.width=Math.max(240,Math.min(window.innerWidth-160,ev.clientX))+'px';
-                     const st=document.getElementById('strip'); if(st) st.style.left=el.offsetWidth+'px'; };
+    const move=ev=>{ el.style.width=Math.max(260,Math.min(window.innerWidth-160,ev.clientX-16))+'px';
+                     const st=document.getElementById('strip'); if(st) st.style.left=(el.offsetWidth+32)+'px'; };
     const up=()=>{ removeEventListener('pointermove',move); removeEventListener('pointerup',up); syncResLayout(); };
     addEventListener('pointermove',move); addEventListener('pointerup',up);
   };

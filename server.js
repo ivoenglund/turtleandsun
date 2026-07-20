@@ -3621,6 +3621,136 @@ app.post('/api/media-cards', requireAuth, upload.single('file'), async (req, res
   } catch (err) { res.status(500).json({ error: 'Upload failed', details: err.message }); }
 });
 
+// ── CONTENT for the editor's left panel ─────────────────────────────────────
+// Filtering happens HERE, not in the browser. The panel must never buffer the
+// whole database — one group alone can hold a hundred people.
+//
+// The panel is SECTIONED: one section per ticked group, so a person who belongs
+// to three groups appears under all three. Timeline (posts) and Archive
+// (pictures) are sections of their own. Each section reports its true total and
+// returns only a first page; "show all" re-requests that one section.
+function contentWhereContacts(q, living, deceased, people, pets, params) {
+  const parts = [];
+  // Both ticked (or the pair meaningless) = no restriction; neither = nothing.
+  if (living && !deceased) parts.push('c.died_on IS NULL');
+  if (deceased && !living) parts.push('c.died_on IS NOT NULL');
+  if (!living && !deceased) parts.push('FALSE');
+  if (people && !pets) parts.push('c.is_pet IS NOT TRUE');
+  if (pets && !people) parts.push('c.is_pet IS TRUE');
+  if (!people && !pets) parts.push('FALSE');
+  if (q) {
+    params.push('%' + q + '%');
+    parts.push('(c.name ILIKE $' + params.length + ' OR c.company ILIKE $' + params.length +
+               ' OR c.job_title ILIKE $' + params.length + ')');
+  }
+  return parts.length ? ' AND ' + parts.join(' AND ') : '';
+}
+
+app.get('/api/content', requireAuth, async (req, res) => {
+  const uid = req.user.id;
+  const Q = req.query || {};
+  const bool = v => v === '1' || v === 'true';
+  const q = String(Q.q || '').trim();
+  const living = bool(Q.living), deceased = bool(Q.deceased);
+  const people = bool(Q.people), pets = bool(Q.pets);
+  const groupIds = String(Q.groups || '').split(',').map(n => +n).filter(Boolean);
+  const previewN = Math.min(200, Math.max(1, +Q.preview || 12));
+  const only = String(Q.section || '');            // 'g:5' | 'ungrouped' | 'timeline' | 'archive'
+  const limit = Math.min(500, Math.max(1, +Q.limit || previewN));
+  const offset = Math.max(0, +Q.offset || 0);
+  const want = key => !only || only === key;
+
+  const CFIELDS = `c.id, c.name, c.job_title, c.company, c.email, c.phone, c.photo_url, c.city`;
+
+  try {
+    const sections = [];
+
+    // ── people, one section per ticked group ──
+    for (const gid of groupIds) {
+      if (!want('g:' + gid)) continue;
+      const p = [uid, gid];
+      const where = contentWhereContacts(q, living, deceased, people, pets, p);
+      const base = `FROM contacts c
+        JOIN contact_group_memberships m ON m.contact_id = c.id AND m.user_id = $1 AND m.group_id = $2
+        WHERE c.user_id = $1` + where;
+      const tot = await pool.query(`SELECT COUNT(*)::int AS n ` + base, p);
+      const lim = only ? limit : previewN, off = only ? offset : 0;
+      const rows = await pool.query(
+        `SELECT ${CFIELDS} ${base} ORDER BY c.name ASC NULLS LAST LIMIT ${lim} OFFSET ${off}`, p);
+      const g = await pool.query(`SELECT name FROM groups WHERE id = $1 AND user_id = $2`, [gid, uid]);
+      sections.push({ key: 'g:' + gid, kind: 'contact', title: (g.rows[0] || {}).name || 'Group',
+                      total: tot.rows[0].n, items: rows.rows });
+    }
+
+    // ── people in no group at all ──
+    if (bool(Q.ungrouped) && want('ungrouped')) {
+      const p = [uid];
+      const where = contentWhereContacts(q, living, deceased, people, pets, p);
+      const base = `FROM contacts c WHERE c.user_id = $1
+        AND NOT EXISTS (SELECT 1 FROM contact_group_memberships m
+                         WHERE m.contact_id = c.id AND m.user_id = $1)` + where;
+      const tot = await pool.query(`SELECT COUNT(*)::int AS n ` + base, p);
+      const lim = only ? limit : previewN, off = only ? offset : 0;
+      const rows = await pool.query(
+        `SELECT ${CFIELDS} ${base} ORDER BY c.name ASC NULLS LAST LIMIT ${lim} OFFSET ${off}`, p);
+      sections.push({ key: 'ungrouped', kind: 'contact', title: 'Ungrouped',
+                      total: tot.rows[0].n, items: rows.rows });
+    }
+
+    // ── posts in the year range ──
+    if (bool(Q.timeline) && want('timeline')) {
+      const p = [uid];
+      const parts = [];
+      if (Q.y1) { p.push(String(Q.y1) + '-01-01'); parts.push('b.post_date >= $' + p.length); }
+      if (Q.y2) { p.push(String(Q.y2) + '-12-31'); parts.push('b.post_date <= $' + p.length); }
+      if (q) { p.push('%' + q + '%'); parts.push('(b.title ILIKE $' + p.length + ' OR b.body ILIKE $' + p.length + ')'); }
+      const base = `FROM blog_posts b WHERE b.user_id = $1` + (parts.length ? ' AND ' + parts.join(' AND ') : '');
+      const tot = await pool.query(`SELECT COUNT(*)::int AS n ` + base, p);
+      const lim = only ? limit : previewN, off = only ? offset : 0;
+      const rows = await pool.query(
+        `SELECT b.id, b.title, b.body, b.post_date, b.photos, b.author, b.tags ${base}
+          ORDER BY b.post_date DESC NULLS LAST, b.id DESC LIMIT ${lim} OFFSET ${off}`, p);
+      const yr = (Q.y1 || Q.y2) ? ' ' + (Q.y1 || '…') + '–' + (Q.y2 || '…') : '';
+      sections.push({ key: 'timeline', kind: 'post', title: 'Timeline' + yr,
+                      total: tot.rows[0].n, items: rows.rows });
+    }
+
+    // ── pictures and logos ──
+    if (bool(Q.archive) && want('archive')) {
+      const p = [uid];
+      let where = '';
+      if (q) { p.push('%' + q + '%'); where = ' AND title ILIKE $' + p.length; }
+      const base = `FROM media_cards WHERE user_id = $1` + where;
+      const tot = await pool.query(`SELECT COUNT(*)::int AS n ` + base, p);
+      const lim = only ? limit : previewN, off = only ? offset : 0;
+      const rows = await pool.query(
+        `SELECT id, title, url, kind, tags ${base} ORDER BY created_at DESC LIMIT ${lim} OFFSET ${off}`, p);
+      sections.push({ key: 'archive', kind: 'media', title: 'Archive',
+                      total: tot.rows[0].n, items: rows.rows });
+    }
+
+    res.json({ v: 1, sections });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Membership counts for the tree — the stable numbers, not affected by the
+// attribute filters, so they don't jump around as you tick things.
+app.get('/api/content/counts', requireAuth, async (req, res) => {
+  try {
+    const g = await pool.query(
+      `SELECT group_id, COUNT(*)::int AS n FROM contact_group_memberships
+        WHERE user_id = $1 GROUP BY group_id`, [req.user.id]);
+    const u = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM contacts c WHERE c.user_id = $1
+        AND NOT EXISTS (SELECT 1 FROM contact_group_memberships m
+                         WHERE m.contact_id = c.id AND m.user_id = $1)`, [req.user.id]);
+    const counts = {};
+    g.rows.forEach(r => { counts['g:' + r.group_id] = r.n; });
+    counts.ungrouped = u.rows[0].n;
+    res.json({ v: 1, counts });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Re-encode any picture as PNG, for the editor's "copy to Google Docs" path.
 //
 // Doing this in the browser (crossOrigin <img> → canvas → toDataURL) is

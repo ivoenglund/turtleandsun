@@ -1,0 +1,29 @@
+/* filter-tree.css — the checkbox filter tree.
+   Shared geometry so the editor's Content panel and the studio sidebar cannot
+   drift apart. Two straight columns: checkbox at one edge, content at another,
+   8px gap, count flush right. Colours come from the host page's CSS variables. */
+
+.ftree{ font-size:13.5px; }
+
+.ftree .fh{ font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase;
+            color:var(--green,#1f4a45); margin:10px 0 3px; }
+.ftree .fh:first-child{ margin-top:0; }
+
+/* One geometry for every row, in every mode. */
+.ftree .frow{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:8px;
+              padding:3px 4px; border-radius:7px; cursor:pointer; line-height:1.3; }
+.ftree .frow:hover{ background:#f4f1e6; }
+.ftree .frow > .c2{ grid-column:2; display:flex; align-items:center; gap:8px; min-width:0; }
+.ftree .frow .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ftree .frow .ct{ font-size:12px; color:var(--muted,#7a8470); margin-left:auto; }
+.ftree .sub > .c2{ padding-left:18px; }
+
+/* Native checkboxes at a consistent size — no custom control to fall out of line. */
+.ftree input[type=checkbox]{ width:14px; height:14px; margin:0; accent-color:var(--green,#1f4a45);
+                             cursor:pointer; }
+
+/* Inline year range sits on the same row as its label. */
+.ftree .yrs{ display:flex; align-items:center; gap:3px; }
+.ftree .yrs input{ width:52px; font-family:inherit; font-size:12px; padding:2px 5px;
+                   border:1px solid #d9d4c4; border-radius:6px; background:#fff; color:inherit; }
+.ftree .yrs span{ color:var(--muted,#7a8470); }
