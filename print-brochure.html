@@ -162,7 +162,7 @@
   /* ── Content panel: same feeling as the right panel — white, gold border,
      rounded, drop shadow. A vertical tab slides it out. Plain: you open it, you
      size it, you drag things out of it, you close it. ── */
-  #res{ position:fixed; left:16px; top:16px; bottom:16px; width:360px; z-index:12; display:none;
+  #res{ position:fixed; left:16px; top:16px; bottom:16px; width:640px; z-index:12; display:none;
         flex-direction:column; background:#fff; border:2px solid var(--gold); border-radius:14px;
         box-shadow:0 4px 18px rgba(0,0,0,.2); font-size:13px; overflow:hidden; }
   #res.open{ display:flex; }
@@ -173,10 +173,18 @@
                border:1px solid #d9d4c4; border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
   #res button:hover{ background:#f4efe4; }
   #res button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #resFilters{ padding:9px 12px; border-bottom:1px solid #ece7d9; max-height:46%; overflow-y:auto; }
-  #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px; margin-top:8px;
+  #resMain{ flex:1; display:flex; min-height:0; }
+  #resFilters{ width:212px; flex:0 0 auto; padding:9px 10px; overflow-y:auto;
+               border-right:1px solid #ece7d9; }
+  #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px; margin-bottom:8px;
               border:1px solid #d9d4c4; border-radius:8px; }
-  #resBody{ flex:1; overflow-y:auto; padding:10px 12px; }
+  #resBody{ flex:1; min-width:0; overflow-y:auto; padding:10px 12px; }
+  /* Archive accepts drops: pictures dragged in from the page or the desktop. */
+  #resBody .dropz.over{ outline:2px dashed var(--gold); outline-offset:3px; border-radius:9px; }
+  .rcard .rdel{ position:absolute; top:3px; right:3px; font-size:10px; font-weight:700;
+                line-height:1; padding:2px 5px; border:1px solid #dcc0b5; border-radius:6px;
+                background:rgba(255,255,255,.92); color:#8c2f1b; cursor:pointer; display:none; }
+  .rcard:hover .rdel{ display:block; }
   #resBody .sechd{ display:flex; align-items:baseline; gap:8px; margin:12px 0 6px; }
   #resBody .sechd:first-child{ margin-top:0; }
   #resBody .sechd b{ font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--green); }
@@ -280,11 +288,13 @@
     <button id="resM" class="on" title="Medium">M</button>
     <button id="resL" title="Large">L</button>
     <button id="resClose" title="Close">✕</button></div>
-  <div id="resFilters">
-    <div class="ftree" id="resTree"></div>
-    <input type="text" id="resSearch" placeholder="Search a name…" autocomplete="off">
+  <div id="resMain">
+    <div id="resFilters">
+      <input type="text" id="resSearch" placeholder="Search…" autocomplete="off">
+      <div class="ftree" id="resTree"></div>
+    </div>
+    <div id="resBody"></div>
   </div>
-  <div id="resBody">Loading…</div>
 </aside>
 <div id="resPrev"><div id="resPrevBox"></div></div>
 <button id="stripTab" title="Show or hide the row of cards">▤ Cards</button>
@@ -2185,7 +2195,9 @@ function toggleStrip(){
 const RES={
   loaded:false, groups:[], counts:{}, sections:[],
   on:{},                          // 'g:5' -> true   which groups are ticked
-  ungrouped:true, timeline:true, archive:true,
+  // Nothing is on at the start: you normally want one group, not everything.
+  // The attribute filters begin fully on, which means "no restriction".
+  ungrouped:false, timeline:false, archive:false,
   living:true, deceased:true, people:true, pets:true,
   y1:'', y2:'', q:'', size:13.5, busy:false, seq:0
 };
@@ -2229,7 +2241,7 @@ async function initContent(){
     flat.push({id:g.id,name:g.name,depth:depth}); walk(g.subgroups,depth+1); }); })(groups||[],0);
   RES.groups=flat;
   RES.counts=(counts&&counts.counts)||{};
-  flat.forEach(g=>{ if(RES.on['g:'+g.id]===undefined) RES.on['g:'+g.id]=true; });
+  flat.forEach(g=>{ if(RES.on['g:'+g.id]===undefined) RES.on['g:'+g.id]=false; });
   RES.loaded=true;
   renderTree();
   fetchContent();
@@ -2300,12 +2312,18 @@ function renderContent(){
   const W=Math.round(RES.size*11);              // thumbnail column width follows the size
   body.innerHTML=RES.sections.map(sec=>{
     const shown=sec.items.length, more=sec.total-shown;
+    const arch=sec.key==='archive';
     return '<div class="sechd"><b>'+esc(sec.title)+'</b><span class="n">'+sec.total+'</span>'+
       (more>0?'<button class="more" data-more="'+esc(sec.key)+'">Show all '+sec.total+'</button>':'')+'</div>'+
-      (shown?'<div class="rgrid">'+sec.items.map(o=>
+      '<div class="'+(arch?'rgrid dropz':'rgrid')+'"'+(arch?' data-drop="1"':'')+'>'+
+      sec.items.map(o=>
         '<div class="rcard" draggable="true" data-rt="'+sec.kind+'" data-ri="'+o.id+'" data-sec="'+esc(sec.key)+'"'+
-        ' style="width:'+W+'px;font-size:'+RES.size+'px;">'+resItemHtml(sec.kind,o)+'</div>').join('')+'</div>'
-       :'<div class="empty">Nothing here with these filters.</div>');
+        ' style="width:'+W+'px;font-size:'+RES.size+'px;">'+
+        (arch?'<button class="rdel" data-del="'+o.id+'" title="Delete from the archive">✕</button>':'')+
+        resItemHtml(sec.kind,o)+'</div>').join('')+
+      (shown?'':'<div class="empty">'+(arch?'Archive is empty — drop a picture here.'
+                                            :'Nothing here with these filters.')+'</div>')+
+      '</div>';
   }).join('');
   body.querySelectorAll('.rcard').forEach(el=>{
     el.ondragstart=e=>{
@@ -2320,6 +2338,62 @@ function renderContent(){
       document.getElementById('resPrev').classList.add('open');
     };
   });
+  // Delete from the archive — but tell the truth first. Deleting a picture also
+  // removes it from every print that uses it (the server clears those items), so
+  // the count is the thing you actually need to see before deciding.
+  body.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const id=b.dataset.del;
+    let msg='Delete this picture from the archive?';
+    try{
+      const r=await fetch('/api/media-cards/'+id+'/usage');
+      if(r.ok){
+        const u=await r.json();
+        if(u.prints||u.blocks){
+          msg='This picture is used in '+u.prints+' print'+(u.prints===1?'':'s')+
+              (u.blocks?' and '+u.blocks+' block'+(u.blocks===1?'':'s'):'')+
+              (u.first?' (e.g. "'+u.first+'")':'')+
+              '.\n\nDeleting it removes it from them too. Delete anyway?';
+        }
+      }
+    }catch(err){}
+    if(!confirm(msg)) return;
+    try{
+      const d=await fetch('/api/media-cards/'+id,{method:'DELETE'});
+      if(!d.ok){ alert('Could not delete that picture.'); return; }
+      fetchContent();
+    }catch(err){ alert('Could not delete that picture.'); }
+  });
+
+  // Drop pictures straight into the archive: files from the desktop, or an image
+  // dragged off a web page. Same upload path as pasting into a card.
+  body.querySelectorAll('[data-drop]').forEach(z=>{
+    z.ondragover=e=>{
+      const t=[...(e.dataTransfer.types||[])];
+      if(t.includes('text/ts-card')) return;             // that's one of ours, not an upload
+      if(t.includes('Files')||t.includes('text/uri-list')||t.includes('text/html')){
+        e.preventDefault(); e.stopPropagation(); z.classList.add('over'); }
+    };
+    z.ondragleave=()=>z.classList.remove('over');
+    z.ondrop=async e=>{
+      const t=[...(e.dataTransfer.types||[])];
+      if(t.includes('text/ts-card')) return;
+      e.preventDefault(); e.stopPropagation();
+      z.classList.remove('over');
+      const files=[...(e.dataTransfer.files||[])].filter(f=>/^image\//i.test(f.type||''));
+      let did=false;
+      for(const f of files){ await archiveAdd({file:f}); did=true; }
+      if(!did){
+        const html=e.dataTransfer.getData('text/html')||'';
+        const m=html.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+        const uri=(e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain')||'').trim().split(/\s+/)[0];
+        const url=(m&&/^https?:\/\//i.test(m[1]))?m[1]:(/^https?:\/\//i.test(uri)?uri:null);
+        if(url){ await archiveAdd({url}); did=true; }
+      }
+      if(did) fetchContent();
+    };
+  });
+
   body.querySelectorAll('[data-more]').forEach(b=>b.onclick=async()=>{
     const key=b.dataset.more;
     b.textContent='Loading…';
@@ -2330,6 +2404,24 @@ function renderContent(){
       if(got){ const i=RES.sections.findIndex(s=>s.key===key); if(i>=0) RES.sections[i]=got; renderContent(); }
     }catch(e){ b.textContent='Failed'; }
   });
+}
+
+// Add to the archive without placing it on a card — same endpoint as everywhere else.
+async function archiveAdd(src){
+  try{
+    let r;
+    if(src.file){
+      const fd=new FormData();
+      fd.append('file',src.file);
+      fd.append('title',(src.file.name||'Picture').replace(/\.[a-z0-9]+$/i,''));
+      r=await fetch('/api/media-cards',{method:'POST',body:fd});
+    }else{
+      r=await fetch('/api/media-cards',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({url:src.url})});
+    }
+    if(!r.ok){ const d=await r.json().catch(()=>({})); alert(d.error||'Could not add that picture.'); return false; }
+    return true;
+  }catch(e){ alert('Could not add that picture.'); return false; }
 }
 
 function setResSize(k){

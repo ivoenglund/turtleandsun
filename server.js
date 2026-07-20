@@ -3790,6 +3790,25 @@ app.get('/api/img-png', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Convert failed', details: err.message }); }
 });
 
+// Where is this picture used? DELETE below removes it from every print that uses
+// it, so the panel asks first and shows these numbers.
+app.get('/api/media-cards/:id(\\d+)/usage', requireAuth, async (req, res) => {
+  try {
+    const c = await pool.query(
+      `SELECT COUNT(DISTINCT i.composition_id)::int AS n, MIN(co.name) AS first_name
+         FROM composition_items i JOIN compositions co ON co.id = i.composition_id
+        WHERE i.ref_type = 'media' AND i.ref_id = $1 AND i.user_id = $2`,
+      [req.params.id, req.user.id]);
+    // Blocks store their items as jsonb, so match on the ref inside the array.
+    const b = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM print_blocks
+        WHERE user_id = $1 AND items @> $2::jsonb`,
+      [req.user.id, JSON.stringify([{ ref_type: 'media', ref_id: +req.params.id }])]);
+    res.json({ v: 1, prints: c.rows[0].n || 0, first: c.rows[0].first_name || null,
+               blocks: b.rows[0].n || 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/media-cards/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     // Remove the card and any composition items that reference it.
