@@ -118,6 +118,36 @@
   #blkList .bact:hover{ background:#fff; border-color:var(--gold); }
   #blkList .bact.danger{ color:#8c2f1b; border-color:#dcc0b5; }
   @media print{ #blkOverlay{ display:none!important; } }
+  /* ── Filmstrip: the document IS this row of cards ── */
+  #strip{ position:fixed; left:0; right:282px; bottom:0; background:rgba(255,255,255,.96);
+          border-top:2px solid var(--gold); box-shadow:0 -3px 14px rgba(0,0,0,.13); z-index:9;
+          display:flex; align-items:stretch; }
+  #strip.hid{ transform:translateY(100%); }
+  #stripTab{ position:fixed; left:10px; bottom:0; z-index:11; font-family:inherit; font-weight:700;
+             font-size:11.5px; padding:3px 10px; border:2px solid var(--gold); border-bottom:0;
+             border-radius:9px 9px 0 0; background:#fff; cursor:pointer; color:var(--ink); }
+  #stripInner{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; display:flex;
+               gap:9px; padding:9px 10px 10px; align-items:flex-start; }
+  .sthumb{ flex:0 0 auto; cursor:pointer; position:relative; }
+  .sprev{ overflow:hidden; background:#fff; border:1.5px solid #d9d4c4; border-radius:5px;
+          position:relative; pointer-events:none; }
+  .sthumb.cur .sprev{ border-color:var(--gold); box-shadow:0 0 0 2px rgba(201,162,75,.45); }
+  .sthumb:hover .sprev{ border-color:var(--green); }
+  /* Previews are pictures, not workspaces — no handles, no selection outlines. */
+  .sprev .abswrap.sel,.sprev .frameobj.sel{ outline:none!important; }
+  .sprev .rszh,.sprev .crE{ display:none!important; }
+  .sscale{ transform-origin:top left; position:absolute; top:0; left:0; }
+  .snum{ text-align:center; font-size:10.5px; font-weight:800; color:var(--muted); margin-top:2px; }
+  .sthumb.cur .snum{ color:var(--green); }
+  .sthumb.dragover .sprev{ border-color:var(--green); box-shadow:-3px 0 0 var(--green); }
+  .sact{ position:absolute; top:2px; right:2px; display:none; gap:2px; }
+  .sthumb:hover .sact{ display:flex; }
+  .sact button{ font-family:inherit; font-size:10px; font-weight:700; line-height:1;
+                padding:2px 4px; border:1px solid #d9d4c4; border-radius:5px; background:#fff;
+                cursor:pointer; color:var(--ink); }
+  .sact button:hover{ border-color:var(--gold); }
+  .sact button.danger{ color:#8c2f1b; border-color:#dcc0b5; }
+  @media print{ #strip,#stripTab{ display:none!important; } }
   #pgLabel{ flex:1; text-align:center; font-weight:700; }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
@@ -193,6 +223,8 @@
   </div>
 </div>
 <div id="out"><div class="err">Loading…</div></div>
+<button id="stripTab" title="Show or hide the row of cards">▤ Cards</button>
+<div id="strip"><div id="stripInner"></div></div>
 
 <script>
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -407,6 +439,7 @@ async function load(){
   render();
   syncZoom();
   showKnobs();
+  renderStrip();
 }
 
 // ── Paper sizes ─────────────────────────────────────────────────────
@@ -487,7 +520,10 @@ function fitPct(){
   const {w,h}=contentNat();
   if(!w) return 100;
   // The WHOLE page must fit: whichever of width and height is tighter wins.
-  return clampPct(Math.min((window.innerWidth-306)/w, (window.innerHeight-32)/h)*100);
+  // The open filmstrip eats the bottom of the window, so Fit has to allow for it.
+  const strip=document.getElementById('strip');
+  const eat = (stripOpen && strip) ? strip.offsetHeight : 0;
+  return clampPct(Math.min((window.innerWidth-306)/w, (window.innerHeight-32-eat)/h)*100);
 }
 function syncZoom(){
   const {w}=contentNat();
@@ -626,9 +662,11 @@ function setSel(key,additive){
 }
 function clearSel(){ cropKey=null; if(!SEL.length) return; SEL=[]; showKnobs(); markSel(); }
 function elOf(key){
-  return key[0]==='i' ? document.querySelector('.abswrap[data-absidx="'+key.slice(1)+'"]')
-       : key[0]==='t' ? document.querySelector('.txtfree[data-text="'+key.slice(1)+'"]')
-                      : document.querySelector('.frameobj[data-frame="'+key.slice(1)+'"]');
+  // Scoped to #out: the filmstrip renders the same page markup as previews, so an
+  // unscoped query could hand back a THUMBNAIL instead of the object on the canvas.
+  return key[0]==='i' ? document.querySelector('#out .abswrap[data-absidx="'+key.slice(1)+'"]')
+       : key[0]==='t' ? document.querySelector('#out .txtfree[data-text="'+key.slice(1)+'"]')
+                      : document.querySelector('#out .frameobj[data-frame="'+key.slice(1)+'"]');
 }
 function ovOf(key){
   return key[0]==='i' ? (COMP.items[+key.slice(1)].overrides=COMP.items[+key.slice(1)].overrides||{})
@@ -679,7 +717,7 @@ function isPicKey(key){
   return !!it&&it.ref_type==='post'&&String((it.overrides||{}).part||'').slice(0,3)==='img';
 }
 function wireDrag(){
-  document.querySelectorAll('.abswrap,.frameobj').forEach(w=>{
+  document.querySelectorAll('#out .abswrap,#out .frameobj').forEach(w=>{
     w.onpointerdown=e=>{
       if(e.target.closest('.rszh,.crE')) return;
       if(e.target.closest('[contenteditable="true"]')) return;
@@ -713,9 +751,10 @@ function wirePan(){
   if(panWired) return; panWired=true;
   document.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
-    if(e.target.closest('#panel')||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
+    if(e.target.closest('#panel')||e.target.closest('#strip')||e.target.closest('#stripTab')||e.target.closest('#blkOverlay')
+       ||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
     if(editing) commitEdit(false);
-    if(e.target.closest('.page')){ startMarquee(e); return; }
+    if(e.target.closest('#out .page')){ startMarquee(e); return; }
     clearSel();
     const sx=e.clientX, sy=e.clientY, opx=panX, opy=panY;
     document.body.style.cursor='grabbing';
@@ -767,7 +806,7 @@ function updatePageNav(){
   if(up) up.disabled=curPage<=1;
   if(dn) dn.disabled=curPage>=N;
 }
-function setPage(n){ curPage=n; SEL=[]; renderCurrent(); syncZoom(); showKnobs(); }
+function setPage(n){ curPage=n; SEL=[]; renderCurrent(); syncZoom(); showKnobs(); stripMark(); }
 // Insert a new card AFTER the current one — a yearbook is built by inserting,
 // not only by appending.
 function addPage(){
@@ -932,12 +971,13 @@ function pushUndo(pre){
   REDO.length=0;
   updateUndoBtns();
   scheduleSave();               // every change autosaves shortly after
+  scheduleStrip();
 }
 function restoreSnap(js){
   const st=JSON.parse(js);
   COMP.params=st.params; COMP.items=st.items;
   SEL=[]; renderCurrent(); showKnobs(); markSel(); updateUndoBtns();
-  scheduleSave();
+  scheduleSave(); scheduleStrip();
 }
 function doUndo(){
   if(editing){ try{ document.execCommand('undo'); }catch(e){} return; }
@@ -1237,7 +1277,7 @@ function showKnobs(){
 // ── In-place text editing ───────────────────────────────────────────
 // Click a selected text object again → edit right there, caret where you
 // clicked. Any click outside commits automatically; nothing is ever lost.
-function curBd(){ return document.querySelector('[contenteditable="true"]'); }
+function curBd(){ return document.querySelector('#out [contenteditable="true"]'); }
 let styleSpan=null, holdSel=false;
 function enterEdit(key,cx,cy){
   const el=elOf(key); if(!el) return;
@@ -1333,10 +1373,10 @@ function updateTb(){
 
 // ── Selection visuals: outline every selected object, resize dot on primary ─
 function markSel(){
-  document.querySelectorAll('.abswrap.sel,.frameobj.sel').forEach(x=>x.classList.remove('sel'));
-  document.querySelectorAll('.abswrap.cropping').forEach(x=>x.classList.remove('cropping'));
-  document.querySelectorAll('.rszh,.crE').forEach(h=>h.remove());
-  document.querySelectorAll('[contenteditable="true"]').forEach(b=>b.removeAttribute('contenteditable'));
+  document.querySelectorAll('#out .abswrap.sel,#out .frameobj.sel').forEach(x=>x.classList.remove('sel'));
+  document.querySelectorAll('#out .abswrap.cropping').forEach(x=>x.classList.remove('cropping'));
+  document.querySelectorAll('#out .rszh,#out .crE').forEach(h=>h.remove());
+  document.querySelectorAll('#out [contenteditable="true"]').forEach(b=>b.removeAttribute('contenteditable'));
   SEL.forEach(key=>{ const el=elOf(key); if(el) el.classList.add('sel'); });
   const p=primary(); if(!p) return;
   const el=elOf(p); if(!el) return;
@@ -1489,7 +1529,7 @@ document.addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; 
 // The wheel zooms EVERYWHERE (anchored to the cursor, even off the page) —
 // except over the panel, which scrolls normally.
 document.addEventListener('wheel',e=>{
-  if(e.target.closest&&e.target.closest('#panel,#blkBox')) return;   // let the panel/picker scroll
+  if(e.target.closest&&e.target.closest('#panel,#blkBox,#strip')) return;   // let the panel/picker/strip scroll
   e.preventDefault();
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
@@ -1712,6 +1752,109 @@ async function openBlocks(){
       openBlocks(); };
   });
 }
+
+// ── The filmstrip: a view of params.cards ───────────────────────────
+// Every operation here is a list operation on params.cards — which is exactly
+// why the card-list refactor came first. Nothing below renumbers anything.
+let stripOpen=true;
+function copyCardAt(n){
+  const id=cardIdAt(n);
+  pushUndo();
+  const nid=newCardId();
+  cards().splice(n,0,{id:nid});                       // the copy sits right after
+  const clone=o=>{ const c=JSON.parse(JSON.stringify(o)); c.card=nid; return c; };
+  (COMP.items||[]).filter(it=>it.overrides&&it.overrides.card===id)
+    .map(it=>({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content, overrides:clone(it.overrides) }))
+    .forEach(c=>COMP.items.push(c));
+  frames().filter(f=>f.card===id).map(clone).forEach(c=>frames().push(c));
+  texts().filter(t=>t.card===id).map(clone).forEach(c=>texts().push(c));
+  syncPages();
+  setPage(n+1);
+}
+function insertCardAt(n){            // new empty card AFTER page n
+  pushUndo();
+  cards().splice(n,0,{id:newCardId()});
+  syncPages();
+  setPage(n+1);
+}
+function moveCard(from,to){
+  if(from===to) return;
+  pushUndo();
+  const c=cards();
+  const [m]=c.splice(from-1,1);
+  c.splice(to-1,0,m);
+  syncPages();
+  setPage(to);
+}
+function renderStrip(){
+  const host=document.getElementById('stripInner');
+  if(!host||!COMP) return;
+  const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
+  const natW=P.w*MMPX, natH=P.h*MMPX;
+  const TW=88, k=TW/natW, TH=Math.round(natH*k);
+  const N=pageCount();
+  let html='';
+  for(let n=1;n<=N;n++){
+    html+='<div class="sthumb'+(n===curPage?' cur':'')+'" data-n="'+n+'" draggable="true" title="Page '+n+' — click to edit, drag to move">'+
+      '<div class="sprev" style="width:'+TW+'px;height:'+TH+'px;">'+
+        '<div class="sscale" style="width:'+natW+'px;height:'+natH+'px;transform:scale('+k+');">'+pageHtml(n)+'</div>'+
+      '</div>'+
+      '<div class="sact">'+
+        '<button data-ins="'+n+'" title="Insert an empty card after this one">＋</button>'+
+        '<button data-cpy="'+n+'" title="Duplicate this card">⧉</button>'+
+        (N>1?'<button class="danger" data-del="'+n+'" title="Delete this card">✕</button>':'')+
+      '</div>'+
+      '<div class="snum">'+n+'</div></div>';
+  }
+  host.innerHTML=html;
+  let dragFrom=null;
+  host.querySelectorAll('.sthumb').forEach(el=>{
+    const n=+el.dataset.n;
+    el.onclick=e=>{ if(e.target.closest('.sact')) return; setPage(n); };
+    el.ondragstart=e=>{ dragFrom=n; e.dataTransfer.effectAllowed='move';
+      try{ e.dataTransfer.setData('text/plain','card'); }catch(err){} };
+    el.ondragover=e=>{ if(dragFrom==null) return; e.preventDefault();
+      e.dataTransfer.dropEffect='move'; el.classList.add('dragover'); };
+    el.ondragleave=()=>el.classList.remove('dragover');
+    el.ondrop=e=>{ e.preventDefault(); e.stopPropagation(); el.classList.remove('dragover');
+      if(dragFrom!=null&&dragFrom!==n) moveCard(dragFrom,n);
+      dragFrom=null; };
+    el.ondragend=()=>{ dragFrom=null; host.querySelectorAll('.dragover').forEach(x=>x.classList.remove('dragover')); };
+  });
+  host.querySelectorAll('[data-ins]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); insertCardAt(+b.dataset.ins); });
+  host.querySelectorAll('[data-cpy]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); copyCardAt(+b.dataset.cpy); });
+  host.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
+    const n=+b.dataset.del; if(n!==curPage) setPage(n); deletePage(); });
+  const cur=host.querySelector('.sthumb.cur');
+  if(cur&&cur.scrollIntoView) cur.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+// The strip renders every page, so it is NOT redrawn on each drag: pushUndo()
+// schedules it, and setPage only moves the highlight.
+let stripTimer=null;
+function scheduleStrip(){ if(!stripOpen) return; clearTimeout(stripTimer); stripTimer=setTimeout(renderStrip,420); }
+function stripMark(){
+  const host=document.getElementById('stripInner'); if(!host) return;
+  host.querySelectorAll('.sthumb').forEach(el=>{
+    const on=(+el.dataset.n===curPage);
+    el.classList.toggle('cur',on);
+    if(on&&el.scrollIntoView) el.scrollIntoView({block:'nearest',inline:'nearest'});
+  });
+}
+function toggleStrip(){
+  stripOpen=!stripOpen;
+  document.getElementById('strip').classList.toggle('hid',!stripOpen);
+  if(stripOpen) renderStrip();
+  syncZoom();          // Fit has more (or less) room now
+}
+document.getElementById('stripTab').onclick=toggleStrip;
+// A long row scrolls sideways: turn a normal vertical wheel into horizontal travel.
+document.getElementById('stripInner').addEventListener('wheel',e=>{
+  const host=document.getElementById('stripInner');
+  const d=e.deltaY||e.deltaX;
+  if(!d) return;
+  e.preventDefault();
+  host.scrollLeft+=d;
+},{passive:false});
 
 document.getElementById('blkSave').onclick=savePageAsBlock;
 document.getElementById('blkUse').onclick=openBlocks;
