@@ -837,9 +837,8 @@ function addPage(){
   setPage(curPage+1);
 }
 function deletePage(){
-  if(pageCount()<=1){ alert('This is the only page — a document needs at least one.'); return; }
-  if(!confirm('Delete page '+curPage+'? The objects on it go too (Ctrl+Z brings them back).')) return;
-  pushUndo();
+  if(pageCount()<=1) return;        // a document keeps at least one card
+  pushUndo();                       // Ctrl+Z brings the card and its objects back
   const id=cardIdAt(curPage);
   COMP.items=(COMP.items||[]).filter(it=>!(it.overrides&&it.overrides.card===id));
   COMP.params.frames=frames().filter(f=>f.card!==id);
@@ -853,19 +852,11 @@ function deletePage(){
 // ── Object operations ───────────────────────────────────────────────
 function removeSelected(){
   if(!SEL.length) return;
-  if(!confirm(SEL.length>1?'Remove these '+SEL.length+' objects from the document?':'Remove this object from the document?')) return;
-  pushUndo();
+  pushUndo();                       // Ctrl+Z is the safety net, not a dialog
   selItemIdxs().sort((a,b)=>b-a).forEach(i=>COMP.items.splice(i,1));
   selFrameIdxs().sort((a,b)=>b-a).forEach(i=>frames().splice(i,1));
   selTextIdxs().sort((a,b)=>b-a).forEach(i=>texts().splice(i,1));
   SEL=[]; renderCurrent(); showKnobs();
-}
-function moveSelToPage(n){
-  if(!SEL.length) return;
-  n=Math.max(1,Math.min(pageCount(),n));
-  pushUndo();
-  SEL.forEach(key=>{ const o=ovOf(key); o.card=cardIdAt(n); o.page=n; });
-  curPage=n; renderCurrent(); showKnobs();
 }
 function bumpZ(dir){
   if(!SEL.length) return;
@@ -1338,7 +1329,6 @@ function showKnobs(){
   const anyColor=SEL.some(kk=>kk[0]!=='f');
   const singlePic=n===1&&isPicKey(p);
   const singleMedia=n===1&&it&&it.ref_type==='media';
-  const N=pageCount();
   const title= n>1?n+' objects'
     : pF!=null?'Frame'
     : anyText?'Text'
@@ -1351,9 +1341,6 @@ function showKnobs(){
     '<div class="kh" style="display:flex;justify-content:space-between;align-items:center;">'+
       '<span>'+title+'</span>'+
       '<button id="knUnplace" class="danger" title="Remove from this document (cards stay in your library)">✕ Remove</button></div>'+
-    '<div class="krow"><button id="knPgPrev" title="Move to the previous page">◀</button>'+
-      '<span style="flex:1;text-align:center;font-weight:700;">Page '+(+ov.page||curPage)+' / '+N+'</span>'+
-      '<button id="knPgNext" title="Move to the next page">▶</button></div>'+
     '<div class="krow"><button id="knFront" style="flex:1;" title="Bring in front">⬆ Front</button>'+
       '<button id="knBack" style="flex:1;" title="Send behind">⬇ Back</button>'+
       '<button id="knFrame" title="Draw a frame around the selection — it becomes its own object">▭ Frame</button>'+
@@ -1402,8 +1389,6 @@ function showKnobs(){
     (n===1&&isTextKey(p)?'<div class="hint" style="margin-top:6px;">Click the text again to edit the words — mixed fonts, sizes and colours per selection.</div>':'');
 
   q('knUnplace').onclick=()=>removeSelected();
-  q('knPgPrev').onclick=()=>moveSelToPage((+ov.page||curPage)-1);
-  q('knPgNext').onclick=()=>moveSelToPage((+ov.page||curPage)+1);
   q('knFront').onclick=()=>bumpZ(1);
   q('knBack').onclick=()=>bumpZ(-1);
   q('knFrame').onclick=()=>frameSelection();
@@ -1745,9 +1730,29 @@ function cropEdgeDrag(e,wrap,key,edge){
 }
 
 // ── Global controls ─────────────────────────────────────────────────
+// Changing paper must NOT restyle the design. x/y/w are percentages of the page,
+// so a bigger sheet would otherwise blow everything up — bigger boxes, bigger type.
+// Rescale the percentages by the paper ratio instead: every object keeps its
+// physical width, position and text size, and the larger sheet simply gives more
+// room around the design. The stored model stays percentage-based, so nothing
+// about the data contract changes.
 document.getElementById('paper').onchange=e=>{
-  COMP.params=COMP.params||{}; COMP.params.paper=e.target.value;
-  applyPaper(e.target.value); render(); syncZoom();
+  COMP.params=COMP.params||{};
+  const from=paperOf(COMP.params.paper||'a4'), to=paperOf(e.target.value);
+  const rw=from.w/to.w, rh=from.h/to.h;
+  if(Math.abs(rw-1)>0.0001||Math.abs(rh-1)>0.0001){
+    pushUndo();
+    const fix=o=>{ if(!o) return;
+      if(o.x!=null) o.x=Math.round((+o.x)*rw*100)/100;
+      if(o.y!=null) o.y=Math.round((+o.y)*rh*100)/100;
+      if(o.w!=null) o.w=Math.round((+o.w)*rw*1000)/1000;
+      if(o.h!=null) o.h=Math.round((+o.h)*rh*1000)/1000;   // frames carry a height
+    };
+    (COMP.items||[]).forEach(it=>fix(it.overrides));
+    frames().forEach(fix); texts().forEach(fix);
+  }
+  COMP.params.paper=e.target.value;
+  applyPaper(e.target.value); render(); syncZoom(); showKnobs(); markSel();
 };
 document.getElementById('zoom').oninput=e=>zoomToPct(+e.target.value);
 document.getElementById('zoomIn').onclick=()=>zoomStep(1.25);
