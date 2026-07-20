@@ -119,13 +119,14 @@
   #blkList .bact.danger{ color:#8c2f1b; border-color:#dcc0b5; }
   @media print{ #blkOverlay{ display:none!important; } }
   /* ── Filmstrip: the document IS this row of cards ── */
-  #strip{ position:fixed; left:0; right:282px; bottom:0; background:rgba(255,255,255,.96);
-          border-top:2px solid var(--gold); box-shadow:0 -3px 14px rgba(0,0,0,.13); z-index:9;
+  /* No bar, no border: the cards sit straight on the background. */
+  #strip{ position:fixed; left:0; right:282px; bottom:0; z-index:9;
           display:flex; align-items:stretch; }
   #strip.hid{ transform:translateY(100%); }
-  #stripTab{ position:fixed; left:10px; bottom:0; z-index:11; font-family:inherit; font-weight:700;
-             font-size:11.5px; padding:3px 10px; border:2px solid var(--gold); border-bottom:0;
-             border-radius:9px 9px 0 0; background:#fff; cursor:pointer; color:var(--ink); }
+  #stripTab{ position:fixed; left:10px; bottom:8px; z-index:11; font-family:inherit; font-weight:700;
+             font-size:11.5px; padding:3px 10px; border:1px solid #cfc9b8; border-radius:8px;
+             background:rgba(255,255,255,.8); cursor:pointer; color:var(--muted); }
+  #stripTab:hover{ background:#fff; color:var(--ink); }
   #stripInner{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; display:flex;
                gap:9px; padding:9px 10px 10px; align-items:flex-start;
                /* Grow out from the middle. "safe" keeps the first card reachable
@@ -142,7 +143,8 @@
   .sprev .abswrap.sel,.sprev .frameobj.sel{ outline:none!important; }
   .sprev .rszh,.sprev .crE{ display:none!important; }
   .sscale{ transform-origin:top left; position:absolute; top:0; left:0; }
-  .snum{ text-align:center; font-size:10.5px; font-weight:800; color:var(--muted); margin-top:2px; }
+  .snum{ text-align:center; font-size:10.5px; font-weight:800; color:#6f7865; margin-top:2px;
+         text-shadow:0 1px 0 rgba(255,255,255,.85); }
   .sthumb.cur .snum{ color:var(--green); }
   .sthumb.dragover .sprev{ border-color:var(--green); box-shadow:-3px 0 0 var(--green); }
   .sact{ position:absolute; top:2px; right:2px; display:none; gap:2px; }
@@ -845,6 +847,49 @@ function addText(){
   renderCurrent();
   SEL=['t'+(texts().length-1)]; showKnobs(); markSel();
 }
+// ── Copy / cut / paste ──────────────────────────────────────────────
+// Objects carry their resolved `content` into the clipboard, so a paste renders
+// immediately — and it goes through localStorage as well as memory, which means
+// you can copy in one document's tab and paste into another. (Content is only a
+// render cache; ref_ids re-resolve on next load, so nothing goes stale.)
+const CLIPKEY='tns_editor_clip';
+let CLIP=null;
+const deepCopy=o=>JSON.parse(JSON.stringify(o||{}));
+function copySel(){
+  if(!SEL.length) return;
+  CLIP={
+    items: selItemIdxs().map(i=>{ const it=COMP.items[i];
+      return { ref_type:it.ref_type, ref_id:it.ref_id, content:it.content, overrides:deepCopy(it.overrides) }; }),
+    texts: selTextIdxs().map(i=>deepCopy(texts()[i])),
+    frames:selFrameIdxs().map(i=>deepCopy(frames()[i]))
+  };
+  try{ localStorage.setItem(CLIPKEY, JSON.stringify(CLIP)); }catch(e){}
+}
+function cutSel(){
+  if(!SEL.length) return;
+  copySel();
+  pushUndo();
+  selItemIdxs().sort((a,b)=>b-a).forEach(i=>COMP.items.splice(i,1));
+  selFrameIdxs().sort((a,b)=>b-a).forEach(i=>frames().splice(i,1));
+  selTextIdxs().sort((a,b)=>b-a).forEach(i=>texts().splice(i,1));
+  SEL=[]; renderCurrent(); showKnobs();
+}
+function pasteClip(){
+  let c=CLIP;
+  if(!c){ try{ c=JSON.parse(localStorage.getItem(CLIPKEY)||'null'); }catch(e){} }
+  if(!c||(!(c.items||[]).length&&!(c.texts||[]).length&&!(c.frames||[]).length)) return;
+  pushUndo();
+  // Everything lands on the CURRENT card, nudged so it doesn't hide the original.
+  const land=o=>{ const k=deepCopy(o); k.card=cardIdAt(curPage); k.page=curPage;
+    k.x=(+k.x||0)+3; k.y=(+k.y||0)+3; delete k.blk; return k; };
+  const newSel=[];
+  (c.items||[]).forEach(x=>{ COMP.items.push({ ref_type:x.ref_type, ref_id:x.ref_id, content:x.content,
+    overrides:land(x.overrides) }); newSel.push('i'+(COMP.items.length-1)); });
+  (c.texts||[]).forEach(t=>{ texts().push(land(t));  newSel.push('t'+(texts().length-1)); });
+  (c.frames||[]).forEach(f=>{ frames().push(land(f)); newSel.push('f'+(frames().length-1)); });
+  renderCurrent(); SEL=newSel; showKnobs(); markSel();
+}
+
 // Duplicate every selected object (styling and all), slightly offset.
 function dupSelected(){
   if(!SEL.length) return;
@@ -1510,6 +1555,11 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); doUndo(); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); doRedo(); return; }
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){ e.preventDefault(); dupSelected(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'){ e.preventDefault(); copySel(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){ e.preventDefault(); cutSel(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='v'){ e.preventDefault(); pasteClip(); return; }
+  if(e.key==='PageDown'){ e.preventDefault(); if(curPage<pageCount()) setPage(curPage+1); return; }
+  if(e.key==='PageUp'){   e.preventDefault(); if(curPage>1)           setPage(curPage-1); return; }
   if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
   if(e.key==='Escape'){ e.preventDefault();
     const bo=document.getElementById('blkOverlay');
