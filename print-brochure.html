@@ -159,6 +159,45 @@
   .sact button:hover{ border-color:var(--gold); }
   .sact button.danger{ color:#8c2f1b; border-color:#dcc0b5; }
   @media print{ #strip,#stripTab{ display:none!important; } }
+  /* ── Resource panel: filters on top, resources at full size below ──
+     A plain panel. You open it, you drag its width where you want it, you drag
+     things out of it, you close it. Nothing moves on its own. */
+  #res{ position:fixed; left:0; top:0; bottom:0; width:340px; z-index:12; display:none;
+        flex-direction:column; background:#fbf9f2; border-right:2px solid var(--gold);
+        box-shadow:3px 0 18px rgba(0,0,0,.16); }
+  #res.open{ display:flex; }
+  #resHead{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid #e6e0cf; }
+  #resHead b{ font-size:12px; letter-spacing:.5px; text-transform:uppercase; color:var(--green); }
+  #resHead .sp{ flex:1; }
+  #res select, #res input[type=number], #res button{ font-family:inherit; font-size:12.5px;
+        padding:4px 7px; border:1px solid #d9d4c4; border-radius:7px; background:#fff; color:var(--ink); }
+  #res button{ font-weight:700; cursor:pointer; }
+  #res button:hover{ background:#f4efe4; }
+  #res button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  #resFilters{ padding:8px 10px; border-bottom:1px solid #e6e0cf; display:flex; flex-direction:column; gap:6px; }
+  #resFilters .frow{ display:flex; gap:5px; align-items:center; }
+  #resFilters .frow > *{ min-width:0; }
+  #resFilters select{ flex:1; }
+  #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px;
+              border:1px solid #d9d4c4; border-radius:7px; }
+  #resList{ flex:1; overflow-y:auto; padding:10px; }
+  #resList .rcount{ font-size:11.5px; color:var(--muted); margin-bottom:8px; }
+  /* Resources render at full size with the SAME renderers the page uses, so what
+     you see here is what lands on the card. */
+  .rcard{ background:#fff; border:1px solid #e2dccb; border-radius:9px; padding:10px;
+          margin-bottom:9px; cursor:grab; position:relative; }
+  .rcard:hover{ border-color:var(--gold); box-shadow:0 2px 10px rgba(0,0,0,.10); }
+  .rcard:active{ cursor:grabbing; }
+  .rcard .block{ font-size:13.5px; }
+  .rcard .rtag{ position:absolute; top:6px; right:8px; font-size:9.5px; font-weight:800;
+                letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  #resSplit{ position:absolute; top:0; right:-3px; width:7px; height:100%; cursor:col-resize; z-index:2; }
+  #resSplit:hover{ background:rgba(201,162,75,.35); }
+  #resTab{ position:fixed; left:10px; top:14px; z-index:11; font-family:inherit; font-weight:700;
+           font-size:11.5px; padding:4px 11px; border:1px solid #cfc9b8; border-radius:8px;
+           background:rgba(255,255,255,.8); cursor:pointer; color:var(--muted); }
+  #resTab:hover{ background:#fff; color:var(--ink); }
+  @media print{ #res,#resTab{ display:none!important; } }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
   #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
@@ -221,6 +260,28 @@
   </div>
 </div>
 <div id="out"><div class="err">Loading…</div></div>
+<button id="resTab" title="Show or hide your resources">◧ Resources</button>
+<aside id="res">
+  <div id="resSplit" title="Drag to set the width"></div>
+  <div id="resHead"><b>Resources</b><span class="sp"></span>
+    <button id="resClose" title="Close">✕</button></div>
+  <div id="resFilters">
+    <div class="frow">
+      <button class="rkind on" data-kind="contact" style="flex:1;">People</button>
+      <button class="rkind on" data-kind="post"    style="flex:1;">Posts</button>
+      <button class="rkind on" data-kind="media"   style="flex:1;">Pictures</button>
+    </div>
+    <div class="frow"><select id="resGroup"></select></div>
+    <div class="frow">
+      <span style="font-size:11.5px;color:var(--muted);">Years</span>
+      <input type="number" id="resY1" placeholder="from" style="width:72px;">
+      <input type="number" id="resY2" placeholder="to" style="width:72px;">
+      <button id="resYClear" title="Any year">✕</button>
+    </div>
+    <input type="text" id="resSearch" placeholder="Search…" autocomplete="off">
+  </div>
+  <div id="resList">Loading…</div>
+</aside>
 <button id="stripTab" title="Show or hide the row of cards">▤ Cards</button>
 <div id="strip"><div id="stripInner"></div></div>
 
@@ -547,7 +608,9 @@ function fitPct(){
   // The open filmstrip eats the bottom of the window, so Fit has to allow for it.
   const strip=document.getElementById('strip');
   const eat = (stripOpen && strip) ? strip.offsetHeight : 0;
-  return clampPct(Math.min((window.innerWidth-306)/w, (window.innerHeight-32-eat)/h)*100);
+  const rp=document.getElementById('res');
+  const left=(rp&&rp.classList.contains('open'))?rp.offsetWidth:0;
+  return clampPct(Math.min((window.innerWidth-306-left)/w, (window.innerHeight-32-eat)/h)*100);
 }
 function syncZoom(){
   const {w}=contentNat();
@@ -788,6 +851,7 @@ function wirePan(){
   document.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
     if(e.target.closest('#panel')||e.target.closest('#strip')||e.target.closest('#stripTab')||e.target.closest('#blkOverlay')
+       ||e.target.closest('#res')||e.target.closest('#resTab')
        ||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
     if(editing) commitEdit(false);
     if(e.target.closest('#out .page')){ startMarquee(e); return; }
@@ -1762,7 +1826,7 @@ document.addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; 
 // The wheel zooms EVERYWHERE (anchored to the cursor, even off the page) —
 // except over the panel, which scrolls normally.
 document.addEventListener('wheel',e=>{
-  if(e.target.closest&&e.target.closest('#panel,#blkBox,#strip')) return;   // let the panel/picker/strip scroll
+  if(e.target.closest&&e.target.closest('#panel,#blkBox,#strip,#res')) return;   // let the panel/picker/strip scroll
   e.preventDefault();
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
@@ -2106,6 +2170,125 @@ function toggleStrip(){
   if(stripOpen) renderStrip();
   syncZoom();          // Fit has more (or less) room now
 }
+// ── Resource panel ──────────────────────────────────────────────────
+// Filters on top, resources below at FULL SIZE, drawn with the very same
+// renderers the page uses — what you see is what lands on the card. Drag one out
+// onto a card; the editor's existing text/ts-card drop handler places it.
+const RES={ loaded:false, contacts:[], posts:[], media:[], groups:[], members:[],
+            kinds:{contact:true,post:true,media:true}, group:'', y1:'', y2:'', q:'' };
+function resOpen(){ return document.getElementById('res').classList.contains('open'); }
+// Keep the filmstrip beside the panel rather than under it, and let Fit know the
+// canvas just got narrower (or wider).
+function syncResLayout(){
+  const el=document.getElementById('res');
+  const w=el.classList.contains('open')?el.offsetWidth:0;
+  const st=document.getElementById('strip'); if(st) st.style.left=w+'px';
+  syncZoom();
+}
+function toggleRes(){
+  const el=document.getElementById('res');
+  el.classList.toggle('open');
+  if(el.classList.contains('open')) loadResources();
+  syncResLayout();
+}
+async function loadResources(){
+  if(RES.loaded){ renderRes(); return; }
+  const list=document.getElementById('resList');
+  list.textContent='Loading…';
+  const get=async u=>{ try{ const r=await fetch(u); return r.ok?await r.json():[]; }catch(e){ return []; } };
+  const [contacts,posts,media,groups,members]=await Promise.all([
+    get('/api/contacts'), get('/api/blog-posts'), get('/api/media-cards'),
+    get('/api/groups'),   get('/api/group-memberships')
+  ]);
+  RES.contacts=Array.isArray(contacts)?contacts:[];
+  RES.posts   =Array.isArray(posts)?posts:[];
+  RES.media   =Array.isArray(media)?media:[];
+  RES.members =Array.isArray(members)?members:[];
+  // /api/groups comes back nested — flatten it, keeping the hierarchy in the label.
+  const flat=[]; (function walk(list,depth){ (list||[]).forEach(g=>{
+    flat.push({id:g.id,name:(depth?'— '.repeat(depth):'')+g.name}); walk(g.subgroups,depth+1); }); })(groups,0);
+  RES.groups=flat;
+  RES.loaded=true;
+  const gs=document.getElementById('resGroup');
+  gs.innerHTML='<option value="">All groups</option>'+
+    flat.map(g=>'<option value="'+g.id+'">'+esc(g.name)+'</option>').join('');
+  renderRes();
+}
+function resYear(p){
+  const d=p&&(p.post_date||p.created_at); if(!d) return null;
+  const y=+String(d).slice(0,4); return y||null;
+}
+function resMatches(kind,o){
+  if(!RES.kinds[kind]) return false;
+  const q=RES.q.trim().toLowerCase();
+  if(RES.group && kind==='contact'){
+    const gid=+RES.group;
+    if(!RES.members.some(m=>+m.contact_id===+o.id && +m.group_id===gid)) return false;
+  }
+  if(kind==='post'){
+    const y=resYear(o);
+    if(RES.y1 && (!y||y<+RES.y1)) return false;
+    if(RES.y2 && (!y||y>+RES.y2)) return false;
+  }
+  if(q){
+    const hay=[o.name,o.title,o.job_title,o.company,o.body,(o.tags||[]).join(' ')]
+      .filter(Boolean).join(' ').toLowerCase();
+    if(hay.indexOf(q)<0) return false;
+  }
+  return true;
+}
+function renderRes(){
+  const list=document.getElementById('resList');
+  if(!list) return;
+  const rows=[];
+  if(RES.kinds.contact) RES.contacts.filter(c=>resMatches('contact',c))
+    .forEach(c=>rows.push({kind:'contact',id:c.id,label:'Person',
+      html:personCard({_idx:-1,ref_type:'contact',content:c,overrides:{}})}));
+  if(RES.kinds.post) RES.posts.filter(p=>resMatches('post',p))
+    .forEach(p=>rows.push({kind:'post',id:p.id,label:'Post',
+      // text block + first photo, so the preview shows what the post actually is
+      html:((p.photos||[]).length?postBlock({_idx:-1,ref_type:'post',content:p,overrides:{part:'img0'}}):'')+
+           postBlock({_idx:-1,ref_type:'post',content:p,overrides:{}})}));
+  if(RES.kinds.media) RES.media.filter(m=>resMatches('media',m))
+    .forEach(m=>rows.push({kind:'media',id:m.id,label:m.kind==='svg'?'Logo':'Picture',
+      html:mediaBlock({_idx:-1,ref_type:'media',content:m,overrides:{caption:1}})}));
+  list.innerHTML='<div class="rcount">'+rows.length+' resource'+(rows.length===1?'':'s')+
+    ' — drag one onto the card</div>'+
+    rows.map(r=>'<div class="rcard" draggable="true" data-rt="'+r.kind+'" data-ri="'+r.id+'">'+
+      '<span class="rtag">'+esc(r.label)+'</span>'+r.html+'</div>').join('');
+  list.querySelectorAll('.rcard').forEach(el=>{
+    el.ondragstart=e=>{
+      // Same payload the Make board sends, so the existing drop handler places it.
+      const p=JSON.stringify({ref_type:el.dataset.rt, ref_id:+el.dataset.ri});
+      try{ e.dataTransfer.setData('text/ts-card',p); }catch(err){}
+      try{ e.dataTransfer.setData('text/plain','');  }catch(err){}
+      e.dataTransfer.effectAllowed='copy';
+    };
+  });
+}
+document.getElementById('resTab').onclick=toggleRes;
+document.getElementById('resClose').onclick=toggleRes;
+document.getElementById('resGroup').onchange=e=>{ RES.group=e.target.value; renderRes(); };
+document.getElementById('resY1').oninput=e=>{ RES.y1=e.target.value; renderRes(); };
+document.getElementById('resY2').oninput=e=>{ RES.y2=e.target.value; renderRes(); };
+document.getElementById('resYClear').onclick=()=>{
+  RES.y1=RES.y2=''; document.getElementById('resY1').value=''; document.getElementById('resY2').value=''; renderRes(); };
+document.getElementById('resSearch').oninput=e=>{ RES.q=e.target.value; renderRes(); };
+document.querySelectorAll('.rkind').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.kind; RES.kinds[k]=!RES.kinds[k];
+  b.classList.toggle('on',RES.kinds[k]); renderRes(); });
+// Drag the edge to whatever width suits the monitor. Nothing automatic.
+(function(){
+  const sp=document.getElementById('resSplit'), el=document.getElementById('res');
+  sp.onpointerdown=e=>{
+    e.preventDefault();
+    const move=ev=>{ el.style.width=Math.max(240,Math.min(window.innerWidth-160,ev.clientX))+'px';
+                     const st=document.getElementById('strip'); if(st) st.style.left=el.offsetWidth+'px'; };
+    const up=()=>{ removeEventListener('pointermove',move); removeEventListener('pointerup',up); syncResLayout(); };
+    addEventListener('pointermove',move); addEventListener('pointerup',up);
+  };
+})();
+
 document.getElementById('stripTab').onclick=toggleStrip;
 // A long row scrolls sideways: turn a normal vertical wheel into horizontal travel.
 document.getElementById('stripInner').addEventListener('wheel',e=>{
