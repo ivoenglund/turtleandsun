@@ -10,7 +10,11 @@
   html,body{ height:100%; }
   body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; overflow:hidden; }
   /* Page width/height/padding are injected per paper size by applyPaper(). */
+  /* isolation:isolate makes the page a stacking context. Without it the page is
+     position:relative with z-index:auto, so an object sent to the back (negative
+     z-index) paints BEHIND the page's own white background and vanishes. */
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:visible;
+         isolation:isolate;
          box-shadow:0 2px 14px rgba(0,0,0,.18); padding:16mm; display:flex; flex-direction:column; }
   /* Objects parked outside the page stay visible but grey — fetch them back
      any time. (Print clips to the page, so parked objects never print.) */
@@ -861,11 +865,23 @@ function removeSelected(){
 function bumpZ(dir){
   if(!SEL.length) return;
   pushUndo();
-  const zs=itemsAll().filter(x=>(x.overrides&&+x.overrides.page)===curPage).map(x=>+(x.overrides&&x.overrides.z)||0)
-    .concat(frames().filter(f=>(+f.page||1)===curPage).map(f=>+f.z||0))
-    .concat(texts().filter(t=>(+t.page||1)===curPage).map(t=>+t.z||0));
+  // Collect the live override objects on this card (same references, so the
+  // renormalise below sees the change we are about to make).
+  const onCard=[];
+  itemsAll().forEach(x=>{ const o=x.overrides; if(o&&+o.page===curPage) onCard.push(o); });
+  frames().forEach(f=>{ if((+f.page||1)===curPage) onCard.push(f); });
+  texts().forEach(t=>{ if((+t.page||1)===curPage) onCard.push(t); });
+
+  const zs=onCard.map(o=>+o.z||0);
   const z = dir>0 ? Math.max(0,...zs)+1 : Math.min(0,...zs)-1;
   SEL.forEach(key=>{ ovOf(key).z=z; });
+
+  // Then lift the whole card so nothing sits below 0. Ordering is unchanged, but
+  // no object ever carries a negative z-index — which is what made "Back" hide it.
+  const lo=Math.min(0,...onCard.map(o=>+o.z||0));
+  if(lo<0) onCard.forEach(o=>{ o.z=(+o.z||0)-lo; });
+  onCard.forEach(o=>{ if(!(+o.z)) delete o.z; });
+
   render(); showKnobs(); markSel();
 }
 // A free text object: headline, page number, anything — no card behind it.
@@ -1163,25 +1179,6 @@ function distSel(axis){
   });
   updateOffpage();
 }
-// A frame = a border AROUND the selection, born as its own object.
-function frameSelection(){
-  if(!SEL.length) return;
-  const page=document.querySelector('#out .page'); if(!page) return;
-  const pr=page.getBoundingClientRect();
-  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
-  SEL.forEach(key=>{ const el=elOf(key); if(!el) return; const r=el.getBoundingClientRect();
-    x1=Math.min(x1,r.left); y1=Math.min(y1,r.top); x2=Math.max(x2,r.right); y2=Math.max(y2,r.bottom); });
-  if(x2<x1) return;
-  pushUndo();
-  const pad=10*curScale;
-  x1-=pad; y1-=pad; x2+=pad; y2+=pad;
-  frames().push({ page:curPage, card:cardIdAt(curPage),
-    x:Math.round((x1-pr.left)/pr.width*1000)/10,  y:Math.round((y1-pr.top)/pr.height*1000)/10,
-    w:Math.round((x2-x1)/pr.width*1000)/10,        h:Math.round((y2-y1)/pr.height*1000)/10,
-    bw:2, bs:'solid', bc:'#c9a24b', r:0, z:0 });
-  renderCurrent();
-  SEL=['f'+(frames().length-1)]; showKnobs(); markSel();
-}
 
 // ── Undo / redo ─────────────────────────────────────────────────────
 let UNDO=[], REDO=[];
@@ -1343,7 +1340,6 @@ function showKnobs(){
       '<button id="knUnplace" class="danger" title="Remove from this document (cards stay in your library)">✕ Remove</button></div>'+
     '<div class="krow"><button id="knFront" style="flex:1;" title="Bring in front">⬆ Front</button>'+
       '<button id="knBack" style="flex:1;" title="Send behind">⬇ Back</button>'+
-      '<button id="knFrame" title="Draw a frame around the selection — it becomes its own object">▭ Frame</button>'+
       '<button id="knDup" title="Duplicate (Ctrl+D)">⧉</button></div>'+
     (n>=2?'<div class="krow"><button id="alL" title="Align left edges">⇤</button>'+
       '<button id="alC" title="Align centres (horizontal)">↔</button>'+
@@ -1391,7 +1387,6 @@ function showKnobs(){
   q('knUnplace').onclick=()=>removeSelected();
   q('knFront').onclick=()=>bumpZ(1);
   q('knBack').onclick=()=>bumpZ(-1);
-  q('knFrame').onclick=()=>frameSelection();
   q('knDup').onclick=()=>dupSelected();
   [['alL','l'],['alC','c'],['alR','r'],['alT','t'],['alM','m'],['alB','b']].forEach(([id,m])=>{
     const b=q(id); if(b) b.onclick=()=>alignSel(m);
