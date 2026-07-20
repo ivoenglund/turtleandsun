@@ -3590,6 +3590,45 @@ app.post('/api/media-cards', requireAuth, upload.single('file'), async (req, res
   } catch (err) { res.status(500).json({ error: 'Upload failed', details: err.message }); }
 });
 
+// Re-encode any picture as PNG, for the editor's "copy to Google Docs" path.
+//
+// Doing this in the browser (crossOrigin <img> → canvas → toDataURL) is
+// unreliable BY DESIGN: if the same image is already in the HTTP cache from the
+// page's own non-CORS <img>, Chrome may reuse that response for the CORS request,
+// the canvas is tainted, and toDataURL throws. Whether it works depends on what
+// happens to be cached — which is exactly the intermittent failure. Same-origin
+// conversion here has no CORS, no canvas and no cache race.
+//
+// Auth-gated (only the editor calls it) and host-guarded (no SSRF into the
+// private network).
+app.get('/api/img-png', requireAuth, async (req, res) => {
+  const u = String((req.query && req.query.u) || '');
+  if (!/^https?:\/\//i.test(u)) return res.status(400).json({ error: 'Bad url' });
+  let host = '';
+  try { host = new URL(u).hostname.toLowerCase(); } catch (_) { return res.status(400).json({ error: 'Bad url' }); }
+  if (host === 'localhost' || host === '::1' || /^127\./.test(host) || /^0\./.test(host) ||
+      /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+    return res.status(400).json({ error: 'Blocked host' });
+  }
+  try {
+    const r = await fetch(u, { redirect: 'follow' });
+    if (!r.ok) return res.status(400).json({ error: 'HTTP ' + r.status });
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (/svg/.test(ct)) return res.status(400).json({ error: 'SVG needs no conversion' });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 25 * 1024 * 1024) return res.status(400).json({ error: 'Too large' });
+    const sharp = require('sharp');
+    const png = await sharp(buf)
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toBuffer();
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.send(png);
+  } catch (err) { res.status(500).json({ error: 'Convert failed', details: err.message }); }
+});
+
 app.delete('/api/media-cards/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     // Remove the card and any composition items that reference it.

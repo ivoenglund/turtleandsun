@@ -950,32 +950,54 @@ function nativeSelection(){ try{ return (window.getSelection()||'').toString(); 
 // show "unsupported format" for a linked image they can't decode. So on copy we
 // redraw every picture through a canvas and inline it as a PNG data URI. That also
 // removes any dependency on the receiving app being able to reach our URLs at all.
-function imgToPng(src){
-  return new Promise(res=>{
-    const im=new Image();
-    im.crossOrigin='anonymous';                    // needed or the canvas is tainted
-    im.onload=()=>{
-      try{
-        const max=1600, k=Math.min(1, max/Math.max(im.naturalWidth||1, im.naturalHeight||1));
-        const cv=document.createElement('canvas');
-        cv.width =Math.max(1,Math.round((im.naturalWidth ||1)*k));
-        cv.height=Math.max(1,Math.round((im.naturalHeight||1)*k));
-        cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
-        res(cv.toDataURL('image/png'));
-      }catch(err){ res(null); }                    // tainted canvas → keep the URL
-    };
-    im.onerror=()=>res(null);
-    im.src=src;
+// Conversion happens on OUR server (/api/img-png), not in a canvas here.
+// The browser version was intermittent by design: if a picture was already in the
+// HTTP cache from the page's own non-CORS <img>, Chrome could reuse that response
+// for the crossOrigin request, taint the canvas, and toDataURL would throw — so
+// whether a copy worked depended on what happened to be cached. Same-origin
+// conversion has no CORS, no canvas and no cache race.
+const PNGCACHE=new Map();          // src -> Promise<dataURL|null>, so repeats are free
+function pngFor(src){
+  if(PNGCACHE.has(src)) return PNGCACHE.get(src);
+  const p=(async()=>{
+    try{
+      const r=await fetch('/api/img-png?u='+encodeURIComponent(src));
+      if(!r.ok) return null;
+      const b=await r.blob();
+      return await new Promise(res=>{
+        const fr=new FileReader();
+        fr.onload =()=>res(fr.result);
+        fr.onerror=()=>res(null);
+        fr.readAsDataURL(b);
+      });
+    }catch(err){ return null; }
+  })();
+  PNGCACHE.set(src,p);
+  return p;
+}
+// Start converting as soon as something is selected, so Ctrl+C rarely waits.
+// (Chrome gives a clipboard-write promise only a short grace period; a cold
+// conversion of a big photo can miss it. Warm cache = instant.)
+function warmPngCache(){
+  if(!SEL.length) return;
+  const d=document.createElement('div'); d.innerHTML=selAsHtml();
+  d.querySelectorAll('img').forEach(im=>{
+    const u=im.getAttribute('src');
+    if(u&&!/^data:/i.test(u)) pngFor(u);
   });
 }
+const withTimeout=(p,ms)=>Promise.race([p,new Promise(r=>setTimeout(()=>r(null),ms))]);
 async function inlineImages(html){
   const d=document.createElement('div'); d.innerHTML=html;
-  for(const im of [...d.querySelectorAll('img')]){
-    const u=im.getAttribute('src');
-    if(!u||/^data:/i.test(u)) continue;
-    const png=await imgToPng(u);
+  const imgs=[...d.querySelectorAll('img')].filter(im=>{
+    const u=im.getAttribute('src'); return u&&!/^data:/i.test(u);
+  });
+  // All at once, each with its own ceiling: one slow picture can't sink the copy.
+  await Promise.all(imgs.map(async im=>{
+    const png=await withTimeout(pngFor(im.getAttribute('src')), 8000);
     if(png) im.setAttribute('src',png);
-  }
+    else console.warn('[copy] could not convert', im.getAttribute('src'));
+  }));
   return d.innerHTML;
 }
 function onCopy(e, cut){
@@ -1234,6 +1256,7 @@ function liveSelStyle(){
 // The panel is CONTEXTUAL: it shows only what applies to the current mode —
 // editing text, cropping, a selection, or nothing.
 function showKnobs(){
+  try{ warmPngCache(); }catch(e){}     // pre-convert this selection's pictures for copying
   const k=document.getElementById('knobs');
   const q=id=>document.getElementById(id);
   const n=SEL.length;
