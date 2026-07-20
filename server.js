@@ -2702,6 +2702,203 @@ app.put('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── PRINT BLOCKS ────────────────────────────────────────────────────────────
+// A block is a saved page (or pages) you stamp into any document. It stores
+// ref_ids, never content — so the people and posts inside resolve LIVE on every
+// stamp. Layout frozen, data fresh.
+//
+// Resolve a block's items against THIS user's real cards. Anything that no
+// longer exists (or was never theirs) is dropped and COUNTED, never silently
+// swallowed — the caller is told, so a stale block is visible instead of just
+// rendering short. Same anti-invention rule the AI path will need.
+async function resolveBlockItems(items, userId) {
+  const out = [];
+  let dropped = 0;
+  for (const it of (Array.isArray(items) ? items : [])) {
+    if (!it || !['post', 'contact', 'media'].includes(it.ref_type) || !it.ref_id) { dropped++; continue; }
+    let content = null;
+    if (it.ref_type === 'post') {
+      const r = await pool.query(
+        `SELECT title, body, post_date, tags, photos, size, author FROM blog_posts WHERE id = $1 AND user_id = $2`,
+        [it.ref_id, userId]);
+      content = r.rows[0] || null;
+    } else if (it.ref_type === 'contact') {
+      const r = await pool.query(
+        `SELECT name, job_title, company, email, phone, photo_url, city FROM contacts WHERE id = $1 AND user_id = $2`,
+        [it.ref_id, userId]);
+      content = r.rows[0] || null;
+    } else if (it.ref_type === 'media') {
+      const r = await pool.query(
+        `SELECT title, url, tags, kind FROM media_cards WHERE id = $1 AND user_id = $2`,
+        [it.ref_id, userId]);
+      content = r.rows[0] || null;
+    }
+    if (!content) { dropped++; continue; }
+    out.push({ ref_type: it.ref_type, ref_id: +it.ref_id, overrides: it.overrides || {}, content });
+  }
+  return { items: out, dropped };
+}
+
+// List — light rows for the picker (no items payload).
+app.get('/api/print-blocks', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, name, kind, pages, declares, created_at,
+              jsonb_array_length(COALESCE(items, '[]'::jsonb)) AS item_count
+         FROM print_blocks WHERE user_id = $1 ORDER BY name`, [req.user.id]);
+    res.json({ v: 1, blocks: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// One block, with every ref resolved live.
+app.get('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, name, kind, pages, params, items, declares FROM print_blocks WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    const b = r.rows[0];
+    const { items, dropped } = await resolveBlockItems(b.items, req.user.id);
+    res.json({ v: 1, ...b, items, dropped });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Save a page (or pages) as a block. Page numbers arrive already rebased to 1.
+app.post('/api/print-blocks', requireAuth, async (req, res) => {
+  const { name, kind, pages, params, items, declares } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
+  const clean = (Array.isArray(items) ? items : [])
+    .filter(it => it && ['post', 'contact', 'media'].includes(it.ref_type) && it.ref_id)
+    .map(it => ({ ref_type: it.ref_type, ref_id: +it.ref_id, overrides: it.overrides || {} }));
+  try {
+    const r = await pool.query(
+      `INSERT INTO print_blocks (user_id, name, kind, pages, params, items, declares)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, name, kind, pages`,
+      [req.user.id, String(name).trim(), kind || 'page', Math.max(1, +pages || 1),
+       JSON.stringify(params || {}), JSON.stringify(clean), JSON.stringify(declares || {})]);
+    res.json({ v: 1, ok: true, block: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Rename, and/or replace the saved layout (re-save an edited block).
+app.put('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
+  const { name, pages, params, items, declares } = req.body || {};
+  try {
+    const own = await pool.query(`SELECT id FROM print_blocks WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Not found' });
+    const clean = Array.isArray(items)
+      ? (items.filter(it => it && ['post', 'contact', 'media'].includes(it.ref_type) && it.ref_id)
+              .map(it => ({ ref_type: it.ref_type, ref_id: +it.ref_id, overrides: it.overrides || {} })))
+      : null;
+    await pool.query(
+      `UPDATE print_blocks SET name = COALESCE($1, name), pages = COALESCE($2, pages),
+              params = COALESCE($3, params), items = COALESCE($4, items),
+              declares = COALESCE($5, declares), updated_at = NOW()
+        WHERE id = $6`,
+      [name ? String(name).trim() : null, pages ? Math.max(1, +pages) : null,
+       params ? JSON.stringify(params) : null, clean ? JSON.stringify(clean) : null,
+       declares ? JSON.stringify(declares) : null, req.params.id]);
+    res.json({ v: 1, ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Copy a block — this is how you make "another letter with different wording".
+app.post('/api/print-blocks/:id(\\d+)/duplicate', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `INSERT INTO print_blocks (user_id, name, kind, pages, params, items, declares)
+       SELECT user_id, COALESCE($3, name || ' (copy)'), kind, pages, params, items, declares
+         FROM print_blocks WHERE id = $1 AND user_id = $2
+       RETURNING id, name, kind, pages`,
+      [req.params.id, req.user.id, (req.body && req.body.name) ? String(req.body.name).trim() : null]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ v: 1, ok: true, block: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM print_blocks WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
+    res.json({ v: 1, ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Assemble a whole print job from an ordered list of blocks.
+// Blocks are STAMPED, not linked: each one's pages are appended in order and
+// expanded into ordinary objects the editor can drag and restyle.
+//
+// Two things get recorded that nothing reads yet, on purpose:
+//   params.made_from — the recipe this job was built from. A RECORD, not a live
+//                      outline; reordering it later moves nothing. It is what
+//                      makes "make another one for a different customer" possible.
+//   overrides.blk    — which block each object came from. This is the binding
+//                      groundwork for swapping a customer on a finished document:
+//                      objects with a blk/role marker can be re-pointed, and
+//                      anything hand-added has no marker, so it survives.
+// Both are ~free now and impossible to backfill later — documents made before
+// this exists could never be swapped, because nothing recorded where they came from.
+app.post('/api/compositions/from-blocks', requireAuth, async (req, res) => {
+  const { name, block_ids, paper } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
+  const ids = (Array.isArray(block_ids) ? block_ids : []).map(n => +n).filter(Boolean);
+  if (!ids.length) return res.status(400).json({ error: 'Pick at least one block' });
+  try {
+    // Load in the ORDER THE USER GAVE, not database order.
+    const r = await pool.query(
+      `SELECT id, name, kind, pages, params, items FROM print_blocks
+        WHERE user_id = $1 AND id = ANY($2::int[])`, [req.user.id, ids]);
+    const byId = new Map(r.rows.map(b => [b.id, b]));
+    const chosen = ids.map(id => byId.get(id)).filter(Boolean);
+    if (!chosen.length) return res.status(400).json({ error: 'None of those blocks exist' });
+
+    const items = [], frames = [], texts = [], madeFrom = [];
+    let offset = 0, totalDropped = 0;
+    for (const b of chosen) {
+      const bp = b.params || {};
+      const { items: ok, dropped } = await resolveBlockItems(b.items, req.user.id);
+      totalDropped += dropped;
+      const shift = o => {
+        const c = JSON.parse(JSON.stringify(o || {}));
+        c.page = (+c.page || 1) + offset;
+        return c;
+      };
+      for (const it of ok) {
+        const ov = shift(it.overrides);
+        ov.blk = b.id;                       // binding groundwork — see note above
+        items.push({ ref_type: it.ref_type, ref_id: it.ref_id, overrides: ov });
+      }
+      for (const f of (bp.frames || [])) { const c = shift(f); c.blk = b.id; frames.push(c); }
+      for (const t of (bp.texts  || [])) { const c = shift(t); c.blk = b.id; texts.push(c); }
+      madeFrom.push({ block_id: b.id, name: b.name, kind: b.kind, pages: Math.max(1, +b.pages || 1) });
+      offset += Math.max(1, +b.pages || 1);
+    }
+
+    const params = {
+      paper: paper || 'a4',
+      pages: Math.max(1, offset),
+      frames, texts,
+      made_from: madeFrom,
+      roles: {}                              // reserved: {customer: <contact_id>, …}
+    };
+
+    const comp = await pool.query(
+      `INSERT INTO compositions (user_id, name, template, params)
+       VALUES ($1,$2,$3,$4) RETURNING id, name`,
+      [req.user.id, String(name).trim(), 'brochure', JSON.stringify(params)]);
+    const compId = comp.rows[0].id;
+    let pos = 0;
+    for (const it of items) {
+      await pool.query(
+        `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [req.user.id, compId, it.ref_type, it.ref_id, pos++, JSON.stringify(it.overrides)]);
+    }
+    res.json({ v: 1, ok: true, composition: comp.rows[0], pages: params.pages, dropped: totalDropped });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM compositions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);

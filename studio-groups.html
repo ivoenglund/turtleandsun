@@ -519,6 +519,24 @@
   </div>
 </div>
 
+<!-- New print job from blocks: tick the blocks, put them in order, generate -->
+<div class="modal-bg" id="jobModalBg">
+  <div class="modal" style="max-width:520px;">
+    <h3>New print from blocks</h3>
+    <div><label>Name of the print</label><input id="jobName" autocomplete="off" placeholder="e.g. Nordkap brochure"></div>
+    <div style="margin-top:12px;">
+      <label>Blocks — tick what goes in, drag ⠿ to reorder</label>
+      <div id="jobList" style="max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;"></div>
+    </div>
+    <div id="jobNeeds" class="muted" style="font-size:12.5px;margin-top:8px;"></div>
+    <div class="foot">
+      <span class="left muted" id="jobPages" style="font-size:12.5px;"></span>
+      <button class="btn sm gray" id="jobCancel">Cancel</button>
+      <button class="btn pub sm" id="jobGo">Generate</button>
+    </div>
+  </div>
+</div>
+
 <!-- Occasion editor modal (edit + create) -->
 <div class="modal-bg" id="occModalBg">
   <div class="modal" style="max-width:440px;">
@@ -2650,7 +2668,8 @@ async function renderMakLib(){
     '<div class="panel" style="padding:12px 14px;">'+
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">'+
       '<b style="font-size:14px;">My prints</b><span class="muted" style="font-size:12.5px;">— brochures, posters, cards</span>'+
-      '<button class="btn pub sm" id="makNewBtn" style="margin-left:auto;">＋ New print</button></div>'+
+      '<button class="btn sm gray" id="makJobBtn" style="margin-left:auto;" title="Assemble a print from saved blocks">▤ New from blocks</button>'+
+      '<button class="btn pub sm" id="makNewBtn">＋ New print</button></div>'+
     (makList.length?'<div class="makGrid">'+makList.map(c=>
       '<div class="makCard" data-id="'+c.id+'" title="Choose what goes in it">'+
         '<div class="im" style="font-size:30px;">🖨</div>'+
@@ -2668,6 +2687,7 @@ async function renderMakLib(){
     makComp={id:r.composition.id,name:r.composition.name,items:[]};
     renderMakPick();
   };
+  $('#makJobBtn').onclick=openJobDlg;
   host.querySelectorAll('.makCard').forEach(cd=>cd.onclick=async e=>{
     if(e.target.closest('button')) return;
     await makLoad(+cd.dataset.id); renderMakPick();
@@ -2680,6 +2700,90 @@ async function renderMakLib(){
     renderMakLib();
   });
 }
+
+// ── New print from blocks ────────────────────────────────────────────
+// Tick blocks, put them in order, generate. The server stamps each block's
+// pages in order and expands them into ordinary objects, so everything is
+// editable the moment the editor opens.
+//
+// The order in this list is the order of the pages. It is a RECIPE, not a live
+// outline: once the print exists, reordering here again does nothing to it —
+// you would generate a new one. That is deliberate (the same reason blocks are
+// not nested: once you hand-edit page 3 there is no honest way to reconcile it).
+let jobBlocks=[];
+async function openJobDlg(){
+  try{ const r=await api('/api/print-blocks'); jobBlocks=(r&&r.blocks||[]).map(b=>({...b, on:false})); }
+  catch(e){ showToast('Could not load your blocks'); return; }
+  $('#jobName').value='';
+  renderJobList();
+  $('#jobModalBg').classList.add('open');
+  $('#jobName').focus();
+}
+function closeJobDlg(){ $('#jobModalBg').classList.remove('open'); }
+function jobChosen(){ return jobBlocks.filter(b=>b.on); }
+function renderJobList(){
+  const host=$('#jobList');
+  if(!jobBlocks.length){
+    host.innerHTML='<div class="empty" style="padding:14px;">No blocks saved yet. Open a print, lay out a page, '+
+      'and press <b>⬒ Save page</b> in the editor panel.</div>';
+  }else{
+    host.innerHTML=jobBlocks.map((b,i)=>
+      '<div class="jobrow" data-i="'+i+'" draggable="true" style="display:flex;align-items:center;gap:8px;'+
+        'padding:7px 10px;border-bottom:1px solid var(--line);cursor:default;">'+
+        '<span title="Drag to reorder" style="cursor:grab;color:var(--mut);">⠿</span>'+
+        '<input type="checkbox" class="jobck" data-i="'+i+'"'+(b.on?' checked':'')+'>'+
+        '<span style="flex:1;min-width:0;">'+esc(b.name)+
+          '<span class="muted" style="font-size:11.5px;"> — '+(+b.pages>1?(b.pages+' pages · '):'')+
+          b.item_count+' card'+(+b.item_count===1?'':'s')+'</span></span>'+
+      '</div>').join('');
+  }
+  host.querySelectorAll('.jobck').forEach(c=>c.onchange=()=>{ jobBlocks[+c.dataset.i].on=c.checked; jobSummary(); });
+  let dragI=null;
+  host.querySelectorAll('.jobrow').forEach(row=>{
+    row.ondragstart=e=>{ dragI=+row.dataset.i; e.dataTransfer.effectAllowed='move'; };
+    row.ondragover=e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; };
+    row.ondrop=e=>{ e.preventDefault();
+      const to=+row.dataset.i;
+      if(dragI==null||dragI===to) return;
+      const [m]=jobBlocks.splice(dragI,1); jobBlocks.splice(to,0,m);
+      dragI=null; renderJobList(); };
+  });
+  jobSummary();
+}
+// Live page estimate + what the chosen blocks will need filled in. Page blocks
+// declare nothing, so "needs" is empty today — it fills itself once group and
+// letter blocks exist, without this code changing.
+function jobSummary(){
+  const on=jobChosen();
+  const pages=on.reduce((n,b)=>n+Math.max(1,+b.pages||1),0);
+  $('#jobPages').textContent = on.length ? (pages+' page'+(pages===1?'':'s')) : '';
+  const needs=new Set();
+  on.forEach(b=>{
+    const d=b.declares||{};
+    (d.roles||[]).forEach(r=>needs.add(r.key));
+    if(d.query) needs.add('group');
+  });
+  $('#jobNeeds').textContent = needs.size ? ('These blocks need: '+[...needs].join(', ')) : '';
+}
+async function generateJob(){
+  const name=$('#jobName').value.trim();
+  if(!name){ showToast('Give the print a name'); $('#jobName').focus(); return; }
+  const on=jobChosen();
+  if(!on.length){ showToast('Tick at least one block'); return; }
+  const btn=$('#jobGo'); btn.disabled=true; btn.textContent='Generating…';
+  try{
+    const r=await api('/api/compositions/from-blocks',{method:'POST',
+      body:JSON.stringify({ name, block_ids:on.map(b=>b.id) })});
+    closeJobDlg();
+    if(r.dropped) showToast(r.dropped+' card'+(r.dropped>1?'s were':' was')+' left out — no longer in your library');
+    window.open('/print/brochure?comp='+r.composition.id,'_blank');
+    renderMakLib();
+  }catch(e){ showToast(e.message||'Could not generate'); }
+  btn.disabled=false; btn.textContent='Generate';
+}
+$('#jobCancel').onclick=closeJobDlg;
+$('#jobGo').onclick=generateJob;
+$('#jobModalBg').onmousedown=e=>{ if(e.target.id==='jobModalBg') closeJobDlg(); };
 
 async function makLoad(id){
   const c=await api('/api/compositions/'+id);

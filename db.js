@@ -442,6 +442,38 @@ async function initDb() {
     ALTER TABLE media_cards ADD  CONSTRAINT media_cards_kind_check
       CHECK (kind IN ('svg','image'));
 
+    -- 2026-07-20: PRINT BLOCKS — reusable page(s) you stamp into any document.
+    -- A block is a saved LAYOUT plus the refs that were in it. It is never nested:
+    -- stamping expands it into ordinary objects. Because it stores ref_ids (not
+    -- content), the people/posts inside resolve LIVE every time it is stamped —
+    -- layout frozen, data fresh. That is the whole point.
+    --
+    -- The kind column is the extension seam. 'page' = literal saved page (v1).
+    -- Later kinds ('group','letter','map','credentials') keep the same layout
+    -- columns and describe what they need in declares:
+    --   group:  { query:{ group_id, exclude:[contact_id] }, grid:{...}, overflow:'flow'|'fit' }
+    --   letter: { roles:[{key:'customer',type:'contact'},{key:'responsible',type:'contact',many:true}] }
+    -- declares is EMPTY for 'page' blocks — nothing to fill in, they just stamp.
+    -- Note the UI calls these "print blocks"; the stored type stays neutral so the
+    -- same blocks can feed group sites later without a data migration.
+    CREATE TABLE IF NOT EXISTS print_blocks (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      name       TEXT NOT NULL,
+      kind       TEXT NOT NULL DEFAULT 'page',
+      pages      INTEGER NOT NULL DEFAULT 1,
+      -- params.frames[] / params.texts[]: page numbers are 1..pages, RELATIVE to
+      -- the block. Stamping adds (target page - 1) to every page number.
+      params     JSONB NOT NULL DEFAULT '{}'::jsonb,
+      -- items[]: [{ref_type, ref_id, overrides}] — same override keys the editor
+      -- already reads/writes. Parameters only, never HTML.
+      items      JSONB NOT NULL DEFAULT '[]'::jsonb,
+      declares   JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_print_blocks_user ON print_blocks(user_id, created_at DESC);
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle
