@@ -2687,18 +2687,49 @@ app.put('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
         [name ? name.trim() : null, params ? JSON.stringify(params) : null, req.params.id]);
     }
     if (Array.isArray(items)) {
-      await pool.query(`DELETE FROM composition_items WHERE composition_id = $1 AND user_id = $2`,
-        [req.params.id, req.user.id]);
-      let pos = 0;
-      for (const it of items) {
-        if (!it || !['post','contact','media'].includes(it.ref_type) || !it.ref_id) continue;
-        await pool.query(
-          `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [req.user.id, req.params.id, it.ref_type, +it.ref_id, pos++, JSON.stringify(it.overrides || {})]);
-      }
+      // ONE TRANSACTION, ONE CONNECTION. Replacing the items is DELETE-then-INSERT;
+      // run unwrapped on pooled connections and two overlapping autosaves interleave
+      // as DELETE(A), DELETE(B), INSERT(A…), INSERT(B…) — and the document comes back
+      // with every object duplicated. More overlap, more copies. This is why objects
+      // appeared two and three times after a burst of card moves and copies.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`DELETE FROM composition_items WHERE composition_id = $1 AND user_id = $2`,
+          [req.params.id, req.user.id]);
+        let pos = 0;
+        for (const it of items) {
+          if (!it || !['post','contact','media'].includes(it.ref_type) || !it.ref_id) continue;
+          await client.query(
+            `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [req.user.id, req.params.id, it.ref_type, +it.ref_id, pos++, JSON.stringify(it.overrides || {})]);
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        throw e;
+      } finally { client.release(); }
     }
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// One-shot repair for documents already damaged by the race above: keep the
+// LAST row of each identical (ref_type, ref_id, overrides) group and drop the rest.
+app.get('/api/admin/dedupe-composition/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM composition_items a
+        USING composition_items b
+        WHERE a.composition_id = $1 AND a.user_id = $2
+          AND b.composition_id = a.composition_id AND b.user_id = a.user_id
+          AND a.ref_type = b.ref_type AND a.ref_id = b.ref_id
+          AND a.overrides::text = b.overrides::text
+          AND a.id < b.id
+        RETURNING a.id`,
+      [req.params.id, req.user.id]);
+    res.json({ v: 1, ok: true, removed: rows.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

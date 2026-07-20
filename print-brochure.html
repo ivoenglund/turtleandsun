@@ -383,7 +383,16 @@ function ensureCards(n){ const c=cards(); while(c.length<n) c.push({id:newCardId
 // Recompute every object's page from where its card now sits in the list.
 function syncPages(){
   const idx=new Map(); cards().forEach((c,i)=>idx.set(c.id,i+1));
-  const put=o=>{ if(!o||!o.card) return; const p=idx.get(o.card); if(p) o.page=p; };
+  const N=Math.max(1,cards().length);
+  // An object whose card is missing or unknown would keep a STALE page number and
+  // sit there for ever, appearing next to the real objects as if duplicated.
+  // Adopt it onto the card its page currently points at instead.
+  const put=o=>{
+    if(!o) return;
+    let p=o.card?idx.get(o.card):null;
+    if(!p){ p=Math.max(1,Math.min(N,+o.page||1)); o.card=cardIdAt(p); }
+    o.page=p;
+  };
   (COMP.items||[]).forEach(it=>put(it.overrides));
   frames().forEach(put); texts().forEach(put);
   COMP.params.pages=Math.max(1,cards().length);
@@ -573,9 +582,14 @@ function cardInner(it){
        : postBlock(it);
 }
 // An object's font-size follows its width (true zoom), times a text-zoom knob.
+// An object's width is a PERCENTAGE of the page, so it grows with the paper.
+// The font-size has to grow with it, or changing A4 → poster leaves the box three
+// times bigger with the same small type — and because everything inside an object
+// is em, the whole internal layout drifts. pScale() is 1.0 on A4, so A4 documents
+// are unaffected; other papers are corrected.
 function fsOf(ov){
   const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
-  return Math.max(2, 13.5*(w/28)*ts);   // no ceiling — big papers want BIG type
+  return Math.max(2, 13.5*(w/28)*ts*pScale());   // no ceiling — big papers want BIG type
 }
 // Crop geometry is stored as RATIOS of the window width (pwr/phr/ixr/iyr), so
 // it survives paper-size changes and object resizing untouched. cropEms turns
@@ -1847,7 +1861,20 @@ window.addEventListener('afterprint',()=>{ renderCurrent(); applyZoom(curScale*1
 // ── Autosave: a couple of seconds after the last change, plus the button ──
 let saveTimer=null;
 function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,2500); }
+// Never two saves in flight. Each PUT replaces the whole item list, so overlapping
+// saves are what let the server interleave them; the guard removes the race at
+// the source and the transaction on the server catches anything else.
+let saving=false, saveAgain=false;
 async function saveNow(){
+  if(saving){ saveAgain=true; return; }
+  saving=true;
+  try{ await saveNowInner(); }
+  finally{
+    saving=false;
+    if(saveAgain){ saveAgain=false; saveNow(); }
+  }
+}
+async function saveNowInner(){
   if(!COMP||!compId) return;
   clearTimeout(saveTimer);
   COMP.params=COMP.params||{}; COMP.params.pages=pageCount();
