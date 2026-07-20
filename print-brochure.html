@@ -127,7 +127,12 @@
              font-size:11.5px; padding:3px 10px; border:2px solid var(--gold); border-bottom:0;
              border-radius:9px 9px 0 0; background:#fff; cursor:pointer; color:var(--ink); }
   #stripInner{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; display:flex;
-               gap:9px; padding:9px 10px 10px; align-items:flex-start; }
+               gap:9px; padding:9px 10px 10px; align-items:flex-start;
+               /* Grow out from the middle. "safe" keeps the first card reachable
+                  once the row is long enough to scroll — plain centring would
+                  push it off the left edge with no way to scroll back to it. */
+               justify-content:center;
+               justify-content:safe center; }
   .sthumb{ flex:0 0 auto; cursor:pointer; position:relative; }
   .sprev{ overflow:hidden; background:#fff; border:1.5px solid #d9d4c4; border-radius:5px;
           position:relative; pointer-events:none; }
@@ -148,7 +153,6 @@
   .sact button:hover{ border-color:var(--gold); }
   .sact button.danger{ color:#8c2f1b; border-color:#dcc0b5; }
   @media print{ #strip,#stripTab{ display:none!important; } }
-  #pgLabel{ flex:1; text-align:center; font-weight:700; }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
   #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
@@ -156,9 +160,8 @@
   #knobs input[type=color]{ width:34px; height:26px; padding:0 2px; border:1px solid #d9d4c4; border-radius:6px; background:#fff; cursor:pointer; }
   /* The canvas floats free: translate+scale, no anchors, no scrollbars. Fit brings it home. */
   #out{ position:absolute; left:0; top:0; transform-origin:0 0; }
-  #zoomWrap button, #pageNav button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
-  #zoomWrap button:hover, #pageNav button:hover{ background:#f4efe4; }
-  #pageNav button:disabled{ opacity:.4; cursor:default; }
+  #zoomWrap button{ font-family:inherit; font-weight:700; padding:4px 8px; border:1px solid #c9c4b4; border-radius:7px; background:#fff; cursor:pointer; }
+  #zoomWrap button:hover{ background:#f4efe4; }
   #out .page{ cursor:grab; }
   .err{ text-align:center; padding:60px; color:var(--muted); }
   @media print{
@@ -195,18 +198,7 @@
       <button id="zoomIn" title="Zoom in ( + )">＋</button>
       <button id="zoomFit" title="Fit to window ( 0 )">Fit</button>
     </div>
-    <div class="ph">Page</div>
-    <div id="pageNav" class="prow">
-      <button id="pgPrev" title="Previous page">◀</button>
-      <span id="pgLabel">1 / 1</span>
-      <button id="pgNext" title="Next page">▶</button>
-      <button id="pgAdd" title="Insert a page after this one">＋</button>
-      <button id="pgDel" title="Delete this page">🗑</button>
-    </div>
-    <div id="pgMove" class="prow">
-      <button id="pgUp" title="Move this page earlier">⇦ Move</button>
-      <button id="pgDown" title="Move this page later">Move ⇨</button>
-    </div>
+    <!-- Page navigation and page operations live in the filmstrip now. -->
     <div class="prow"><button id="addTextBtn" title="Add a free text object to this page">＋ Text</button></div>
     <div class="ph">Print blocks</div>
     <div class="prow">
@@ -626,7 +618,7 @@ function renderCurrent(){
   curPage=Math.max(1,Math.min(N,curPage));
   document.getElementById('out').innerHTML=pageHtml(curPage);
   wireDrag(); wirePan();
-  updatePageNav(); markSel();
+  markSel();
   updateOffpage(); setTimeout(updateOffpage,250);   // again once images have height
 }
 // Grey out anything ENTIRELY outside the page (parked). Partly-off objects
@@ -795,17 +787,6 @@ function startMarquee(e){
 }
 
 // ── Page navigation ─────────────────────────────────────────────────
-function updatePageNav(){
-  const N=pageCount();
-  const lab=document.getElementById('pgLabel'); if(lab) lab.textContent='Page '+curPage+' / '+N;
-  const prev=document.getElementById('pgPrev'), next=document.getElementById('pgNext'), del=document.getElementById('pgDel');
-  if(prev) prev.disabled=curPage<=1;
-  if(next) next.disabled=curPage>=N;
-  if(del)  del.disabled=N<=1;
-  const up=document.getElementById('pgUp'), dn=document.getElementById('pgDown');
-  if(up) up.disabled=curPage<=1;
-  if(dn) dn.disabled=curPage>=N;
-}
 function setPage(n){ curPage=n; SEL=[]; renderCurrent(); syncZoom(); showKnobs(); stripMark(); }
 // Insert a new card AFTER the current one — a yearbook is built by inserting,
 // not only by appending.
@@ -827,18 +808,6 @@ function deletePage(){
   syncPages();
   curPage=Math.min(curPage,pageCount());
   SEL=[]; renderCurrent(); syncZoom(); showKnobs();
-}
-// Reorder: splice the card list, resync. No object is touched — this is exactly
-// what the card list was introduced for.
-function movePage(d){
-  const N=pageCount(), to=curPage+d;
-  if(to<1||to>N) return;
-  pushUndo();
-  const c=cards();
-  const [m]=c.splice(curPage-1,1);
-  c.splice(to-1,0,m);
-  syncPages();
-  setPage(to);
 }
 
 // ── Object operations ───────────────────────────────────────────────
@@ -1566,12 +1535,6 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='0'){ e.preventDefault(); syncZoom(); }
 });
 // Page navigation buttons.
-document.getElementById('pgPrev').onclick=()=>setPage(curPage-1);
-document.getElementById('pgNext').onclick=()=>setPage(curPage+1);
-document.getElementById('pgAdd').onclick=()=>addPage();
-document.getElementById('pgDel').onclick=()=>deletePage();
-document.getElementById('pgUp').onclick=()=>movePage(-1);
-document.getElementById('pgDown').onclick=()=>movePage(1);
 // Undo / redo buttons (mousedown-preventDefault keeps the text editor focused,
 // so while editing they drive the browser's native text undo).
 const _ub=document.getElementById('undoBtn'), _rb=document.getElementById('redoBtn');
