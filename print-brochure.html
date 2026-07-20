@@ -327,14 +327,20 @@ function postBlock(it){
   }
   return '<div class="'+cls+'"'+ffs+' data-idx="'+it._idx+'">'+inner+'</div>';
 }
+// The words under the portrait live in a .bd, exactly like a post's text — that
+// is what makes them editable in place. The photo stays OUTSIDE .bd so editing
+// can never swallow it. ov.text overrides the generated wording, same as a post.
 function personCard(it){
   const c=it.content, ov=it.overrides||{};
   const init=(c.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
-  return '<div class="person block'+(ov.tc?' tco':'')+'" data-idx="'+it._idx+'">'+
+  const cls=['person','block', ov.tc?'tco':'', ov.ff?'ffo':''].filter(Boolean).join(' ');
+  const inner = ov.text ? sanitizeHtml(ov.text)
+    : '<b>'+esc(c.name||'')+'</b>'+
+      (c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
+      '<div class="ct">'+[c.email,c.phone].filter(Boolean).map(esc).join('<br>')+'</div>';
+  return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
     (c.photo_url?'<img src="'+esc(c.photo_url)+'">':'<div class="init">'+esc(init)+'</div>')+
-    '<b>'+esc(c.name||'')+'</b>'+
-    (c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
-    '<div class="ct">'+[c.email,c.phone].filter(Boolean).map(esc).join('<br>')+'</div></div>';
+    '<div class="bd">'+inner+'</div></div>';
 }
 // Media card = an SVG (logo/graphic). Rendered via <img> so no script runs.
 function mediaBlock(it){
@@ -733,7 +739,10 @@ document.getElementById('out').addEventListener('click',e=>{
   if(w.dataset.absidx!=null){
     const idx=+w.dataset.absidx; key='i'+idx;
     const it=COMP.items[idx];
-    isText=it&&it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt';
+    // Person cards are editable too — but NOT isTextKey, because resizing one
+    // must scale the portrait with the words, not reflow the words alone.
+    isText=!!it&&( (it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt')
+                 || it.ref_type==='contact' );
   }else if(w.dataset.text!=null){ key='t'+w.dataset.text; isText=true; }
   if(key&&isText&&w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]===key) enterEdit(key,e.clientX,e.clientY);
 });
@@ -904,7 +913,8 @@ function selAsHtml(){
     const c=it.content||{}, ov=it.overrides||{};
     if(ov.text){ parts.push(ov.text); return; }              // user-edited text wins
     if(it.ref_type==='contact'){
-      parts.push('<p><b>'+esc(c.name||'')+'</b>'+
+      parts.push((c.photo_url?'<p><img src="'+esc(c.photo_url)+'"></p>':'')+
+        '<p><b>'+esc(c.name||'')+'</b>'+
         (c.job_title?'<br>'+esc(c.job_title):'')+(c.company?'<br>'+esc(c.company):'')+
         (c.email?'<br>'+esc(c.email):'')+(c.phone?'<br>'+esc(c.phone):'')+'</p>');
     } else if(it.ref_type==='media'){
@@ -1697,11 +1707,26 @@ updateUndoBtns();
 // Cards dragged in from the Make board (another window) land where dropped.
 // The composition is saved with the new ref, then re-fetched so the card's
 // LIVE content resolves — same mirror rule as everything else.
+// Accept our own cards, and also pictures and files dragged in from a web page
+// or the desktop. Without the extra types here the browser refuses the drop.
 document.addEventListener('dragover',e=>{
-  if([...(e.dataTransfer.types||[])].includes('text/ts-card')) e.preventDefault();
+  const t=[...(e.dataTransfer.types||[])];
+  if(t.includes('text/ts-card')||t.includes('Files')||t.includes('text/uri-list')||t.includes('text/html'))
+    e.preventDefault();
 });
 document.addEventListener('drop',async e=>{
-  const raw=e.dataTransfer.getData('text/ts-card'); if(!raw) return;
+  const raw=e.dataTransfer.getData('text/ts-card');
+  if(!raw){                                   // not one of our cards — a picture?
+    const dt=e.dataTransfer;
+    const files=[...(dt.files||[])].filter(f=>/^image\//i.test(f.type||''));
+    if(files.length){ e.preventDefault(); for(const f of files) await addImageFromFile(f); return; }
+    const html=dt.getData('text/html')||'';
+    const m=html.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+    if(m&&/^https?:\/\//i.test(m[1])){ e.preventDefault(); await addImageFromUrl(m[1]); return; }
+    const uri=(dt.getData('text/uri-list')||dt.getData('text/plain')||'').trim().split(/\s+/)[0];
+    if(/^https?:\/\//i.test(uri)){ e.preventDefault(); await addImageFromUrl(uri); return; }
+    return;
+  }
   e.preventDefault();
   let d; try{ d=JSON.parse(raw); }catch(err){ return; }
   if(!d||!['post','contact','media'].includes(d.ref_type)||!+d.ref_id) return;
