@@ -890,6 +890,108 @@ function pasteClip(){
   renderCurrent(); SEL=newSel; showKnobs(); markSel();
 }
 
+// ── Talking to the SYSTEM clipboard ─────────────────────────────────
+// Copy renders the selection as real HTML so it pastes into Google Docs, Word or
+// mail as text and pictures. A hidden marker tells our own paste handler that the
+// clipboard came from here, so pasting back in restores OBJECTS, not flat text.
+const CLIPMARK='<!--tns-objects-->';
+function selAsHtml(){
+  const parts=[];
+  SEL.forEach(k=>{
+    if(k[0]==='f') return;                                   // a frame is a border; nothing to paste
+    if(k[0]==='t'){ parts.push(texts()[+k.slice(1)].text||''); return; }
+    const it=COMP.items[+k.slice(1)]; if(!it) return;
+    const c=it.content||{}, ov=it.overrides||{};
+    if(ov.text){ parts.push(ov.text); return; }              // user-edited text wins
+    if(it.ref_type==='contact'){
+      parts.push('<p><b>'+esc(c.name||'')+'</b>'+
+        (c.job_title?'<br>'+esc(c.job_title):'')+(c.company?'<br>'+esc(c.company):'')+
+        (c.email?'<br>'+esc(c.email):'')+(c.phone?'<br>'+esc(c.phone):'')+'</p>');
+    } else if(it.ref_type==='media'){
+      if(c.url) parts.push('<p><img src="'+esc(c.url)+'"></p>');
+    } else {
+      const photo=(c.photos||[])[0];
+      parts.push((c.title?'<h3>'+esc(c.title)+'</h3>':'')+
+        (photo?'<p><img src="'+esc(photo)+'"></p>':'')+
+        (c.body?'<p>'+esc(c.body).replace(/\n/g,'<br>')+'</p>':''));
+    }
+  });
+  return parts.filter(Boolean).join('\n');
+}
+function htmlToText(h){ const d=document.createElement('div'); d.innerHTML=h; return (d.textContent||'').trim(); }
+function nativeSelection(){ try{ return (window.getSelection()||'').toString(); }catch(e){ return ''; } }
+
+function onCopy(e, cut){
+  if(editing) return;                       // typing: let the browser copy the text
+  if(nativeSelection()) return;             // a real text selection: leave it alone
+  if(!SEL.length) return;
+  copySel();                                // our own object clipboard
+  const html=selAsHtml();
+  if(e.clipboardData){
+    e.clipboardData.setData('text/html', CLIPMARK+html);
+    e.clipboardData.setData('text/plain', htmlToText(html));
+    e.preventDefault();
+  }
+  if(cut) cutSel();
+}
+document.addEventListener('copy', e=>onCopy(e,false));
+document.addEventListener('cut',  e=>onCopy(e,true));
+
+// Put a freshly uploaded picture on the current card.
+function placeMedia(card){
+  pushUndo();
+  COMP.items.push({ ref_type:'media', ref_id:card.id,
+    content:{ title:card.title, url:card.url, tags:card.tags, kind:card.kind },
+    overrides:{ page:curPage, card:cardIdAt(curPage), x:18, y:18, w:34 } });
+  renderCurrent(); SEL=['i'+(COMP.items.length-1)]; showKnobs(); markSel();
+}
+async function addImageFromFile(f){
+  const fd=new FormData();
+  fd.append('file', f);
+  fd.append('title', (f.name||'Pasted image').replace(/\.[a-z0-9]+$/i,''));
+  try{
+    const r=await fetch('/api/media-cards',{method:'POST',body:fd});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ alert(d.error||'Could not add that image.'); return; }
+    if(d.card) placeMedia(d.card);
+  }catch(err){ alert('Could not add that image.'); }
+}
+async function addImageFromUrl(u){
+  try{
+    const r=await fetch('/api/media-cards',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ url:u })});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ alert(d.error||'Could not fetch that image.'); return; }
+    if(d.card) placeMedia(d.card);
+  }catch(err){ alert('Could not fetch that image.'); }
+}
+function addTextObjectWith(html){
+  pushUndo();
+  texts().push({ page:curPage, card:cardIdAt(curPage), x:20, y:20, w:34, text:sanitizeHtml(html) });
+  renderCurrent(); SEL=['t'+(texts().length-1)]; showKnobs(); markSel();
+}
+
+// Paste: a picture from a web page or the file system becomes a real media card;
+// text becomes a text object; our own objects come back as objects.
+document.addEventListener('paste', async e=>{
+  if(editing) return;                       // typing: native paste into the text
+  const dt=e.clipboardData; if(!dt) return;
+  const html=dt.getData('text/html')||'';
+  if(html.indexOf(CLIPMARK)===0){ e.preventDefault(); pasteClip(); return; }
+
+  const files=[...(dt.files||[])].filter(f=>/^image\//i.test(f.type||''));
+  if(files.length){ e.preventDefault(); for(const f of files) await addImageFromFile(f); return; }
+
+  const m=html.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+  if(m && /^https?:\/\//i.test(m[1])){ e.preventDefault(); await addImageFromUrl(m[1]); return; }
+
+  const txt=(dt.getData('text/plain')||'').trim();
+  if(/^https?:\/\/\S+$/i.test(txt)){ e.preventDefault(); await addImageFromUrl(txt); return; }
+  if(html){ e.preventDefault(); addTextObjectWith(html); return; }
+  if(txt){  e.preventDefault(); addTextObjectWith('<p>'+esc(txt).replace(/\n/g,'<br>')+'</p>'); return; }
+  pasteClip();
+});
+
 // Duplicate every selected object (styling and all), slightly offset.
 function dupSelected(){
   if(!SEL.length) return;
@@ -1555,9 +1657,9 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); doUndo(); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); doRedo(); return; }
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){ e.preventDefault(); dupSelected(); return; }
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'){ e.preventDefault(); copySel(); return; }
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){ e.preventDefault(); cutSel(); return; }
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='v'){ e.preventDefault(); pasteClip(); return; }
+  // Ctrl+C/X/V are NOT handled here — the real copy/cut/paste events are, further
+  // down. Intercepting the key stops anything reaching the system clipboard, which
+  // is what broke pasting into Google Docs.
   if(e.key==='PageDown'){ e.preventDefault(); if(curPage<pageCount()) setPage(curPage+1); return; }
   if(e.key==='PageUp'){   e.preventDefault(); if(curPage>1)           setPage(curPage-1); return; }
   if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
