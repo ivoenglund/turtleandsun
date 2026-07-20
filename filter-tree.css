@@ -22,8 +22,10 @@
 .ftree input[type=checkbox]{ width:14px; height:14px; margin:0; accent-color:var(--green,#1f4a45);
                              cursor:pointer; }
 
-/* Inline year range sits on the same row as its label. */
-.ftree .yrs{ display:flex; align-items:center; gap:3px; }
-.ftree .yrs input{ width:52px; font-family:inherit; font-size:12px; padding:2px 5px;
+/* Year range: two plain fields on the same row as the label, nothing else. */
+.ftree .yrs{ display:flex; align-items:center; gap:4px; margin-left:auto; }
+.ftree .yrs input{ width:50px; font-family:inherit; font-size:12px; padding:2px 4px; text-align:center;
                    border:1px solid #d9d4c4; border-radius:6px; background:#fff; color:inherit; }
-.ftree .yrs span{ color:var(--muted,#7a8470); }
+.ftree .yrs input::-webkit-outer-spin-button,
+.ftree .yrs input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.ftree .yrs input[type=number]{ -moz-appearance:textfield; appearance:textfield; }

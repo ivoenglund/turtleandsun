@@ -801,9 +801,37 @@ function dragSelFrom(e,w){
     });
     updateOffpage();
   };
-  const up=()=>{ removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
-    if(dragMoved) pushUndo(pre); };
-  addEventListener('pointermove',mv); addEventListener('pointerup',up);
+  // Let go over a card in the filmstrip and the selection moves to THAT card,
+  // keeping the position it had. This is the quick way to shift a picture to
+  // another page without cutting and pasting.
+  const overThumb=ev=>{
+    const el=document.elementFromPoint(ev.clientX,ev.clientY);
+    const th=el&&el.closest&&el.closest('.sthumb');
+    return th?+th.dataset.n:null;
+  };
+  const mvHi=ev=>{
+    const n=overThumb(ev);
+    document.querySelectorAll('.sthumb.dragover').forEach(x=>x.classList.remove('dragover'));
+    if(n){ const t=document.querySelector('.sthumb[data-n="'+n+'"]'); if(t) t.classList.add('dragover'); }
+  };
+  const up=ev=>{
+    removeEventListener('pointermove',mv); removeEventListener('pointermove',mvHi);
+    removeEventListener('pointerup',up);
+    document.querySelectorAll('.sthumb.dragover').forEach(x=>x.classList.remove('dragover'));
+    const n=dragMoved?overThumb(ev):null;
+    if(n&&n!==curPage){
+      // Snap back to where they started, then re-home them on the target card.
+      start.forEach(s=>{ const o=ovOf(s.key); o.x=s.x; o.y=s.y; });
+      const id=cardIdAt(n);
+      SEL.forEach(key=>{ const o=ovOf(key); o.card=id; o.page=n; });
+      pushUndo(pre);
+      renderCurrent(); showKnobs(); markSel();
+      return;
+    }
+    if(dragMoved) pushUndo(pre);
+  };
+  addEventListener('pointermove',mv); addEventListener('pointermove',mvHi);
+  addEventListener('pointerup',up);
   e.stopPropagation(); e.preventDefault();
 }
 function keyOfEl(w){
@@ -1895,12 +1923,113 @@ updateUndoBtns();
 // LIVE content resolves — same mirror rule as everything else.
 // Accept our own cards, and also pictures and files dragged in from a web page
 // or the desktop. Without the extra types here the browser refuses the drop.
+// ── Dropping a whole group ──────────────────────────────────────────
+// No arbitrary cap. The drop FILLS the card with a grid of as many as physically
+// fit — a number that means something, because it depends on the paper and the
+// size — then reports what's left with one button to continue onto new cards.
+const GRIDMARGIN=6, GRIDGAP=2.5, CARDASPECT=1.45;
+function planFor(cols){
+  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
+  const w=(100-GRIDMARGIN*2-GRIDGAP*(cols-1))/cols;              // % of page width
+  // A person card runs about 1.45x as tall as it is wide (portrait + three lines);
+  // convert that to a share of page HEIGHT, which is what rows are measured in.
+  const hPct=w*(P.w/P.h)*CARDASPECT;
+  const rows=Math.max(1, Math.floor((100-GRIDMARGIN*2+GRIDGAP)/(hPct+GRIDGAP)));
+  return { w, hPct, rows, cols, perCard:rows*cols };
+}
+// Use the BIGGEST cards that still get everyone onto one card, down to 6 columns.
+// So six people come out large, seventeen come out as a proper team page, and a
+// hundred customers pack tightly — without you choosing a number.
+function gridPlan(count){
+  let best=null;
+  for(let cols=2; cols<=6; cols++){
+    const p=planFor(cols);
+    if(!best) best=p;
+    if(count && p.perCard>=count) return p;
+    best=p;
+  }
+  return best;
+}
+// One plan for the whole drop, so the leftovers on later cards are laid out at
+// exactly the same size as the first card — not re-planned for a smaller count.
+function placeGrid(items, kind, groupKey, startPage, g){
+  let page=startPage, i=0;
+  while(i<items.length){
+    ensureCards(page);
+    const slice=items.slice(i, i+g.perCard);
+    slice.forEach((o,n)=>{
+      const col=n%g.cols, row=Math.floor(n/g.cols);
+      COMP.items.push({ ref_type:kind, ref_id:o.id, content:o, overrides:{
+        page, card:cardIdAt(page),
+        x:Math.round((GRIDMARGIN+col*(g.w+GRIDGAP))*10)/10,
+        y:Math.round((GRIDMARGIN+row*(g.hPct+GRIDGAP))*10)/10,
+        w:Math.round(g.w*10)/10,
+        grp:groupKey            // where these came from — see note below
+      }});
+    });
+    i+=slice.length;
+    if(i<items.length) page++;
+  }
+  return page;
+}
+function groupBanner(msg, btnLabel, fn){
+  let b=document.getElementById('grpBanner');
+  if(!b){ b=document.createElement('div'); b.id='grpBanner';
+    b.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:80;'+
+      'background:#fff;border:2px solid var(--gold);border-radius:12px;padding:9px 14px;'+
+      'box-shadow:0 4px 18px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center;';
+    document.body.appendChild(b); }
+  b.innerHTML='<span>'+esc(msg)+'</span>';
+  if(btnLabel){ const btn=document.createElement('button');
+    btn.textContent=btnLabel;
+    btn.style.cssText='font-family:inherit;font-weight:700;font-size:12.5px;padding:4px 9px;'+
+      'border:1px solid var(--green);border-radius:8px;background:var(--green);color:#f4efe4;cursor:pointer;';
+    btn.onclick=()=>{ b.remove(); fn(); }; b.appendChild(btn); }
+  const x=document.createElement('button');
+  x.textContent='✕';
+  x.style.cssText='font-family:inherit;font-size:12px;border:0;background:none;cursor:pointer;color:#7a8470;';
+  x.onclick=()=>b.remove(); b.appendChild(x);
+  clearTimeout(groupBanner._t); groupBanner._t=setTimeout(()=>{ if(b) b.remove(); }, 14000);
+}
+async function dropGroup(d){
+  const body=document.getElementById('resBody');
+  try{
+    const r=await fetch('/api/content?'+d.q+'&section='+encodeURIComponent(d.section)+'&limit=500&offset=0');
+    if(!r.ok){ alert('Could not load that group.'); return; }
+    const sec=((await r.json()).sections||[])[0];
+    if(!sec||!sec.items.length){ alert('Nothing in that group with the current filters.'); return; }
+    const g=gridPlan(sec.items.length);
+    pushUndo();
+    const fit=sec.items.slice(0,g.perCard);
+    placeGrid(fit, sec.kind, d.section, curPage, g);
+    syncPages(); renderCurrent(); syncZoom(); showKnobs(); markSel();
+    const rest=sec.items.slice(g.perCard);
+    if(rest.length){
+      groupBanner('Placed '+fit.length+' of '+sec.items.length+' — '+rest.length+' left.',
+        'Place the rest on new cards', ()=>{
+          pushUndo();
+          placeGrid(rest, sec.kind, d.section, curPage+1, g);
+          syncPages(); renderCurrent(); syncZoom(); showKnobs();
+        });
+    }else{
+      groupBanner('Placed all '+fit.length+'.');
+    }
+  }catch(e){ alert('Could not place that group.'); }
+}
+
 document.addEventListener('dragover',e=>{
   const t=[...(e.dataTransfer.types||[])];
-  if(t.includes('text/ts-card')||t.includes('Files')||t.includes('text/uri-list')||t.includes('text/html'))
+  if(t.includes('text/ts-card')||t.includes('text/ts-group')||t.includes('Files')
+     ||t.includes('text/uri-list')||t.includes('text/html'))
     e.preventDefault();
 });
 document.addEventListener('drop',async e=>{
+  const grp=e.dataTransfer.getData('text/ts-group');
+  if(grp){ e.preventDefault();
+    let d; try{ d=JSON.parse(grp); }catch(err){ return; }
+    if(d&&d.section) await dropGroup(d);
+    return;
+  }
   const raw=e.dataTransfer.getData('text/ts-card');
   if(!raw){                                   // not one of our cards — a picture?
     const dt=e.dataTransfer;
@@ -2199,7 +2328,8 @@ const RES={
   // The attribute filters begin fully on, which means "no restriction".
   ungrouped:false, timeline:false, archive:false,
   living:true, deceased:true, people:true, pets:true,
-  y1:'', y2:'', q:'', size:13.5, busy:false, seq:0
+  y1:String(new Date().getFullYear()), y2:String(new Date().getFullYear()+1),
+  q:'', size:13.5, busy:false, seq:0
 };
 const RSIZES={S:9.5, M:13.5, L:19};
 
@@ -2260,9 +2390,9 @@ function renderTree(){
   // Timeline is NOT a <label>: the year fields live on the same row, and inside a
   // label every click on them would toggle the checkbox.
   h+='<div class="frow"><input type="checkbox" data-f="timeline"'+(RES.timeline?' checked':'')+'>'+
-       '<span class="c2"><span class="nm" id="rTlLbl" style="cursor:pointer;">Timeline</span>'+
-       '<span class="yrs"><input type="number" id="rY1" placeholder="from" value="'+esc(RES.y1)+'">'+
-       '<span>–</span><input type="number" id="rY2" placeholder="to" value="'+esc(RES.y2)+'"></span></span></div>';
+       '<span class="c2"><span class="nm" id="rTlLbl" style="cursor:pointer;flex:0 0 auto;">Timeline</span>'+
+       '<span class="yrs"><input type="number" id="rY1" value="'+esc(RES.y1)+'">'+
+       '<input type="number" id="rY2" value="'+esc(RES.y2)+'"></span></span></div>';
   h+=row('archive','Archive',RES.archive);
   h+='<div class="fh">Filter</div>';
   h+=row('living','Living',RES.living)+row('deceased','Deceased',RES.deceased)+
@@ -2292,7 +2422,7 @@ async function fetchContent(){
   const body=document.getElementById('resBody');
   const mine=++RES.seq;
   try{
-    const r=await fetch('/api/content?'+resQuery({preview:12}));
+    const r=await fetch('/api/content?'+resQuery({preview:100}));
     if(mine!==RES.seq) return;                  // a newer request has overtaken this one
     if(!r.ok){ body.textContent='Could not load your content.'; return; }
     RES.sections=(await r.json()).sections||[];
@@ -2313,7 +2443,10 @@ function renderContent(){
   body.innerHTML=RES.sections.map(sec=>{
     const shown=sec.items.length, more=sec.total-shown;
     const arch=sec.key==='archive';
-    return '<div class="sechd"><b>'+esc(sec.title)+'</b><span class="n">'+sec.total+'</span>'+
+    // Grab the heading to drag the WHOLE section onto a card.
+    return '<div class="sechd" draggable="true" data-sec="'+esc(sec.key)+'" data-title="'+esc(sec.title)+'"'+
+      ' title="Drag this heading to put the whole group on the card">'+
+      '<b>'+esc(sec.title)+'</b><span class="n">'+sec.total+'</span>'+
       (more>0?'<button class="more" data-more="'+esc(sec.key)+'">Show all '+sec.total+'</button>':'')+'</div>'+
       '<div class="'+(arch?'rgrid dropz':'rgrid')+'"'+(arch?' data-drop="1"':'')+'>'+
       sec.items.map(o=>
@@ -2341,6 +2474,13 @@ function renderContent(){
   // Delete from the archive — but tell the truth first. Deleting a picture also
   // removes it from every print that uses it (the server clears those items), so
   // the count is the thing you actually need to see before deciding.
+  body.querySelectorAll('.sechd[data-sec]').forEach(h=>{
+    h.ondragstart=e=>{
+      try{ e.dataTransfer.setData('text/ts-group',
+        JSON.stringify({section:h.dataset.sec, title:h.dataset.title, q:resQuery({})})); }catch(err){}
+      e.dataTransfer.effectAllowed='copy';
+    };
+  });
   body.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
     const id=b.dataset.del;
