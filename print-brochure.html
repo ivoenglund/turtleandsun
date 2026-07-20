@@ -1433,8 +1433,10 @@ function showKnobs(){
     kp.oninput=e=>{
       const px=+e.target.value; if(!(px>=4&&px<=500)) return;
       if(kp._pre==null) kp._pre=snap();
+      // Must be the exact inverse of fsOf(), pScale() included — otherwise the
+      // number you type is only honoured on A4.
       SEL.forEach(key=>{ if(!isTextKey(key)) return; const o=ovOf(key);
-        o.ts=Math.round(px/(13.5*((+o.w||28)/28))*1000)/1000;
+        o.ts=Math.round(px/(13.5*((+o.w||28)/28)*pScale())*1000)/1000;
         if(Math.abs(o.ts-1)<0.002) delete o.ts; });
       liveSelStyle();
     };
