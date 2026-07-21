@@ -2712,14 +2712,17 @@ const PAPERW={a0:841,a1:594,a2:420,a3:297,a4:210,a5:148,a6:105,
   letter:215.9,legal:215.9,tabloid:279.4,ansic:431.8,ansid:558.8,ansie:863.6,poster:700};
 const PAPERH={a0:1189,a1:841,a2:594,a3:420,a4:297,a5:210,a6:148,
   letter:279.4,legal:355.6,tabloid:431.8,ansic:558.8,ansid:863.6,ansie:1117.6,poster:1000};
-let PRINTS=[], prQ='', prSort='new', prGroup='none';
+let PRINTS=[], PRBLOCKS=0, prQ='', prSort='new', prGroup='none';
 
 async function renderMakLib(){
   $('#makPick').classList.add('hide');
   const host=$('#makLib'); host.classList.remove('hide');
   host.innerHTML='<div class="panel" style="padding:12px 14px;">Loading…</div>';
-  try{ PRINTS=((await api('/api/prints'))||{}).prints||[]; }
-  catch(e){ PRINTS=[]; }
+  try{
+    const [pr,bl]=await Promise.all([api('/api/prints'), api('/api/print-blocks').catch(()=>null)]);
+    PRINTS=(pr||{}).prints||[];
+    PRBLOCKS=((bl||{}).blocks||[]).length;
+  }catch(e){ PRINTS=[]; PRBLOCKS=0; }
   drawPrintLib();
 }
 
@@ -2753,7 +2756,6 @@ function prCardHtml(p){
       '<div class="mt">'+p.items+' object'+(p.items===1?'':'s')+'</div>'+
       '<div class="row">'+
         '<button class="btn sm gray prOpen" data-id="'+p.id+'" style="flex:1;">Open</button>'+
-        '<button class="btn sm gray prPick" data-id="'+p.id+'" title="Choose what goes in it">Cards</button>'+
         '<button class="btn sm danger prKill" data-id="'+p.id+'" title="Delete this print">✕</button>'+
       '</div></div></div>';
 }
@@ -2787,8 +2789,10 @@ function drawPrintLib(){
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">'+
       '<b style="font-size:14px;">My prints</b>'+
       '<span class="muted" style="font-size:12.5px;">'+PRINTS.length+' — brochures, posters, yearbooks, cards</span>'+
-      '<button class="btn sm gray" id="makJobBtn" style="margin-left:auto;" title="Assemble a print from saved blocks">▤ New from blocks</button>'+
-      '<button class="btn pub sm" id="makNewBtn">＋ New print</button></div>'+
+      (PRBLOCKS>0
+        ? '<button class="btn sm gray" id="makJobBtn" style="margin-left:auto;" title="Assemble a print from saved cards">▤ New from cards</button>'+
+          '<button class="btn pub sm" id="makNewBtn">＋ New print</button>'
+        : '<button class="btn pub sm" id="makNewBtn" style="margin-left:auto;">＋ New print</button>')+'</div>'+
     '<div class="prBar">'+
       '<input type="text" id="prSearch" placeholder="Search prints or customers…" value="'+esc(prQ)+'" autocomplete="off">'+
       '<select id="prSort"><option value="new">Newest first</option>'+
@@ -2806,14 +2810,14 @@ function drawPrintLib(){
   $('#makNewBtn').onclick=async()=>{
     const name=prompt('Name of the print (e.g. "QCC brochure"):'); if(!name||!name.trim()) return;
     const r=await api('/api/compositions',{method:'POST',body:JSON.stringify({name:name.trim(),template:'brochure'})});
-    makComp={id:r.composition.id,name:r.composition.name,items:[]};
-    renderMakPick();
+    // Straight into the editor: content goes in by dragging from the Content panel.
+    window.open('/print/brochure?comp='+r.composition.id,'_blank');
+    renderMakLib();
   };
-  $('#makJobBtn').onclick=openJobDlg;
+  if($('#makJobBtn')) $('#makJobBtn').onclick=openJobDlg;
 
   host.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>window.open('/print/brochure?comp='+el.dataset.open,'_blank'));
   host.querySelectorAll('.prOpen').forEach(b=>b.onclick=()=>window.open('/print/brochure?comp='+b.dataset.id,'_blank'));
-  host.querySelectorAll('.prPick').forEach(b=>b.onclick=async()=>{ await makLoad(+b.dataset.id); renderMakPick(); });
   host.querySelectorAll('.prKill').forEach(b=>b.onclick=async()=>{
     const p=PRINTS.find(x=>x.id===+b.dataset.id);
     if(!confirm('Delete "'+(p?p.name:'this print')+'"? The cards themselves are not touched.')) return;
