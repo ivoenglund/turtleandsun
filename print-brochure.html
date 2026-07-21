@@ -405,6 +405,30 @@ function syncPages(){
 }
 // Documents made before cards existed are keyed by page number only: mint one
 // card per page, in page order, and hand every object the matching id.
+// One-time: text styled before sizes were relative carries font-size in PX,
+// which cannot scale with the paper. Convert to em against the object's own size,
+// using the paper the document is stored with — so run this before any paper change.
+function migrateTextSizes(){
+  COMP.params=COMP.params||{};
+  if(COMP.params.emsizes) return;
+  const conv=(html, ov)=>{
+    if(!html || html.indexOf('px')<0) return html;
+    const base=fsOf(ov)||13.5;
+    const t=document.createElement('template');
+    t.innerHTML=html;
+    let touched=false;
+    t.content.querySelectorAll('[style]').forEach(el=>{
+      const fs=el.style.fontSize;
+      const m=fs && /^([\d.]+)px$/.exec(fs.trim());
+      if(m){ el.style.fontSize=(parseFloat(m[1])/base).toFixed(4)+'em'; touched=true; }
+    });
+    return touched ? t.innerHTML : html;
+  };
+  (COMP.items||[]).forEach(it=>{ const ov=it.overrides||{};
+    if(ov.text) ov.text=conv(ov.text, ov); });
+  texts().forEach(t=>{ if(t.text) t.text=conv(t.text, t); });
+  COMP.params.emsizes=1;
+}
 function migrateCards(){
   if(!cards().length){
     let maxP=Math.max(1,+((COMP.params||{}).pages)||1);
@@ -455,6 +479,7 @@ function normalizeItems(){
   });
   COMP.items=out;
   migrateCards();
+  migrateTextSizes();
 }
 
 async function load(){
@@ -1386,7 +1411,11 @@ function showKnobs(){
         '<button id="tbDone" class="primary" style="flex:1;">✓ Done</button></div>'+
       '<div class="hint" style="margin-top:6px;">Clicking anywhere outside also finishes — it saves by itself.</div>';
     q('tbFont').onchange=e=>{ if(e.target.value) applyStyle('fontFamily',fontCss(e.target.value)); };
-    q('tbSize').oninput=e=>{ const px=+e.target.value; if(px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
+    q('tbSize').oninput=e=>{
+      const px=+e.target.value; if(!(px>=4&&px<=500)) return;
+      const base=fsOf(ov)||13.5;                    // the object's own size
+      applyStyle('fontSize',(px/base).toFixed(4)+'em');
+    };
     q('tbColor').oninput=e=>applyStyle('color',e.target.value);
     k.querySelectorAll('.sw').forEach(b=>{
       b.onmousedown=e=>e.preventDefault();
