@@ -150,6 +150,14 @@
   .sact button.danger:hover{ background:#f9ece7; }
   /* Drop a saved card here to append it as a new page. */
   /* A card that follows a group says so, and the badge takes you to its rule. */
+  /* A chapter reads as one run: a tinted band under its cards, name on the first. */
+  .sthumb.chIn .sprev{ box-shadow:0 6px 0 -2px rgba(31,74,69,.30); }
+  .sthumb.chIn.cur .sprev{ box-shadow:0 0 0 2px rgba(201,162,75,.45), 0 6px 0 -2px rgba(31,74,69,.45); }
+  .schap{ position:absolute; left:3px; bottom:-3px; z-index:2; max-width:calc(100% - 6px);
+          font-size:9.5px; font-weight:800; letter-spacing:.3px; padding:1px 6px;
+          border-radius:20px; background:var(--green); color:#f4efe4; cursor:pointer;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .schap:hover{ background:#17403b; }
   .srule{ position:absolute; left:3px; top:3px; z-index:2; max-width:calc(100% - 6px);
           font-size:9.5px; font-weight:800; letter-spacing:.3px; padding:2px 6px;
           border-radius:20px; background:var(--green); color:#f4efe4; cursor:pointer;
@@ -954,8 +962,12 @@ function setPage(n){ curPage=n; SEL=[]; renderCurrent(); showKnobs(); stripMark(
 // not only by appending.
 function addPage(){
   pushUndo();
-  cards().splice(curPage,0,{id:newCardId()});
-  syncPages();
+  const nid=newCardId();
+  const f=chapterOf(curPage);
+  cards().splice(curPage,0,{id:nid});
+  // A chapter is a container: adding a page grows it instead of breaking it in two.
+  if(f){ const list=f.ch.cards||[]; const at=list.indexOf(cardIdAt(curPage)); list.splice(at+1,0,nid); }
+  enforceChapters();
   setPage(curPage+1);
 }
 function deletePage(){
@@ -966,7 +978,7 @@ function deletePage(){
   COMP.params.frames=frames().filter(f=>f.card!==id);
   COMP.params.texts =texts().filter(t=>t.card!==id);
   cards().splice(curPage-1,1);
-  syncPages();
+  enforceChapters();
   curPage=Math.min(curPage,pageCount());
   SEL=[]; renderCurrent(); showKnobs();
 }
@@ -1378,6 +1390,26 @@ function liveSelStyle(){
 // editing text, cropping, a selection, or nothing.
 // The rule is a set of controls, not hidden state: every part of it is visible
 // and changeable on the card it belongs to.
+function chapterSectionHtml(){
+  const cp=chapterPos(curPage); if(!cp) return '';
+  return '<div class="kh">Chapter — '+esc(cp.ch.name||'')+'</div>'+
+    '<div class="krow"><input type="text" id="chName" value="'+esc(cp.ch.name||'')+'" '+
+      'style="flex:1;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid #d9d4c4;border-radius:8px;">'+
+      '</div>'+
+    '<div class="hint">Page '+cp.i+' of '+cp.n+'. These cards move together and stay side by side. '+
+      '＋ adds a page to the chapter.</div>'+
+    '<div class="krow"><button id="chUngroup" style="flex:1;" title="Keep the pages, drop the grouping">⊟ Ungroup</button>'+
+      '<button id="chDel" class="danger" title="Delete the chapter and all its pages">🗑</button></div>';
+}
+function wireChapterSection(){
+  const cp=chapterPos(curPage); if(!cp) return;
+  const nm=document.getElementById('chName');
+  if(nm) nm.onchange=()=>{ pushUndo(); cp.ch.name=nm.value.trim()||'Chapter'; showKnobs(); scheduleStrip(); };
+  const ug=document.getElementById('chUngroup');
+  if(ug) ug.onclick=()=>ungroupChapter(cp.id);
+  const dl=document.getElementById('chDel');
+  if(dl) dl.onclick=()=>deleteChapter(cp.id);
+}
 function ruleSectionHtml(){
   const r=ruleOf(curPage); if(!r) return '';
   const pinned=(COMP.items||[]).filter(it=>it.overrides&&it.overrides.card===cardIdAt(curPage)&&+it.overrides.pin).length;
@@ -1481,7 +1513,7 @@ function showKnobs(){
   }
 
   // ── The card's own rule, if it has one ────────────────────────────
-  const cardRuleHtml=ruleSectionHtml();
+  const cardRuleHtml=chapterSectionHtml()+ruleSectionHtml();
 
   // ── MODE: nothing selected ────────────────────────────────────────
   if(!n){
@@ -1493,7 +1525,7 @@ function showKnobs(){
       '<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
       'Shift-click or drag a rectangle on the page for several. Drag to move, gold dot to resize, '+
       'click a selected text again to edit it.</div>';
-    wireRuleSection();
+    wireChapterSection(); wireRuleSection();
     return;
   }
 
@@ -1595,7 +1627,7 @@ function showKnobs(){
       render(); showKnobs(); markSel();
     };
   });
-  wireRuleSection();
+  wireChapterSection(); wireRuleSection();
   liveSlider('knW', v=>SEL.forEach(key=>{
     const o=ovOf(key);
     if(isTextKey(key)){    // text reshapes: wider box = longer lines, same letters
@@ -2011,6 +2043,79 @@ updateUndoBtns();
 // LIVE content resolves — same mirror rule as everything else.
 // Accept our own cards, and also pictures and files dragged in from a web page
 // or the desktop. Without the extra types here the browser refuses the drop.
+// ── CHAPTERS: cards that hold together ──────────────────────────────
+// params.chapters[id] = { name, cards:[cardId, …] }
+// A chapter's cards are ALWAYS contiguous in the document. That is not a nicety:
+// a chapter with a stranger's page wedged between 1/3 and 2/3 is meaningless on
+// paper, and it makes "where does the new page go" unanswerable.
+// enforceChapters() re-establishes the invariant after any card-list change, so
+// no single operation has to be careful.
+function chapters(){ COMP.params=COMP.params||{}; return COMP.params.chapters=COMP.params.chapters||{}; }
+function newChId(){ return 'ch'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function chapterOfCard(id){
+  if(!id) return null;
+  const cs=chapters();
+  for(const k in cs){ if((cs[k].cards||[]).indexOf(id)>=0) return { id:k, ch:cs[k] }; }
+  return null;
+}
+function chapterOf(n){ return chapterOfCard(cardIdAt(n)); }
+// Position in the chapter, 1-based, and its length: "2/3".
+function chapterPos(n){
+  const f=chapterOf(n); if(!f) return null;
+  const list=(f.ch.cards||[]).filter(id=>cards().some(c=>c.id===id));
+  return { id:f.id, ch:f.ch, i:list.indexOf(cardIdAt(n))+1, n:list.length };
+}
+function enforceChapters(){
+  const cs=chapters();
+  Object.keys(cs).forEach(k=>{
+    const ch=cs[k];
+    // drop members that no longer exist, and re-order to document order
+    const present=cards().map(c=>c.id);
+    ch.cards=(ch.cards||[]).filter(id=>present.indexOf(id)>=0);
+    if(!ch.cards.length){ delete cs[k]; return; }
+    ch.cards.sort((a,b)=>present.indexOf(a)-present.indexOf(b));
+    // pull any strays up so the run is unbroken
+    const first=present.indexOf(ch.cards[0]);
+    const arr=cards();
+    ch.cards.forEach((id,off)=>{
+      const at=arr.findIndex(c=>c.id===id);
+      const want=first+off;
+      if(at!==want && at>=0){ const [m]=arr.splice(at,1); arr.splice(want,0,m); }
+    });
+  });
+  syncPages();
+}
+function createChapter(n){
+  const id=cardIdAt(n); if(!id) return;
+  if(chapterOfCard(id)) return;
+  const name=prompt('Name this chapter (e.g. "The team", "Kunder"):','Chapter');
+  if(!name||!name.trim()) return;
+  pushUndo();
+  chapters()[newChId()]={ name:name.trim(), cards:[id] };
+  enforceChapters(); renderCurrent(); showKnobs(); scheduleStrip();
+}
+function ungroupChapter(chId){
+  pushUndo();
+  delete chapters()[chId];
+  enforceChapters(); renderCurrent(); showKnobs(); scheduleStrip();
+}
+function deleteChapter(chId){
+  const ch=chapters()[chId]; if(!ch) return;
+  const ids=(ch.cards||[]).slice();
+  if(cards().length<=ids.length){ alert('That would delete every page — a print keeps at least one.'); return; }
+  if(!confirm('Delete the chapter “'+(ch.name||'')+'” and its '+ids.length+
+              ' page'+(ids.length===1?'':'s')+'? Ctrl+Z brings it back.')) return;
+  pushUndo();
+  COMP.items=(COMP.items||[]).filter(it=>!(it.overrides&&ids.indexOf(it.overrides.card)>=0));
+  COMP.params.frames=frames().filter(f=>ids.indexOf(f.card)<0);
+  COMP.params.texts =texts().filter(t=>ids.indexOf(t.card)<0);
+  COMP.params.cards=cards().filter(c=>ids.indexOf(c.id)<0);
+  delete chapters()[chId];
+  enforceChapters();
+  curPage=Math.min(curPage,pageCount());
+  SEL=[]; renderCurrent(); showKnobs(); scheduleStrip();
+}
+
 // ── GROUP CARDS: a rule, not a snapshot ─────────────────────────────
 // params.rules[cardId] = { kind:'group', group_id, name, exclude:[], cols, fields:{} }
 // Objects the rule placed carry overrides.rule = cardId. Move one by hand and it
@@ -2475,29 +2580,49 @@ function copyCardAt(n){
   pushUndo();
   const nid=newCardId();
   cards().splice(n,0,{id:nid});                       // the copy sits right after
+  { const f=chapterOfCard(id); if(f){ const l=f.ch.cards||[]; l.splice(l.indexOf(id)+1,0,nid); } }
   const clone=o=>{ const c=JSON.parse(JSON.stringify(o)); c.card=nid; return c; };
   (COMP.items||[]).filter(it=>it.overrides&&it.overrides.card===id)
     .map(it=>({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content, overrides:clone(it.overrides) }))
     .forEach(c=>COMP.items.push(c));
   frames().filter(f=>f.card===id).map(clone).forEach(c=>frames().push(c));
   texts().filter(t=>t.card===id).map(clone).forEach(c=>texts().push(c));
-  syncPages();
+  enforceChapters();
   setPage(n+1);
 }
 function insertCardAt(n){            // new empty card AFTER page n
   pushUndo();
-  cards().splice(n,0,{id:newCardId()});
-  syncPages();
+  const nid=newCardId();
+  const f=chapterOf(n);
+  cards().splice(n,0,{id:nid});
+  if(f){ const list=f.ch.cards||[]; const at=list.indexOf(cardIdAt(n)); list.splice(at+1,0,nid); }
+  enforceChapters();
   setPage(n+1);
 }
 function moveCard(from,to){
   if(from===to) return;
+  const arr=cards();
+  const movingId=cardIdAt(from), targetId=cardIdAt(to);
+  const fromCh=chapterOfCard(movingId), toCh=chapterOfCard(targetId);
   pushUndo();
-  const c=cards();
-  const [m]=c.splice(from-1,1);
-  c.splice(to-1,0,m);
-  syncPages();
-  setPage(to);
+  if(fromCh){
+    // The whole chapter travels together — you cannot pull one page out by dragging.
+    const ids=(fromCh.ch.cards||[]).slice();
+    const block=ids.map(id=>arr.find(c=>c.id===id)).filter(Boolean);
+    const before=arr.filter(c=>ids.indexOf(c.id)<0);
+    let at=before.findIndex(c=>c.id===targetId);
+    if(at<0) at=before.length; else if(to>from) at+=1;
+    before.splice(at,0,...block);
+    COMP.params.cards=before;
+  }else{
+    const [m]=arr.splice(from-1,1);
+    arr.splice(to-1,0,m);
+    // Dropped onto a page that belongs to a chapter? Then it joins that chapter.
+    if(toCh){ const l=toCh.ch.cards||[]; const at=l.indexOf(targetId);
+      l.splice(to>from?at+1:at,0,movingId); }
+  }
+  enforceChapters();
+  setPage(Math.max(1,Math.min(pageCount(),to)));
 }
 function renderStrip(){
   const host=document.getElementById('stripInner');
@@ -2509,7 +2634,10 @@ function renderStrip(){
   let html='';
   for(let n=1;n<=N;n++){
     const rl=ruleOf(n);
-    html+='<div class="sthumb'+(n===curPage?' cur':'')+'" data-n="'+n+'" draggable="true" title="Page '+n+' — click to edit, drag to move">'+
+    const cp=chapterPos(n);
+    html+='<div class="sthumb'+(n===curPage?' cur':'')+(cp?' chIn':'')+'" data-n="'+n+'" draggable="true" title="Page '+n+
+      (cp?' — '+esc(cp.ch.name||'chapter')+' '+cp.i+'/'+cp.n+', moves with its chapter':' — click to edit, drag to move')+'">'+
+      (cp&&cp.i===1?'<span class="schap" data-chap="'+n+'" title="Chapter settings">'+esc(cp.ch.name||'chapter')+'</span>':'')+
       (rl?'<span class="srule" data-rule="'+n+'" title="This card follows the group ‘'+esc(rl.name||'')+'’ — click for its settings">↻ '+esc(rl.name||'group')+'</span>':'')+
       '<div class="sprev" style="width:'+TW+'px;height:'+TH+'px;">'+
         '<div class="sscale" style="width:'+natW+'px;height:'+natH+'px;transform:scale('+k+');">'+pageHtml(n)+'</div>'+
@@ -2518,9 +2646,10 @@ function renderStrip(){
         '<button data-ins="'+n+'" title="Insert an empty card after this one">＋</button>'+
         '<button data-cpy="'+n+'" title="Duplicate this card">⧉</button>'+
         '<button data-savecard="'+n+'" title="Save this card to reuse in other prints">⬒</button>'+
+        (chapterOf(n)?'':'<button data-chnew="'+n+'" title="Start a chapter with this card">⊞</button>')+
         (N>1?'<button class="danger" data-del="'+n+'" title="Delete this card">✕</button>':'')+
       '</div></div>'+
-      '<div class="snum">'+n+'</div></div>';
+      '<div class="snum">'+(cp?esc(cp.ch.name?cp.ch.name.slice(0,1).toUpperCase():'C')+' '+cp.i+'/'+cp.n:n)+'</div></div>';
   }
   html+='<div id="stripEnd" title="Drop a saved card here to add it as a new page at the end"'+
         ' style="width:'+TW+'px;height:'+TH+'px;">+</div>';
@@ -2577,6 +2706,8 @@ function renderStrip(){
   host.querySelectorAll('[data-savecard]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); saveCardAsBlock(+b.dataset.savecard); });
   host.querySelectorAll('[data-rule]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
     setPage(+b.dataset.rule); showKnobs(); });
+  host.querySelectorAll('[data-chnew]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); createChapter(+b.dataset.chnew); });
+  host.querySelectorAll('[data-chap]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); setPage(+b.dataset.chap); showKnobs(); });
   host.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
     const n=+b.dataset.del; if(n!==curPage) setPage(n); deletePage(); });
   const cur=host.querySelector('.sthumb.cur');
