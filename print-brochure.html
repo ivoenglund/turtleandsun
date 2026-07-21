@@ -261,7 +261,8 @@
   #txtEdHead button:hover{ background:#f4efe4; }
   #txtEdHead button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
   #txtEdHead button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #teBody{ flex:1; overflow:auto; min-height:180px; font-size:16px; }
+  /* quill.core.css sets Helvetica on .ql-container; the object's own font wins. */
+  #teBody{ flex:1; overflow:auto; min-height:180px; font-size:16px; font-family:inherit; }
   #teBody .ql-editor{ padding:22px 26px; line-height:1.45; min-height:180px; }
   #teBody .ql-editor:focus{ outline:none; }
   #teBody h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
@@ -1785,7 +1786,11 @@ function teFormat(name,value){
   const r=TE_Q.getSelection() || TE_RANGE;      // survives a trip to a toolbar control
   if(r && r.length>0) TE_Q.formatText(r.index, r.length, name, value, 'user');
   else if(r)          TE_Q.format(name, value, 'user');       // caret: affects typing
-  else                TE_Q.formatText(0, TE_Q.getLength(), name, value, 'user');  // nothing selected: all of it
+  else{
+    // Nothing selected: all of it. Clear per-run values first, or the old ones win.
+    TE_Q.formatText(0, TE_Q.getLength(), name, false, 'silent');
+    TE_Q.formatText(0, TE_Q.getLength(), name, value, 'user');
+  }
   TE_Q.focus();
   teSyncToolbar();
 }
@@ -1821,6 +1826,10 @@ document.getElementById('teU').onclick=()=>teFormat('underline',!teCurFmt().unde
 document.getElementById('teColor').oninput=e=>teFormat('color',e.target.value);
 document.getElementById('teFont').onchange=e=>{
   const v=e.target.value;
+  // Must FORMAT the text, not just style the container. Any inline font-family
+  // left on the words — and there usually is one — overrides a container style,
+  // which is why changing the font appeared to do nothing at all.
+  teFormat('font', v ? fontCss(v) : false);
   if(TE_Q) TE_Q.root.style.fontFamily = v?fontCss(v):'';
 };
 document.getElementById('teSize').onchange=e=>{
