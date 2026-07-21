@@ -289,11 +289,8 @@
       <button id="redoBtn" title="Redo (Ctrl+Y)" style="flex:0 0 auto;">↷</button>
     </div>
     <div class="ph">Paper</div>
-    <select id="paper"></select>
-    <div class="prow" id="paperModeRow">
-      <button id="pmScale" class="on" title="The design scales with the paper — same layout, bigger or smaller">Scale design</button>
-      <button id="pmKeep" title="Everything keeps its physical size — a bigger sheet just gives more room">Keep size</button>
-    </div>
+    <div class="hint" id="designPaper" style="margin:0 0 4px;">Designed for A4</div>
+    <select id="outPaper" title="Print this design on a different paper — the whole page scales, nothing is re-laid out"></select>
     <div class="ph">Zoom · <span id="zoomPct">100%</span></div>
     <div id="zoomWrap" class="prow">
       <button id="zoomOut" title="Zoom out ( - )">−</button>
@@ -405,30 +402,6 @@ function syncPages(){
 }
 // Documents made before cards existed are keyed by page number only: mint one
 // card per page, in page order, and hand every object the matching id.
-// One-time: text styled before sizes were relative carries font-size in PX,
-// which cannot scale with the paper. Convert to em against the object's own size,
-// using the paper the document is stored with — so run this before any paper change.
-function migrateTextSizes(){
-  COMP.params=COMP.params||{};
-  if(COMP.params.emsizes) return;
-  const conv=(html, ov)=>{
-    if(!html || html.indexOf('px')<0) return html;
-    const base=fsOf(ov)||13.5;
-    const t=document.createElement('template');
-    t.innerHTML=html;
-    let touched=false;
-    t.content.querySelectorAll('[style]').forEach(el=>{
-      const fs=el.style.fontSize;
-      const m=fs && /^([\d.]+)px$/.exec(fs.trim());
-      if(m){ el.style.fontSize=(parseFloat(m[1])/base).toFixed(4)+'em'; touched=true; }
-    });
-    return touched ? t.innerHTML : html;
-  };
-  (COMP.items||[]).forEach(it=>{ const ov=it.overrides||{};
-    if(ov.text) ov.text=conv(ov.text, ov); });
-  texts().forEach(t=>{ if(t.text) t.text=conv(t.text, t); });
-  COMP.params.emsizes=1;
-}
 function migrateCards(){
   if(!cards().length){
     let maxP=Math.max(1,+((COMP.params||{}).pages)||1);
@@ -479,7 +452,6 @@ function normalizeItems(){
   });
   COMP.items=out;
   migrateCards();
-  migrateTextSizes();
 }
 
 async function load(){
@@ -491,9 +463,8 @@ async function load(){
   { const dn=document.getElementById('docName'); if(dn) dn.value=COMP.name||''; }
   normalizeItems();
   buildPaperOptions();
-  const paper=(COMP.params&&COMP.params.paper)||'a4';
-  document.getElementById('paper').value=paperOf(paper).k;
-  applyPaper(paper);
+  document.getElementById('outPaper').value=paperOf(outPaperKey()).k;
+  applyPaper();
   render();
   syncZoom();
   showKnobs();
@@ -510,27 +481,38 @@ function paperLabel(P){
     : P.n+' — '+num1(P.w/10)+' × '+num1(P.h/10)+' cm';
 }
 function buildPaperOptions(){
-  const sel=document.getElementById('paper');
+  const sel=document.getElementById('outPaper');
   sel.innerHTML=PAPERS.slice().sort((a,b)=>paperArea(b)-paperArea(a))
     .map(P=>'<option value="'+P.k+'">'+paperLabel(P)+'</option>').join('');
 }
-function applyPaper(k){
-  CardRender.setPaper(k);
-  const P=paperOf(k);
-  document.body.className = P.canvas ? 'fmt-poster' : 'fmt-doc';
-  // Paper-proportional corner radius for pictures etc. (A4 ⇒ ~4.5px).
-  document.body.style.setProperty('--pr',(4.5*P.w*MMPX/794).toFixed(1)+'px');
+// The page is ALWAYS built at its design size. The output paper is one zoom on
+// top — layout-affecting, so the sheet is the right physical size, and inherited
+// by everything inside including absolute px.
+function applyPaper(){
+  const D=paperOf(designPaperKey()), O=paperOf(outPaperKey());
+  CardRender.setPaper(D.k);
+  document.body.className = D.canvas ? 'fmt-poster' : 'fmt-doc';
+  document.body.style.setProperty('--pr',(4.5*D.w*MMPX/794).toFixed(1)+'px');
   let st=document.getElementById('pageSize');
   if(!st){ st=document.createElement('style'); st.id='pageSize'; document.head.appendChild(st); }
-  let css='@page{ size:'+P.w+'mm '+P.h+'mm; margin:0; }';
-  if(P.canvas){
-    css+=' .page{ width:'+P.w+'mm; height:'+P.h+'mm; min-height:0; padding:0; }';
+  // Fit BOTH ways. Scaling by width alone overflows whenever the output sheet is
+  // a different shape — A4 onto US Letter is 2.8% wider but 6% shorter, so the
+  // bottom of the design would run off the page.
+  const ratio=Math.min(O.w/D.w, O.h/D.h);
+  let css='@page{ size:'+O.w+'mm '+O.h+'mm; margin:0; }';
+  if(D.canvas){
+    css+=' .page{ width:'+D.w+'mm; height:'+D.h+'mm; min-height:0; padding:0;';
   }else{
-    const pad=Math.max(8, Math.round(P.w*0.06));
-    css+=' .page{ width:'+P.w+'mm; min-height:'+P.h+'mm; height:auto; padding:'+pad+'mm; }';
+    const pad=Math.max(8, Math.round(D.w*0.06));
+    css+=' .page{ width:'+D.w+'mm; min-height:'+D.h+'mm; height:auto; padding:'+pad+'mm;';
   }
+  css+=' zoom:'+ratio.toFixed(6)+'; }';
   st.textContent=css;
+  const lbl=document.getElementById('designPaper');
+  if(lbl) lbl.textContent='Designed for '+paperLabel(D)+(ratio!==1?' — printing at '+(ratio*100).toFixed(0)+'%':'');
 }
+function designPaperKey(){ return (COMP&&COMP.params&&COMP.params.paper)||'a4'; }
+function outPaperKey(){ return (COMP&&COMP.params&&(COMP.params.outPaper||COMP.params.paper))||'a4'; }
 
 // ── Zoom + free pan ─────────────────────────────────────────────────
 const ZMIN=5;
@@ -552,8 +534,15 @@ let panX=20, panY=16;
 function setView(){
   const out=document.getElementById('out');
   out.style.transform='translate('+panX+'px,'+panY+'px) scale('+curScale+')';
-  out.style.setProperty('--ui', String(1/curScale));   // constant-screen-size handles/outlines
+  out.style.setProperty('--ui', String(1/screenScale()));   // constant-screen-size handles/outlines
 }
+// True screen scale = the editor's zoom x the output-paper zoom.
+function paperZoom(){
+  try{ const D=paperOf(designPaperKey()), O=paperOf(outPaperKey());
+       return Math.min(O.w/D.w, O.h/D.h); }
+  catch(e){ return 1; }
+}
+function screenScale(){ return curScale*paperZoom(); }
 function applyZoom(pct){ pct=clampPct(pct); curScale=pct/100; setView(); syncZoomLabel(pct); }
 function syncZoomLabel(pct){
   const zi=document.getElementById('zoom'); if(zi){ zi.max=zmax(); zi.value=Math.round(pct); }
@@ -1825,7 +1814,8 @@ function cropDrag(e,wrap,key){
   let moved=false;
   const mv=ev=>{
     moved=true;
-    const dxE=(ev.clientX-sx)/curScale/fs0, dyE=(ev.clientY-sy)/curScale/fs0;
+    const k=screenScale();
+    const dxE=(ev.clientX-sx)/k/fs0, dyE=(ev.clientY-sy)/k/fs0;
     const ix=Math.max(Wem-pw, Math.min(0, ox+dxE));
     const iy=Math.max(ph-imgH, Math.min(0, oy+dyE));
     o.ixr=r4(ix/Wem); o.iyr=r4(iy/Wem);
@@ -1856,7 +1846,7 @@ function cropEdgeDrag(e,wrap,key,edge){
   const mv=ev=>{
     moved=true;
     const dxPct=(ev.clientX-sx)/pr.width*100;
-    const dyEm=(ev.clientY-sy)/curScale/fs0;
+    const dyEm=(ev.clientY-sy)/screenScale()/fs0;
     let x=st.x, y=st.y, w=st.w, ph=st.ph, ix=st.ix, iy=st.iy;
     if(edge==='r'){
       const maxW=(pw+st.ix)/emPerPctW;                // window can't outgrow the picture
@@ -1892,49 +1882,21 @@ function cropEdgeDrag(e,wrap,key,edge){
 // physical width, position and text size, and the larger sheet simply gives more
 // room around the design. The stored model stays percentage-based, so nothing
 // about the data contract changes.
-// Two honest behaviours, and both are wanted.
+// ── Paper ───────────────────────────────────────────────────────────
+// A print is DESIGNED on one paper and can be PRINTED on any other. Nothing
+// stored ever changes: the page is always laid out at its design size, and the
+// output paper is applied as a single CSS zoom over the whole page.
 //
-// SCALE (default): leave x/y/w alone. They are percentages of the page, and
-// fsOf() carries the paper scale, so everything grows or shrinks by exactly one
-// factor — the design is identical, just a different size. Nothing can drift.
-// This is the same reason the card thumbnails are faithful.
-//
-// KEEP SIZE: rescale x/y/w by the paper ratio so every object keeps its physical
-// width, position and type size, and the larger sheet simply gives more room.
-let paperMode = 'scale';
-try{ paperMode = localStorage.getItem('ts_paper_mode') || 'scale'; }catch(e){}
-function setPaperMode(m){
-  paperMode = m;
-  try{ localStorage.setItem('ts_paper_mode', m); }catch(e){}
-  const a=document.getElementById('pmScale'), b=document.getElementById('pmKeep');
-  if(a) a.classList.toggle('on', m==='scale');
-  if(b) b.classList.toggle('on', m==='keep');
-}
-document.getElementById('pmScale').onclick=()=>setPaperMode('scale');
-document.getElementById('pmKeep').onclick=()=>setPaperMode('keep');
-setPaperMode(paperMode);
-
-document.getElementById('paper').onchange=e=>{
+// That is the point. Rescaling stored coordinates drags in every unit in the
+// document — px inside text, borders, crop ratios — and any one of them that is
+// not relative breaks. Scaling the rendered page scales ALL of it together,
+// including the px, because none of it knows it is being scaled.
+document.getElementById('outPaper').onchange=e=>{
   COMP.params=COMP.params||{};
-  const from=paperOf(COMP.params.paper||'a4'), to=paperOf(e.target.value);
-  if(paperMode==='keep'){
-    const rw=from.w/to.w, rh=from.h/to.h;
-    if(Math.abs(rw-1)>0.0001||Math.abs(rh-1)>0.0001){
-      pushUndo();
-      const fix=o=>{ if(!o) return;
-        if(o.x!=null) o.x=Math.round((+o.x)*rw*100)/100;
-        if(o.y!=null) o.y=Math.round((+o.y)*rh*100)/100;
-        if(o.w!=null) o.w=Math.round((+o.w)*rw*1000)/1000;
-        if(o.h!=null) o.h=Math.round((+o.h)*rh*1000)/1000;   // frames carry a height
-      };
-      (COMP.items||[]).forEach(it=>fix(it.overrides));
-      frames().forEach(fix); texts().forEach(fix);
-    }
-  }else{
-    pushUndo();     // nothing to move: the percentages already scale everything
-  }
-  COMP.params.paper=e.target.value;
-  applyPaper(e.target.value); render(); applyZoom(curScale*100); showKnobs(); markSel(); scheduleStrip();
+  COMP.params.outPaper=e.target.value;
+  scheduleSave();
+  applyPaper();
+  render(); applyZoom(curScale*100); showKnobs(); markSel(); scheduleStrip();
 };
 document.getElementById('zoom').oninput=e=>zoomToPct(+e.target.value);
 document.getElementById('zoomIn').onclick=()=>zoomStep(1.25);
