@@ -849,18 +849,6 @@ function wireDrag(){
       if(editing) commitEdit(false);        // click away = saved, never lost
       const key=keyOfEl(w);
       if(cropKey===key&&e.target.closest('img')) return cropDrag(e,w,key);
-      // Alt-click digs down through a stack: each Alt-click takes the next object
-      // beneath the pointer, so a small text on top of a big one is reachable.
-      if(e.altKey){
-        const stack=document.elementsFromPoint(e.clientX,e.clientY)
-          .filter(el=>el.matches&&el.matches('#out .abswrap,#out .frameobj,#out .txtfree'));
-        if(stack.length>1){
-          const cur=stack.findIndex(el=>{ const k=keyOfEl(el); return k&&SEL.includes(k); });
-          const nx=stack[(cur+1)%stack.length];
-          const nk=nx&&keyOfEl(nx);
-          if(nk){ setSel(nk,false); e.stopPropagation(); e.preventDefault(); return; }
-        }
-      }
       w._wasSel=SEL.includes(key);
       if(e.shiftKey){ setSel(key,true); if(!SEL.includes(key)) return; }
       else if(!w._wasSel) setSel(key,false);
@@ -879,6 +867,27 @@ document.getElementById('out').addEventListener('dblclick',e=>{
   }else if(w.dataset.text!=null) key='t'+w.dataset.text;
   if(key){ e.preventDefault(); setSel(key,false); teOpen(key); }
 });
+
+// Alt-click digs down through whatever is stacked under the pointer. It runs on
+// the CAPTURE phase so it fires no matter which element the browser picked — a
+// photo with transparent corners still swallows clicks across its whole box, and
+// that is what put the logo out of reach.
+document.getElementById('out').addEventListener('pointerdown',e=>{
+  if(!e.altKey||e.button!==0) return;
+  const seen=new Set(), stack=[];
+  document.elementsFromPoint(e.clientX,e.clientY).forEach(el=>{
+    const w=el.closest&&el.closest('#out .abswrap,#out .frameobj');
+    if(w&&!seen.has(w)){ seen.add(w); stack.push(w); }
+  });
+  if(!stack.length) return;
+  e.stopPropagation(); e.preventDefault();
+  // Where are we now? Move one deeper; with nothing selected, take the second,
+  // because the top one is what an ordinary click already gives you.
+  const cur=stack.findIndex(el=>{ const k=keyOfEl(el); return k&&SEL.includes(k); });
+  const next=stack[(cur<0 ? Math.min(1,stack.length-1) : (cur+1)%stack.length)];
+  const nk=next&&keyOfEl(next);
+  if(nk){ setSel(nk,false); groupBanner(stack.length+' objects here — Alt-click again for the next.'); }
+}, true);
 
 // Empty space: drag on the PAGE draws a selection rectangle (everything it
 // touches gets selected); drag on the grey outside pans the canvas.
@@ -1699,10 +1708,25 @@ function showKnobs(){
     }
     showKnobs(); markSel();
   };
+  // Strip per-word font-family so the object's choice actually takes effect.
+  // Without this the panel silently loses to whatever the text carries.
+  const dropInlineFont=html=>{
+    if(!html||html.indexOf('font-family')<0) return html;
+    const t=document.createElement('template'); t.innerHTML=html;
+    t.content.querySelectorAll('[style]').forEach(el=>{
+      el.style.fontFamily='';
+      if(!el.getAttribute('style')) el.removeAttribute('style');
+    });
+    return t.innerHTML;
+  };
   const ff=q('knFF');
   if(ff) ff.onchange=e=>{ pushUndo();
-    selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides; if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font; });
-    selTextIdxs().forEach(i=>{ const t=texts()[i]; if(e.target.value) t.ff=e.target.value; else delete t.ff; });
+    selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides;
+      if(e.target.value) o.ff=e.target.value; else delete o.ff; delete o.font;
+      if(o.text) o.text=dropInlineFont(o.text); });
+    selTextIdxs().forEach(i=>{ const t=texts()[i];
+      if(e.target.value) t.ff=e.target.value; else delete t.ff;
+      if(t.text) t.text=dropInlineFont(t.text); });
     render(); showKnobs(); markSel(); };
   const setObjColor=c=>{ pushUndo();
     SEL.forEach(key=>{ if(key[0]==='f') return; const o=ovOf(key); if(c) o.tc=c; else delete o.tc; });
