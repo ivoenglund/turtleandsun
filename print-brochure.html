@@ -1583,9 +1583,6 @@ function showKnobs(){
     '<div class="krow"><button id="knFront" style="flex:1;" title="Bring in front">⬆ Front</button>'+
       '<button id="knBack" style="flex:1;" title="Send behind">⬇ Back</button>'+
       '<button id="knDup" title="Duplicate (Ctrl+D)">⧉</button></div>'+
-    (anyText?'<div class="krow"><button id="knFit" style="flex:1;" '+
-      'title="Shrink the box to the words, keeping the letters exactly the size they are">'+
-      '⇱ Fit box to text</button></div>':'')+
     (n>=2?'<div class="krow"><button id="alL" title="Align left edges">⇤</button>'+
       '<button id="alC" title="Align centres (horizontal)">↔</button>'+
       '<button id="alR" title="Align right edges">⇥</button>'+
@@ -1751,25 +1748,6 @@ function showKnobs(){
       if(!el.getAttribute('style')) el.removeAttribute('style');
     });
     return t.innerHTML;
-  };
-  const fit=q('knFit');
-  if(fit) fit.onclick=()=>{
-    const page=document.querySelector('#out .page'); if(!page) return;
-    pushUndo();
-    SEL.forEach(key=>{
-      if(!isTextKey(key)) return;
-      const el=elOf(key), o=ovOf(key); if(!el||!o) return;
-      const ink=inkOf(el,page); if(!ink||ink.w<=0.2) return;
-      // Narrowing the box would shrink the type, because font-size follows width.
-      // Compensate with the text-zoom so the letters stay exactly as they are.
-      const f0=fsOf(o);
-      o.x=Math.round(((+o.x||0)+ink.dx)*10)/10;
-      o.w=Math.round(Math.max(2,ink.w+0.4)*10)/10;
-      const f1=13.5*((+o.w||28)/28)*pScale();
-      o.ts=Math.round((f0/f1)*1000)/1000;
-      if(Math.abs(o.ts-1)<0.002) delete o.ts;
-    });
-    render(); showKnobs(); markSel();
   };
   const fw=q('knFW');
   if(fw) fw.onchange=e=>{ pushUndo();
