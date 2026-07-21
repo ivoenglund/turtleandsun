@@ -474,6 +474,13 @@ async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS idx_print_blocks_user ON print_blocks(user_id, created_at DESC);
 
+    -- 2026-07-20: a saved card is a CARD (1 page) or a CHAPTER (2..N pages).
+    -- paper   = the paper it was built on, so mismatches can be greyed out.
+    -- version = bumped every time the card is saved over. A print records which
+    --           version it took, and is offered the newer one when opened.
+    ALTER TABLE print_blocks ADD COLUMN IF NOT EXISTS paper   TEXT;
+    ALTER TABLE print_blocks ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle

@@ -2935,7 +2935,7 @@ async function resolveBlockItems(items, userId) {
 app.get('/api/print-blocks', requireAuth, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT id, name, kind, pages, params, items, declares, created_at,
+      `SELECT id, name, kind, pages, paper, version, params, items, declares, created_at, updated_at,
               jsonb_array_length(COALESCE(items, '[]'::jsonb)) AS item_count
          FROM print_blocks WHERE user_id = $1 ORDER BY name`, [req.user.id]);
     const blocks = [];
@@ -2946,6 +2946,7 @@ app.get('/api/print-blocks', requireAuth, async (req, res) => {
       const { items: cover } = await resolveBlockItems(first, req.user.id);
       const texts = (((b.params || {}).texts) || []).filter(t => (+t.page || 1) === 1);
       blocks.push({ id: b.id, name: b.name, kind: b.kind, pages: b.pages,
+                    paper: b.paper, version: b.version, updated_at: b.updated_at,
                     declares: b.declares, created_at: b.created_at,
                     item_count: b.item_count, cover, texts });
     }
@@ -2953,11 +2954,23 @@ app.get('/api/print-blocks', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Just the versions — what a print needs to know whether it is behind.
+app.get('/api/print-blocks/versions', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, name, pages, paper, version, updated_at FROM print_blocks WHERE user_id = $1`,
+      [req.user.id]);
+    const by = {};
+    r.rows.forEach(x => { by[x.id] = x; });
+    res.json({ v: 1, blocks: by });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // One block, with every ref resolved live.
 app.get('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT id, name, kind, pages, params, items, declares FROM print_blocks WHERE id = $1 AND user_id = $2`,
+      `SELECT id, name, kind, pages, paper, version, params, items, declares FROM print_blocks WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.id]);
     if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
     const b = r.rows[0];
@@ -2968,17 +2981,18 @@ app.get('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
 
 // Save a page (or pages) as a block. Page numbers arrive already rebased to 1.
 app.post('/api/print-blocks', requireAuth, async (req, res) => {
-  const { name, kind, pages, params, items, declares } = req.body || {};
+  const { name, kind, pages, params, items, declares, paper } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
   const clean = (Array.isArray(items) ? items : [])
     .filter(it => it && ['post', 'contact', 'media'].includes(it.ref_type) && it.ref_id)
     .map(it => ({ ref_type: it.ref_type, ref_id: +it.ref_id, overrides: it.overrides || {} }));
   try {
     const r = await pool.query(
-      `INSERT INTO print_blocks (user_id, name, kind, pages, params, items, declares)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, name, kind, pages`,
+      `INSERT INTO print_blocks (user_id, name, kind, pages, params, items, declares, paper, version)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1) RETURNING id, name, kind, pages, paper, version`,
       [req.user.id, String(name).trim(), kind || 'page', Math.max(1, +pages || 1),
-       JSON.stringify(params || {}), JSON.stringify(clean), JSON.stringify(declares || {})]);
+       JSON.stringify(params || {}), JSON.stringify(clean), JSON.stringify(declares || {}),
+       paper || null]);
     res.json({ v: 1, ok: true, block: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2994,10 +3008,13 @@ app.put('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
       ? (items.filter(it => it && ['post', 'contact', 'media'].includes(it.ref_type) && it.ref_id)
               .map(it => ({ ref_type: it.ref_type, ref_id: +it.ref_id, overrides: it.overrides || {} })))
       : null;
+    // Any change to the content is a new version; a rename alone is not.
+    const bump = (params || clean || pages) ? 1 : 0;
     await pool.query(
       `UPDATE print_blocks SET name = COALESCE($1, name), pages = COALESCE($2, pages),
               params = COALESCE($3, params), items = COALESCE($4, items),
-              declares = COALESCE($5, declares), updated_at = NOW()
+              declares = COALESCE($5, declares), updated_at = NOW(),
+              version = version + ${bump}
         WHERE id = $6`,
       [name ? String(name).trim() : null, pages ? Math.max(1, +pages) : null,
        params ? JSON.stringify(params) : null, clean ? JSON.stringify(clean) : null,

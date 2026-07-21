@@ -232,7 +232,31 @@
   #resPrevBox{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:22px;
                max-width:620px; max-height:88vh; overflow:auto; font-size:20px;
                box-shadow:0 8px 30px rgba(0,0,0,.3); }
-  @media print{ #res,#resTab,#resPrev{ display:none!important; } }
+  /* Out-of-date cards, offered when a print opens. */
+  #updOverlay{ display:none; position:fixed; inset:0; z-index:75; background:rgba(35,41,29,.45);
+               align-items:center; justify-content:center; padding:40px; }
+  #updOverlay.open{ display:flex; }
+  #updBox{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:18px 20px;
+           max-width:620px; width:100%; max-height:86vh; overflow:auto; font-size:13px;
+           box-shadow:0 8px 30px rgba(0,0,0,.3); }
+  #updBox h3{ margin:0 0 4px; font-size:15px; color:var(--green); }
+  #updBox .sub{ color:var(--muted); font-size:12.5px; margin-bottom:12px; }
+  #updBody .uhead,#updBody .urow{ display:grid; grid-template-columns:1fr auto auto 28px;
+        gap:10px; align-items:start; padding:8px 2px; border-bottom:1px solid #efe9d8; }
+  #updBody .uhead{ font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+        color:var(--green); border-bottom-width:2px; }
+  #updBody .urow.edited{ background:#fdf6ee; }
+  #updBody .uwarn{ font-size:11px; color:#8c2f1b; }
+  #updBox .foot{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  #updBox button{ font-family:inherit; font-weight:700; font-size:13px; padding:6px 12px;
+        border:1px solid #d9d4c4; border-radius:9px; background:#fff; cursor:pointer; }
+  #updBox button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  /* Saved-card badges in the Content panel. */
+  .rcard .rmeta{ font-size:10px; color:var(--muted); margin-top:2px; white-space:nowrap;
+                 overflow:hidden; text-overflow:ellipsis; }
+  .rcard.paperOff{ opacity:.45; }
+  .rcard.paperOff:hover{ opacity:1; }
+  @media print{ #res,#resTab,#resPrev,#updOverlay{ display:none!important; } }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
   #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
@@ -302,6 +326,12 @@
   </div>
 </aside>
 <div id="resPrev"><div id="resPrevBox"></div></div>
+<div id="updOverlay"><div id="updBox">
+  <h3>Some cards have newer versions</h3>
+  <div class="sub">Nothing changes unless you tick it. Updating replaces those pages with the latest.</div>
+  <div id="updBody"></div>
+  <div class="foot"><button id="updSkip">Not now</button><button id="updGo" class="primary">Update ticked</button></div>
+</div></div>
 <button id="stripTab" title="Show or hide the row of cards">▤ Cards</button>
 <div id="strip"><div id="stripInner"></div></div>
 
@@ -557,6 +587,7 @@ async function load(){
   syncZoom();
   showKnobs();
   renderStrip();
+  setTimeout(()=>{ try{ checkForUpdates(); }catch(e){} }, 400);
 }
 
 // ── Paper sizes ─────────────────────────────────────────────────────
@@ -2385,18 +2416,122 @@ document.addEventListener('dragover',e=>{
 // A saved card is a whole PAGE, so it does not land on top of the page you are
 // working on. By default it becomes a NEW card straight after the current one.
 // Drop it on a page in the filmstrip and it goes into that page instead.
+// ── Is anything in this print out of date? ──────────────────────────
+// Nothing changes without you ticking it, so an old print stays exactly as it
+// was printed. The page count is shown because updating changes the length.
+function plcHasLocalEdits(pid){
+  return (COMP.items||[]).some(it=>it.overrides&&it.overrides.plc===pid&&
+    (+it.overrides.pin||it.overrides.text!=null));
+}
+async function checkForUpdates(){
+  const plcs=placements();
+  const ids=Object.keys(plcs);
+  if(!ids.length) return;
+  let by={};
+  try{
+    const r=await fetch('/api/print-blocks/versions');
+    if(!r.ok) return;
+    by=((await r.json()).blocks)||{};
+  }catch(e){ return; }
+  const behind=ids.map(pid=>{
+    const p=plcs[pid], live=by[p.block_id];
+    if(!live) return null;
+    if((+live.version||1)<=(+p.version||1)) return null;
+    return { pid, p, live, edited:plcHasLocalEdits(pid) };
+  }).filter(Boolean);
+  if(!behind.length) return;
+  showUpdateTable(behind);
+}
+function showUpdateTable(rows){
+  const bg=document.getElementById('updOverlay');
+  const body=document.getElementById('updBody');
+  body.innerHTML='<div class="uhead"><span>Card</span><span>In this print</span><span>Latest</span><span></span></div>'+
+    rows.map(r=>{
+      const was=(r.p.cards||[]).length, now=Math.max(1,+r.live.pages||1);
+      return '<div class="urow'+(r.edited?' edited':'')+'">'+
+        '<span><b>'+esc(r.live.name||r.p.name||'card')+'</b>'+
+          (r.edited?'<br><span class="uwarn">you changed this copy — updating replaces it</span>':'')+'</span>'+
+        '<span>v'+(+r.p.version||1)+' · '+was+' page'+(was===1?'':'s')+'</span>'+
+        '<span><b>v'+(+r.live.version||1)+' · '+now+' page'+(now===1?'':'s')+'</b>'+
+          (now!==was?'<br><span class="uwarn">the print '+(now>was?'grows by '+(now-was):'loses '+(was-now))+'</span>':'')+'</span>'+
+        '<span><input type="checkbox" class="uck" data-pid="'+r.pid+'"'+(r.edited?'':' checked')+'></span>'+
+      '</div>';
+    }).join('');
+  bg.classList.add('open');
+  document.getElementById('updGo').onclick=async()=>{
+    const picked=[...body.querySelectorAll('.uck')].filter(c=>c.checked).map(c=>c.dataset.pid);
+    bg.classList.remove('open');
+    for(const pid of picked) await updatePlacement(pid);
+    if(picked.length) groupBanner('Updated '+picked.length+' card'+(picked.length===1?'':'s')+'.');
+  };
+  document.getElementById('updSkip').onclick=()=>bg.classList.remove('open');
+}
+// Replace a placement's run in place: out with its old pages, in with the new
+// ones at the same position. The chapter, if any, is rebuilt around them.
+async function updatePlacement(pid){
+  const p=placements()[pid]; if(!p) return;
+  let b;
+  try{
+    const r=await fetch('/api/print-blocks/'+p.block_id);
+    if(!r.ok) return;
+    b=await r.json();
+  }catch(e){ return; }
+  pushUndo();
+  const old=(p.cards||[]).slice();
+  const arr=cards();
+  let at=arr.findIndex(c=>c.id===old[0]);
+  if(at<0) at=arr.length;
+  const ch=chapterOfCard(old[0]);
+  // out with the old
+  COMP.items=(COMP.items||[]).filter(it=>!(it.overrides&&old.indexOf(it.overrides.card)>=0));
+  COMP.params.frames=frames().filter(f=>old.indexOf(f.card)<0);
+  COMP.params.texts =texts().filter(t=>old.indexOf(t.card)<0);
+  COMP.params.cards=arr.filter(c=>old.indexOf(c.id)<0);
+  // in with the new, at the same place
+  const pages=Math.max(1,+b.pages||1), made=[];
+  for(let i=0;i<pages;i++){ const nid=newCardId(); cards().splice(at+i,0,{id:nid}); made.push(nid); }
+  if(ch){ const l=ch.ch.cards||[];
+    ch.ch.cards=l.filter(id=>old.indexOf(id)<0);
+    ch.ch.cards.splice(0,0,...made);
+  }else if(pages>1){
+    chapters()[newChId()]={ name:b.name||'Chapter', cards:made.slice() };
+  }
+  p.version=+b.version||1; p.cards=made.slice(); p.name=b.name||p.name;
+  syncPages();
+  const keep=curPage;
+  curPage=at+1;
+  stampBlock(b, made, pid);
+  enforceChapters();
+  curPage=Math.max(1,Math.min(pageCount(),keep));
+  renderCurrent(); showKnobs(); scheduleStrip();
+}
+
+// params.placements[pid] = { block_id, version, name, cards:[…] }
+// A print remembers which of its pages came from which saved card, and at which
+// version — that is what lets it be offered the newer one later.
+function placements(){ COMP.params=COMP.params||{}; return COMP.params.placements=COMP.params.placements||{}; }
+function newPlcId(){ return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
 async function dropSavedCard(id, onto){
   try{
     const r=await fetch('/api/print-blocks/'+id);
     if(!r.ok){ alert('Could not load that card.'); return; }
     const b=await r.json();
-    if(onto==='new'){
-      pushUndo();
-      cards().splice(curPage,0,{id:newCardId()});
-      syncPages();
-      curPage=curPage+1; SEL=[];
-    }
-    stampBlock(b);
+    const pages=Math.max(1,+b.pages||1);
+    pushUndo();
+    // Always its own pages: a saved card is a whole page, so it never lands on top
+    // of the one you are working on.
+    const startAt = (onto==='new') ? curPage : curPage-1;
+    const made=[];
+    for(let i=0;i<pages;i++){ const nid=newCardId(); cards().splice(startAt+i,0,{id:nid}); made.push(nid); }
+    syncPages();
+    curPage=startAt+1; SEL=[];
+    // More than one page arrives as a chapter, so it holds together from the start.
+    if(pages>1) chapters()[newChId()]={ name:b.name||'Chapter', cards:made.slice() };
+    const pid=newPlcId();
+    placements()[pid]={ block_id:+id, version:+b.version||1, name:b.name||'', cards:made.slice() };
+    stampBlock(b, made, pid);
+    enforceChapters();
   }catch(e){ alert('Could not load that card.'); }
 }
 document.addEventListener('drop',async e=>{
@@ -2511,60 +2646,66 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 // so the block is position-independent — it can land on any page later.
 // Save one card as a reusable card. Called from that card in the filmstrip, so
 // there is never any doubt which page you meant.
+// ⬒ saves this card — or, if it belongs to a chapter, the WHOLE chapter, because
+// a chapter is the unit you reuse. Page numbers are rebased to 1..N.
 async function saveCardAsBlock(n){
   if(!COMP) return;
   if(editing) commitEdit(true);
-  const id=cardIdAt(n);
-  const onPage=COMP.items.filter(it=>it.overrides&&it.overrides.card===id);
-  const fr=frames().filter(f=>f.card===id);
-  const tx=texts().filter(t=>t.card===id);
-  if(!onPage.length&&!fr.length&&!tx.length){ alert('That card is empty — nothing to save.'); return; }
-  const name=prompt('Name this card (e.g. "Our team", "Standard letter"):',
-    COMP.name?(COMP.name+' — page '+n):'');
+  const cp=chapterPos(n);
+  const ids = cp ? (cp.ch.cards||[]).slice() : [cardIdAt(n)];
+  const pageOf = id => ids.indexOf(id)+1;
+  const onPage=(COMP.items||[]).filter(it=>it.overrides&&ids.indexOf(it.overrides.card)>=0);
+  const fr=frames().filter(f=>ids.indexOf(f.card)>=0);
+  const tx=texts().filter(t=>ids.indexOf(t.card)>=0);
+  if(!onPage.length&&!fr.length&&!tx.length){ alert('There is nothing on that to save.'); return; }
+  const suggested = cp ? (cp.ch.name||'Chapter') : (COMP.name?(COMP.name+' — page '+n):'');
+  const name=prompt(cp
+    ? 'Name this chapter ('+ids.length+' pages) so you can reuse it:'
+    : 'Name this card so you can reuse it:', suggested);
   if(!name||!name.trim()) return;
-  // A saved card is page-relative and carries no card identity: that belongs to
-  // the document it came from, not to the card.
-  const rebase=o=>{ const c=JSON.parse(JSON.stringify(o||{})); c.page=1;
-    delete c.card; delete c.blk; delete c.grp; delete c.gi; return c; };
+  // Saved content is page-relative and carries no document identity.
+  const rebase=o=>{ const c=JSON.parse(JSON.stringify(o||{}));
+    c.page=pageOf(c.card)||1;
+    delete c.card; delete c.blk; delete c.grp; delete c.gi; delete c.pin;
+    delete c.rule; delete c.ri; delete c.plc; return c; };
   try{
     const r=await fetch('/api/print-blocks',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ name:name.trim(), kind:'page', pages:1,
+      body:JSON.stringify({ name:name.trim(), kind:'page', pages:ids.length,
+        paper:(COMP.params&&COMP.params.paper)||'a4',
         params:{ frames:fr.map(rebase), texts:tx.map(rebase) },
         items:onPage.map(it=>({ref_type:it.ref_type,ref_id:it.ref_id,overrides:rebase(it.overrides)})),
         declares:{} })});
-    if(!r.ok){ alert('Could not save that card.'); return; }
+    if(!r.ok){ alert('Could not save that.'); return; }
     RES.cardsDirty=true;
     if(document.getElementById('res').classList.contains('open')&&RES.cards) fetchContent();
-    saveState('✓ Card saved', 2200);
-  }catch(e){ alert('Could not save that card.'); }
+    saveState(cp?'✓ Chapter saved':'✓ Card saved', 2200);
+  }catch(e){ alert('Could not save that.'); }
 }
 
 // Stamp a block onto the current page: its page 1 lands on curPage, page 2 on
 // curPage+1, and so on — adding pages to the document if it needs them.
-function stampBlock(b){
+// Lay a saved card's objects onto cards that ALREADY exist (dropSavedCard made
+// them). cardIds[i] is where page i+1 goes; plc tags each object with the
+// placement so an update knows exactly what to replace.
+function stampBlock(b, cardIds, plc){
   if(!COMP) return;
-  const off = curPage - 1;
-  const need = off + Math.max(1, +b.pages || 1);
-  pushUndo();
   COMP.params = COMP.params || {};
-  ensureCards(need);                 // grow the card list if the block is longer
-  const newSel=[];
-  // c.blk records WHICH BLOCK each object came from. Nothing reads it yet — it is
-  // the groundwork for swapping a customer on a finished document: marked objects
-  // can be re-pointed, hand-added ones have no marker and survive untouched.
-  const shift = o => { const c=JSON.parse(JSON.stringify(o||{}));
-    const p=(+c.page||1)+off; c.page=p; c.card=cardIdAt(p); c.blk=b.id; return c; };
+  const ids = cardIds || [];
+  const place = o => { const c=JSON.parse(JSON.stringify(o||{}));
+    const p=Math.max(1,+c.page||1);
+    const target = ids[p-1] || cardIdAt(curPage);
+    c.card=target; c.blk=b.id; if(plc) c.plc=plc;
+    delete c.page; return c; };
   (b.items||[]).forEach(it=>{
     COMP.items.push({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content,
-                      overrides:shift(it.overrides) });
-    newSel.push('i'+(COMP.items.length-1));
+                      overrides:place(it.overrides) });
   });
-  (((b.params||{}).frames)||[]).forEach(f=>{ frames().push(shift(f)); newSel.push('f'+(frames().length-1)); });
-  (((b.params||{}).texts) ||[]).forEach(t=>{ texts().push(shift(t));  newSel.push('t'+(texts().length-1)); });
+  (((b.params||{}).frames)||[]).forEach(f=>frames().push(place(f)));
+  (((b.params||{}).texts) ||[]).forEach(t=>texts().push(place(t)));
   syncPages();
-  SEL = newSel.filter(k=>{ const ov=ovOf(k); return ov && (+ov.page||1)===curPage; });
-  renderCurrent(); showKnobs(); markSel();
-  if(b.dropped) alert('Placed — but '+b.dropped+' card'+(b.dropped>1?'s are':' is')+
+  SEL=[];
+  renderCurrent(); showKnobs(); markSel(); scheduleStrip();
+  if(b.dropped) groupBanner(b.dropped+' card'+(b.dropped>1?'s are':' is')+
     ' no longer in your library, so '+(b.dropped>1?'they were':'it was')+' left out.');
 }
 
@@ -2884,16 +3025,21 @@ function renderContent(){
   const body=document.getElementById('resBody');
   const W=Math.round(RES.size*11);              // thumbnail column width follows the size
   const list=RES.cardList||[];
+  const curPaper=(COMP&&COMP.params&&COMP.params.paper)||'a4';
   const cardsHtml = RES.cards
     ? '<div class="sechd"><b>My cards</b><span class="n">'+list.length+'</span></div>'+
       (list.length
         ? '<div class="rgrid">'+list.map(b=>
-            '<div class="rcard" draggable="true" data-blk="'+b.id+'" style="width:'+W+'px;" '+
-            'title="'+esc(b.name)+' — drag it onto the page">'+
+            '<div class="rcard'+((b.paper&&b.paper!==curPaper)?' paperOff':'')+
+            '" draggable="true" data-blk="'+b.id+'" style="width:'+W+'px;" '+
+            'title="'+esc(b.name)+' · '+esc((b.paper||'a4').toUpperCase())+
+            ((b.paper&&b.paper!==curPaper)?' — built for a different paper':'')+' — drag it onto the page">'+
             '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">✕</button>'+
             cardThumbHtml(b,W-18)+
             '<div style="font-size:11px;font-weight:700;margin-top:5px;white-space:nowrap;'+
-            'overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+'</div></div>').join('')+'</div>'
+            'overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+'</div>'+
+            '<div class="rmeta">'+esc((b.paper||'a4').toUpperCase())+' · v'+(+b.version||1)+
+              ' · '+(+b.pages||1)+(+b.pages>1?' pages':' page')+'</div></div>').join('')+'</div>'
         : '<div class="empty">No saved cards yet. Hover a card in the filmstrip and press ⬒ to keep it.</div>')
     : '';
   if(!RES.sections.length&&!cardsHtml){
