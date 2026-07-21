@@ -2641,7 +2641,7 @@ function prCardHtml(p){
   return '<div class="prCard" data-id="'+p.id+'">'+
     prCoverHtml(p)+
     '<div class="prBody">'+
-      '<div class="tt">'+esc(p.name)+'</div>'+
+      '<div class="tt" data-rn="'+p.id+'" title="Double-click to rename" style="cursor:text;">'+esc(p.name)+'</div>'+
       '<div class="cu'+(cu?'':' none')+'" data-cust="'+p.id+'" title="Set the customer">'+
         (cu?esc(cu.company||cu.name):'+ customer')+'</div>'+
       '<div class="mt">'+p.items+' object'+(p.items===1?'':'s')+'</div>'+
@@ -2722,6 +2722,28 @@ function drawPrintLib(){
     renderMakLib();
   });
   host.querySelectorAll('[data-cust]').forEach(el=>el.onclick=()=>pickCustomer(+el.dataset.cust));
+  // Double-click a print's name to rename it — the same gesture as everywhere else.
+  host.querySelectorAll('[data-rn]').forEach(el=>{
+    el.ondblclick=e=>{
+      e.stopPropagation();
+      const id=el.dataset.rn, was=el.textContent;
+      const inp=document.createElement('input');
+      inp.type='text'; inp.value=was;
+      inp.style.cssText='width:100%;font-family:inherit;font-size:13px;font-weight:700;'+
+        'padding:2px 5px;border:1px solid #c9a24b;border-radius:6px;';
+      const done=async(save)=>{
+        const v=inp.value.trim();
+        el.textContent=(save&&v)?v:was;
+        if(save&&v&&v!==was){
+          try{ await api('/api/compositions/'+id,{method:'PUT',body:JSON.stringify({name:v})}); }catch(err){}
+          const pr=PRINTS.find(x=>+x.id===+id); if(pr) pr.name=v;
+        }
+      };
+      inp.onkeydown=ev=>{ if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ inp._x=1; inp.blur(); } };
+      inp.onblur=()=>done(!inp._x);
+      el.textContent=''; el.appendChild(inp); inp.focus(); inp.select();
+    };
+  });
 }
 
 // Assign a customer to a print — writes params.roles.customer, which is also what

@@ -103,6 +103,11 @@
                  border-radius:8px; background:#fff; cursor:pointer; color:var(--ink); line-height:1.2; }
   #panel button:hover{ background:#f4efe4; }
   #panel button:disabled{ opacity:.35; cursor:default; }
+  #docName{ width:100%; font-family:inherit; font-size:13.5px; font-weight:700; color:var(--ink);
+            padding:5px 8px; margin-bottom:6px; border:1px solid transparent; border-radius:8px;
+            background:#f7f4ea; }
+  #docName:hover{ border-color:#e2dccb; }
+  #docName:focus{ border-color:var(--gold); background:#fff; outline:none; }
   #saveState{ flex:1; font-size:11.5px; font-weight:700; color:var(--muted); text-align:right;
               padding-right:2px; white-space:nowrap; }
   #panel button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
@@ -299,6 +304,7 @@
 
 <aside id="panel">
   <div id="docCtl">
+    <input id="docName" type="text" placeholder="Name of this print" title="Rename this print">
     <div class="prow">
       <button onclick="window.print()" title="Print / save as PDF">🖨 PDF</button>
       <span id="saveState" title="Everything saves by itself">✓ Saved</span>
@@ -597,6 +603,7 @@ async function load(){
   if(!r.ok){ document.getElementById('out').innerHTML='<div class="err">Could not load the brochure.</div>'; return; }
   COMP=await r.json();
   document.title=COMP.name+' · Turtle & Sun';
+  { const dn=document.getElementById('docName'); if(dn) dn.value=COMP.name||''; }
   normalizeItems();
   buildPaperOptions();
   const paper=(COMP.params&&COMP.params.paper)||'a4';
@@ -3178,8 +3185,9 @@ function renderContent(){
             ((b.paper&&b.paper!==curPaper)?' — built for a different paper':'')+' — drag it onto the page">'+
             '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">✕</button>'+
             cardThumbHtml(b,W-18)+
-            '<div style="font-size:11px;font-weight:700;margin-top:5px;white-space:nowrap;'+
-            'overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+'</div>'+
+            '<div class="rname" data-rn="'+b.id+'" title="Double-click to rename" '+
+            'style="font-size:11px;font-weight:700;margin-top:5px;white-space:nowrap;'+
+            'overflow:hidden;text-overflow:ellipsis;cursor:text;">'+esc(b.name)+'</div>'+
             '<div class="rmeta">'+esc((b.paper||'a4').toUpperCase())+' · v'+(+b.version||1)+
               ' · '+(+b.pages||1)+(+b.pages>1?' pages':' page')+'</div></div>').join('')+'</div>'
         : '<div class="empty">No saved cards yet. Hover a card in the filmstrip and press ⬒ to keep it.</div>')
@@ -3228,6 +3236,31 @@ function renderContent(){
       e.dataTransfer.effectAllowed='copy';
     };
     el.onclick=e=>{ if(e.target.closest('[data-blkdel]')) return; };
+  });
+  // Double-click a card's name to rename it. Renaming never breaks a link — those
+  // are by id — but it does change which name a later save will match.
+  body.querySelectorAll('[data-rn]').forEach(el=>{
+    el.ondblclick=e=>{
+      e.stopPropagation();
+      const id=el.dataset.rn, was=el.textContent;
+      const inp=document.createElement('input');
+      inp.type='text'; inp.value=was;
+      inp.style.cssText='width:100%;font-family:inherit;font-size:11px;font-weight:700;'+
+        'padding:2px 4px;border:1px solid var(--gold);border-radius:5px;';
+      inp.onclick=ev=>ev.stopPropagation();
+      const done=async(save)=>{
+        const v=inp.value.trim();
+        el.textContent = (save&&v) ? v : was;
+        if(save&&v&&v!==was){
+          try{ await fetch('/api/print-blocks/'+id,{method:'PUT',
+            headers:{'Content-Type':'application/json'},body:JSON.stringify({name:v})}); }catch(err){}
+          const c=(RES.cardList||[]).find(x=>+x.id===+id); if(c) c.name=v;
+        }
+      };
+      inp.onkeydown=ev=>{ if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ inp._x=1; inp.blur(); } };
+      inp.onblur=()=>done(!inp._x);
+      el.textContent=''; el.appendChild(inp); inp.focus(); inp.select();
+    };
   });
   body.querySelectorAll('[data-blkdel]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
@@ -3348,6 +3381,18 @@ document.getElementById('resPrev').onclick=()=>document.getElementById('resPrev'
     addEventListener('pointermove',move); addEventListener('pointerup',up);
   };
 })();
+
+document.getElementById('docName').onchange=async e=>{
+  const v=e.target.value.trim();
+  if(!v||!COMP||v===COMP.name){ e.target.value=COMP?COMP.name||'':''; return; }
+  COMP.name=v;
+  document.title=v+' · Turtle & Sun';
+  try{
+    await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:v})});
+    saveState('✓ Renamed', 1800);
+  }catch(err){ saveState('Rename failed', 2500); }
+};
 
 document.getElementById('stripTab').onclick=toggleStrip;
 // A long row scrolls sideways: turn a normal vertical wheel into horizontal travel.
