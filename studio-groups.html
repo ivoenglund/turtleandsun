@@ -351,6 +351,37 @@
     <!-- MAKE — prints: a library, then a scrolling wall of your material -->
     <style>
       .makSec{margin:16px 0 6px;font-weight:800;font-size:13px;color:#1f4a45;display:flex;gap:10px;align-items:center;}
+      /* ── The print library ──
+         A cover is the real layout of card 1: photos where they actually sit,
+         text as bars. Recognisable at thumbnail size without rendering a page. */
+      .prGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px;}
+      .prCard{border:1px solid #e3ddca;border-radius:11px;background:#fff;overflow:hidden;
+              box-shadow:0 1px 5px rgba(0,0,0,.06);transition:box-shadow .12s,border-color .12s;}
+      .prCard:hover{border-color:#c9a24b;box-shadow:0 4px 16px rgba(0,0,0,.14);}
+      .prCover{position:relative;background:#fff;border-bottom:1px solid #efe9d8;cursor:pointer;
+               background-image:linear-gradient(#fbf9f2 0 0);}
+      .prCover .pg{position:absolute;inset:0;overflow:hidden;}
+      .prCover .ob{position:absolute;overflow:hidden;border-radius:2px;}
+      .prCover .ob img{width:100%;height:100%;object-fit:cover;display:block;}
+      .prCover .ob.txt{background:#e7e2d2;}
+      .prCover .ob.nm{background:#dfe7d8;}
+      .prCover .pill{position:absolute;right:6px;bottom:6px;font-size:9.5px;font-weight:800;
+                     letter-spacing:.4px;background:rgba(255,255,255,.92);border:1px solid #e3ddca;
+                     border-radius:20px;padding:1px 7px;color:#7a8470;}
+      .prBody{padding:8px 10px 10px;}
+      .prBody .tt{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .prBody .cu{font-size:11.5px;color:#1f4a45;font-weight:700;margin-top:1px;
+                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+      .prBody .cu.none{color:#a6a294;font-weight:400;}
+      .prBody .mt{font-size:11px;color:#7a8470;margin-top:2px;}
+      .prBody .row{display:flex;gap:5px;margin-top:8px;}
+      .prBar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+      .prBar input[type=text]{flex:1;min-width:150px;font-family:inherit;font-size:13px;
+                              padding:6px 10px;border:1px solid #d9d4c4;border-radius:9px;}
+      .prBar select{font-family:inherit;font-size:12.5px;padding:5px 8px;border:1px solid #d9d4c4;border-radius:9px;background:#fff;}
+      .prGroupHd{font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+                 color:#1f4a45;margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid #ece7d9;}
+      .prGroupHd:first-child{margin-top:0;}
       .makGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
       .makCard{position:relative;border:1px solid #e3ddca;border-radius:10px;background:#fff;cursor:pointer;overflow:hidden;}
       .makCard.on{outline:3px solid #c9a24b;outline-offset:-3px;}
@@ -515,6 +546,19 @@
     <div class="foot">
       <button class="btn sm gray left" id="personPickNew">＋ New person…</button>
       <button class="btn sm gray" id="personPickCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Which customer is this print for? Writes params.roles.customer -->
+<div class="modal-bg" id="custPickBg">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="custPickTitle">Customer</h3>
+    <input class="search" id="custPickSearch" type="text" placeholder="Search a person or company…" style="max-width:none;width:100%;" autocomplete="off">
+    <div class="picklist" id="custPickList" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px;"></div>
+    <div class="foot">
+      <button class="btn sm gray left" id="custPickClear">Remove customer</button>
+      <button class="btn sm gray" id="custPickCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2659,28 +2703,106 @@ async function renderMak(){
   if(makComp) renderMakPick(); else await renderMakLib();
 }
 
-// ── View A: the library — open a print, or start a new one ──
+// ── View A: the print library ───────────────────────────────────────
+// Every print as a real cover: the objects from card 1 laid out where they
+// actually sit, photos and all. Search, sort, and group by customer — a print
+// remembers its customer in params.roles.customer, the slot that was reserved
+// when the bindings groundwork went in, so this costs no new table.
+const PAPERW={a0:841,a1:594,a2:420,a3:297,a4:210,a5:148,a6:105,
+  letter:215.9,legal:215.9,tabloid:279.4,ansic:431.8,ansid:558.8,ansie:863.6,poster:700};
+const PAPERH={a0:1189,a1:841,a2:594,a3:420,a4:297,a5:210,a6:148,
+  letter:279.4,legal:355.6,tabloid:431.8,ansic:558.8,ansid:863.6,ansie:1117.6,poster:1000};
+let PRINTS=[], prQ='', prSort='new', prGroup='none';
+
 async function renderMakLib(){
   $('#makPick').classList.add('hide');
   const host=$('#makLib'); host.classList.remove('hide');
-  makList=await api('/api/compositions')||[];
-  host.innerHTML=
-    '<div class="panel" style="padding:12px 14px;">'+
+  host.innerHTML='<div class="panel" style="padding:12px 14px;">Loading…</div>';
+  try{ PRINTS=((await api('/api/prints'))||{}).prints||[]; }
+  catch(e){ PRINTS=[]; }
+  drawPrintLib();
+}
+
+function prCoverHtml(p){
+  const W=PAPERW[p.paper]||210, H=PAPERH[p.paper]||297;
+  const boxH=Math.round(168*(H/W));                    // cover keeps the paper's shape
+  const obs=(p.cover||[]).slice().sort((a,b)=>(a.z||0)-(b.z||0));
+  const bars=(p.texts||[]).map(t=>
+    '<div class="ob txt" style="left:'+t.x+'%;top:'+t.y+'%;width:'+t.w+'%;height:4%;"></div>').join('');
+  const body=obs.map(o=>{
+    const st='left:'+o.x+'%;top:'+o.y+'%;width:'+o.w+'%;'+
+      (o.r?'transform:rotate('+o.r+'deg);':'');
+    if(o.img) return '<div class="ob" style="'+st+'height:'+(o.w*(W/H)*0.95).toFixed(1)+'%;">'+
+      '<img src="'+esc(o.img)+'" loading="lazy" alt=""></div>';
+    const cls=o.rt==='contact'?'ob nm':'ob txt';
+    return '<div class="'+cls+'" style="'+st+'height:'+(o.rt==='contact'?6:5)+'%;"></div>';
+  }).join('');
+  return '<div class="prCover" data-open="'+p.id+'" style="height:'+boxH+'px;" title="Open '+esc(p.name)+'">'+
+    '<div class="pg">'+bars+body+'</div>'+
+    '<span class="pill">'+esc((p.paper||'a4').toUpperCase())+' · '+p.pages+'p</span></div>';
+}
+
+function prCardHtml(p){
+  const cu=p.customer;
+  return '<div class="prCard" data-id="'+p.id+'">'+
+    prCoverHtml(p)+
+    '<div class="prBody">'+
+      '<div class="tt">'+esc(p.name)+'</div>'+
+      '<div class="cu'+(cu?'':' none')+'" data-cust="'+p.id+'" title="Set the customer">'+
+        (cu?esc(cu.company||cu.name):'+ customer')+'</div>'+
+      '<div class="mt">'+p.items+' object'+(p.items===1?'':'s')+'</div>'+
+      '<div class="row">'+
+        '<button class="btn sm gray prOpen" data-id="'+p.id+'" style="flex:1;">Open</button>'+
+        '<button class="btn sm gray prPick" data-id="'+p.id+'" title="Choose what goes in it">Cards</button>'+
+        '<button class="btn sm danger prKill" data-id="'+p.id+'" title="Delete this print">✕</button>'+
+      '</div></div></div>';
+}
+
+function drawPrintLib(){
+  const host=$('#makLib');
+  const q=prQ.trim().toLowerCase();
+  let list=PRINTS.filter(p=>!q||
+    (p.name||'').toLowerCase().includes(q)||
+    ((p.customer&&(p.customer.name||'')+' '+(p.customer.company||''))||'').toLowerCase().includes(q));
+  if(prSort==='name') list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  else if(prSort==='old') list.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  else list.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+  let bodyHtml;
+  if(!list.length){
+    bodyHtml='<div class="empty">'+(PRINTS.length?'Nothing matches that.':'No prints yet — make your first one.')+'</div>';
+  }else if(prGroup==='customer'){
+    const buckets=new Map();
+    list.forEach(p=>{ const k=p.customer?(p.customer.company||p.customer.name):'No customer';
+      if(!buckets.has(k)) buckets.set(k,[]); buckets.get(k).push(p); });
+    const keys=[...buckets.keys()].sort((a,b)=> a==='No customer'?1 : b==='No customer'?-1 : a.localeCompare(b));
+    bodyHtml=keys.map(k=>'<div class="prGroupHd">'+esc(k)+' <span style="font-weight:400;color:#7a8470;">'+
+      buckets.get(k).length+'</span></div><div class="prGrid">'+
+      buckets.get(k).map(prCardHtml).join('')+'</div>').join('');
+  }else{
+    bodyHtml='<div class="prGrid">'+list.map(prCardHtml).join('')+'</div>';
+  }
+
+  host.innerHTML='<div class="panel" style="padding:12px 14px;">'+
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">'+
-      '<b style="font-size:14px;">My prints</b><span class="muted" style="font-size:12.5px;">— brochures, posters, cards</span>'+
+      '<b style="font-size:14px;">My prints</b>'+
+      '<span class="muted" style="font-size:12.5px;">'+PRINTS.length+' — brochures, posters, yearbooks, cards</span>'+
       '<button class="btn sm gray" id="makJobBtn" style="margin-left:auto;" title="Assemble a print from saved blocks">▤ New from blocks</button>'+
       '<button class="btn pub sm" id="makNewBtn">＋ New print</button></div>'+
-    (makList.length?'<div class="makGrid">'+makList.map(c=>
-      '<div class="makCard" data-id="'+c.id+'" title="Choose what goes in it">'+
-        '<div class="im" style="font-size:30px;">🖨</div>'+
-        '<div class="tt">'+esc(c.name)+'</div>'+
-        '<div class="ss">'+c.item_count+' cards</div>'+
-        '<div style="display:flex;gap:4px;padding:0 6px 6px;">'+
-          '<button class="btn sm gray makEdit" data-id="'+c.id+'" style="flex:1;">Open editor</button>'+
-          '<button class="btn sm danger makKill" data-id="'+c.id+'" title="Delete this print">✕</button></div>'+
-      '</div>').join('')+'</div>'
-    :'<div class="empty">No prints yet — make your first one.</div>')+
-    '</div>';
+    '<div class="prBar">'+
+      '<input type="text" id="prSearch" placeholder="Search prints or customers…" value="'+esc(prQ)+'" autocomplete="off">'+
+      '<select id="prSort"><option value="new">Newest first</option>'+
+        '<option value="old">Oldest first</option><option value="name">By name</option></select>'+
+      '<select id="prGroup"><option value="none">No grouping</option>'+
+        '<option value="customer">Group by customer</option></select>'+
+    '</div>'+bodyHtml+'</div>';
+
+  $('#prSort').value=prSort; $('#prGroup').value=prGroup;
+  $('#prSearch').oninput=e=>{ prQ=e.target.value; drawPrintLib();
+    const el=$('#prSearch'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); };
+  $('#prSort').onchange=e=>{ prSort=e.target.value; drawPrintLib(); };
+  $('#prGroup').onchange=e=>{ prGroup=e.target.value; drawPrintLib(); };
+
   $('#makNewBtn').onclick=async()=>{
     const name=prompt('Name of the print (e.g. "QCC brochure"):'); if(!name||!name.trim()) return;
     const r=await api('/api/compositions',{method:'POST',body:JSON.stringify({name:name.trim(),template:'brochure'})});
@@ -2688,17 +2810,54 @@ async function renderMakLib(){
     renderMakPick();
   };
   $('#makJobBtn').onclick=openJobDlg;
-  host.querySelectorAll('.makCard').forEach(cd=>cd.onclick=async e=>{
-    if(e.target.closest('button')) return;
-    await makLoad(+cd.dataset.id); renderMakPick();
-  });
-  host.querySelectorAll('.makEdit').forEach(b=>b.onclick=()=>window.open('/print/brochure?comp='+b.dataset.id,'_blank'));
-  host.querySelectorAll('.makKill').forEach(b=>b.onclick=async()=>{
-    const c=makList.find(x=>x.id===+b.dataset.id);
-    if(!confirm('Delete "'+(c?c.name:'this print')+'"? The cards themselves are not touched.')) return;
+
+  host.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>window.open('/print/brochure?comp='+el.dataset.open,'_blank'));
+  host.querySelectorAll('.prOpen').forEach(b=>b.onclick=()=>window.open('/print/brochure?comp='+b.dataset.id,'_blank'));
+  host.querySelectorAll('.prPick').forEach(b=>b.onclick=async()=>{ await makLoad(+b.dataset.id); renderMakPick(); });
+  host.querySelectorAll('.prKill').forEach(b=>b.onclick=async()=>{
+    const p=PRINTS.find(x=>x.id===+b.dataset.id);
+    if(!confirm('Delete "'+(p?p.name:'this print')+'"? The cards themselves are not touched.')) return;
     await api('/api/compositions/'+b.dataset.id,{method:'DELETE'});
     renderMakLib();
   });
+  host.querySelectorAll('[data-cust]').forEach(el=>el.onclick=()=>pickCustomer(+el.dataset.cust));
+}
+
+// Assign a customer to a print — writes params.roles.customer, which is also what
+// a future "make this one for a different customer" would read.
+async function pickCustomer(printId){
+  const p=PRINTS.find(x=>x.id===printId); if(!p) return;
+  custPickFor=printId;
+  const bg=$('#custPickBg');
+  $('#custPickTitle').textContent='Customer for "'+p.name+'"';
+  const list=$('#custPickList'), search=$('#custPickSearch');
+  search.value=''; list.innerHTML='<div class="empty" style="padding:12px;">Type at least two letters.</div>';
+  bg.classList.add('open'); search.focus();
+  let t=null;
+  search.oninput=()=>{ clearTimeout(t); t=setTimeout(async()=>{
+    const q=search.value.trim();
+    if(q.length<2){ list.innerHTML='<div class="empty" style="padding:12px;">Type at least two letters.</div>'; return; }
+    let rows=[];
+    try{ rows=((await api('/api/contacts/search?q='+encodeURIComponent(q)))||{}).contacts||[]; }catch(e){}
+    list.innerHTML = rows.length
+      ? rows.map(c=>'<div class="row" data-cid="'+c.id+'" style="padding:7px 10px;cursor:pointer;">'+
+          '<span class="c2"><b>'+esc(c.name||'')+'</b>'+
+          (c.company?' <span class="muted" style="font-size:12px;">'+esc(c.company)+'</span>':'')+'</span></div>').join('')
+      : '<div class="empty" style="padding:12px;">Nobody matches.</div>';
+    list.querySelectorAll('[data-cid]').forEach(r=>r.onclick=()=>setCustomer(printId,+r.dataset.cid));
+  },250); };
+}
+async function setCustomer(printId, contactId){
+  const p=PRINTS.find(x=>x.id===printId); if(!p) return;
+  try{
+    const cur=await api('/api/compositions/'+printId);
+    const params=cur.params||{};
+    params.roles=params.roles||{};
+    if(contactId) params.roles.customer=contactId; else delete params.roles.customer;
+    await api('/api/compositions/'+printId,{method:'PUT',body:JSON.stringify({params})});
+    $('#custPickBg').classList.remove('open');
+    renderMakLib();
+  }catch(e){ showToast('Could not set the customer'); }
 }
 
 // ── New print from blocks ────────────────────────────────────────────
@@ -2781,6 +2940,11 @@ async function generateJob(){
   }catch(e){ showToast(e.message||'Could not generate'); }
   btn.disabled=false; btn.textContent='Generate';
 }
+let custPickFor=null;
+$('#custPickCancel').onclick=()=>$('#custPickBg').classList.remove('open');
+$('#custPickClear').onclick=()=>{ if(custPickFor) setCustomer(custPickFor,null); };
+$('#custPickBg').onmousedown=e=>{ if(e.target.id==='custPickBg') $('#custPickBg').classList.remove('open'); };
+
 $('#jobCancel').onclick=closeJobDlg;
 $('#jobGo').onclick=generateJob;
 $('#jobModalBg').onmousedown=e=>{ if(e.target.id==='jobModalBg') closeJobDlg(); };

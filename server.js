@@ -2733,6 +2733,106 @@ app.get('/api/admin/dedupe-composition/:id(\\d+)', requireAuth, async (req, res)
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── THE PRINT LIBRARY ───────────────────────────────────────────────────────
+// Every print with what the library needs to draw a real cover: the objects on
+// card 1 with just enough content to show a picture or a name. Deliberately NOT
+// the full render — a cover is a recognisable thumbnail, not a page.
+//
+// A print's customer lives in params.roles.customer (the slot reserved when the
+// bindings groundwork went in), so grouping by customer costs no new table.
+app.get('/api/prints', requireAuth, async (req, res) => {
+  const uid = req.user.id;
+  try {
+    const comps = await pool.query(
+      `SELECT id, name, template, params, created_at FROM compositions
+        WHERE user_id = $1 ORDER BY created_at DESC, id DESC`, [uid]);
+    if (!comps.rows.length) return res.json({ v: 1, prints: [] });
+
+    const items = await pool.query(
+      `SELECT composition_id, ref_type, ref_id, overrides FROM composition_items
+        WHERE user_id = $1 ORDER BY position, id`, [uid]);
+
+    // Which objects sit on card 1 of each print?
+    const firstCardOf = c => {
+      const cards = (c.params && c.params.cards) || [];
+      return cards.length ? cards[0].id : null;
+    };
+    const onCover = {}, need = { post: new Set(), contact: new Set(), media: new Set() };
+    comps.rows.forEach(c => { onCover[c.id] = []; });
+    items.rows.forEach(it => {
+      const c = comps.rows.find(x => x.id === it.composition_id);
+      if (!c) return;
+      const ov = it.overrides || {};
+      const fc = firstCardOf(c);
+      const isFirst = fc ? ov.card === fc : (+ov.page || 1) === 1;
+      if (!isFirst) return;
+      if (onCover[c.id].length >= 40) return;          // a cover needs no more
+      onCover[c.id].push(it);
+      if (need[it.ref_type]) need[it.ref_type].add(+it.ref_id);
+    });
+
+    const pick = async (sql, ids) => {
+      if (!ids.size) return {};
+      const r = await pool.query(sql, [uid, [...ids]]);
+      const m = {}; r.rows.forEach(x => { m[x.id] = x; }); return m;
+    };
+    const [posts, contacts, media] = await Promise.all([
+      pick(`SELECT id, title, photos FROM blog_posts WHERE user_id = $1 AND id = ANY($2::int[])`, need.post),
+      pick(`SELECT id, name, photo_url FROM contacts WHERE user_id = $1 AND id = ANY($2::int[])`, need.contact),
+      pick(`SELECT id, title, url, kind FROM media_cards WHERE user_id = $1 AND id = ANY($2::int[])`, need.media),
+    ]);
+
+    // Customers referenced by params.roles.customer
+    const custIds = new Set();
+    comps.rows.forEach(c => {
+      const cid = c.params && c.params.roles && +c.params.roles.customer;
+      if (cid) custIds.add(cid);
+    });
+    const custs = await pick(`SELECT id, name, company FROM contacts WHERE user_id = $1 AND id = ANY($2::int[])`, custIds);
+
+    const prints = comps.rows.map(c => {
+      const p = c.params || {};
+      const cards = p.cards || [];
+      const cover = onCover[c.id].map(it => {
+        const ov = it.overrides || {};
+        const o = { rt: it.ref_type, x: +ov.x || 0, y: +ov.y || 0, w: +ov.w || 24,
+                    r: +ov.r || 0, z: +ov.z || 0, part: ov.part || null };
+        if (it.ref_type === 'contact') { const c2 = contacts[it.ref_id]; if (c2) { o.img = c2.photo_url; o.label = c2.name; } }
+        else if (it.ref_type === 'media') { const m = media[it.ref_id]; if (m) { o.img = m.kind === 'svg' ? m.url : m.url; o.label = m.title; } }
+        else { const b = posts[it.ref_id];
+               if (b) { o.label = b.title;
+                        if (o.part && o.part.slice(0, 3) === 'img') o.img = (b.photos || [])[+o.part.slice(3) || 0]; } }
+        return o;
+      });
+      const cid = p.roles && +p.roles.customer;
+      const cu = cid ? custs[cid] : null;
+      return {
+        id: c.id, name: c.name, created_at: c.created_at,
+        paper: p.paper || 'a4',
+        pages: Math.max(1, cards.length || +p.pages || 1),
+        items: onCover[c.id].length,
+        texts: (p.texts || []).filter(t => (+t.page || 1) === 1).map(t => ({ x: +t.x || 0, y: +t.y || 0, w: +t.w || 30 })),
+        customer: cu ? { id: cu.id, name: cu.name, company: cu.company } : null,
+        cover
+      };
+    });
+    res.json({ v: 1, prints });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Small contact lookup for assigning a customer to a print.
+app.get('/api/contacts/search', requireAuth, async (req, res) => {
+  const q = String((req.query && req.query.q) || '').trim();
+  if (q.length < 2) return res.json({ v: 1, contacts: [] });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, company, job_title FROM contacts
+        WHERE user_id = $1 AND (name ILIKE $2 OR company ILIKE $2)
+        ORDER BY name ASC NULLS LAST LIMIT 20`, [req.user.id, '%' + q + '%']);
+    res.json({ v: 1, contacts: rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── PRINT BLOCKS ────────────────────────────────────────────────────────────
 // A block is a saved page (or pages) you stamp into any document. It stores
 // ref_ids, never content — so the people and posts inside resolve LIVE on every
