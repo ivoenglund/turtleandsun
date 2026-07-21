@@ -237,7 +237,35 @@
                  overflow:hidden; text-overflow:ellipsis; }
   .rcard.paperOff{ opacity:.45; }
   .rcard.paperOff:hover{ opacity:1; }
-  @media print{ #res,#resTab,#resPrev,#updOverlay{ display:none!important; } }
+  /* ── Text editor: a plain dialog at normal size ──
+     Editing inside the canvas means editing inside a scaled, zoomed, transformed
+     box, which is what made sizes behave strangely. Here nothing is transformed. */
+  #txtEd{ display:none; position:fixed; inset:0; z-index:80; background:rgba(35,41,29,.45);
+          align-items:center; justify-content:center; padding:32px; }
+  #txtEd.open{ display:flex; }
+  #txtEdBox{ background:#fff; border:2px solid var(--gold); border-radius:14px; width:100%;
+             max-width:780px; max-height:88vh; display:flex; flex-direction:column;
+             box-shadow:0 8px 30px rgba(0,0,0,.3); overflow:hidden; }
+  #txtEdHead{ display:flex; align-items:center; gap:6px; padding:9px 12px; flex-wrap:wrap;
+              border-bottom:1px solid #ece7d9; background:#fbf9f2; }
+  #txtEdHead .sp{ flex:1; }
+  #txtEdHead .u{ font-size:11.5px; color:var(--muted); margin-left:-3px; }
+  #txtEdHead select{ font-family:inherit; font-size:13px; padding:5px 8px; border:1px solid #d9d4c4;
+                     border-radius:8px; background:#fff; max-width:180px; }
+  #txtEdHead input[type=number]{ width:66px; font-family:inherit; font-size:13px; padding:5px 8px;
+                                 border:1px solid #d9d4c4; border-radius:8px; }
+  #txtEdHead input[type=color]{ width:34px; height:30px; padding:0; border:1px solid #d9d4c4;
+                                border-radius:8px; background:#fff; cursor:pointer; }
+  #txtEdHead button{ font-family:inherit; font-weight:700; font-size:13px; padding:5px 10px;
+                     border:1px solid #d9d4c4; border-radius:8px; background:#fff; cursor:pointer; color:var(--ink); }
+  #txtEdHead button:hover{ background:#f4efe4; }
+  #txtEdHead button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  #teBody{ flex:1; overflow:auto; padding:22px 26px; font-size:16px; line-height:1.45;
+           outline:none; min-height:180px; }
+  #teBody h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
+  #teBody p{ margin:0 0 .73em; }
+  #txtEdFoot{ padding:7px 12px; font-size:11.5px; color:var(--muted); border-top:1px solid #ece7d9; }
+  @media print{ #res,#resTab,#resPrev,#updOverlay,#txtEd{ display:none!important; } }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
   #knobs .row{ display:flex; gap:4px; flex-wrap:wrap; }
   #knobs .hint{ font-size:12px; color:var(--muted); line-height:1.45; }
@@ -312,6 +340,22 @@
   </div>
 </aside>
 <div id="resPrev"><div id="resPrevBox"></div></div>
+<div id="txtEd"><div id="txtEdBox">
+  <div id="txtEdHead">
+    <select id="teFont"></select>
+    <input type="number" id="teSize" min="4" max="900" step="1" title="Size in points, as it will print">
+    <span class="u">pt</span>
+    <button id="teB" title="Bold"><b>B</b></button>
+    <button id="teI" title="Italic"><i>I</i></button>
+    <button id="teU" title="Underline"><span style="text-decoration:underline">U</span></button>
+    <input type="color" id="teColor" title="Colour of the selected text">
+    <span class="sp"></span>
+    <button id="teCancel">Cancel</button>
+    <button id="teDone" class="primary">✓ Done</button>
+  </div>
+  <div id="teBody" contenteditable="true" spellcheck="false"></div>
+  <div id="txtEdFoot">Select some words to change only those. Sizes are in points on the page.</div>
+</div></div>
 <div id="updOverlay"><div id="updBox">
   <h3>Some cards have newer versions</h3>
   <div class="sub">Nothing changes unless you tick it. Updating replaces those pages with the latest.</div>
@@ -794,7 +838,19 @@ function wireDrag(){
     };
   });
 }
-// Click an ALREADY-selected text object again (no drag) → edit right there.
+// Double-click any text object opens the editor dialog — no need to select first.
+document.getElementById('out').addEventListener('dblclick',e=>{
+  const w=e.target.closest('.abswrap,.txtfree'); if(!w) return;
+  let key=null;
+  if(w.dataset.absidx!=null){
+    const idx=+w.dataset.absidx, it=COMP.items[idx];
+    const ok=!!it&&((it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt')||it.ref_type==='contact');
+    if(ok) key='i'+idx;
+  }else if(w.dataset.text!=null) key='t'+w.dataset.text;
+  if(key){ e.preventDefault(); setSel(key,false); teOpen(key); }
+});
+
+// Click an ALREADY-selected text object again (no drag) → the editor dialog.
 document.getElementById('out').addEventListener('click',e=>{
   const w=e.target.closest('.abswrap'); if(!w) return;
   if(e.target.closest('[contenteditable="true"]')) return;
@@ -807,7 +863,7 @@ document.getElementById('out').addEventListener('click',e=>{
     isText=!!it&&( (it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt')
                  || it.ref_type==='contact' );
   }else if(w.dataset.text!=null){ key='t'+w.dataset.text; isText=true; }
-  if(key&&isText&&w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]===key) enterEdit(key,e.clientX,e.clientY);
+  if(key&&isText&&w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]===key) teOpen(key);
 });
 // Empty space: drag on the PAGE draws a selection rectangle (everything it
 // touches gets selected); drag on the grey outside pans the canvas.
@@ -1648,6 +1704,92 @@ function showKnobs(){
 // clicked. Any click outside commits automatically; nothing is ever lost.
 function curBd(){ return document.querySelector('#out [contenteditable="true"]'); }
 let styleSpan=null, holdSel=false;
+// ── The text editor dialog ──────────────────────────────────────────
+// Double-click a text object and it opens here, at a comfortable size, with
+// nothing scaled or transformed around it. Sizes are shown in POINTS as they
+// will print: the object's own font-size is 1em, so a run at 2em is twice that,
+// and pt = px x 0.75. Typing a point size converts back to em, which is what
+// keeps text scaling with the paper.
+let TE_KEY=null, TE_BASE=13.5;
+function teOpen(key){
+  const ov=ovOf(key); if(!ov) return;
+  TE_KEY=key;
+  TE_BASE=fsOf(ov)||13.5;
+  const body=document.getElementById('teBody');
+  const it=(key[0]==='i')?COMP.items[+key.slice(1)]:null;
+  // Start from the override if there is one, otherwise from what is on the page.
+  let html=ov.text;
+  if(html==null){
+    const el=elOf(key), bd=el&&el.querySelector('.bd');
+    html=bd?bd.innerHTML:'';
+  }
+  body.innerHTML=sanitizeHtml(html||'');
+  body.style.fontFamily = ov.ff ? fontCss(ov.ff) : '';
+  body.style.color = ov.tc || '';
+  const f=document.getElementById('teFont');
+  f.innerHTML='<option value="">Font of the object…</option>'+
+    FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:'+esc(fontCss(v))+'">'+t+'</option>').join('');
+  f.value=ov.ff||'';
+  document.getElementById('teColor').value=(ov.tc&&/^#/.test(ov.tc))?ov.tc:'#23291d';
+  document.getElementById('teSize').value=Math.round(TE_BASE*0.75);
+  document.getElementById('txtEd').classList.add('open');
+  setTimeout(()=>{ body.focus(); },30);
+}
+function teClose(){ document.getElementById('txtEd').classList.remove('open'); TE_KEY=null; }
+function teExec(cmd){ document.getElementById('teBody').focus(); try{ document.execCommand(cmd,false,null); }catch(e){} }
+// Apply to the selection, or to the whole text when nothing is selected.
+function teStyle(prop,val){
+  const body=document.getElementById('teBody');
+  body.focus();
+  const sel=getSelection();
+  if(!sel.rangeCount||sel.isCollapsed||!body.contains(sel.anchorNode)){
+    body.querySelectorAll('span,b,i,u,h3,p').forEach(el=>{ if(prop==='fontSize') el.style.fontSize=''; });
+    body.style[prop]=val;                       // whole text
+    return;
+  }
+  const r=sel.getRangeAt(0);
+  const sp=document.createElement('span');
+  sp.style[prop]=val;
+  try{ r.surroundContents(sp); }
+  catch(e){ const frag=r.extractContents(); sp.appendChild(frag); r.insertNode(sp); }
+}
+function teSave(){
+  if(!TE_KEY) return;
+  const body=document.getElementById('teBody');
+  const ov=ovOf(TE_KEY);
+  const html=sanitizeHtml(body.innerHTML);
+  const ff=document.getElementById('teFont').value;
+  const changed = html!==(ov.text||'') || (ff||'')!==(ov.ff||'');
+  if(changed){
+    pushUndo();
+    ov.text=html;
+    if(ff) ov.ff=ff; else delete ov.ff;
+  }
+  teClose();
+  render(); showKnobs(); markSel(); scheduleStrip();
+}
+document.getElementById('txtEd').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); teClose(); }
+  // Ctrl+Enter finishes without reaching for the mouse.
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); teSave(); }
+});
+document.getElementById('teCancel').onclick=teClose;
+document.getElementById('teDone').onclick=teSave;
+document.getElementById('txtEd').onmousedown=e=>{ if(e.target.id==='txtEd') teClose(); };
+document.getElementById('teB').onclick=()=>teExec('bold');
+document.getElementById('teI').onclick=()=>teExec('italic');
+document.getElementById('teU').onclick=()=>teExec('underline');
+document.getElementById('teColor').oninput=e=>teStyle('color',e.target.value);
+document.getElementById('teFont').onchange=e=>{
+  const v=e.target.value;
+  document.getElementById('teBody').style.fontFamily = v?fontCss(v):'';
+};
+document.getElementById('teSize').onchange=e=>{
+  const pt=+e.target.value; if(!(pt>=4&&pt<=900)) return;
+  // pt on the page -> em relative to the object, so it still scales with paper.
+  teStyle('fontSize',(pt/0.75/TE_BASE).toFixed(4)+'em');
+};
+
 function enterEdit(key,cx,cy){
   const el=elOf(key); if(!el) return;
   const bd=el.querySelector('.bd'); if(!bd) return;
@@ -1936,6 +2078,8 @@ document.addEventListener('keydown',e=>{
   if(e.key==='PageUp'){   e.preventDefault(); if(curPage>1)           setPage(curPage-1); return; }
   if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
   if(e.key==='Escape'){ e.preventDefault();
+    const te=document.getElementById('txtEd');
+    if(te&&te.classList.contains('open')){ teClose(); return; }
     if(cropKey){ cropKey=null; showKnobs(); markSel(); } else clearSel(); return; }
   // Arrow keys nudge the selection: 0.5% per press, 0.1% with Shift.
   if(SEL.length&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
