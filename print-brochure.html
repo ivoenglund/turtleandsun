@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <title>Brochure — Turtle &amp; Sun</title>
 <style>
-negative
+  :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{ margin:0; font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif; color:var(--ink); background:#e8e4d8; overflow:hidden; }
+  /* Page width/height/padding are injected per paper size by applyPaper(). */
+  /* isolation:isolate makes the page a stacking context. Without it the page is
+     position:relative with z-index:auto, so an object sent to the back (negative
      z-index) paints BEHIND the page's own white background and vanishes. */
   .page{ width:210mm; min-height:296mm; margin:0 auto 14px; background:#fff; position:relative; overflow:visible;
          isolation:isolate;
