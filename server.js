@@ -2776,11 +2776,6 @@ app.get('/api/prints', requireAuth, async (req, res) => {
       const r = await pool.query(sql, [uid, [...ids]]);
       const m = {}; r.rows.forEach(x => { m[x.id] = x; }); return m;
     };
-    const [posts, contacts, media] = await Promise.all([
-      pick(`SELECT id, title, photos FROM blog_posts WHERE user_id = $1 AND id = ANY($2::int[])`, need.post),
-      pick(`SELECT id, name, photo_url FROM contacts WHERE user_id = $1 AND id = ANY($2::int[])`, need.contact),
-      pick(`SELECT id, title, url, kind FROM media_cards WHERE user_id = $1 AND id = ANY($2::int[])`, need.media),
-    ]);
 
     // Customers referenced by params.roles.customer
     const custIds = new Set();
@@ -2790,32 +2785,28 @@ app.get('/api/prints', requireAuth, async (req, res) => {
     });
     const custs = await pick(`SELECT id, name, company FROM contacts WHERE user_id = $1 AND id = ANY($2::int[])`, custIds);
 
-    const prints = comps.rows.map(c => {
+    // Resolve the cover items properly — the library renders them with the SAME
+    // renderer the editor uses, so it needs real overrides and real content.
+    const prints = [];
+    for (const c of comps.rows) {
       const p = c.params || {};
       const cards = p.cards || [];
-      const cover = onCover[c.id].map(it => {
-        const ov = it.overrides || {};
-        const o = { rt: it.ref_type, x: +ov.x || 0, y: +ov.y || 0, w: +ov.w || 24,
-                    r: +ov.r || 0, z: +ov.z || 0, part: ov.part || null };
-        if (it.ref_type === 'contact') { const c2 = contacts[it.ref_id]; if (c2) { o.img = c2.photo_url; o.label = c2.name; } }
-        else if (it.ref_type === 'media') { const m = media[it.ref_id]; if (m) { o.img = m.kind === 'svg' ? m.url : m.url; o.label = m.title; } }
-        else { const b = posts[it.ref_id];
-               if (b) { o.label = b.title;
-                        if (o.part && o.part.slice(0, 3) === 'img') o.img = (b.photos || [])[+o.part.slice(3) || 0]; } }
-        return o;
-      });
+      const { items: cover } = await resolveBlockItems(
+        onCover[c.id].map(it => ({ ref_type: it.ref_type, ref_id: it.ref_id, overrides: it.overrides })),
+        uid);
       const cid = p.roles && +p.roles.customer;
       const cu = cid ? custs[cid] : null;
-      return {
+      const firstCard = cards.length ? cards[0].id : null;
+      prints.push({
         id: c.id, name: c.name, created_at: c.created_at,
         paper: p.paper || 'a4',
         pages: Math.max(1, cards.length || +p.pages || 1),
         items: onCover[c.id].length,
-        texts: (p.texts || []).filter(t => (+t.page || 1) === 1).map(t => ({ x: +t.x || 0, y: +t.y || 0, w: +t.w || 30 })),
+        texts: (p.texts || []).filter(t => firstCard ? t.card === firstCard : (+t.page || 1) === 1),
         customer: cu ? { id: cu.id, name: cu.name, company: cu.company } : null,
         cover
-      };
-    });
+      });
+    }
     res.json({ v: 1, prints });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

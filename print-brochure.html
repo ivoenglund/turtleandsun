@@ -44,33 +44,7 @@
   .abswrap.pinned::after{ content:''; position:absolute; left:calc(-4px*var(--ui,1));
     top:calc(-4px*var(--ui,1)); width:calc(9px*var(--ui,1)); height:calc(9px*var(--ui,1));
     border-radius:50%; background:var(--green); box-shadow:0 0 0 calc(1.5px*var(--ui,1)) #fff; }
-  .block{ margin:0; }
-  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
-  .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
-  .block p{ margin:0 0 .73em; font-size:1em; line-height:1.45; }
-  .block.txt-s p{ font-size:.85em; } .block.txt-l p{ font-size:1.2em; line-height:1.5; }
-  .block.txt-l h3{ font-size:1.85em; }
-  .block img{ width:100%; height:auto; border-radius:var(--pr,.55em); display:block; margin:0; }
-  .block.media{ text-align:center; }
-  .block.media img{ object-fit:contain; }
-  .block.media .cap{ font-size:.89em; color:#5c5c4d; margin-top:.5em; }
-  .imgo.cropped{ border-radius:var(--pr,.55em); }
-  .sqc img, .imgo.sqc, .imgo.cropped.sqc{ border-radius:0!important; }
-  /* Square corners = EVERYTHING square: pictures, background, border, shadow. */
-  .sqo, .sqo img, .sqo .imgo, .sqo .person img, .sqo .init{ border-radius:0!important; }
-  .block.ffo h3, .block.ffo p, .block.ffo .meta, .block.ffo .cap{ font-family:inherit; }
-  .block.tco h3, .block.tco p, .block.tco .meta, .block.tco .cap, .block.tco b,
-  .block.tco .role, .block.tco .ct{ color:inherit; }
-  .block.font-serif h3,.block.font-serif p{ font-family:Georgia,'Times New Roman',serif; }
-  .block.font-hand h3,.block.font-hand p{ font-family:'Caveat',cursive; font-size:1.35em; }
-  .block .bd[contenteditable="true"]{ outline:calc(2px*var(--ui,1)) solid #7FB36F; outline-offset:calc(2px*var(--ui,1)); border-radius:2mm; cursor:text; }
-  .person{ text-align:center; }
-  .person img{ max-width:100%; width:auto; border-radius:var(--pr,.55em); display:block; margin:0 auto .55em; }
-  .person .init{ width:8.4em; height:10em; border-radius:var(--pr,.55em); background:var(--cream); color:var(--green);
-                 display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:1.63em; margin:0 auto .35em; }
-  .person b{ font-size:1em; display:block; }
-  .person .role{ font-size:.81em; color:var(--green); font-weight:700; }
-  .person .ct{ font-size:.78em; color:var(--muted); line-height:1.4; }
+  /* Card contents are styled by the shared /card-render.css, linked above. */
   /* A frame = its own object: a border you can drag, resize, restyle. */
   .frameobj{ cursor:grab; border-radius:var(--pr,6px); }
   .frameobj.sel{ outline:calc(3px*var(--ui,1)) dashed var(--gold); outline-offset:calc(3px*var(--ui,1)); }
@@ -300,6 +274,8 @@
   }
 </style>
 <link rel="stylesheet" href="/filter-tree.css">
+<link rel="stylesheet" href="/card-render.css">
+<script src="/card-render.js"></script>
 </head>
 <body>
 
@@ -358,160 +334,39 @@
 <div id="strip"><div id="stripInner"></div></div>
 
 <script>
-const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Everything about how a card LOOKS comes from the shared module, so the
+// editor, the filmstrip, the Content panel and the print library can never
+// disagree. Aliased to the old names so no call site had to change.
+const { esc, cleanStyle, sanitizeHtml, STYLE_OK, BORDER_STYLES, FONTSTACK, fontCss,
+        SHB, SHT, shStr, decoCss, borderCss, cropEms, fsOf,
+        postBlock, personCard, mediaBlock, cardInner,
+        PAPERS, paperOf, MMPX, r4, pScale, RADpx, PADpx } = CardRender;
 const compId = new URLSearchParams(location.search).get('comp');
 
 // Limited rich text: only harmless formatting survives (text is content; scripts
 // are not). DOM-based: parse into an inert template, drop dangerous elements,
 // unwrap unknown tags, and keep only whitelisted style properties on the rest.
-const STYLE_OK=['font-family','font-size','color','font-weight','font-style','text-decoration'];
-function cleanStyle(s){
-  return String(s||'').split(';').map(d=>{
-    const i=d.indexOf(':'); if(i<0) return '';
-    const p=d.slice(0,i).trim().toLowerCase(), v=d.slice(i+1).trim();
-    if(!STYLE_OK.includes(p)) return '';
-    if(/url\s*\(|expression|javascript|@import|[<>]/i.test(v)) return '';
-    return p+':'+v;
-  }).filter(Boolean).join(';');
-}
-function sanitizeHtml(s){
-  const t=document.createElement('template');
-  t.innerHTML=String(s||'');
-  t.content.querySelectorAll('script,style,iframe,object,embed,link,meta,svg,img,video,audio,form,input,button,textarea,select').forEach(e=>e.remove());
-  const OK=['H3','P','B','STRONG','U','I','EM','BR','DIV','SPAN'];
-  (function walk(node){
-    [...node.children].forEach(el=>{
-      walk(el);
-      if(!OK.includes(el.tagName)){          // unknown (font, a, …) → unwrap, keep content
-        while(el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
-        el.remove(); return;
-      }
-      [...el.attributes].forEach(a=>{ if(a.name.toLowerCase()!=='style') el.removeAttribute(a.name); });
-      const cs=cleanStyle(el.getAttribute('style'));
-      if(cs) el.setAttribute('style',cs); else el.removeAttribute('style');
-    });
-  })(t.content);
-  return t.innerHTML;
-}
 
 // ── Object renderers ───────────────────────────────────────────────
 // A post decomposes into SEPARATE objects: one text object + one object per
 // photo (part: 'txt' | 'img0','img1',…). They never move together — every
 // piece is dragged, sized, angled and bordered on its own.
-const BORDER_STYLES=['solid','dashed','dotted','double'];
 // Futura Book is licensed, so it may simply not be on the machine. Name it first,
 // then Jost — the open geometric sans from the same lineage — so the page still
 // looks right rather than dropping to the browser default.
-const FONTSTACK={ 'Futura Book': "'Futura Book','Jost','Century Gothic',sans-serif" };
-function fontCss(name){
-  if(!name) return '';
-  return FONTSTACK[name] || ("'"+String(name).replace(/'/g,'')+"'");
-}
 // Shadow presets (em-based → they scale with the object). Bare text (no
 // background, no border) gets a LETTER shadow; everything else a box shadow.
 // Border/background/radius/shadow all scale WITH THE PAPER (A4 = reference),
 // so a card and a poster carry the exact same look, just proportionally.
-function pScale(){
-  return paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4').w*MMPX/794;   // 794px = A4 width
-}
-const RADpx=()=>(4.5*pScale());
-const PADpx=()=>(5.4*pScale());
 // Tight, close shadows — short gradient, real density. Values are A4 px.
-const SHB=[[0,0,0],[2,5,.4],[4,9,.55],[6,14,.75]];
-const SHT=[[0,0,0],[1,2.5,.5],[2,4.5,.65],[3,7,.8]];
-function shStr(arr,i){
-  const s=pScale(), a=arr[i]||arr[0];
-  return '0 '+(a[0]*s).toFixed(1)+'px '+(a[1]*s).toFixed(1)+'px rgba(0,0,0,'+a[2]+')';
-}
-function decoCss(ov,isBareText){
-  let s='';
-  if(ov.bg) s+='background:'+esc(ov.bg)+';'+(!+ov.bw?'padding:'+PADpx().toFixed(1)+'px;':'');
-  const sh=+ov.sh||0;
-  if(sh){
-    if(isBareText&&!ov.bg&&!+ov.bw) s+='text-shadow:'+shStr(SHT,sh)+';';
-    else s+='box-shadow:'+shStr(SHB,sh)+';';
-  }
-  return s;
-}
-function borderCss(ov){
-  const bw=+ov.bw||0; if(!bw) return '';
-  const bs=BORDER_STYLES.includes(ov.bs)?ov.bs:'solid';
-  return 'border:'+(bw*pScale()).toFixed(1)+'px '+bs+' '+esc(ov.bc||'#23291d')+';padding:'+PADpx().toFixed(1)+'px;';
-}
-function postBlock(it){
-  const c=it.content||{}, ov=it.overrides||{};
-  const part=ov.part||'txt';
-  if(part.slice(0,3)==='img'){
-    const ph=(c.photos||[])[+part.slice(3)||0];
-    // Crop = a WINDOW (height phr, overflow hidden) over the picture, which
-    // keeps its own size (pwr) and offset (ixr/iyr) — all ratios of the
-    // window width, so paper changes and resizing leave the crop intact.
-    let bs='', ist='';
-    if(+ov.pwr){
-      const cr=cropEms(ov);
-      bs=' style="position:relative;overflow:hidden;height:'+r4(cr.ph)+'em;"';
-      ist=' style="position:absolute;width:'+r4(cr.pw)+'em;max-width:none;left:'+r4(cr.ix)+'em;top:'+r4(cr.iy)+'em;border-radius:0;"';
-    }else if(+ov.ph){   // ancient cover-crop: still renders; converts on crop entry
-      ist=' style="height:'+(+ov.ph)+'em;object-fit:cover;object-position:'+
-        (ov.px!=null?+ov.px:50)+'% '+(ov.py!=null?+ov.py:50)+'%;"';
-    }
-    const icls='block imgo'+(+ov.pwr?' cropped':'')+(ov.sq?' sqc':'');
-    return '<div class="'+icls+'"'+bs+' data-idx="'+it._idx+'">'+
-      (ph?'<img src="'+esc(ph)+'"'+ist+'>':'<div class="hint">picture missing</div>')+'</div>';
-  }
-  const cls=['block','txtobj', ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'',
-             ov.ff?'ffo':'', ov.tc?'tco':''].filter(Boolean).join(' ');
-  const ffs=ov.ff?' style="font-family:'+esc(fontCss(ov.ff))+'"':'';
-  let inner;
-  if(ov.text){ inner='<div class="bd">'+sanitizeHtml(ov.text)+'</div>'; }
-  else{
-    const paras=String(c.body||'').split(/\n\n+/).filter(Boolean).slice(0,12)
-      .map(p=>'<p>'+esc(p)+'</p>').join('');
-    inner='<div class="bd">'+(c.title?'<h3>'+esc(c.title)+'</h3>':'')+
-      (c.author&&!ov.nodate?'<div class="meta">'+esc(c.author)+'</div>':'')+paras+'</div>';
-  }
-  return '<div class="'+cls+'"'+ffs+' data-idx="'+it._idx+'">'+inner+'</div>';
-}
 // The words under the portrait live in a .bd, exactly like a post's text — that
 // is what makes them editable in place. The photo stays OUTSIDE .bd so editing
 // can never swallow it. ov.text overrides the generated wording, same as a post.
-function personCard(it){
-  const c=it.content, ov=it.overrides||{};
-  const init=(c.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
-  const cls=['person','block', ov.tc?'tco':'', ov.ff?'ffo':''].filter(Boolean).join(' ');
-  // ov.flds (set by a group card's rule) says which fields to show. Absent = all.
-  const show = ov.flds!=null ? new Set(String(ov.flds).split(',')) : null;
-  const on = f => !show || show.has(f);
-  const inner = ov.text ? sanitizeHtml(ov.text)
-    : (on('name')?'<b>'+esc(c.name||'')+'</b>':'')+
-      (on('title')&&c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
-      '<div class="ct">'+[on('email')?c.email:null, on('phone')?c.phone:null]
-        .filter(Boolean).map(esc).join('<br>')+'</div>';
-  return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
-    (on('photo')
-      ? (c.photo_url?'<img src="'+esc(c.photo_url)+'">':'<div class="init">'+esc(init)+'</div>')
-      : '')+
-    '<div class="bd">'+inner+'</div></div>';
-}
 // Media card = an SVG (logo/graphic). Rendered via <img> so no script runs.
 // A media picture crops exactly like a post photo: the .imgo wrapper is always
 // present (that is what the crop code measures and drags), and when ov.pwr is set
 // it becomes a window over a larger, offset image. The caption stays outside the
 // window so cropping never clips it.
-function mediaBlock(it){
-  const c=it.content||{}, ov=it.overrides||{};
-  const showCap = ov.caption && c.title;
-  let bs='', ist='';
-  if(+ov.pwr){
-    const cr=cropEms(ov);
-    bs=' style="position:relative;overflow:hidden;height:'+r4(cr.ph)+'em;"';
-    ist=' style="position:absolute;width:'+r4(cr.pw)+'em;max-width:none;left:'+r4(cr.ix)+'em;top:'+r4(cr.iy)+'em;border-radius:0;object-fit:fill;"';
-  }
-  const wcls='imgo'+(+ov.pwr?' cropped':'')+(ov.sq?' sqc':'');
-  return '<div class="block media'+(ov.tc?' tco':'')+(ov.sq?' sqc':'')+'" data-idx="'+it._idx+'">'+
-    (c.url?'<div class="'+wcls+'"'+bs+'><img src="'+esc(c.url)+'"'+ist+'></div>':'')+
-    (showCap?'<div class="cap">'+esc(c.title)+'</div>':'')+'</div>';
-}
 
 let COMP=null;
 let curPage=1;
@@ -622,22 +477,6 @@ async function load(){
 }
 
 // ── Paper sizes ─────────────────────────────────────────────────────
-const PAPERS=[
-  {k:'a0',n:'A0',w:841,h:1189,u:'cm'},
-  {k:'a1',n:'A1',w:594,h:841,u:'cm'},
-  {k:'a2',n:'A2',w:420,h:594,u:'cm'},
-  {k:'a3',n:'A3',w:297,h:420,u:'cm'},
-  {k:'a4',n:'A4',w:210,h:297,u:'cm'},
-  {k:'a5',n:'A5',w:148,h:210,u:'cm'},
-  {k:'a6',n:'A6',w:105,h:148,u:'cm'},
-  {k:'letter', n:'US Letter',  w:215.9,h:279.4,u:'in'},
-  {k:'legal',  n:'US Legal',   w:215.9,h:355.6,u:'in'},
-  {k:'tabloid',n:'US Tabloid', w:279.4,h:431.8,u:'in'},
-  {k:'ansic',  n:'US ANSI C',  w:431.8,h:558.8,u:'in'},
-  {k:'ansid',  n:'US ANSI D',  w:558.8,h:863.6,u:'in'},
-  {k:'ansie',  n:'US ANSI E',  w:863.6,h:1117.6,u:'in'},
-  {k:'poster', n:'Poster',     w:700,  h:1000,  u:'cm', canvas:true},
-];
 const paperArea=P=>P.w*P.h;
 const num1=x=>String(Math.round(x*10)/10);
 function paperLabel(P){
@@ -645,13 +484,13 @@ function paperLabel(P){
     ? P.n+' — '+num1(P.w/25.4)+' × '+num1(P.h/25.4)+' in'
     : P.n+' — '+num1(P.w/10)+' × '+num1(P.h/10)+' cm';
 }
-function paperOf(k){ return PAPERS.find(x=>x.k===k) || PAPERS.find(x=>x.k==='a4'); }
 function buildPaperOptions(){
   const sel=document.getElementById('paper');
   sel.innerHTML=PAPERS.slice().sort((a,b)=>paperArea(b)-paperArea(a))
     .map(P=>'<option value="'+P.k+'">'+paperLabel(P)+'</option>').join('');
 }
 function applyPaper(k){
+  CardRender.setPaper(k);
   const P=paperOf(k);
   document.body.className = P.canvas ? 'fmt-poster' : 'fmt-doc';
   // Paper-proportional corner radius for pictures etc. (A4 ⇒ ~4.5px).
@@ -737,32 +576,15 @@ function pageCount(){
   texts().forEach(t=>{ if(+t.page>n) n=+t.page; });
   return Math.max(1,n);
 }
-function cardInner(it){
-  return it.ref_type==='contact' ? personCard(it)
-       : it.ref_type==='media'   ? mediaBlock(it)
-       : postBlock(it);
-}
 // An object's font-size follows its width (true zoom), times a text-zoom knob.
 // An object's width is a PERCENTAGE of the page, so it grows with the paper.
 // The font-size has to grow with it, or changing A4 → poster leaves the box three
 // times bigger with the same small type — and because everything inside an object
 // is em, the whole internal layout drifts. pScale() is 1.0 on A4, so A4 documents
 // are unaffected; other papers are corrected.
-function fsOf(ov){
-  const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
-  return Math.max(2, 13.5*(w/28)*ts*pScale());   // no ceiling — big papers want BIG type
-}
 // Crop geometry is stored as RATIOS of the window width (pwr/phr/ixr/iyr), so
 // it survives paper-size changes and object resizing untouched. cropEms turns
 // them into em values for the CURRENT paper.
-const MMPX=96/25.4;
-const r4=v=>Math.round(v*10000)/10000;
-function cropEms(ov){
-  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
-  const fs=fsOf(ov);
-  const Wem=P.w*MMPX*((+ov.w||28)/100)/fs;
-  return { Wem, pw:(+ov.pwr||1)*Wem, ph:(+ov.phr||0.6)*Wem, ix:(+ov.ixr||0)*Wem, iy:(+ov.iyr||0)*Wem };
-}
 function absWrap(it){
   const ov=it.overrides||{};
   const x=ov.x!=null?+ov.x:10, y=ov.y!=null?+ov.y:10, w=+ov.w||28;

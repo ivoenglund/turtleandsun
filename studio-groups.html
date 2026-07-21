@@ -2,6 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Studio — Groups &amp; contacts — Turtle and Sun</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="/card-render.css">
+<script src="/card-render.js"></script>
 <script src="/nav.js?v=20260712b"></script>
 <script src="/vendor/d3.v7.min.js"></script>
 <script src="/vendor/topola.min.js"></script>
@@ -350,11 +352,7 @@
       .prCard:hover{border-color:#c9a24b;box-shadow:0 4px 16px rgba(0,0,0,.14);}
       .prCover{position:relative;background:#fff;border-bottom:1px solid #efe9d8;cursor:pointer;
                background-image:linear-gradient(#fbf9f2 0 0);}
-      .prCover .pg{position:absolute;inset:0;overflow:hidden;}
-      .prCover .ob{position:absolute;overflow:hidden;border-radius:2px;}
-      .prCover .ob img{width:100%;height:100%;object-fit:cover;display:block;}
-      .prCover .ob.txt{background:#e7e2d2;}
-      .prCover .ob.nm{background:#dfe7d8;}
+      .prCover > div{pointer-events:none;}
       .prCover .pill{position:absolute;right:6px;bottom:6px;font-size:9.5px;font-weight:800;
                      letter-spacing:.4px;background:rgba(255,255,255,.92);border:1px solid #e3ddca;
                      border-radius:20px;padding:1px 7px;color:#7a8470;}
@@ -2603,10 +2601,6 @@ async function renderMak(){ await renderMakLib(); }
 // actually sit, photos and all. Search, sort, and group by customer — a print
 // remembers its customer in params.roles.customer, the slot that was reserved
 // when the bindings groundwork went in, so this costs no new table.
-const PAPERW={a0:841,a1:594,a2:420,a3:297,a4:210,a5:148,a6:105,
-  letter:215.9,legal:215.9,tabloid:279.4,ansic:431.8,ansid:558.8,ansie:863.6,poster:700};
-const PAPERH={a0:1189,a1:841,a2:594,a3:420,a4:297,a5:210,a6:148,
-  letter:279.4,legal:355.6,tabloid:431.8,ansic:558.8,ansid:863.6,ansie:1117.6,poster:1000};
 let PRINTS=[], prQ='', prSort='new', prGroup='none';
 
 async function renderMakLib(){
@@ -2617,22 +2611,15 @@ async function renderMakLib(){
   drawPrintLib();
 }
 
+// The cover is the print's first card, rendered by the SAME module the editor
+// uses and shrunk with one transform. Previously this drew coloured bars, which
+// meant no fonts at all — and any change to a card's look would not show here.
 function prCoverHtml(p){
-  const W=PAPERW[p.paper]||210, H=PAPERH[p.paper]||297;
-  const boxH=Math.round(168*(H/W));                    // cover keeps the paper's shape
-  const obs=(p.cover||[]).slice().sort((a,b)=>(a.z||0)-(b.z||0));
-  const bars=(p.texts||[]).map(t=>
-    '<div class="ob txt" style="left:'+t.x+'%;top:'+t.y+'%;width:'+t.w+'%;height:4%;"></div>').join('');
-  const body=obs.map(o=>{
-    const st='left:'+o.x+'%;top:'+o.y+'%;width:'+o.w+'%;'+
-      (o.r?'transform:rotate('+o.r+'deg);':'');
-    if(o.img) return '<div class="ob" style="'+st+'height:'+(o.w*(W/H)*0.95).toFixed(1)+'%;">'+
-      '<img src="'+esc(o.img)+'" loading="lazy" alt=""></div>';
-    const cls=o.rt==='contact'?'ob nm':'ob txt';
-    return '<div class="'+cls+'" style="'+st+'height:'+(o.rt==='contact'?6:5)+'%;"></div>';
-  }).join('');
-  return '<div class="prCover" data-open="'+p.id+'" style="height:'+boxH+'px;" title="Open '+esc(p.name)+'">'+
-    '<div class="pg">'+bars+body+'</div>'+
+  const W=168;
+  const P=CardRender.paperOf(p.paper||'a4');
+  const H=Math.round(W*(P.h/P.w));
+  return '<div class="prCover" data-open="'+p.id+'" style="height:'+H+'px;" title="Open '+esc(p.name)+'">'+
+    CardRender.pageHtml({ paper:p.paper||'a4', items:p.cover||[], texts:p.texts||[] }, W)+
     '<span class="pill">'+esc((p.paper||'a4').toUpperCase())+' · '+p.pages+'p</span></div>';
 }
 
