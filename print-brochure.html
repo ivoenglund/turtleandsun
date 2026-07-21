@@ -267,9 +267,9 @@
     /* Backgrounds and shadows must actually print. */
     .abswrap,.frameobj,.block,.txtfree{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     #out{ position:static!important; transform:none!important; width:auto!important; height:auto!important; margin:0!important; overflow:visible!important; }
-    .page{ box-shadow:none; margin:0; page-break-after:always; height:auto; min-height:296mm; overflow:hidden!important; }
+    /* Size comes from applyPaper()'s injected rule — the DESIGN paper. */
+    .page{ box-shadow:none; margin:0; page-break-after:always; overflow:hidden!important; }
     .page:last-child{ page-break-after:auto; break-after:auto; }   /* no phantom empty sheet */
-    body.fmt-poster .page{ height:1000mm; }
     #out .page{ cursor:auto; }
   }
 </style>
