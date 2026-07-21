@@ -2647,6 +2647,7 @@ function prCardHtml(p){
       '<div class="mt">'+p.items+' object'+(p.items===1?'':'s')+'</div>'+
       '<div class="row">'+
         '<button class="btn sm gray prOpen" data-id="'+p.id+'" style="flex:1;">Open</button>'+
+        '<button class="btn sm gray prDup" data-id="'+p.id+'" title="Make another one like this">⧉</button>'+
         '<button class="btn sm danger prKill" data-id="'+p.id+'" title="Delete this print">✕</button>'+
       '</div></div></div>';
 }
@@ -2705,6 +2706,15 @@ function drawPrintLib(){
 
   host.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>window.open('/print/brochure?comp='+el.dataset.open,'_blank'));
   host.querySelectorAll('.prOpen').forEach(b=>b.onclick=()=>window.open('/print/brochure?comp='+b.dataset.id,'_blank'));
+  host.querySelectorAll('.prDup').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    try{
+      const r=await api('/api/compositions/'+b.dataset.id+'/duplicate',{method:'POST',body:'{}'});
+      showToast('Copied');
+      await renderMakLib();
+      if(r&&r.composition) window.open('/print/brochure?comp='+r.composition.id,'_blank');
+    }catch(e){ showToast('Could not copy'); b.disabled=false; }
+  });
   host.querySelectorAll('.prKill').forEach(b=>b.onclick=async()=>{
     const p=PRINTS.find(x=>x.id===+b.dataset.id);
     if(!confirm('Delete "'+(p?p.name:'this print')+'"? The cards themselves are not touched.')) return;

@@ -88,6 +88,8 @@
                  border-radius:8px; background:#fff; cursor:pointer; color:var(--ink); line-height:1.2; }
   #panel button:hover{ background:#f4efe4; }
   #panel button:disabled{ opacity:.35; cursor:default; }
+  #saveState{ flex:1; font-size:11.5px; font-weight:700; color:var(--muted); text-align:right;
+              padding-right:2px; white-space:nowrap; }
   #panel button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
   #panel button.primary:hover{ background:#17403b; }
   #panel button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
@@ -99,29 +101,6 @@
   #panel input[type=range]{ width:100%; margin:1px 0 3px; accent-color:var(--gold); }
   #panel input[type=number]{ font-family:inherit; font-size:13px; padding:5px 8px; border-radius:8px; border:1px solid #d9d4c4; }
   #zoomWrap input[type=range]{ flex:1; min-width:0; width:auto; margin:0; }
-  /* ── Print blocks picker: same card look as the panel ── */
-  #blkOverlay{ display:none; position:fixed; inset:0; background:rgba(35,41,29,.34); z-index:60; }
-  #blkOverlay.open{ display:block; }
-  #blkBox{ position:absolute; right:290px; top:16px; width:330px; max-height:calc(100vh - 32px);
-           display:flex; flex-direction:column; background:#fff; border:2px solid var(--gold);
-           border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,.25); font-size:13px; overflow:hidden; }
-  #blkHead{ display:flex; align-items:center; justify-content:space-between; padding:9px 12px;
-            font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase;
-            color:var(--green); border-bottom:1px solid #ece7d9; }
-  #blkHead button{ font-family:inherit; font-weight:700; font-size:13px; border:0; background:none;
-                   cursor:pointer; color:var(--muted); padding:0 2px; }
-  #blkList{ overflow:auto; padding:6px; }
-  #blkList .bempty{ color:var(--muted); padding:14px 8px; line-height:1.5; }
-  #blkList .brow{ display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:9px; cursor:pointer; }
-  #blkList .brow:hover{ background:#f4efe4; }
-  #blkList .bmain{ flex:1; min-width:0; }
-  #blkList .bname{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #blkList .bsub{ font-size:11px; color:var(--muted); }
-  #blkList .bact{ font-family:inherit; font-weight:700; font-size:11px; padding:3px 7px; border-radius:7px;
-                  border:1px solid #d9d4c4; background:#fff; cursor:pointer; color:var(--ink); }
-  #blkList .bact:hover{ background:#fff; border-color:var(--gold); }
-  #blkList .bact.danger{ color:#8c2f1b; border-color:#dcc0b5; }
-  @media print{ #blkOverlay{ display:none!important; } }
   /* ── Filmstrip: the document IS this row of cards ── */
   /* No bar, no border: the cards sit straight on the background. */
   #strip{ position:fixed; left:0; right:282px; bottom:0; z-index:9;
@@ -255,7 +234,7 @@
   <div id="docCtl">
     <div class="prow">
       <button onclick="window.print()" title="Print / save as PDF">🖨 PDF</button>
-      <button id="saveBtn" class="primary">Save</button>
+      <span id="saveState" title="Everything saves by itself">✓ Saved</span>
       <button id="undoBtn" title="Undo (Ctrl+Z)" style="flex:0 0 auto;">↶</button>
       <button id="redoBtn" title="Redo (Ctrl+Y)" style="flex:0 0 auto;">↷</button>
     </div>
@@ -270,20 +249,9 @@
     </div>
     <!-- Page navigation and page operations live in the filmstrip now. -->
     <div class="prow"><button id="addTextBtn" title="Add a free text object to this page">＋ Text</button></div>
-    <div class="ph">Print blocks</div>
-    <div class="prow">
-      <button id="blkUse" style="flex:1;" title="Stamp a saved block onto this page">▤ Use block</button>
-      <button id="blkSave" style="flex:1;" title="Save this page as a reusable block">⬒ Save page</button>
-    </div>
   </div>
   <div id="knobs"></div>
 </aside>
-<div id="blkOverlay">
-  <div id="blkBox">
-    <div id="blkHead">Print blocks<button id="blkClose" title="Close">✕</button></div>
-    <div id="blkList">Loading…</div>
-  </div>
-</div>
 <div id="out"><div class="err">Loading…</div></div>
 <button id="resTab" title="Show or hide your content">Content</button>
 <aside id="res">
@@ -904,8 +872,7 @@ function wirePan(){
   if(panWired) return; panWired=true;
   document.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
-    if(e.target.closest('#panel')||e.target.closest('#strip')||e.target.closest('#stripTab')||e.target.closest('#blkOverlay')
-       ||e.target.closest('#res')||e.target.closest('#resTab')
+    if(e.target.closest('#panel')||e.target.closest('#strip')||e.target.closest('#stripTab')||e.target.closest('#res')||e.target.closest('#resTab')
        ||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
     if(editing) commitEdit(false);
     if(e.target.closest('#out .page')){ startMarquee(e); return; }
@@ -1881,7 +1848,7 @@ document.addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; 
 // The wheel zooms EVERYWHERE (anchored to the cursor, even off the page) —
 // except over the panel, which scrolls normally.
 document.addEventListener('wheel',e=>{
-  if(e.target.closest&&e.target.closest('#panel,#blkBox,#strip,#res')) return;   // let the panel/picker/strip scroll
+  if(e.target.closest&&e.target.closest('#panel,#strip,#res')) return;   // let the panel/picker/strip scroll
   e.preventDefault();
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
@@ -1900,8 +1867,6 @@ document.addEventListener('keydown',e=>{
   if(e.key==='PageUp'){   e.preventDefault(); if(curPage>1)           setPage(curPage-1); return; }
   if(e.key==='Delete'&&SEL.length){ e.preventDefault(); removeSelected(); return; }
   if(e.key==='Escape'){ e.preventDefault();
-    const bo=document.getElementById('blkOverlay');
-    if(bo&&bo.classList.contains('open')){ closeBlocks(); return; }
     if(cropKey){ cropKey=null; showKnobs(); markSel(); } else clearSel(); return; }
   // Arrow keys nudge the selection: 0.5% per press, 0.1% with Shift.
   if(SEL.length&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
@@ -2084,11 +2049,21 @@ async function dropGroup(d){
 
 document.addEventListener('dragover',e=>{
   const t=[...(e.dataTransfer.types||[])];
-  if(t.includes('text/ts-card')||t.includes('text/ts-group')||t.includes('Files')
-     ||t.includes('text/uri-list')||t.includes('text/html'))
+  if(t.includes('text/ts-card')||t.includes('text/ts-group')||t.includes('text/ts-block')
+     ||t.includes('Files')||t.includes('text/uri-list')||t.includes('text/html'))
     e.preventDefault();
 });
+// A saved card dropped from the Content panel stamps onto the current page.
+async function dropSavedCard(id){
+  try{
+    const r=await fetch('/api/print-blocks/'+id);
+    if(!r.ok){ alert('Could not load that card.'); return; }
+    stampBlock(await r.json());
+  }catch(e){ alert('Could not load that card.'); }
+}
 document.addEventListener('drop',async e=>{
+  const blk=e.dataTransfer.getData('text/ts-block');
+  if(blk){ e.preventDefault(); await dropSavedCard(blk); return; }
   const grp=e.dataTransfer.getData('text/ts-group');
   if(grp){ e.preventDefault();
     let d; try{ d=JSON.parse(grp); }catch(err){ return; }
@@ -2144,7 +2119,7 @@ window.addEventListener('afterprint',()=>{ renderCurrent(); applyZoom(curScale*1
 
 // ── Autosave: a couple of seconds after the last change, plus the button ──
 let saveTimer=null;
-function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,2500); }
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,2500); saveState('Unsaved changes'); }
 // Never two saves in flight. Each PUT replaces the whole item list, so overlapping
 // saves are what let the server interleave them; the guard removes the race at
 // the source and the transaction on the server catches anything else.
@@ -2163,17 +2138,29 @@ async function saveNowInner(){
   clearTimeout(saveTimer);
   COMP.params=COMP.params||{}; COMP.params.pages=pageCount();
   const items=COMP.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}));
-  const btn=document.getElementById('saveBtn');
-  if(btn) btn.textContent='Saving…';
+  saveState('Saving…');
   let ok=false;
   try{
     const r=await fetch('/api/compositions/'+compId,{method:'PUT',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({items, params:COMP.params||{}})});
+      body:JSON.stringify({items, params:COMP.params||{}}), keepalive:true});
     ok=r.ok;
   }catch(e){}
-  if(btn){ btn.textContent= ok ? '✓ Saved' : 'Save failed'; setTimeout(()=>btn.textContent='Save',1500); }
+  saveState(ok?'✓ Saved':'Not saved — retrying');
+  if(!ok) scheduleSave();
 }
-document.getElementById('saveBtn').onclick=()=>{ if(editing) commitEdit(true); saveNow(); };
+// The panel reports; there is nothing to press. Everything saves 2.5s after the
+// last change, and anything still pending is flushed when the tab goes away.
+let saveStateT=null;
+function saveState(txt, back){
+  const el=document.getElementById('saveState'); if(!el) return;
+  el.textContent=txt;
+  clearTimeout(saveStateT);
+  if(back) saveStateT=setTimeout(()=>{ el.textContent='✓ Saved'; }, back);
+}
+function flushSave(){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; saveNow(); } }
+// pagehide covers closing and navigating away; keepalive lets the PUT finish.
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSave(); });
 
 // ── PRINT BLOCKS ────────────────────────────────────────────────────
 // A block is a saved page you can stamp into any document. It stores
@@ -2184,35 +2171,34 @@ document.getElementById('saveBtn').onclick=()=>{ if(editing) commitEdit(true); s
 
 // Save the current page as a reusable block. Page numbers are rebased to 1
 // so the block is position-independent — it can land on any page later.
-async function savePageAsBlock(){
+// Save one card as a reusable card. Called from that card in the filmstrip, so
+// there is never any doubt which page you meant.
+async function saveCardAsBlock(n){
   if(!COMP) return;
   if(editing) commitEdit(true);
-  const onPage = COMP.items
-    .map((it,i)=>({it,i}))
-    .filter(({it})=> (+(it.overrides&&it.overrides.page)||0)===curPage);
-  const fr = frames().filter(f=>(+f.page||1)===curPage);
-  const tx = texts().filter(t=>(+t.page||1)===curPage);
-  if(!onPage.length && !fr.length && !tx.length){ alert('This page is empty — nothing to save.'); return; }
-  const name = prompt('Name this block (e.g. "Our team", "Standard letter"):', COMP.name ? (COMP.name+' — page '+curPage) : '');
-  if(!name || !name.trim()) return;
-  // Blocks are page-relative and card-identity-free: the card id belongs to the
-  // document it came from, not to the block.
-  const rebase = o => { const c=JSON.parse(JSON.stringify(o||{})); c.page=1; delete c.card; delete c.blk; return c; };
-  const body = {
-    name: name.trim(), kind:'page', pages:1,
-    params: { frames: fr.map(rebase), texts: tx.map(rebase) },
-    items: onPage.map(({it})=>({ ref_type:it.ref_type, ref_id:it.ref_id, overrides:rebase(it.overrides) })),
-    declares: {}
-  };
-  const btn=document.getElementById('blkSave');
-  if(btn) btn.textContent='Saving…';
-  let ok=false;
+  const id=cardIdAt(n);
+  const onPage=COMP.items.filter(it=>it.overrides&&it.overrides.card===id);
+  const fr=frames().filter(f=>f.card===id);
+  const tx=texts().filter(t=>t.card===id);
+  if(!onPage.length&&!fr.length&&!tx.length){ alert('That card is empty — nothing to save.'); return; }
+  const name=prompt('Name this card (e.g. "Our team", "Standard letter"):',
+    COMP.name?(COMP.name+' — page '+n):'');
+  if(!name||!name.trim()) return;
+  // A saved card is page-relative and carries no card identity: that belongs to
+  // the document it came from, not to the card.
+  const rebase=o=>{ const c=JSON.parse(JSON.stringify(o||{})); c.page=1;
+    delete c.card; delete c.blk; delete c.grp; delete c.gi; return c; };
   try{
     const r=await fetch('/api/print-blocks',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body)});
-    ok=r.ok;
-  }catch(e){}
-  if(btn){ btn.textContent= ok ? '✓ Saved' : 'Save failed'; setTimeout(()=>btn.textContent='⬒ Save page',1600); }
+      body:JSON.stringify({ name:name.trim(), kind:'page', pages:1,
+        params:{ frames:fr.map(rebase), texts:tx.map(rebase) },
+        items:onPage.map(it=>({ref_type:it.ref_type,ref_id:it.ref_id,overrides:rebase(it.overrides)})),
+        declares:{} })});
+    if(!r.ok){ alert('Could not save that card.'); return; }
+    RES.cardsDirty=true;
+    if(document.getElementById('res').classList.contains('open')&&RES.cards) fetchContent();
+    saveState('✓ Card saved', 2200);
+  }catch(e){ alert('Could not save that card.'); }
 }
 
 // Stamp a block onto the current page: its page 1 lands on curPage, page 2 on
@@ -2244,56 +2230,8 @@ function stampBlock(b){
     ' no longer in your library, so '+(b.dropped>1?'they were':'it was')+' left out.');
 }
 
-async function useBlock(id){
-  try{
-    const r=await fetch('/api/print-blocks/'+id);
-    if(!r.ok){ alert('Could not load that block.'); return; }
-    const b=await r.json();
-    closeBlocks();
-    stampBlock(b);
-  }catch(e){ alert('Could not load that block.'); }
-}
 
-function closeBlocks(){ document.getElementById('blkOverlay').classList.remove('open'); }
 
-async function openBlocks(){
-  const ov=document.getElementById('blkOverlay'), list=document.getElementById('blkList');
-  ov.classList.add('open');
-  list.textContent='Loading…';
-  let blocks=[];
-  try{
-    const r=await fetch('/api/print-blocks');
-    if(r.ok) blocks=(await r.json()).blocks||[];
-  }catch(e){ list.textContent='Could not load your blocks.'; return; }
-  if(!blocks.length){
-    list.innerHTML='<div class="bempty">No blocks yet.<br><br>Lay out a page the way you like it, then press '+
-      '<b>⬒ Save page</b> to keep it here. The people and posts inside stay live — reuse it in any document '+
-      'and their details come back fresh.</div>';
-    return;
-  }
-  list.innerHTML = blocks.map(b=>
-    '<div class="brow" data-use="'+b.id+'" title="Place this block on page '+curPage+'">'+
-      '<div class="bmain"><div class="bname">'+esc(b.name)+'</div>'+
-        '<div class="bsub">'+(+b.pages>1?(b.pages+' pages · '):'')+b.item_count+' card'+(+b.item_count===1?'':'s')+'</div></div>'+
-      '<button class="bact" data-dup="'+b.id+'" title="Make a copy to edit separately">⧉</button>'+
-      '<button class="bact danger" data-del="'+b.id+'" title="Delete this block">✕</button>'+
-    '</div>').join('');
-  list.querySelectorAll('[data-use]').forEach(el=>{
-    el.onclick=e=>{ if(e.target.closest('[data-dup],[data-del]')) return; useBlock(el.getAttribute('data-use')); };
-  });
-  list.querySelectorAll('[data-dup]').forEach(el=>{
-    el.onclick=async e=>{ e.stopPropagation();
-      await fetch('/api/print-blocks/'+el.getAttribute('data-dup')+'/duplicate',
-        {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-      openBlocks(); };
-  });
-  list.querySelectorAll('[data-del]').forEach(el=>{
-    el.onclick=async e=>{ e.stopPropagation();
-      if(!confirm('Delete this block? Documents you already made keep their layout.')) return;
-      await fetch('/api/print-blocks/'+el.getAttribute('data-del'),{method:'DELETE'});
-      openBlocks(); };
-  });
-}
 
 // ── The filmstrip: a view of params.cards ───────────────────────────
 // Every operation here is a list operation on params.cards — which is exactly
@@ -2344,6 +2282,7 @@ function renderStrip(){
       '<div class="sact">'+
         '<button data-ins="'+n+'" title="Insert an empty card after this one">＋</button>'+
         '<button data-cpy="'+n+'" title="Duplicate this card">⧉</button>'+
+        '<button data-savecard="'+n+'" title="Save this card to reuse in other prints">⬒</button>'+
         (N>1?'<button class="danger" data-del="'+n+'" title="Delete this card">✕</button>':'')+
       '</div>'+
       '<div class="snum">'+n+'</div></div>';
@@ -2359,7 +2298,8 @@ function renderStrip(){
     // whole group dragged out of the Content panel — dropped straight onto THAT page.
     el.ondragover=e=>{
       const t=[...(e.dataTransfer.types||[])];
-      if(dragFrom==null && !t.includes('text/ts-card') && !t.includes('text/ts-group')) return;
+      if(dragFrom==null && !t.includes('text/ts-card') && !t.includes('text/ts-group')
+         && !t.includes('text/ts-block')) return;
       e.preventDefault();
       e.dataTransfer.dropEffect=dragFrom==null?'copy':'move';
       el.classList.add('dragover');
@@ -2370,9 +2310,11 @@ function renderStrip(){
       if(dragFrom!=null){ if(dragFrom!==n) moveCard(dragFrom,n); dragFrom=null; return; }
       const grp=e.dataTransfer.getData('text/ts-group');
       const one=e.dataTransfer.getData('text/ts-card');
-      if(!grp&&!one) return;
+      const blk=e.dataTransfer.getData('text/ts-block');
+      if(!grp&&!one&&!blk) return;
       if(n!==curPage) setPage(n);            // work on the page you dropped onto
-      if(grp){ let d; try{ d=JSON.parse(grp); }catch(err){ return; }
+      if(blk){ await dropSavedCard(blk); }
+      else if(grp){ let d; try{ d=JSON.parse(grp); }catch(err){ return; }
                if(d&&d.section) await dropGroup(d); }
       else   { let d; try{ d=JSON.parse(one); }catch(err){ return; }
                await placeCardRef(d, null, null); }
@@ -2381,6 +2323,7 @@ function renderStrip(){
   });
   host.querySelectorAll('[data-ins]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); insertCardAt(+b.dataset.ins); });
   host.querySelectorAll('[data-cpy]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); copyCardAt(+b.dataset.cpy); });
+  host.querySelectorAll('[data-savecard]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); saveCardAsBlock(+b.dataset.savecard); });
   host.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
     const n=+b.dataset.del; if(n!==curPage) setPage(n); deletePage(); });
   const cur=host.querySelector('.sthumb.cur');
@@ -2415,7 +2358,8 @@ const RES={
   on:{},                          // 'g:5' -> true   which groups are ticked
   // Nothing is on at the start: you normally want one group, not everything.
   // The attribute filters begin fully on, which means "no restriction".
-  ungrouped:false, timeline:false, archive:false,
+  ungrouped:false, timeline:false, archive:false, cards:false,
+  cardList:[], cardsDirty:true,
   living:true, deceased:true, people:true, pets:true,
   y1:String(new Date().getFullYear()), y2:String(new Date().getFullYear()+1),
   q:'', size:13.5, busy:false, seq:0
@@ -2482,6 +2426,8 @@ function renderTree(){
        '<span class="yrs"><input type="number" id="rY1" value="'+esc(RES.y1)+'">'+
        '<input type="number" id="rY2" value="'+esc(RES.y2)+'"></span></span></div>';
   h+=row('archive','Archive',RES.archive);
+  h+='<div class="fh">Cards</div>';
+  h+=row('cards','My cards',RES.cards,RES.cardList.length||null);
   h+='<div class="fh">Filter</div>';
   h+=row('living','Living',RES.living)+row('deceased','Deceased',RES.deceased)+
      row('people','People',RES.people)+row('pets','Pets',RES.pets);
@@ -2510,10 +2456,13 @@ async function fetchContent(){
   const body=document.getElementById('resBody');
   const mine=++RES.seq;
   try{
-    const r=await fetch('/api/content?'+resQuery({preview:100}));
+    const jobs=[fetch('/api/content?'+resQuery({preview:100}))];
+    if(RES.cards&&RES.cardsDirty) jobs.push(fetch('/api/print-blocks'));
+    const [r,rb]=await Promise.all(jobs);
     if(mine!==RES.seq) return;                  // a newer request has overtaken this one
     if(!r.ok){ body.textContent='Could not load your content.'; return; }
     RES.sections=(await r.json()).sections||[];
+    if(rb&&rb.ok){ RES.cardList=((await rb.json()).blocks)||[]; RES.cardsDirty=false; }
     renderContent();
   }catch(e){ if(mine===RES.seq) body.textContent='Could not load your content.'; }
 }
@@ -2527,11 +2476,47 @@ function resItemHtml(kind,o){
            postBlock({_idx:-1,ref_type:'post',content:o,overrides:{part:'img'+i}})).join('')+
          '<div class="clamp8">'+postBlock({_idx:-1,ref_type:'post',content:o,overrides:{}})+'</div>';
 }
+// A saved card previews as a real mini page: the same renderers, positioned
+// exactly where the objects sit, scaled by each wrapper's font-size.
+function cardThumbHtml(b, W){
+  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
+  const H=Math.round(W*(P.h/P.w));
+  const obs=(b.cover||[]).map(it=>{
+    const ov=it.overrides||{};
+    const w=+ov.w||24;
+    return '<div style="position:absolute;left:'+(+ov.x||0)+'%;top:'+(+ov.y||0)+'%;width:'+w+'%;'+
+      'font-size:'+Math.max(1.5,(W*w/100)/28*13.5/13.5*2.2).toFixed(2)+'px;'+
+      ((+ov.r)?'transform:rotate('+(+ov.r)+'deg);':'')+'overflow:hidden;">'+
+      cardInner({ ...it, _idx:-1 })+'</div>';
+  }).join('');
+  const bars=(b.texts||[]).map(t=>
+    '<div style="position:absolute;left:'+(+t.x||0)+'%;top:'+(+t.y||0)+'%;width:'+(+t.w||30)+'%;'+
+    'height:4%;background:#e7e2d2;border-radius:2px;"></div>').join('');
+  return '<div style="position:relative;width:'+W+'px;height:'+H+'px;background:#fff;'+
+    'border:1px solid #e2dccb;border-radius:4px;overflow:hidden;">'+bars+obs+'</div>';
+}
+
 function renderContent(){
   const body=document.getElementById('resBody');
-  if(!RES.sections.length){ body.innerHTML='<div class="empty">Nothing ticked — choose a group, or Timeline or Archive above.</div>'; return; }
   const W=Math.round(RES.size*11);              // thumbnail column width follows the size
-  body.innerHTML=RES.sections.map(sec=>{
+  const list=RES.cardList||[];
+  const cardsHtml = RES.cards
+    ? '<div class="sechd"><b>My cards</b><span class="n">'+list.length+'</span></div>'+
+      (list.length
+        ? '<div class="rgrid">'+list.map(b=>
+            '<div class="rcard" draggable="true" data-blk="'+b.id+'" style="width:'+W+'px;" '+
+            'title="'+esc(b.name)+' — drag it onto the page">'+
+            '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">✕</button>'+
+            cardThumbHtml(b,W-18)+
+            '<div style="font-size:11px;font-weight:700;margin-top:5px;white-space:nowrap;'+
+            'overflow:hidden;text-overflow:ellipsis;">'+esc(b.name)+'</div></div>').join('')+'</div>'
+        : '<div class="empty">No saved cards yet. Hover a card in the filmstrip and press ⬒ to keep it.</div>')
+    : '';
+  if(!RES.sections.length&&!cardsHtml){
+    body.innerHTML='<div class="empty">Nothing ticked — choose a group, or Timeline, Archive or Cards above.</div>';
+    return;
+  }
+  body.innerHTML=cardsHtml+RES.sections.map(sec=>{
     const shown=sec.items.length, more=sec.total-shown;
     const arch=sec.key==='archive';
     // Grab the heading to drag the WHOLE section onto a card.
@@ -2565,6 +2550,19 @@ function renderContent(){
   // Delete from the archive — but tell the truth first. Deleting a picture also
   // removes it from every print that uses it (the server clears those items), so
   // the count is the thing you actually need to see before deciding.
+  body.querySelectorAll('.rcard[data-blk]').forEach(el=>{
+    el.ondragstart=e=>{
+      try{ e.dataTransfer.setData('text/ts-block', el.dataset.blk); }catch(err){}
+      e.dataTransfer.effectAllowed='copy';
+    };
+    el.onclick=e=>{ if(e.target.closest('[data-blkdel]')) return; };
+  });
+  body.querySelectorAll('[data-blkdel]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    if(!confirm('Delete this card? Prints you already made keep their layout.')) return;
+    try{ await fetch('/api/print-blocks/'+b.dataset.blkdel,{method:'DELETE'});
+         RES.cardsDirty=true; fetchContent(); }catch(err){}
+  });
   body.querySelectorAll('.sechd[data-sec]').forEach(h=>{
     h.ondragstart=e=>{
       try{ e.dataTransfer.setData('text/ts-group',
@@ -2689,10 +2687,6 @@ document.getElementById('stripInner').addEventListener('wheel',e=>{
   host.scrollLeft+=d;
 },{passive:false});
 
-document.getElementById('blkSave').onclick=savePageAsBlock;
-document.getElementById('blkUse').onclick=openBlocks;
-document.getElementById('blkClose').onclick=closeBlocks;
-document.getElementById('blkOverlay').onmousedown=e=>{ if(e.target.id==='blkOverlay') closeBlocks(); };
 
 load();
 </script>

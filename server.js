@@ -2820,6 +2820,66 @@ app.get('/api/prints', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Copy a print, layout and all — "make another one like this". The copy keeps
+// the same refs, so its people and posts still resolve live.
+app.post('/api/compositions/:id(\\d+)/duplicate', requireAuth, async (req, res) => {
+  const uid = req.user.id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const src = await client.query(
+      `SELECT name, template, params FROM compositions WHERE id = $1 AND user_id = $2`,
+      [req.params.id, uid]);
+    if (!src.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
+    const s = src.rows[0];
+    const name = (req.body && req.body.name) ? String(req.body.name).trim() : (s.name + ' (copy)');
+    // Fresh card ids: the copy is its own document, not a second name for the same one.
+    const params = s.params || {};
+    if (Array.isArray(params.cards)) {
+      const map = {};
+      params.cards = params.cards.map(c => {
+        const nid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        map[c.id] = nid; return { ...c, id: nid };
+      });
+      params._cardmap = map;
+    }
+    const ins = await client.query(
+      `INSERT INTO compositions (user_id, name, template, params)
+       VALUES ($1,$2,$3,$4) RETURNING id, name`,
+      [uid, name, s.template || 'brochure', JSON.stringify((() => {
+        const p = { ...params }; delete p._cardmap; return p;
+      })())]);
+    const newId = ins.rows[0].id;
+    const items = await client.query(
+      `SELECT ref_type, ref_id, position, overrides FROM composition_items
+        WHERE composition_id = $1 AND user_id = $2 ORDER BY position, id`,
+      [req.params.id, uid]);
+    const map = params._cardmap || {};
+    for (const it of items.rows) {
+      const ov = { ...(it.overrides || {}) };
+      if (ov.card && map[ov.card]) ov.card = map[ov.card];
+      await client.query(
+        `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [uid, newId, it.ref_type, it.ref_id, it.position, JSON.stringify(ov)]);
+    }
+    // Frames and free texts live in params and were copied with it — re-point their cards too.
+    if (Object.keys(map).length) {
+      const p = await client.query(`SELECT params FROM compositions WHERE id = $1`, [newId]);
+      const np = p.rows[0].params || {};
+      ['frames', 'texts'].forEach(k => {
+        if (Array.isArray(np[k])) np[k] = np[k].map(o => (o && o.card && map[o.card]) ? { ...o, card: map[o.card] } : o);
+      });
+      await client.query(`UPDATE compositions SET params = $1 WHERE id = $2`, [JSON.stringify(np), newId]);
+    }
+    await client.query('COMMIT');
+    res.json({ v: 1, ok: true, composition: ins.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    res.status(500).json({ error: err.message });
+  } finally { client.release(); }
+});
+
 // Small contact lookup for assigning a customer to a print.
 app.get('/api/contacts/search', requireAuth, async (req, res) => {
   const q = String((req.query && req.query.q) || '').trim();
@@ -2870,14 +2930,26 @@ async function resolveBlockItems(items, userId) {
   return { items: out, dropped };
 }
 
-// List — light rows for the picker (no items payload).
+// List, each with a COVER: the objects on its first page, resolved, so the
+// Content panel can draw a real mini-page instead of a name in a list.
 app.get('/api/print-blocks', requireAuth, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT id, name, kind, pages, declares, created_at,
+      `SELECT id, name, kind, pages, params, items, declares, created_at,
               jsonb_array_length(COALESCE(items, '[]'::jsonb)) AS item_count
          FROM print_blocks WHERE user_id = $1 ORDER BY name`, [req.user.id]);
-    res.json({ v: 1, blocks: r.rows });
+    const blocks = [];
+    for (const b of r.rows) {
+      const first = (Array.isArray(b.items) ? b.items : [])
+        .filter(it => (+((it.overrides || {}).page) || 1) === 1)
+        .slice(0, 24);
+      const { items: cover } = await resolveBlockItems(first, req.user.id);
+      const texts = (((b.params || {}).texts) || []).filter(t => (+t.page || 1) === 1);
+      blocks.push({ id: b.id, name: b.name, kind: b.kind, pages: b.pages,
+                    declares: b.declares, created_at: b.created_at,
+                    item_count: b.item_count, cover, texts });
+    }
+    res.json({ v: 1, blocks });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
