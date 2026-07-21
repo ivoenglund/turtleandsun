@@ -111,7 +111,7 @@
              background:rgba(255,255,255,.8); cursor:pointer; color:var(--muted); }
   #stripTab:hover{ background:#fff; color:var(--ink); }
   #stripInner{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; display:flex;
-               gap:9px; padding:9px 10px 10px; align-items:flex-start;
+               gap:9px; padding:38px 10px 10px; align-items:flex-start;
                /* Grow out from the middle. "safe" keeps the first card reachable
                   once the row is long enough to scroll — plain centring would
                   push it off the left edge with no way to scroll back to it. */
@@ -130,13 +130,26 @@
          text-shadow:0 1px 0 rgba(255,255,255,.85); }
   .sthumb.cur .snum{ color:var(--green); }
   .sthumb.dragover .sprev{ border-color:var(--green); box-shadow:-3px 0 0 var(--green); }
-  .sact{ position:absolute; top:2px; right:2px; display:none; gap:2px; }
+  /* Hovering a card floats a real toolbar above it — the old corner buttons were
+     10px and impossible to hit. */
+  .sact{ position:absolute; left:50%; bottom:calc(100% + 5px); transform:translateX(-50%);
+         display:none; gap:3px; background:#fff; border:1.5px solid var(--gold);
+         border-radius:9px; padding:3px; box-shadow:0 3px 12px rgba(0,0,0,.22); z-index:3;
+         white-space:nowrap; }
   .sthumb:hover .sact{ display:flex; }
-  .sact button{ font-family:inherit; font-size:10px; font-weight:700; line-height:1;
-                padding:2px 4px; border:1px solid #d9d4c4; border-radius:5px; background:#fff;
+  .sact button{ font-family:inherit; font-size:14px; font-weight:700; line-height:1;
+                width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+                border:1px solid #e2dccb; border-radius:7px; background:#fff;
                 cursor:pointer; color:var(--ink); }
-  .sact button:hover{ border-color:var(--gold); }
+  .sact button:hover{ background:#f4efe4; border-color:var(--gold); }
   .sact button.danger{ color:#8c2f1b; border-color:#dcc0b5; }
+  .sact button.danger:hover{ background:#f9ece7; }
+  /* Drop a saved card here to append it as a new page. */
+  #stripEnd{ flex:0 0 auto; align-self:flex-start; display:flex; align-items:center;
+             justify-content:center; border:2px dashed #cfc9b8; border-radius:6px;
+             color:var(--muted); font-size:18px; font-weight:700; cursor:default;
+             background:rgba(255,255,255,.45); }
+  #stripEnd.over{ border-color:var(--green); color:var(--green); background:#fff; }
   @media print{ #strip,#stripTab{ display:none!important; } }
   /* ── Content panel: same feeling as the right panel — white, gold border,
      rounded, drop shadow. A vertical tab slides it out. Plain: you open it, you
@@ -2053,17 +2066,26 @@ document.addEventListener('dragover',e=>{
      ||t.includes('Files')||t.includes('text/uri-list')||t.includes('text/html'))
     e.preventDefault();
 });
-// A saved card dropped from the Content panel stamps onto the current page.
-async function dropSavedCard(id){
+// A saved card is a whole PAGE, so it does not land on top of the page you are
+// working on. By default it becomes a NEW card straight after the current one.
+// Drop it on a page in the filmstrip and it goes into that page instead.
+async function dropSavedCard(id, onto){
   try{
     const r=await fetch('/api/print-blocks/'+id);
     if(!r.ok){ alert('Could not load that card.'); return; }
-    stampBlock(await r.json());
+    const b=await r.json();
+    if(onto==='new'){
+      pushUndo();
+      cards().splice(curPage,0,{id:newCardId()});
+      syncPages();
+      curPage=curPage+1; SEL=[];
+    }
+    stampBlock(b);
   }catch(e){ alert('Could not load that card.'); }
 }
 document.addEventListener('drop',async e=>{
   const blk=e.dataTransfer.getData('text/ts-block');
-  if(blk){ e.preventDefault(); await dropSavedCard(blk); return; }
+  if(blk){ e.preventDefault(); await dropSavedCard(blk,'new'); return; }
   const grp=e.dataTransfer.getData('text/ts-group');
   if(grp){ e.preventDefault();
     let d; try{ d=JSON.parse(grp); }catch(err){ return; }
@@ -2287,7 +2309,23 @@ function renderStrip(){
       '</div>'+
       '<div class="snum">'+n+'</div></div>';
   }
+  html+='<div id="stripEnd" title="Drop a saved card here to add it as a new page at the end"'+
+        ' style="width:'+TW+'px;height:'+TH+'px;">+</div>';
   host.innerHTML=html;
+  const endz=document.getElementById('stripEnd');
+  if(endz){
+    endz.ondragover=e=>{
+      if(![...(e.dataTransfer.types||[])].includes('text/ts-block')) return;
+      e.preventDefault(); e.stopPropagation(); endz.classList.add('over');
+    };
+    endz.ondragleave=()=>endz.classList.remove('over');
+    endz.ondrop=async e=>{
+      e.preventDefault(); e.stopPropagation(); endz.classList.remove('over');
+      const id=e.dataTransfer.getData('text/ts-block'); if(!id) return;
+      setPage(pageCount());                 // append after the last card
+      await dropSavedCard(id,'new');
+    };
+  }
   let dragFrom=null;
   host.querySelectorAll('.sthumb').forEach(el=>{
     const n=+el.dataset.n;
@@ -2313,7 +2351,7 @@ function renderStrip(){
       const blk=e.dataTransfer.getData('text/ts-block');
       if(!grp&&!one&&!blk) return;
       if(n!==curPage) setPage(n);            // work on the page you dropped onto
-      if(blk){ await dropSavedCard(blk); }
+      if(blk){ await dropSavedCard(blk,'here'); }
       else if(grp){ let d; try{ d=JSON.parse(grp); }catch(err){ return; }
                if(d&&d.section) await dropGroup(d); }
       else   { let d; try{ d=JSON.parse(one); }catch(err){ return; }
