@@ -33,6 +33,8 @@
   .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em;
              font-weight:inherit; }
   .block b, .block strong{ font-weight:inherit; }
+  /* Line spacing: the wrapper carries line-height, the text inherits it. */
+  .abswrap.lh .bd, .abswrap.lh .bd p, .abswrap.lh .bd h3, .abswrap.lh .bd .meta{ line-height:inherit; }
   .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
   .block p{ margin:0 0 .73em; font-size:1em; line-height:1.45; }
   .block.txt-s p{ font-size:.85em; } .block.txt-l p{ font-size:1.2em; line-height:1.5; }

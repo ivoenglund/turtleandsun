@@ -499,7 +499,18 @@ function normalizeItems(){
       out.push(it);
     }
   });
-  COMP.items=out;
+  // Drop exact-stacked duplicates: identical ref and identical overrides.
+  const seen=new Set(), dedup=[];
+  out.forEach(it=>{
+    const sig=it.ref_type+'|'+it.ref_id+'|'+JSON.stringify(it.overrides||{});
+    if(seen.has(sig)) return;               // a perfect twin already kept
+    seen.add(sig); dedup.push(it);
+  });
+  COMP.items=dedup;
+  // Free texts and frames the same way.
+  const dd=arr=>{ const s2=new Set(); return (arr||[]).filter(o=>{
+    const sig=JSON.stringify(o||{}); if(s2.has(sig)) return false; s2.add(sig); return true; }); };
+  if(COMP.params){ COMP.params.texts=dd(COMP.params.texts); COMP.params.frames=dd(COMP.params.frames); }
   migrateCards();
 }
 
@@ -679,8 +690,9 @@ function absWrap(it){
     +borderCss(ov)
     +decoCss(ov,bareText)
     +(ov.tc?'color:'+esc(ov.tc)+';':'')
-    +(ov.fw?'font-weight:'+(+ov.fw)+';':'');
-  return '<div class="abswrap'+(ov.sq?' sqo':'')+(+ov.pin?' pinned':'')+
+    +(ov.fw?'font-weight:'+(+ov.fw)+';':'')
+    +(ov.lh?'line-height:'+(+ov.lh)+';':'');
+  return '<div class="abswrap'+(ov.sq?' sqo':'')+(+ov.pin?' pinned':'')+(ov.lh?' lh':'')+
     '" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
 function frameDiv(f,i){
@@ -701,10 +713,11 @@ function txtFreeDiv(t,i){
     +borderCss(t)
     +decoCss(t,true)
     +(t.tc?'color:'+esc(t.tc)+';':'')
-    +(t.fw?'font-weight:'+(+t.fw)+';':'');
+    +(t.fw?'font-weight:'+(+t.fw)+';':'')
+    +(t.lh?'line-height:'+(+t.lh)+';':'');
   const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
   const ffs=t.ff?' style="font-family:'+esc(fontCss(t.ff))+'"':'';
-  return '<div class="abswrap txtfree'+(t.sq?' sqo':'')+'" style="'+st+'" data-text="'+i+'">'+
+  return '<div class="abswrap txtfree'+(t.sq?' sqo':'')+(t.lh?' lh':'')+'" style="'+st+'" data-text="'+i+'">'+
     '<div class="'+cls+'"'+ffs+'><div class="bd">'+sanitizeHtml(t.text||'')+'</div></div></div>';
 }
 function pageHtml(n){
@@ -1387,7 +1400,9 @@ function liveSelStyle(){
       el.style.textShadow=(sh&&bare)?shStr(SHT,sh):'';
       el.style.boxShadow=(sh&&!bare)?shStr(SHB,sh):'';
       el.style.borderRadius=o.sq?'0':RADpx().toFixed(1)+'px';
+      el.style.lineHeight=o.lh?(+o.lh):'';
       el.classList.toggle('sqo',!!o.sq);
+      el.classList.toggle('lh',!!o.lh);
     }else{
       el.style.width=(+o.w||20)+'%'; el.style.height=(+o.h||20)+'%';
       el.style.transform=+o.r?('rotate('+(+o.r)+'deg)'):'';
@@ -1616,6 +1631,9 @@ function showKnobs(){
       '<input type="number" id="knY" step="0.5" value="'+(Math.round((+ov.y||0)*10)/10)+'" style="width:60px;">'+
       '<span style="font-size:11px;color:var(--muted);">W</span>'+
       '<input type="number" id="knWn" step="0.5" min="1" max="200" value="'+(Math.round((+ov.w||28)*10)/10)+'" style="width:60px;"></div>'+
+    (anyText?'<div class="krow"><span style="font-size:11px;color:var(--muted);">Line spacing</span>'+
+      '<input type="range" id="knLh" min="0.8" max="2.4" step="0.05" value="'+(+ov.lh||1.45)+'" style="flex:1;width:auto;margin:0;">'+
+      '<span id="knLhV" style="font-size:11px;color:var(--muted);width:30px;text-align:right;">'+(+ov.lh||1.45).toFixed(2)+'</span></div>':'')+
     '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(+ov.bw||0)+'" title="Border width (0 = none)" style="width:56px;">'+
       '<select id="knBs" style="flex:1;margin-bottom:0;">'+
         BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
@@ -1749,6 +1767,15 @@ function showKnobs(){
     });
     return t.innerHTML;
   };
+  const lh=q('knLh');
+  if(lh){
+    let pre=null;
+    lh.oninput=e=>{ if(pre==null) pre=snap();
+      const v=+e.target.value; q('knLhV').textContent=v.toFixed(2);
+      SEL.forEach(key=>{ if(!isTextKey(key)) return; ovOf(key).lh=v; });
+      liveSelStyle(); };
+    lh.onchange=()=>{ if(pre!=null){ pushUndo(pre); pre=null; } };
+  }
   const fw=q('knFW');
   if(fw) fw.onchange=e=>{ pushUndo();
     const v=e.target.value;
