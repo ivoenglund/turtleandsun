@@ -29,6 +29,10 @@
      SIZE at any zoom — on an A0 at fit-zoom they used to shrink to nothing. */
   .abswrap{ cursor:grab; }
   .abswrap.sel{ outline:calc(3px*var(--ui,1)) dashed var(--gold); outline-offset:calc(3px*var(--ui,1)); }
+  /* Placed by a rule, then moved by hand: the rule will leave this one alone. */
+  .abswrap.pinned::after{ content:''; position:absolute; left:calc(-4px*var(--ui,1));
+    top:calc(-4px*var(--ui,1)); width:calc(9px*var(--ui,1)); height:calc(9px*var(--ui,1));
+    border-radius:50%; background:var(--green); box-shadow:0 0 0 calc(1.5px*var(--ui,1)) #fff; }
   .block{ margin:0; }
   .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
   .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
@@ -400,12 +404,18 @@ function personCard(it){
   const c=it.content, ov=it.overrides||{};
   const init=(c.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const cls=['person','block', ov.tc?'tco':'', ov.ff?'ffo':''].filter(Boolean).join(' ');
+  // ov.flds (set by a group card's rule) says which fields to show. Absent = all.
+  const show = ov.flds!=null ? new Set(String(ov.flds).split(',')) : null;
+  const on = f => !show || show.has(f);
   const inner = ov.text ? sanitizeHtml(ov.text)
-    : '<b>'+esc(c.name||'')+'</b>'+
-      (c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
-      '<div class="ct">'+[c.email,c.phone].filter(Boolean).map(esc).join('<br>')+'</div>';
+    : (on('name')?'<b>'+esc(c.name||'')+'</b>':'')+
+      (on('title')&&c.job_title?'<div class="role">'+esc(c.job_title)+'</div>':'')+
+      '<div class="ct">'+[on('email')?c.email:null, on('phone')?c.phone:null]
+        .filter(Boolean).map(esc).join('<br>')+'</div>';
   return '<div class="'+cls+'" data-idx="'+it._idx+'">'+
-    (c.photo_url?'<img src="'+esc(c.photo_url)+'">':'<div class="init">'+esc(init)+'</div>')+
+    (on('photo')
+      ? (c.photo_url?'<img src="'+esc(c.photo_url)+'">':'<div class="init">'+esc(init)+'</div>')
+      : '')+
     '<div class="bd">'+inner+'</div></div>';
 }
 // Media card = an SVG (logo/graphic). Rendered via <img> so no script runs.
@@ -688,7 +698,8 @@ function absWrap(it){
     +borderCss(ov)
     +decoCss(ov,bareText)
     +(ov.tc?'color:'+esc(ov.tc)+';':'');
-  return '<div class="abswrap'+(ov.sq?' sqo':'')+'" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
+  return '<div class="abswrap'+(ov.sq?' sqo':'')+(+ov.pin?' pinned':'')+
+    '" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
 function frameDiv(f,i){
   const bs=BORDER_STYLES.includes(f.bs)?f.bs:'solid';
@@ -806,11 +817,13 @@ function dragSelFrom(e,w){
     document.querySelectorAll('.sthumb.dragover').forEach(x=>x.classList.remove('dragover'));
     if(n){ const t=document.querySelector('.sthumb[data-n="'+n+'"]'); if(t) t.classList.add('dragover'); }
   };
+  const pinTouched=()=>SEL.forEach(k=>{ const o=ovOf(k); if(o&&o.rule&&!o.pin) o.pin=1; });
   const up=ev=>{
     removeEventListener('pointermove',mv); removeEventListener('pointermove',mvHi);
     removeEventListener('pointerup',up);
     document.querySelectorAll('.sthumb.dragover').forEach(x=>x.classList.remove('dragover'));
     const n=dragMoved?overThumb(ev):null;
+    if(dragMoved) pinTouched();
     if(n&&n!==curPage){
       // Snap back to where they started, then re-home them on the target card.
       start.forEach(s=>{ const o=ovOf(s.key); o.x=s.x; o.y=s.y; });
@@ -1356,6 +1369,54 @@ function liveSelStyle(){
 }
 // The panel is CONTEXTUAL: it shows only what applies to the current mode —
 // editing text, cropping, a selection, or nothing.
+// The rule is a set of controls, not hidden state: every part of it is visible
+// and changeable on the card it belongs to.
+function ruleSectionHtml(){
+  const r=ruleOf(curPage); if(!r) return '';
+  const pinned=(COMP.items||[]).filter(it=>it.overrides&&it.overrides.card===cardIdAt(curPage)&&+it.overrides.pin).length;
+  const fld=f=>'<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;">'+
+    '<input type="checkbox" class="rfld" data-f="'+f+'"'+
+    ((r.fields&&r.fields[f]===false)?'':' checked')+'> '+f+'</label>';
+  return '<div class="kh">Card rule — '+esc(r.name||'group')+'</div>'+
+    '<div class="krow"><span style="font-size:11.5px;flex:0 0 auto;">Columns</span>'+
+      '<input type="number" id="rCols" min="1" max="8" step="1" value="'+(+r.cols||4)+'" style="width:56px;">'+
+      '<button id="rRefresh" style="flex:1;" title="Fetch the group again and relay">↻ Refresh</button></div>'+
+    '<div class="krow" style="flex-wrap:wrap;gap:7px;">'+RULEFIELDS.map(fld).join('')+'</div>'+
+    (r.exclude&&r.exclude.length
+      ? '<div class="hint">Leaving out '+r.exclude.length+'. <a href="#" id="rClearEx">Put them back</a></div>' : '')+
+    (pinned
+      ? '<div class="hint">'+pinned+' moved by hand — the rule leaves those alone. '+
+        '<a href="#" id="rUnpin">Release them</a></div>' : '')+
+    '<div class="krow"><button id="rUnlink" class="danger" style="flex:1;" '+
+      'title="Drop the rule — the card keeps what is on it and stops updating">⛓ Unlink</button></div>';
+}
+function wireRuleSection(){
+  const q=id=>document.getElementById(id);
+  const r=ruleOf(curPage); if(!r) return;
+  const id=cardIdAt(curPage);
+  const cols=q('rCols');
+  if(cols) cols.onchange=()=>{ pushUndo(); r.cols=Math.max(1,Math.min(8,+cols.value||4)); applyRule(curPage,{quiet:1}); };
+  const rf=q('rRefresh'); if(rf) rf.onclick=()=>applyRule(curPage);
+  document.querySelectorAll('.rfld').forEach(cb=>cb.onchange=()=>{
+    pushUndo(); r.fields=r.fields||{}; r.fields[cb.dataset.f]=cb.checked; applyRule(curPage,{quiet:1});
+  });
+  const ex=q('rClearEx');
+  if(ex) ex.onclick=e=>{ e.preventDefault(); pushUndo(); r.exclude=[]; applyRule(curPage,{quiet:1}); };
+  const up=q('rUnpin');
+  if(up) up.onclick=e=>{ e.preventDefault(); pushUndo();
+    (COMP.items||[]).forEach(it=>{ const o=it.overrides; if(o&&o.card===id&&o.pin) delete o.pin; });
+    applyRule(curPage,{quiet:1}); };
+  const ul=q('rUnlink');
+  if(ul) ul.onclick=()=>{
+    if(!confirm('Drop the rule? The card keeps what is on it, but it will stop following the group.')) return;
+    pushUndo();
+    delete rules()[id];
+    (COMP.items||[]).forEach(it=>{ const o=it.overrides;
+      if(o&&o.rule===id){ delete o.rule; delete o.ri; delete o.pin; delete o.flds; } });
+    renderCurrent(); showKnobs(); markSel();
+  };
+}
+
 function showKnobs(){
   try{ warmPngCache(); }catch(e){}     // pre-convert this selection's pictures for copying
   const k=document.getElementById('knobs');
@@ -1412,11 +1473,16 @@ function showKnobs(){
     return;
   }
 
+  // ── The card's own rule, if it has one ────────────────────────────
+  const cardRuleHtml=ruleSectionHtml();
+
   // ── MODE: nothing selected ────────────────────────────────────────
   if(!n){
-    k.innerHTML='<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
+    k.innerHTML=cardRuleHtml+
+      '<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
       'Shift-click or drag a rectangle on the page for several. Drag to move, gold dot to resize, '+
       'click a selected text again to edit it.</div>';
+    wireRuleSection();
     return;
   }
 
@@ -1462,6 +1528,13 @@ function showKnobs(){
           FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
         '</select></div>':'')+
     '<div class="kh">Border</div>'+
+    '<div class="kh">Position</div>'+
+    '<div class="krow"><span style="font-size:11px;color:var(--muted);">X</span>'+
+      '<input type="number" id="knX" step="0.5" value="'+(Math.round((+ov.x||0)*10)/10)+'" style="width:60px;">'+
+      '<span style="font-size:11px;color:var(--muted);">Y</span>'+
+      '<input type="number" id="knY" step="0.5" value="'+(Math.round((+ov.y||0)*10)/10)+'" style="width:60px;">'+
+      '<span style="font-size:11px;color:var(--muted);">W</span>'+
+      '<input type="number" id="knWn" step="0.5" min="1" max="200" value="'+(Math.round((+ov.w||28)*10)/10)+'" style="width:60px;"></div>'+
     '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(+ov.bw||0)+'" title="Border width (0 = none)" style="width:56px;">'+
       '<select id="knBs" style="flex:1;margin-bottom:0;">'+
         BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
@@ -1498,6 +1571,20 @@ function showKnobs(){
       const l=q(label); if(l) l.textContent=fmt(+e.target.value); liveSelStyle(); };
     el.onchange=()=>{ if(el._pre!=null){ pushUndo(el._pre); el._pre=null; } };
   };
+  // Exact numbers, in % of the page — the same units everything else uses.
+  [['knX','x'],['knY','y'],['knWn','w']].forEach(([id,key])=>{
+    const el=q(id); if(!el) return;
+    el.onchange=()=>{
+      const v=+el.value; if(!isFinite(v)) return;
+      pushUndo();
+      SEL.forEach(k2=>{ const o=ovOf(k2);
+        o[key]=Math.round(v*10)/10;
+        if(o.rule&&!o.pin) o.pin=1;        // typing a position is a hand-adjustment too
+      });
+      render(); showKnobs(); markSel();
+    };
+  });
+  wireRuleSection();
   liveSlider('knW', v=>SEL.forEach(key=>{
     const o=ovOf(key);
     if(isTextKey(key)){    // text reshapes: wider box = longer lines, same letters
@@ -1913,6 +2000,123 @@ updateUndoBtns();
 // LIVE content resolves — same mirror rule as everything else.
 // Accept our own cards, and also pictures and files dragged in from a web page
 // or the desktop. Without the extra types here the browser refuses the drop.
+// ── GROUP CARDS: a rule, not a snapshot ─────────────────────────────
+// params.rules[cardId] = { kind:'group', group_id, name, exclude:[], cols, fields:{} }
+// Objects the rule placed carry overrides.rule = cardId. Move one by hand and it
+// gets overrides.pin = 1: refresh then relays everyone else AROUND it and leaves
+// yours exactly where you put it. Unlink drops the rule and the card becomes an
+// ordinary snapshot.
+function rules(){ COMP.params=COMP.params||{}; return COMP.params.rules=COMP.params.rules||{}; }
+function ruleOf(n){ const id=cardIdAt(n); return id?rules()[id]:null; }
+const RULEFIELDS=['photo','name','title','email','phone'];
+
+// Fetch the group's ACTIVE members (the server filters status now).
+async function ruleMembers(rule){
+  const p=new URLSearchParams();
+  p.set('groups',String(rule.group_id));
+  p.set('living','1'); p.set('deceased','1'); p.set('people','1'); p.set('pets','1');
+  p.set('section','g:'+rule.group_id); p.set('limit','500'); p.set('offset','0');
+  const r=await fetch('/api/content?'+p.toString());
+  if(!r.ok) return null;
+  const sec=((await r.json()).sections||[])[0];
+  if(!sec) return null;
+  const ex=new Set((rule.exclude||[]).map(Number));
+  return sec.items.filter(o=>!ex.has(+o.id));
+}
+
+// Place the members in a grid, then MEASURE what was actually rendered and
+// correct the rows. Estimating heights is what made things overflow oddly;
+// the browser already knows the true height, so ask it.
+function ruleLayout(cardId, members, rule){
+  const startPage=Math.max(1, cards().findIndex(c=>c.id===cardId)+1);
+  const cols=Math.max(1,Math.min(8,+rule.cols||4));
+  const gap=2.5, margin=6;
+  const w=(100-margin*2-gap*(cols-1))/cols;
+
+  // Slots already taken by pinned objects on this card keep their place.
+  const pinned=(COMP.items||[]).filter(it=>it.overrides&&it.overrides.rule===cardId&&+it.overrides.pin);
+  const pinnedIds=new Set(pinned.map(it=>+it.ref_id));
+
+  // Drop the unpinned ones; we are about to lay them out again.
+  COMP.items=(COMP.items||[]).filter(it=>!(it.overrides&&it.overrides.rule===cardId&&!+it.overrides.pin));
+
+  const fresh=members.filter(m=>!pinnedIds.has(+m.id));
+  const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
+  let est=w*(P.w/P.h)*1.45;                       // first guess, corrected below
+  fresh.forEach((m,i)=>{
+    const col=i%cols, row=Math.floor(i/cols);
+    COMP.items.push({ ref_type:'contact', ref_id:+m.id, content:m, overrides:{
+      page:startPage, card:cardId, rule:cardId, ri:i,
+      x:Math.round((margin+col*(w+gap))*10)/10,
+      y:Math.round((margin+row*(est+gap))*10)/10,
+      w:Math.round(w*10)/10,
+      flds:RULEFIELDS.filter(f=>rule.fields&&rule.fields[f]!==false).join(',')
+    }});
+  });
+  return { cols, gap, margin, w, count:fresh.length, startPage };
+}
+
+// Second pass: read the real heights off the page and re-space the rows,
+// spilling onto as many cards as this paper needs.
+function ruleCorrect(cardId, plan){
+  const page=document.querySelector('#out .page'); if(!page||!plan.count) return;
+  const pr=page.getBoundingClientRect(); if(!pr.height) return;
+  let tallest=0;
+  page.querySelectorAll('.abswrap').forEach(el=>{
+    const k=keyOfEl(el); if(!k) return;
+    const ov=ovOf(k); if(!ov||ov.rule!==cardId||+ov.pin) return;
+    const h=el.getBoundingClientRect().height/pr.height*100;
+    if(h>tallest) tallest=h;
+  });
+  if(tallest<=0) return;
+  const rowH=tallest+plan.gap;
+  const usable=100-plan.margin*2+plan.gap;
+  const rows=Math.max(1,Math.floor(usable/rowH));
+  const per=rows*plan.cols;
+
+  const startIdx=cards().findIndex(c=>c.id===cardId);
+  let maxPage=startIdx+1;
+  (COMP.items||[]).forEach(it=>{
+    const ov=it.overrides; if(!ov||ov.rule!==cardId||+ov.pin) return;
+    const i=+ov.ri||0;
+    const sheet=Math.floor(i/per), n=i%per;
+    const col=n%plan.cols, row=Math.floor(n/plan.cols);
+    const pg=startIdx+1+sheet;
+    ensureCards(pg);
+    ov.page=pg; ov.card=cardIdAt(pg);
+    ov.x=Math.round((plan.margin+col*(plan.w+plan.gap))*10)/10;
+    ov.y=Math.round((plan.margin+row*rowH)*10)/10;
+    if(pg>maxPage) maxPage=pg;
+  });
+  syncPages();
+}
+
+async function applyRule(n, opts){
+  const cardId=cardIdAt(n); if(!cardId) return;
+  const rule=rules()[cardId]; if(!rule) return;
+  const members=await ruleMembers(rule);
+  if(!members){ alert('Could not read that group.'); return; }
+  pushUndo();
+  // Someone pinned who has left the group comes off — a team page showing an
+  // ex-employee is worse than losing a nudge.
+  const live=new Set(members.map(m=>+m.id));
+  const dropped=[];
+  COMP.items=(COMP.items||[]).filter(it=>{
+    const ov=it.overrides;
+    if(!ov||ov.rule!==cardId||!+ov.pin) return true;
+    if(live.has(+it.ref_id)) return true;
+    dropped.push((it.content&&it.content.name)||'someone');
+    return false;
+  });
+  const plan=ruleLayout(cardId, members, rule);
+  syncPages(); renderCurrent();
+  ruleCorrect(cardId, plan);
+  renderCurrent(); showKnobs(); markSel();
+  if(dropped.length) groupBanner(dropped.join(', ')+(dropped.length>1?' are':' is')+
+    ' no longer in the group — taken off this card.');
+  else if(!opts||!opts.quiet) groupBanner('Card updated — '+plan.count+' from '+(rule.name||'the group')+'.');
+}
+
 // ── Dropping a whole group ──────────────────────────────────────────
 // No arbitrary cap. The drop FILLS the card with a grid of as many as physically
 // fit — a number that means something, because it depends on the paper and the
@@ -2025,39 +2229,35 @@ function groupBanner(msg, btnLabel, fn){
   x.onclick=()=>b.remove(); b.appendChild(x);
   clearTimeout(groupBanner._t); groupBanner._t=setTimeout(()=>{ if(b) b.remove(); }, 14000);
 }
+// Dragging a group in creates a RULE card, not a snapshot: the card remembers
+// the group, so adding someone to it later and pressing ↻ brings them in.
+// Timeline and Archive stay snapshots — there is no membership to follow.
 async function dropGroup(d){
-  const body=document.getElementById('resBody');
-  try{
-    const r=await fetch('/api/content?'+d.q+'&section='+encodeURIComponent(d.section)+'&limit=500&offset=0');
-    if(!r.ok){ alert('Could not load that group.'); return; }
-    const sec=((await r.json()).sections||[])[0];
-    if(!sec||!sec.items.length){ alert('Nothing in that group with the current filters.'); return; }
-    const g=gridPlan(sec.items.length);
-    pushUndo();
-    // Everything comes in as one continuous grid. What fits prints; the rest runs
-    // on below the page edge, greyed and parked, ready to be moved or flowed.
-    // Start under whatever is already on the card rather than across it.
-    const bot=occupiedBottom();
-    const y0=bot>0 ? Math.min(bot+GRIDGAP, 100) : GRIDMARGIN;
-    placeGrid(sec.items, sec.kind, d.section, curPage, g, true, y0);
-    syncPages(); renderCurrent(); showKnobs(); markSel();
-    const over=sec.items.length-g.perCard;
-    if(over>0){
-      groupBanner(g.perCard+' of '+sec.items.length+' fit the page — '+over+' are parked below.',
-        'Flow them onto new cards', ()=>{
-          pushUndo();
-          const rest=sec.items.slice(g.perCard);
-          // Drop the parked copies, then lay the same people out on real cards.
-          // Remove exactly the parked ones — by grid index, not by guessing at y.
-          COMP.items=COMP.items.filter(it=>!(it.overrides&&it.overrides.grp===d.section
-                                            && +it.overrides.gi>=g.perCard));
-          placeGrid(rest, sec.kind, d.section, curPage+1, g, false, GRIDMARGIN);
-          syncPages(); renderCurrent(); showKnobs();
-        });
-    }else{
-      groupBanner('Placed all '+sec.items.length+'.');
-    }
-  }catch(e){ alert('Could not place that group.'); }
+  const gid=(String(d.section||'').slice(0,2)==='g:')?+String(d.section).slice(2):0;
+  if(!gid){                                   // Timeline / Archive: place them as they are
+    try{
+      const r=await fetch('/api/content?'+d.q+'&section='+encodeURIComponent(d.section)+'&limit=500&offset=0');
+      if(!r.ok){ alert('Could not load that.'); return; }
+      const sec=((await r.json()).sections||[])[0];
+      if(!sec||!sec.items.length){ alert('Nothing there with the current filters.'); return; }
+      const g=gridPlan(sec.items.length);
+      pushUndo();
+      const bot=occupiedBottom();
+      placeGrid(sec.items, sec.kind, d.section, curPage, g, true, bot>0?Math.min(bot+2.5,100):6);
+      syncPages(); renderCurrent(); showKnobs(); markSel();
+      groupBanner('Placed '+sec.items.length+' from '+(d.title||'that source')+'.');
+    }catch(e){ alert('Could not place that.'); }
+    return;
+  }
+  // A group lands on its OWN card, so the rule owns the whole page.
+  pushUndo();
+  cards().splice(curPage,0,{id:newCardId()});
+  syncPages();
+  curPage=curPage+1; SEL=[];
+  const id=cardIdAt(curPage);
+  rules()[id]={ kind:'group', group_id:gid, name:d.title||'Group', exclude:[], cols:4, fields:{} };
+  await applyRule(curPage,{quiet:1});
+  groupBanner('“'+(d.title||'Group')+'” is now a rule card — it follows the group.');
 }
 
 document.addEventListener('dragover',e=>{

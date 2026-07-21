@@ -3843,7 +3843,8 @@ app.get('/api/content', requireAuth, async (req, res) => {
       const p = [uid, gid];
       const where = contentWhereContacts(q, living, deceased, people, pets, p);
       const base = `FROM contacts c
-        JOIN contact_group_memberships m ON m.contact_id = c.id AND m.user_id = $1 AND m.group_id = $2
+        JOIN contact_group_memberships m ON m.contact_id = c.id AND m.user_id = $1
+             AND m.group_id = $2 AND m.status = 'active'
         WHERE c.user_id = $1` + where;
       const tot = await pool.query(`SELECT COUNT(*)::int AS n ` + base, p);
       const lim = only ? limit : previewN, off = only ? offset : 0;
@@ -3860,7 +3861,7 @@ app.get('/api/content', requireAuth, async (req, res) => {
       const where = contentWhereContacts(q, living, deceased, people, pets, p);
       const base = `FROM contacts c WHERE c.user_id = $1
         AND NOT EXISTS (SELECT 1 FROM contact_group_memberships m
-                         WHERE m.contact_id = c.id AND m.user_id = $1)` + where;
+                         WHERE m.contact_id = c.id AND m.user_id = $1 AND m.status = 'active')` + where;
       const tot = await pool.query(`SELECT COUNT(*)::int AS n ` + base, p);
       const lim = only ? limit : previewN, off = only ? offset : 0;
       const rows = await pool.query(
@@ -3911,11 +3912,11 @@ app.get('/api/content/counts', requireAuth, async (req, res) => {
   try {
     const g = await pool.query(
       `SELECT group_id, COUNT(*)::int AS n FROM contact_group_memberships
-        WHERE user_id = $1 GROUP BY group_id`, [req.user.id]);
+        WHERE user_id = $1 AND status = 'active' GROUP BY group_id`, [req.user.id]);
     const u = await pool.query(
       `SELECT COUNT(*)::int AS n FROM contacts c WHERE c.user_id = $1
         AND NOT EXISTS (SELECT 1 FROM contact_group_memberships m
-                         WHERE m.contact_id = c.id AND m.user_id = $1)`, [req.user.id]);
+                         WHERE m.contact_id = c.id AND m.user_id = $1 AND m.status = 'active')`, [req.user.id]);
     const counts = {};
     g.rows.forEach(r => { counts['g:' + r.group_id] = r.n; });
     counts.ungrouped = u.rows[0].n;
