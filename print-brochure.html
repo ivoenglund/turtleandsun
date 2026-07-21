@@ -1256,13 +1256,33 @@ function dupSelected(){
   renderCurrent(); SEL=newSel; showKnobs(); markSel();
 }
 // ── Align & distribute (page-% geometry from the live DOM) ─────────
+// Where the LETTERS actually are, not where the box is. A text object is a fixed
+// percentage wide, so short text leaves empty space inside its own box — aligning
+// two of them lined up invisible edges instead of the words.
+function inkOf(el, page){
+  const bd=el.querySelector('.bd'); if(!bd) return null;
+  try{
+    const r=document.createRange();
+    r.selectNodeContents(bd);
+    const rc=r.getBoundingClientRect();
+    if(!rc.width||!rc.height) return null;
+    const pr=page.getBoundingClientRect(), er=el.getBoundingClientRect();
+    return { dx:(rc.left-er.left)/pr.width*100, dy:(rc.top-er.top)/pr.height*100,
+             w:rc.width/pr.width*100,           h:rc.height/pr.height*100 };
+  }catch(e){ return null; }
+}
+// x/y/wp/hp describe the INK; dx/dy say how far the box sits outside it, so
+// moving the ink to a target means putting the box at target - dx.
 function geoSel(){
   const page=document.querySelector('#out .page'); if(!page) return null;
   return SEL.map(key=>{
     const el=elOf(key), o=ovOf(key); if(!el||!o) return null;
-    const wp=+o.w||(key[0]==='f'?20:28);
-    const hp=key[0]==='f' ? (+o.h||20) : el.offsetHeight/page.offsetHeight*100;
-    return { key, o, el, wp, hp, x:+o.x||0, y:+o.y||0 };
+    let wp=+o.w||(key[0]==='f'?20:28);
+    let hp=key[0]==='f' ? (+o.h||20) : el.offsetHeight/page.offsetHeight*100;
+    let dx=0, dy=0;
+    const ink=(key[0]==='f')?null:inkOf(el,page);
+    if(ink && ink.w>0.2){ dx=ink.dx; dy=ink.dy; wp=ink.w; hp=ink.h; }
+    return { key, o, el, wp, hp, dx, dy, x:(+o.x||0)+dx, y:(+o.y||0)+dy };
   }).filter(Boolean);
 }
 function alignSel(mode){
@@ -1271,12 +1291,13 @@ function alignSel(mode){
   const minX=Math.min(...g.map(a=>a.x)),      maxR=Math.max(...g.map(a=>a.x+a.wp));
   const minY=Math.min(...g.map(a=>a.y)),      maxB=Math.max(...g.map(a=>a.y+a.hp));
   g.forEach(a=>{
-    if(mode==='l') a.o.x=minX;
-    else if(mode==='r') a.o.x=maxR-a.wp;
-    else if(mode==='c') a.o.x=(minX+maxR)/2-a.wp/2;
-    else if(mode==='t') a.o.y=minY;
-    else if(mode==='b') a.o.y=maxB-a.hp;
-    else if(mode==='m') a.o.y=(minY+maxB)/2-a.hp/2;
+    // Solve for where the INK should be, then put the box at ink - dx.
+    if(mode==='l') a.o.x=minX-a.dx;
+    else if(mode==='r') a.o.x=maxR-a.wp-a.dx;
+    else if(mode==='c') a.o.x=(minX+maxR)/2-a.wp/2-a.dx;
+    else if(mode==='t') a.o.y=minY-a.dy;
+    else if(mode==='b') a.o.y=maxB-a.hp-a.dy;
+    else if(mode==='m') a.o.y=(minY+maxB)/2-a.hp/2-a.dy;
     a.o.x=Math.round(a.o.x*10)/10; a.o.y=Math.round(a.o.y*10)/10;
     a.el.style.left=a.o.x+'%'; a.el.style.top=a.o.y+'%';
   });
@@ -1291,9 +1312,10 @@ function distSel(axis){
   const span=(last[P]+last[S])-first[P];
   const sum=g.reduce((s,a)=>s+a[S],0);
   const gap=(span-sum)/(g.length-1);
+  const D=axis==='h'?'dx':'dy';
   let cur=first[P];
   g.forEach(a=>{
-    a.o[P]=Math.round(cur*10)/10;
+    a.o[P]=Math.round((cur-a[D])*10)/10;      // position the INK, place the box
     a.el.style[P==='x'?'left':'top']=a.o[P]+'%';
     cur+=a[S]+gap;
   });
@@ -1561,6 +1583,9 @@ function showKnobs(){
     '<div class="krow"><button id="knFront" style="flex:1;" title="Bring in front">⬆ Front</button>'+
       '<button id="knBack" style="flex:1;" title="Send behind">⬇ Back</button>'+
       '<button id="knDup" title="Duplicate (Ctrl+D)">⧉</button></div>'+
+    (anyText?'<div class="krow"><button id="knFit" style="flex:1;" '+
+      'title="Shrink the box to the words, keeping the letters exactly the size they are">'+
+      '⇱ Fit box to text</button></div>':'')+
     (n>=2?'<div class="krow"><button id="alL" title="Align left edges">⇤</button>'+
       '<button id="alC" title="Align centres (horizontal)">↔</button>'+
       '<button id="alR" title="Align right edges">⇥</button>'+
@@ -1726,6 +1751,25 @@ function showKnobs(){
       if(!el.getAttribute('style')) el.removeAttribute('style');
     });
     return t.innerHTML;
+  };
+  const fit=q('knFit');
+  if(fit) fit.onclick=()=>{
+    const page=document.querySelector('#out .page'); if(!page) return;
+    pushUndo();
+    SEL.forEach(key=>{
+      if(!isTextKey(key)) return;
+      const el=elOf(key), o=ovOf(key); if(!el||!o) return;
+      const ink=inkOf(el,page); if(!ink||ink.w<=0.2) return;
+      // Narrowing the box would shrink the type, because font-size follows width.
+      // Compensate with the text-zoom so the letters stay exactly as they are.
+      const f0=fsOf(o);
+      o.x=Math.round(((+o.x||0)+ink.dx)*10)/10;
+      o.w=Math.round(Math.max(2,ink.w+0.4)*10)/10;
+      const f1=13.5*((+o.w||28)/28)*pScale();
+      o.ts=Math.round((f0/f1)*1000)/1000;
+      if(Math.abs(o.ts-1)<0.002) delete o.ts;
+    });
+    render(); showKnobs(); markSel();
   };
   const fw=q('knFW');
   if(fw) fw.onchange=e=>{ pushUndo();
