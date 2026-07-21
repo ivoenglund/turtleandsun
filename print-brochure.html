@@ -153,7 +153,11 @@
   @media print{ #strip,#stripTab{ display:none!important; } }
   /* ── Content panel: same feeling as the right panel — white, gold border,
      rounded, drop shadow. A vertical tab slides it out. Plain: you open it, you
-     size it, you drag things out of it, you close it. ── */
+     size it, you drag things out of it, you close it.
+     The filter column (#resFilters) is now its OWN panel-in-a-panel, styled
+     identically to #panel (white, 2px gold border, 14px radius, same shadow) —
+     Ivo wanted the search+tree column to read as a separate "gorgeous" panel,
+     not just a bare column with a hairline divider. ── */
   #res{ position:fixed; left:16px; top:16px; bottom:16px; width:640px; z-index:12; display:none;
         flex-direction:column; background:#fff; border:2px solid var(--gold); border-radius:14px;
         box-shadow:0 4px 18px rgba(0,0,0,.2); font-size:13px; overflow:hidden; }
@@ -165,9 +169,10 @@
                border:1px solid #d9d4c4; border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
   #res button:hover{ background:#f4efe4; }
   #res button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #resMain{ flex:1; display:flex; min-height:0; }
-  #resFilters{ width:212px; flex:0 0 auto; padding:9px 10px; overflow-y:auto;
-               border-right:1px solid #ece7d9; }
+  #resMain{ flex:1; display:flex; min-height:0; background:var(--cream); }
+  #resFilters{ width:212px; flex:0 0 auto; margin:9px 0 9px 9px; padding:10px 12px; overflow-y:auto;
+               background:#fff; border:2px solid var(--gold); border-radius:14px;
+               box-shadow:0 4px 18px rgba(0,0,0,.2); }
   #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px; margin-bottom:8px;
               border:1px solid #d9d4c4; border-radius:8px; }
   #resBody{ flex:1; min-width:0; overflow-y:auto; padding:10px 12px; }
