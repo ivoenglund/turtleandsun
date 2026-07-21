@@ -2734,6 +2734,12 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 // there is never any doubt which page you meant.
 // ⬒ saves this card — or, if it belongs to a chapter, the WHOLE chapter, because
 // a chapter is the unit you reuse. Page numbers are rebased to 1..N.
+// ⬒ saves this card — or the WHOLE chapter, if it belongs to one, because a
+// chapter is the unit you reuse.
+//
+// SAME NAME = SAME CARD. Save under a name you have already used and it becomes
+// the next version of that card, not a fourth copy of it. Give it a new name to
+// make a new card. No dialog, nothing ambiguous: the name you type decides.
 async function saveCardAsBlock(n){
   if(!COMP) return;
   if(editing) commitEdit(true);
@@ -2746,25 +2752,53 @@ async function saveCardAsBlock(n){
   if(!onPage.length&&!fr.length&&!tx.length){ alert('There is nothing on that to save.'); return; }
   const suggested = cp ? (cp.ch.name||'Chapter') : (COMP.name?(COMP.name+' — page '+n):'');
   const name=prompt(cp
-    ? 'Name this chapter ('+ids.length+' pages) so you can reuse it:'
-    : 'Name this card so you can reuse it:', suggested);
+    ? 'Name this chapter ('+ids.length+' pages). Re-use a name to save a new version of that card:'
+    : 'Name this card. Re-use a name to save a new version of that card:', suggested);
   if(!name||!name.trim()) return;
-  // Saved content is page-relative and carries no document identity.
+  const nm=name.trim();
+
   const rebase=o=>{ const c=JSON.parse(JSON.stringify(o||{}));
     c.page=pageOf(c.card)||1;
     delete c.card; delete c.blk; delete c.grp; delete c.gi; delete c.pin;
     delete c.rule; delete c.ri; delete c.plc; return c; };
+  const body={ name:nm, kind:'page', pages:ids.length,
+    paper:(COMP.params&&COMP.params.paper)||'a4',
+    params:{ frames:fr.map(rebase), texts:tx.map(rebase) },
+    items:onPage.map(it=>({ref_type:it.ref_type,ref_id:it.ref_id,overrides:rebase(it.overrides)})),
+    declares:{} };
+
+  // Is there already a card by that name?
+  let existing=null;
   try{
-    const r=await fetch('/api/print-blocks',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ name:name.trim(), kind:'page', pages:ids.length,
-        paper:(COMP.params&&COMP.params.paper)||'a4',
-        params:{ frames:fr.map(rebase), texts:tx.map(rebase) },
-        items:onPage.map(it=>({ref_type:it.ref_type,ref_id:it.ref_id,overrides:rebase(it.overrides)})),
-        declares:{} })});
+    const v=await fetch('/api/print-blocks/versions');
+    if(v.ok){
+      const by=((await v.json()).blocks)||{};
+      for(const k in by){ if(String(by[k].name||'').trim().toLowerCase()===nm.toLowerCase()){ existing=by[k]; break; } }
+    }
+  }catch(e){}
+
+  try{
+    let r, verb, ver;
+    if(existing){
+      r=await fetch('/api/print-blocks/'+existing.id,{method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ pages:body.pages, params:body.params, items:body.items })});
+      const d=await r.json().catch(()=>({}));
+      ver=+d.version||((+existing.version||1)+1);
+      verb='“'+nm+'” is now v'+ver;
+      // If these very pages came from that card, keep this print in step.
+      const f=placementOf(n);
+      if(f&&+f.p.block_id===+existing.id) f.p.version=ver;
+    }else{
+      r=await fetch('/api/print-blocks',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)});
+      verb='“'+nm+'” saved';
+    }
     if(!r.ok){ alert('Could not save that.'); return; }
     RES.cardsDirty=true;
     if(document.getElementById('res').classList.contains('open')&&RES.cards) fetchContent();
-    saveState(cp?'✓ Chapter saved':'✓ Card saved', 2200);
+    groupBanner(verb+(ids.length>1?' — '+ids.length+' pages.':'.'));
+    saveState('✓ Saved', 2200);
   }catch(e){ alert('Could not save that.'); }
 }
 
