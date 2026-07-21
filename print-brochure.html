@@ -108,10 +108,8 @@
   .sprev .abswrap.sel,.sprev .frameobj.sel{ outline:none!important; }
   .sprev .rszh,.sprev .crE{ display:none!important; }
   .sscale{ transform-origin:top left; position:absolute; top:0; left:0; }
-  /* applyPaper() puts the output-paper zoom on every .page. The filmstrip does its
-     own scaling, so a page in here must NOT be zoomed a second time — printing at
-     50% would otherwise halve every miniature. Same for the big preview. */
-  #stripInner .page, #resPrevBox .page{ zoom:1 !important; }
+  /* applyPaper() also writes the rule that makes a page inside these previews a
+     fixed, clipped, unzoomed page box — see the comment there. */
   .snum{ text-align:center; font-size:10.5px; font-weight:800; color:#6f7865; margin-top:2px;
          text-shadow:0 1px 0 rgba(255,255,255,.85);
          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -504,6 +502,11 @@ function applyPaper(){
     css+=' .page{ width:'+D.w+'mm; min-height:'+D.h+'mm; height:auto; padding:'+pad+'mm;';
   }
   css+=' zoom:'+ratio.toFixed(6)+'; }';
+  // Previews show exactly ONE page. The canvas page is min-height + overflow
+  // visible so an object can hang off the edge while you work; a miniature must
+  // be a fixed page box, clipped like print, or the bottom is silently lost.
+  css+=' #stripInner .page, #resPrevBox .page{ zoom:1!important; height:'+D.h+'mm!important;'+
+       ' min-height:0!important; overflow:hidden!important; margin:0!important; box-shadow:none!important; }';
   st.textContent=css;
   const lbl=document.getElementById('designPaper');
   if(lbl) lbl.textContent='Designed for '+paperLabel(D)+(ratio!==1?' — printing at '+(ratio*100).toFixed(0)+'%':'');
