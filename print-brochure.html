@@ -354,7 +354,8 @@
     <button id="teDone" class="primary">✓ Done</button>
   </div>
   <div id="teBody" contenteditable="true" spellcheck="false"></div>
-  <div id="txtEdFoot">Select some words to change only those. Sizes are in points on the page.</div>
+  <div id="txtEdFoot">Select some words to change only those — otherwise it applies to all of the text.
+    Sizes are points as they will print. Ctrl+Enter finishes.</div>
 </div></div>
 <div id="updOverlay"><div id="updBox">
   <h3>Some cards have newer versions</h3>
@@ -760,9 +761,11 @@ function dragSelFrom(e,w){
   const sx=e.clientX, sy=e.clientY;
   const start=SEL.map(key=>{ const o=ovOf(key); return {key, x:+o.x||0, y:+o.y||0}; });
   dragMoved=false;
+  const DRAG_MIN=4;                       // screen px before it counts as a drag
   const mv=ev=>{
+    if(!dragMoved && Math.hypot(ev.clientX-sx, ev.clientY-sy) < DRAG_MIN) return;
+    dragMoved=true;
     const dx=(ev.clientX-sx)/pr.width*100, dy=(ev.clientY-sy)/pr.height*100;
-    if(Math.abs(dx)+Math.abs(dy)>0.1) dragMoved=true;
     start.forEach(s=>{
       const o=ovOf(s.key);
       o.x=Math.round(Math.max(-150,Math.min(240,s.x+dx))*10)/10;   // park freely off-page
@@ -835,6 +838,18 @@ function wireDrag(){
       if(editing) commitEdit(false);        // click away = saved, never lost
       const key=keyOfEl(w);
       if(cropKey===key&&e.target.closest('img')) return cropDrag(e,w,key);
+      // Alt-click digs down through a stack: each Alt-click takes the next object
+      // beneath the pointer, so a small text on top of a big one is reachable.
+      if(e.altKey){
+        const stack=document.elementsFromPoint(e.clientX,e.clientY)
+          .filter(el=>el.matches&&el.matches('#out .abswrap,#out .frameobj,#out .txtfree'));
+        if(stack.length>1){
+          const cur=stack.findIndex(el=>{ const k=keyOfEl(el); return k&&SEL.includes(k); });
+          const nx=stack[(cur+1)%stack.length];
+          const nk=nx&&keyOfEl(nx);
+          if(nk){ setSel(nk,false); e.stopPropagation(); e.preventDefault(); return; }
+        }
+      }
       w._wasSel=SEL.includes(key);
       if(e.shiftKey){ setSel(key,true); if(!SEL.includes(key)) return; }
       else if(!w._wasSel) setSel(key,false);
@@ -854,21 +869,6 @@ document.getElementById('out').addEventListener('dblclick',e=>{
   if(key){ e.preventDefault(); setSel(key,false); teOpen(key); }
 });
 
-// Click an ALREADY-selected text object again (no drag) → the editor dialog.
-document.getElementById('out').addEventListener('click',e=>{
-  const w=e.target.closest('.abswrap'); if(!w) return;
-  if(e.target.closest('[contenteditable="true"]')) return;
-  let key=null, isText=false;
-  if(w.dataset.absidx!=null){
-    const idx=+w.dataset.absidx; key='i'+idx;
-    const it=COMP.items[idx];
-    // Person cards are editable too — but NOT isTextKey, because resizing one
-    // must scale the portrait with the words, not reflow the words alone.
-    isText=!!it&&( (it.ref_type==='post'&&((it.overrides||{}).part||'txt')==='txt')
-                 || it.ref_type==='contact' );
-  }else if(w.dataset.text!=null){ key='t'+w.dataset.text; isText=true; }
-  if(key&&isText&&w._wasSel&&!dragMoved&&SEL.length===1&&SEL[0]===key) teOpen(key);
-});
 // Empty space: drag on the PAGE draws a selection rectangle (everything it
 // touches gets selected); drag on the grey outside pans the canvas.
 // A plain click on either deselects.
@@ -1510,8 +1510,9 @@ function showKnobs(){
         'open <b>Content</b>, tick a group, and drag its <b>heading</b> onto the page. That card '+
         'then updates when people join or leave, and its settings appear here.</div>')+
       '<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
-      'Shift-click or drag a rectangle on the page for several. Drag to move, gold dot to resize, '+
-      'click a selected text again to edit it.</div>';
+      'Shift-click or drag a rectangle on the page for several. <b>Alt-click</b> reaches whatever '+
+      'is underneath, so a small object on top of a big one is still selectable. '+
+      'Drag to move, gold dot to resize, <b>double-click text to edit it</b>.</div>';
     wirePlacementSection(); wireChapterSection(); wireRuleSection();
     return;
   }
@@ -1735,20 +1736,36 @@ function teOpen(key){
     FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:'+esc(fontCss(v))+'">'+t+'</option>').join('');
   f.value=ov.ff||'';
   document.getElementById('teColor').value=(ov.tc&&/^#/.test(ov.tc))?ov.tc:'#23291d';
-  document.getElementById('teSize').value=Math.round(TE_BASE*0.75);
+  setTimeout(teReadSize,40);
   document.getElementById('txtEd').classList.add('open');
   setTimeout(()=>{ body.focus(); },30);
 }
 function teClose(){ document.getElementById('txtEd').classList.remove('open'); TE_KEY=null; }
 function teExec(cmd){ document.getElementById('teBody').focus(); try{ document.execCommand(cmd,false,null); }catch(e){} }
+// The dialog renders 1em of the object as TE_DIALOG_EM pixels, so a run showing
+// D px here is D/TE_DIALOG_EM em on the page. Points are that times the object's
+// own size, times 0.75. Every conversion goes through these two.
+const TE_DIALOG_EM=16;
+function tePtToEm(pt){ return pt/0.75/TE_BASE; }
+function tePxToPt(px){ return (px/TE_DIALOG_EM)*TE_BASE*0.75; }
+
 // Apply to the selection, or to the whole text when nothing is selected.
+// Whole-text has to be written INTO the html — setting it on the dialog element
+// would look right and then be thrown away, because only innerHTML is saved.
 function teStyle(prop,val){
   const body=document.getElementById('teBody');
   body.focus();
   const sel=getSelection();
-  if(!sel.rangeCount||sel.isCollapsed||!body.contains(sel.anchorNode)){
-    body.querySelectorAll('span,b,i,u,h3,p').forEach(el=>{ if(prop==='fontSize') el.style.fontSize=''; });
-    body.style[prop]=val;                       // whole text
+  const hasSel = sel.rangeCount && !sel.isCollapsed && body.contains(sel.anchorNode);
+  if(!hasSel){
+    if(prop==='fontSize'){
+      // inner sizes would win over an outer wrapper, so clear them first
+      body.querySelectorAll('[style]').forEach(el=>{ el.style.fontSize=''; });
+    }
+    const sp=document.createElement('span');
+    sp.style[prop]=val;
+    while(body.firstChild) sp.appendChild(body.firstChild);
+    body.appendChild(sp);
     return;
   }
   const r=sel.getRangeAt(0);
@@ -1757,6 +1774,21 @@ function teStyle(prop,val){
   try{ r.surroundContents(sp); }
   catch(e){ const frag=r.extractContents(); sp.appendChild(frag); r.insertNode(sp); }
 }
+// Show the size of whatever the caret is in, in points on the page.
+function teReadSize(){
+  const body=document.getElementById('teBody'), f=document.getElementById('teSize');
+  if(!body||!f||document.activeElement===f) return;
+  const sel=getSelection();
+  let node=(sel&&sel.rangeCount&&body.contains(sel.anchorNode))?sel.anchorNode:body.firstChild;
+  if(node&&node.nodeType===3) node=node.parentElement;
+  if(!node||!body.contains(node)) node=body;
+  const px=parseFloat(getComputedStyle(node).fontSize)||TE_DIALOG_EM;
+  f.value=Math.max(1,Math.round(tePxToPt(px)));
+}
+document.addEventListener('selectionchange',()=>{
+  const te=document.getElementById('txtEd');
+  if(te&&te.classList.contains('open')) teReadSize();
+});
 function teSave(){
   if(!TE_KEY) return;
   const body=document.getElementById('teBody');
@@ -1791,7 +1823,7 @@ document.getElementById('teFont').onchange=e=>{
 document.getElementById('teSize').onchange=e=>{
   const pt=+e.target.value; if(!(pt>=4&&pt<=900)) return;
   // pt on the page -> em relative to the object, so it still scales with paper.
-  teStyle('fontSize',(pt/0.75/TE_BASE).toFixed(4)+'em');
+  teStyle('fontSize',tePtToEm(pt).toFixed(4)+'em');
 };
 
 function enterEdit(key,cx,cy){
