@@ -27,7 +27,12 @@
    look of what is inside one. Colours come from the host page's variables. */
 
   .block{ margin:0; }
-  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
+  /* <h3> is BOLD in the browser's own stylesheet. Nothing here ever overrode it,
+     so every heading was bold whatever font you chose. Inherit instead: the
+     object's weight decides, and the Weight control can actually reach it. */
+  .block h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em;
+             font-weight:inherit; }
+  .block b, .block strong{ font-weight:inherit; }
   .block .meta{ font-size:.85em; color:var(--muted); margin-bottom:.65em; }
   .block p{ margin:0 0 .73em; font-size:1em; line-height:1.45; }
   .block.txt-s p{ font-size:.85em; } .block.txt-l p{ font-size:1.2em; line-height:1.5; }

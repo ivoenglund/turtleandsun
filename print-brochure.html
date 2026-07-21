@@ -265,7 +265,8 @@
   #teBody{ flex:1; overflow:auto; min-height:180px; font-size:16px; font-family:inherit; }
   #teBody .ql-editor{ padding:22px 26px; line-height:1.45; min-height:180px; }
   #teBody .ql-editor:focus{ outline:none; }
-  #teBody h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
+  #teBody h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em;
+              font-weight:inherit; }
   #teBody p{ margin:0 0 .73em; }
   #txtEdFoot{ padding:7px 12px; font-size:11.5px; color:var(--muted); border-top:1px solid #ece7d9; }
   @media print{ #res,#resTab,#resPrev,#updOverlay,#txtEd{ display:none!important; } }
@@ -676,7 +677,8 @@ function absWrap(it){
     +(+ov.r?'transform:rotate('+(+ov.r)+'deg);':'')
     +borderCss(ov)
     +decoCss(ov,bareText)
-    +(ov.tc?'color:'+esc(ov.tc)+';':'');
+    +(ov.tc?'color:'+esc(ov.tc)+';':'')
+    +(ov.fw?'font-weight:'+(+ov.fw)+';':'');
   return '<div class="abswrap'+(ov.sq?' sqo':'')+(+ov.pin?' pinned':'')+
     '" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
@@ -697,7 +699,8 @@ function txtFreeDiv(t,i){
     +(+t.r?'transform:rotate('+(+t.r)+'deg);':'')
     +borderCss(t)
     +decoCss(t,true)
-    +(t.tc?'color:'+esc(t.tc)+';':'');
+    +(t.tc?'color:'+esc(t.tc)+';':'')
+    +(t.fw?'font-weight:'+(+t.fw)+';':'');
   const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
   const ffs=t.ff?' style="font-family:'+esc(fontCss(t.ff))+'"':'';
   return '<div class="abswrap txtfree'+(t.sq?' sqo':'')+'" style="'+st+'" data-text="'+i+'">'+
@@ -1574,6 +1577,10 @@ function showKnobs(){
     (anyText?
       '<div class="kh">Text</div>'+
       '<div class="krow"><input type="number" id="knPx" min="4" max="500" step="1" value="'+px0+'" style="width:62px;" title="Text size in px — arrow keys step it live">'+
+        '<select id="knFW" style="flex:0 0 auto;margin-bottom:0;" title="Weight of this object">'+
+          [['','Weight'],['300','Light'],['400','Regular'],['500','Medium'],['700','Bold'],['800','Extra bold']]
+            .map(([v,t])=>'<option value="'+v+'"'+((String(ov.fw||'')===v)?' selected':'')+'>'+t+'</option>').join('')+
+        '</select>'+
         '<select id="knFF" style="flex:1;margin-bottom:0;">'+
           '<option value="">Jakarta (default)</option>'+
           FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:'+esc(fontCss(v))+'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
@@ -1719,6 +1726,12 @@ function showKnobs(){
     });
     return t.innerHTML;
   };
+  const fw=q('knFW');
+  if(fw) fw.onchange=e=>{ pushUndo();
+    const v=e.target.value;
+    SEL.forEach(key=>{ if(key[0]==='f') return; const o=ovOf(key);
+      if(v) o.fw=+v; else delete o.fw; });
+    render(); showKnobs(); markSel(); };
   const ff=q('knFF');
   if(ff) ff.onchange=e=>{ pushUndo();
     selItemIdxs().forEach(i=>{ const o=COMP.items[i].overrides;
