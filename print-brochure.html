@@ -566,6 +566,10 @@ function outPaperKey(){ return (COMP&&COMP.params&&(COMP.params.outPaper||COMP.p
 
 // ── Zoom + free pan ─────────────────────────────────────────────────
 const ZMIN=5;
+// Everything that floats above the canvas. The pan handler and the wheel handler
+// both listen on `document`, so anything missing from this list has its clicks
+// stolen — which is what made the page start panning while the text dialog was open.
+const OVERLAYS='#panel,#strip,#stripTab,#res,#resTab,#resPrev,#updOverlay,#txtEd';
 let curScale=1;
 // Small papers may zoom far further: the limit is "page ≈ 3× window width",
 // so an A6 goes to ~1000%+ while an A0 keeps a sane range.
@@ -873,7 +877,7 @@ function wirePan(){
   if(panWired) return; panWired=true;
   document.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
-    if(e.target.closest('#panel')||e.target.closest('#strip')||e.target.closest('#stripTab')||e.target.closest('#res')||e.target.closest('#resTab')
+    if(e.target.closest(OVERLAYS)
        ||e.target.closest('.abswrap')||e.target.closest('.frameobj')||e.target.closest('[contenteditable="true"]')) return;
     if(editing) commitEdit(false);
     if(e.target.closest('#out .page')){ startMarquee(e); return; }
@@ -2059,7 +2063,7 @@ document.addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; 
 // The wheel zooms EVERYWHERE (anchored to the cursor, even off the page) —
 // except over the panel, which scrolls normally.
 document.addEventListener('wheel',e=>{
-  if(e.target.closest&&e.target.closest('#panel,#strip,#res')) return;   // let the panel/picker/strip scroll
+  if(e.target.closest&&e.target.closest(OVERLAYS)) return;   // let panels and dialogs scroll
   e.preventDefault();
   zoomStep(e.deltaY<0 ? 1.12 : 1/1.12, e.clientX, e.clientY);
 }, { passive:false });
