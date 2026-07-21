@@ -4,7 +4,18 @@
 <meta charset="utf-8">
 <title>Brochure — Turtle &amp; Sun</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Caveat:wght@600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Oswald:wght@400;600&family=Raleway:wght@400;700&family=Nunito:wght@400;700&family=Roboto+Slab:wght@400;700&family=Dancing+Script:wght@600&family=Pacifico&family=Abril+Fatface&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Caveat:wght@600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Oswald:wght@400;600&family=Raleway:wght@400;700&family=Nunito:wght@400;700&family=Roboto+Slab:wght@400;700&family=Dancing+Script:wght@600&family=Pacifico&family=Abril+Fatface&family=Jost:wght@300;400;500;700&display=swap');
+  /* "Futura Book" is licensed and cannot be served from here. This uses a real
+     locally-installed Futura when there is one, and falls back to Jost — the open
+     geometric sans drawn from the same Renner lineage — everywhere else. */
+  @font-face{
+    font-family:'Futura Book';
+    src: local('Futura Book'), local('Futura-Book'), local('FuturaBT-Book'),
+         local('Futura BT Book'), local('Futura Std Book'), local('FuturaStd-Book'),
+         local('Futura PT Book'), local('FuturaPT-Book'), local('Futura'),
+         url('/fonts/futura-book.woff2') format('woff2');
+    font-weight:400; font-style:normal; font-display:swap;
+  }
   :root{ --ink:#23291d; --green:#1f4a45; --gold:#c9a24b; --cream:#f7f3e8; --muted:#7a8470; }
   *{ box-sizing:border-box; }
   html,body{ height:100%; }
@@ -377,6 +388,14 @@ function sanitizeHtml(s){
 // photo (part: 'txt' | 'img0','img1',…). They never move together — every
 // piece is dragged, sized, angled and bordered on its own.
 const BORDER_STYLES=['solid','dashed','dotted','double'];
+// Futura Book is licensed, so it may simply not be on the machine. Name it first,
+// then Jost — the open geometric sans from the same lineage — so the page still
+// looks right rather than dropping to the browser default.
+const FONTSTACK={ 'Futura Book': "'Futura Book','Jost','Century Gothic',sans-serif" };
+function fontCss(name){
+  if(!name) return '';
+  return FONTSTACK[name] || ("'"+String(name).replace(/'/g,'')+"'");
+}
 // Shadow presets (em-based → they scale with the object). Bare text (no
 // background, no border) gets a LETTER shadow; everything else a box shadow.
 // Border/background/radius/shadow all scale WITH THE PAPER (A4 = reference),
@@ -431,7 +450,7 @@ function postBlock(it){
   }
   const cls=['block','txtobj', ov.txt?'txt-'+ov.txt:'', ov.font?'font-'+ov.font:'',
              ov.ff?'ffo':'', ov.tc?'tco':''].filter(Boolean).join(' ');
-  const ffs=ov.ff?' style="font-family:\''+esc(ov.ff)+'\'"':'';
+  const ffs=ov.ff?' style="font-family:'+esc(fontCss(ov.ff))+'"':'';
   let inner;
   if(ov.text){ inner='<div class="bd">'+sanitizeHtml(ov.text)+'</div>'; }
   else{
@@ -766,7 +785,7 @@ function txtFreeDiv(t,i){
     +decoCss(t,true)
     +(t.tc?'color:'+esc(t.tc)+';':'');
   const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
-  const ffs=t.ff?' style="font-family:\''+esc(t.ff)+'\'"':'';
+  const ffs=t.ff?' style="font-family:'+esc(fontCss(t.ff))+'"':'';
   return '<div class="abswrap txtfree'+(t.sq?' sqo':'')+'" style="'+st+'" data-text="'+i+'">'+
     '<div class="'+cls+'"'+ffs+'><div class="bd">'+sanitizeHtml(t.text||'')+'</div></div></div>';
 }
@@ -1385,7 +1404,8 @@ const FONTS=[
   ['Merriweather','Merriweather'],['Lora','Lora'],['Montserrat','Montserrat'],
   ['Oswald','Oswald'],['Raleway','Raleway'],['Nunito','Nunito'],['Roboto Slab','Roboto Slab'],
   ['Caveat','Caveat (hand)'],['Dancing Script','Dancing Script'],['Pacifico','Pacifico'],
-  ['Abril Fatface','Abril Fatface'],['Arial','Arial'],['Courier New','Courier New']
+  ['Abril Fatface','Abril Fatface'],['Futura Book','Futura Book'],['Jost','Jost'],
+  ['Arial','Arial'],['Courier New','Courier New']
 ];
 const SWATCH=['#23291d','#1f4a45','#c9a24b','#7a8470','#8c2f1b','#2a5d8c','#ffffff','#000000'];
 // Live style refresh for all selected objects, no re-render.
@@ -1531,7 +1551,7 @@ function showKnobs(){
         (pI!=null?'<button id="tbReset" title="Back to the original text">↺</button>':'')+
         '<button id="tbDone" class="primary" style="flex:1;">✓ Done</button></div>'+
       '<div class="hint" style="margin-top:6px;">Clicking anywhere outside also finishes — it saves by itself.</div>';
-    q('tbFont').onchange=e=>{ if(e.target.value) applyStyle('fontFamily',"'"+e.target.value+"'"); };
+    q('tbFont').onchange=e=>{ if(e.target.value) applyStyle('fontFamily',fontCss(e.target.value)); };
     q('tbSize').oninput=e=>{ const px=+e.target.value; if(px>=4&&px<=500) applyStyle('fontSize',px+'px'); };
     q('tbColor').oninput=e=>applyStyle('color',e.target.value);
     k.querySelectorAll('.sw').forEach(b=>{
@@ -1617,7 +1637,7 @@ function showKnobs(){
       '<div class="krow"><input type="number" id="knPx" min="4" max="500" step="1" value="'+px0+'" style="width:62px;" title="Text size in px — arrow keys step it live">'+
         '<select id="knFF" style="flex:1;margin-bottom:0;">'+
           '<option value="">Jakarta (default)</option>'+
-          FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:\''+v+'\'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
+          FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:'+esc(fontCss(v))+'"'+(ov.ff===v?' selected':'')+'>'+t+'</option>').join('')+
         '</select></div>':'')+
     '<div class="kh">Border</div>'+
     '<div class="kh">Position</div>'+
