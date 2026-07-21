@@ -185,10 +185,13 @@
                 line-height:1; padding:2px 5px; border:1px solid #dcc0b5; border-radius:6px;
                 background:rgba(255,255,255,.92); color:#8c2f1b; cursor:pointer; display:none; }
   .rcard:hover .rdel{ display:block; }
-  #resBody .sechd{ display:flex; align-items:baseline; gap:8px; margin:12px 0 6px; }
+  #resBody .sechd{ display:flex; align-items:baseline; gap:9px; margin:16px 0 8px;
+                   position:sticky; top:-10px; z-index:2; background:#fff;
+                   padding:6px 0 5px; border-bottom:1px solid #ece7d9; cursor:grab; }
   #resBody .sechd:first-child{ margin-top:0; }
-  #resBody .sechd b{ font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--green); }
-  #resBody .sechd .n{ font-size:11px; color:var(--muted); }
+  #resBody .sechd:active{ cursor:grabbing; }
+  #resBody .sechd b{ font-size:17px; font-weight:800; letter-spacing:.2px; color:var(--green); }
+  #resBody .sechd .n{ font-size:12px; color:var(--muted); }
   #resBody .sechd .more{ margin-left:auto; font-size:11px; }
   #resBody .empty{ color:var(--muted); padding:10px 2px; line-height:1.5; }
   .rgrid{ display:flex; flex-wrap:wrap; gap:8px; }
@@ -1952,11 +1955,12 @@ function gridPlan(count){
 }
 // One plan for the whole drop, so the leftovers on later cards are laid out at
 // exactly the same size as the first card — not re-planned for a smaller count.
-function placeGrid(items, kind, groupKey, startPage, g){
+function placeGrid(items, kind, groupKey, startPage, g, continuous){
   let page=startPage, i=0;
   while(i<items.length){
     ensureCards(page);
-    const slice=items.slice(i, i+g.perCard);
+    // continuous = one card, rows carrying on into the grey below the page.
+    const slice=continuous?items:items.slice(i, i+g.perCard);
     slice.forEach((o,n)=>{
       const col=n%g.cols, row=Math.floor(n/g.cols);
       COMP.items.push({ ref_type:kind, ref_id:o.id, content:o, overrides:{
@@ -1964,7 +1968,8 @@ function placeGrid(items, kind, groupKey, startPage, g){
         x:Math.round((GRIDMARGIN+col*(g.w+GRIDGAP))*10)/10,
         y:Math.round((GRIDMARGIN+row*(g.hPct+GRIDGAP))*10)/10,
         w:Math.round(g.w*10)/10,
-        grp:groupKey            // where these came from — see note below
+        grp:groupKey,           // which group these came from — groundwork
+        gi:(continuous?n:i+n)   // position in the group's grid, for exact re-flow
       }});
     });
     i+=slice.length;
@@ -2000,19 +2005,25 @@ async function dropGroup(d){
     if(!sec||!sec.items.length){ alert('Nothing in that group with the current filters.'); return; }
     const g=gridPlan(sec.items.length);
     pushUndo();
-    const fit=sec.items.slice(0,g.perCard);
-    placeGrid(fit, sec.kind, d.section, curPage, g);
+    // Everything comes in as one continuous grid. What fits prints; the rest runs
+    // on below the page edge, greyed and parked, ready to be moved or flowed.
+    placeGrid(sec.items, sec.kind, d.section, curPage, g, true);
     syncPages(); renderCurrent(); syncZoom(); showKnobs(); markSel();
-    const rest=sec.items.slice(g.perCard);
-    if(rest.length){
-      groupBanner('Placed '+fit.length+' of '+sec.items.length+' — '+rest.length+' left.',
-        'Place the rest on new cards', ()=>{
+    const over=sec.items.length-g.perCard;
+    if(over>0){
+      groupBanner(g.perCard+' of '+sec.items.length+' fit the page — '+over+' are parked below.',
+        'Flow them onto new cards', ()=>{
           pushUndo();
-          placeGrid(rest, sec.kind, d.section, curPage+1, g);
+          const rest=sec.items.slice(g.perCard);
+          // Drop the parked copies, then lay the same people out on real cards.
+          // Remove exactly the parked ones — by grid index, not by guessing at y.
+          COMP.items=COMP.items.filter(it=>!(it.overrides&&it.overrides.grp===d.section
+                                            && +it.overrides.gi>=g.perCard));
+          placeGrid(rest, sec.kind, d.section, curPage+1, g, false);
           syncPages(); renderCurrent(); syncZoom(); showKnobs();
         });
     }else{
-      groupBanner('Placed all '+fit.length+'.');
+      groupBanner('Placed all '+sec.items.length+'.');
     }
   }catch(e){ alert('Could not place that group.'); }
 }
