@@ -259,9 +259,11 @@
   #txtEdHead button{ font-family:inherit; font-weight:700; font-size:13px; padding:5px 10px;
                      border:1px solid #d9d4c4; border-radius:8px; background:#fff; cursor:pointer; color:var(--ink); }
   #txtEdHead button:hover{ background:#f4efe4; }
+  #txtEdHead button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
   #txtEdHead button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #teBody{ flex:1; overflow:auto; padding:22px 26px; font-size:16px; line-height:1.45;
-           outline:none; min-height:180px; }
+  #teBody{ flex:1; overflow:auto; min-height:180px; font-size:16px; }
+  #teBody .ql-editor{ padding:22px 26px; line-height:1.45; min-height:180px; }
+  #teBody .ql-editor:focus{ outline:none; }
   #teBody h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em; }
   #teBody p{ margin:0 0 .73em; }
   #txtEdFoot{ padding:7px 12px; font-size:11.5px; color:var(--muted); border-top:1px solid #ece7d9; }
@@ -293,6 +295,8 @@
 </style>
 <link rel="stylesheet" href="/filter-tree.css">
 <link rel="stylesheet" href="/card-render.css">
+<link rel="stylesheet" href="/vendor/quill.core.css">
+<script src="/vendor/quill.min.js"></script>
 <script src="/card-render.js"></script>
 </head>
 <body>
@@ -353,7 +357,7 @@
     <button id="teCancel">Cancel</button>
     <button id="teDone" class="primary">✓ Done</button>
   </div>
-  <div id="teBody" contenteditable="true" spellcheck="false"></div>
+  <div id="teBody"></div>
   <div id="txtEdFoot">Select some words to change only those — otherwise it applies to all of the text.
     Sizes are points as they will print. Ctrl+Enter finishes.</div>
 </div></div>
@@ -1710,93 +1714,85 @@ function showKnobs(){
 function curBd(){ return document.querySelector('#out [contenteditable="true"]'); }
 let styleSpan=null, holdSel=false;
 // ── The text editor dialog ──────────────────────────────────────────
-// Double-click a text object and it opens here, at a comfortable size, with
-// nothing scaled or transformed around it. Sizes are shown in POINTS as they
-// will print: the object's own font-size is 1em, so a run at 2em is twice that,
-// and pt = px x 0.75. Typing a point size converts back to em, which is what
-// keeps text scaling with the paper.
-let TE_KEY=null, TE_BASE=13.5;
+// Quill (BSD-3, vendored) does the editing. Hand-rolling this was the mistake:
+// clicking the size field moves focus out of a contenteditable and the browser
+// throws the selection away, so "make THESE words bigger" became "make
+// everything bigger". Quill keeps its own selection model, so a range survives
+// a trip to a toolbar control.
+//
+// Sizes are stored as em relative to the object, which is what keeps text
+// scaling with the paper. The dialog renders 1em as TE_DIALOG_EM px and shows
+// points on the page, so the number means something in print.
+let TE_KEY=null, TE_BASE=13.5, TE_Q=null;
+const TE_DIALOG_EM=16;
+function tePtToEm(pt){ return pt/0.75/TE_BASE; }
+function teEmToPt(em){ return em*TE_BASE*0.75; }
+
+function teQuill(){
+  if(TE_Q) return TE_Q;
+  // Style attributors write inline font-size / font-family, which is what the
+  // sanitiser already allows and what the page renderer already understands.
+  const Size=Quill.import('attributors/style/size'); Size.whitelist=null; Quill.register(Size,true);
+  const Font=Quill.import('attributors/style/font'); Font.whitelist=null; Quill.register(Font,true);
+  TE_Q=new Quill('#teBody',{ theme:null, modules:{ toolbar:false } });
+  TE_Q.on('selection-change',()=>teSyncToolbar());
+  TE_Q.on('text-change',()=>teSyncToolbar());
+  return TE_Q;
+}
 function teOpen(key){
   const ov=ovOf(key); if(!ov) return;
   TE_KEY=key;
   TE_BASE=fsOf(ov)||13.5;
-  const body=document.getElementById('teBody');
-  const it=(key[0]==='i')?COMP.items[+key.slice(1)]:null;
-  // Start from the override if there is one, otherwise from what is on the page.
+  const q=teQuill();
   let html=ov.text;
-  if(html==null){
+  if(html==null){                       // never edited: start from what is on the page
     const el=elOf(key), bd=el&&el.querySelector('.bd');
     html=bd?bd.innerHTML:'';
   }
-  body.innerHTML=sanitizeHtml(html||'');
-  body.style.fontFamily = ov.ff ? fontCss(ov.ff) : '';
-  body.style.color = ov.tc || '';
+  q.setContents(q.clipboard.convert({ html: sanitizeHtml(html||'') }), 'silent');
+  const root=q.root;
+  root.style.fontFamily = ov.ff ? fontCss(ov.ff) : '';
+  root.style.color = ov.tc || '';
   const f=document.getElementById('teFont');
   f.innerHTML='<option value="">Font of the object…</option>'+
     FONTS.map(([v,t])=>'<option value="'+v+'" style="font-family:'+esc(fontCss(v))+'">'+t+'</option>').join('');
   f.value=ov.ff||'';
   document.getElementById('teColor').value=(ov.tc&&/^#/.test(ov.tc))?ov.tc:'#23291d';
-  setTimeout(teReadSize,40);
   document.getElementById('txtEd').classList.add('open');
-  setTimeout(()=>{ body.focus(); },30);
+  setTimeout(()=>{ q.focus(); teSyncToolbar(); },30);
 }
 function teClose(){ document.getElementById('txtEd').classList.remove('open'); TE_KEY=null; }
-function teExec(cmd){ document.getElementById('teBody').focus(); try{ document.execCommand(cmd,false,null); }catch(e){} }
-// The dialog renders 1em of the object as TE_DIALOG_EM pixels, so a run showing
-// D px here is D/TE_DIALOG_EM em on the page. Points are that times the object's
-// own size, times 0.75. Every conversion goes through these two.
-const TE_DIALOG_EM=16;
-function tePtToEm(pt){ return pt/0.75/TE_BASE; }
-function tePxToPt(px){ return (px/TE_DIALOG_EM)*TE_BASE*0.75; }
 
-// Apply to the selection, or to the whole text when nothing is selected.
-// Whole-text has to be written INTO the html — setting it on the dialog element
-// would look right and then be thrown away, because only innerHTML is saved.
-function teStyle(prop,val){
-  const body=document.getElementById('teBody');
-  body.focus();
-  const sel=getSelection();
-  const hasSel = sel.rangeCount && !sel.isCollapsed && body.contains(sel.anchorNode);
-  if(!hasSel){
-    if(prop==='fontSize'){
-      // inner sizes would win over an outer wrapper, so clear them first
-      body.querySelectorAll('[style]').forEach(el=>{ el.style.fontSize=''; });
-    }
-    const sp=document.createElement('span');
-    sp.style[prop]=val;
-    while(body.firstChild) sp.appendChild(body.firstChild);
-    body.appendChild(sp);
-    return;
-  }
-  const r=sel.getRangeAt(0);
-  const sp=document.createElement('span');
-  sp.style[prop]=val;
-  try{ r.surroundContents(sp); }
-  catch(e){ const frag=r.extractContents(); sp.appendChild(frag); r.insertNode(sp); }
+// Show what the caret is actually sitting in.
+function teSyncToolbar(){
+  if(!TE_Q||!TE_KEY) return;
+  const sz=document.getElementById('teSize');
+  if(document.activeElement===sz) return;      // do not fight the user mid-type
+  const fmt=TE_Q.getFormat() || {};
+  const em = fmt.size ? parseFloat(fmt.size) : 1;   // no size set = 1em of the object
+  sz.value=Math.max(1,Math.round(teEmToPt(isFinite(em)?em:1)));
+  const b=document.getElementById('teB'), i=document.getElementById('teI'), u=document.getElementById('teU');
+  if(b) b.classList.toggle('on',!!fmt.bold);
+  if(i) i.classList.toggle('on',!!fmt.italic);
+  if(u) u.classList.toggle('on',!!fmt.underline);
 }
-// Show the size of whatever the caret is in, in points on the page.
-function teReadSize(){
-  const body=document.getElementById('teBody'), f=document.getElementById('teSize');
-  if(!body||!f||document.activeElement===f) return;
-  const sel=getSelection();
-  let node=(sel&&sel.rangeCount&&body.contains(sel.anchorNode))?sel.anchorNode:body.firstChild;
-  if(node&&node.nodeType===3) node=node.parentElement;
-  if(!node||!body.contains(node)) node=body;
-  const px=parseFloat(getComputedStyle(node).fontSize)||TE_DIALOG_EM;
-  f.value=Math.max(1,Math.round(tePxToPt(px)));
+// Quill remembers the range even after focus goes to a toolbar control, which is
+// the whole reason this works now.
+function teFormat(name,value){
+  if(!TE_Q) return;
+  const r=TE_Q.getSelection();
+  if(r && r.length>0) TE_Q.formatText(r.index, r.length, name, value, 'user');
+  else if(r)          TE_Q.format(name, value, 'user');       // caret: affects typing
+  else                TE_Q.formatText(0, TE_Q.getLength(), name, value, 'user');  // nothing selected: all of it
+  TE_Q.focus();
+  teSyncToolbar();
 }
-document.addEventListener('selectionchange',()=>{
-  const te=document.getElementById('txtEd');
-  if(te&&te.classList.contains('open')) teReadSize();
-});
 function teSave(){
-  if(!TE_KEY) return;
-  const body=document.getElementById('teBody');
+  if(!TE_KEY||!TE_Q) return;
   const ov=ovOf(TE_KEY);
-  const html=sanitizeHtml(body.innerHTML);
+  const html=sanitizeHtml(TE_Q.root.innerHTML);
   const ff=document.getElementById('teFont').value;
-  const changed = html!==(ov.text||'') || (ff||'')!==(ov.ff||'');
-  if(changed){
+  if(html!==(ov.text||'') || (ff||'')!==(ov.ff||'')){
     pushUndo();
     ov.text=html;
     if(ff) ov.ff=ff; else delete ov.ff;
@@ -1806,24 +1802,22 @@ function teSave(){
 }
 document.getElementById('txtEd').addEventListener('keydown',e=>{
   if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); teClose(); }
-  // Ctrl+Enter finishes without reaching for the mouse.
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); teSave(); }
 });
 document.getElementById('teCancel').onclick=teClose;
 document.getElementById('teDone').onclick=teSave;
 document.getElementById('txtEd').onmousedown=e=>{ if(e.target.id==='txtEd') teClose(); };
-document.getElementById('teB').onclick=()=>teExec('bold');
-document.getElementById('teI').onclick=()=>teExec('italic');
-document.getElementById('teU').onclick=()=>teExec('underline');
-document.getElementById('teColor').oninput=e=>teStyle('color',e.target.value);
+document.getElementById('teB').onclick=()=>{ const f=TE_Q&&TE_Q.getFormat()||{}; teFormat('bold',!f.bold); };
+document.getElementById('teI').onclick=()=>{ const f=TE_Q&&TE_Q.getFormat()||{}; teFormat('italic',!f.italic); };
+document.getElementById('teU').onclick=()=>{ const f=TE_Q&&TE_Q.getFormat()||{}; teFormat('underline',!f.underline); };
+document.getElementById('teColor').oninput=e=>teFormat('color',e.target.value);
 document.getElementById('teFont').onchange=e=>{
   const v=e.target.value;
-  document.getElementById('teBody').style.fontFamily = v?fontCss(v):'';
+  if(TE_Q) TE_Q.root.style.fontFamily = v?fontCss(v):'';
 };
 document.getElementById('teSize').onchange=e=>{
   const pt=+e.target.value; if(!(pt>=4&&pt<=900)) return;
-  // pt on the page -> em relative to the object, so it still scales with paper.
-  teStyle('fontSize',tePtToEm(pt).toFixed(4)+'em');
+  teFormat('size', tePtToEm(pt).toFixed(4)+'em');
 };
 
 function enterEdit(key,cx,cy){
