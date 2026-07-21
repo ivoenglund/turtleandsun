@@ -41,7 +41,6 @@
      8px gap, col 2 = content. One geometry for every row, every mode. */
   .row{display:grid;grid-template-columns:14px 1fr;column-gap:8px;align-items:center;
        padding:3px 10px;border-radius:8px;cursor:pointer;color:#33402a;position:relative;}
-  .row .mkChk{grid-column:1;}
   .row .c2{grid-column:2;display:flex;align-items:center;gap:8px;min-width:0;}
   .row:hover{background:#F4F1E6;}
   .row.active{background:#EAF3E2;color:var(--green2);font-weight:700;}
@@ -205,15 +204,6 @@
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fDead" checked> Deceased</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPeople" checked> People</label>
     <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="fPets" checked> Pets</label>
-    <!-- Make tab only: what the board shows (the ☐ column in the tree picks groups) -->
-    <div class="mk-only">
-      <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkUngrouped"> Ungrouped</label>
-      <div class="flt" style="white-space:nowrap;">
-        <input type="checkbox" id="mkTimeline" style="width:auto;">
-        <span style="display:flex;align-items:center;gap:0;white-space:nowrap;">Timeline&nbsp;<input type="text" inputmode="numeric" maxlength="4" id="mkY1" style="width:38px;padding:2px 1px;text-align:center;">-<input type="text" inputmode="numeric" maxlength="4" id="mkY2" style="width:38px;padding:2px 1px;text-align:center;"></span>
-      </div>
-      <label class="flt" style="padding:3px 10px;"><input type="checkbox" id="mkArchive"> Archive</label>
-    </div>
   </div>
   <div class="sideStrip hide" id="sideStrip" title="Open the panel">»</div>
 
@@ -394,37 +384,14 @@
                    border:1.5px solid #c9c4b4;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
       .makCard.on .ck{background:#c9a24b;border-color:#c9a24b;}
       .makDelBadge{position:absolute;top:6px;left:6px;}
-      #makWall.dropping{outline:3px dashed #c9a24b;outline-offset:-3px;border-radius:10px;}
       /* Board controls live in the EXISTING sidebar; visible only on the Make tab. */
-      .mk-only{display:none;}
-      body.makmode .mk-only{display:block;}
       /* Sidebar filter rows share the row grid: checkbox 14px + 8px gap. */
       #side .flt{display:grid;grid-template-columns:14px 1fr;column-gap:8px;align-items:center;padding:3px 10px;}
       /* Hard reset: the global input styling (padding/border/radius) must NOT
          touch these — they are plain native 14px checkboxes. */
-      .mkChk{display:none;appearance:auto;-webkit-appearance:checkbox;width:14px!important;height:14px;
-             padding:0!important;margin:0!important;border:none!important;background:none!important;
-             border-radius:0!important;accent-color:#1f4a45;}
-      body.makmode .mkChk{display:inline-block;}
     </style>
     <div id="mak" class="hide">
       <div id="makLib"></div>
-      <div id="makPick" class="hide">
-        <div class="panel" style="padding:10px 14px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn sm gray" id="makBack" title="Back to your prints (saves first)">‹ My prints</button>
-          <input id="makName" style="flex:1;min-width:160px;font-weight:700;" placeholder="Name of this print">
-          <span id="makCount" class="muted" style="font-size:12.5px;"></span>
-          <button class="btn sm gray" id="makSaveBtn">Save</button>
-          <button class="btn pub" id="makGo">Save &amp; open the editor →</button>
-        </div>
-        <div class="panel" style="padding:8px 12px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input class="search" id="makSearch" type="text" placeholder="Search everything…" style="flex:1;min-width:150px;">
-          <button class="btn sm gray" id="makAddSvg" title="Upload a logo or image — or just drop files onto the board">＋ Add SVG / image</button>
-          <input type="file" id="makSvgFile" accept=".svg,image/*" multiple style="display:none;">
-        </div>
-        <div id="makWall" style="max-height:calc(100vh - 300px);overflow:auto;padding:0 2px 10px;"></div>
-        <div class="help">Click cards to pick them. Drag files from your computer (or a picture from a web page) onto the board — they land in the archive. You can also drag any card straight into an open editor window. Already-placed cards keep their layout; new picks arrive parked beside the page.</div>
-      </div>
     </div>
 
     <!-- DUPLICATES -->
@@ -817,7 +784,6 @@ function rerenderAll(){
   renderContactsTable();
   if(current){ renderMembers(); renderMap(); }
   if(!$('#tid').classList.contains('hide')) renderTimeline();
-  if(typeof makComp!=='undefined'&&makComp&&!$('#mak').classList.contains('hide')) renderMakWall();
   updateSideCounts();
 }
 
@@ -881,21 +847,10 @@ function renderTree(){
     div.className='row'+(selected&&selected.id===node.id?' active':'')+(depth?' sub':'');
     const arrow = (node.subgroups&&node.subgroups.length)?'▾':'';
     const isFamily = node.name==='Family';
-    const onBoard=(typeof makView!=='undefined')?(makView.groups[node.id]!==false):true;
-    div.innerHTML = `<input type="checkbox" class="mkChk" data-g="${node.id}" ${onBoard?'checked':''} title="Show this group on the Make board">`
-      + `<span class="c2"><span>${depth?'•':'📁'}</span> ${esc(node.name)}${arrow?` <span class="arr">${arrow}</span>`:''} <span class="ct">${countFor(node)}</span>`
+    div.innerHTML = `<span class="c2"><span>${depth?'•':'📁'}</span> ${esc(node.name)}${arrow?` <span class="arr">${arrow}</span>`:''} <span class="ct">${countFor(node)}</span>`
       + (isFamily?'':`<span class="del" title="Delete group">✕</span>`)
       + `</span>`;
     div.onclick = ()=>selectGroup(node);
-    const mkc=div.querySelector('.mkChk');
-    if(mkc){
-      mkc.onclick=e=>e.stopPropagation();
-      mkc.onchange=()=>{
-        makView.groups[node.id]=mkc.checked?true:false;
-        makViewSave();
-        if(makComp&&!$('#mak').classList.contains('hide')) renderMakWall();
-      };
-    }
     const del = div.querySelector('.del');
     if(del) del.onclick = async(e)=>{
       e.stopPropagation();
@@ -2650,58 +2605,17 @@ async function renderCalEntries(calId, calName){
   }catch(e){ host.innerHTML='<div class="empty">Could not load: '+esc(e.message)+'</div>'; }
 }
 
-// ── Make tab: PRINTS — a library, then a scrolling wall of your material ──
-// AI contract: everything here reduces to plain data operations —
-//   a selection = [{ref_type, ref_id}]  →  create/update a composition.
-// A later AI performs the exact same operations by emitting that list (plus
-// layout overrides); this UI is just human hands on the same lever.
-let makComp = null;      // the print being composed; null = library view
+// ── Make tab: the PRINT LIBRARY ──
+// Content goes into a print by dragging it from the editor's Content panel —
+// there is no picking surface here any more.
 let makList = [];
-// What the board shows — persisted. groups: {id:false} = hidden.
-// Living/Deceased/People/Pets come from the EXISTING sidebar filters.
-let makView = { groups:{}, ungrouped:true, timeline:true, archive:true, y1:'', y2:'' };
-try{ Object.assign(makView, JSON.parse(localStorage.getItem('ts_mak_view')||'{}')); }catch(e){}
-{ const y=new Date().getFullYear();
-  if(!/^\d{4}$/.test(String(makView.y1||''))) makView.y1=String(y);
-  if(!/^\d{4}$/.test(String(makView.y2||''))||+makView.y2<+makView.y1) makView.y2=String(+makView.y1+1); }
-function makViewSave(){ try{ localStorage.setItem('ts_mak_view',JSON.stringify(makView)); }catch(e){} }
-// Wire the sidebar's Make-only controls (static HTML, wired once).
-(function(){
-  $('#mkUngrouped').checked=!!makView.ungrouped;
-  $('#mkTimeline').checked=!!makView.timeline;
-  $('#mkArchive').checked=!!makView.archive;
-  $('#mkY1').value=makView.y1||''; $('#mkY2').value=makView.y2||'';
-  const refresh=()=>{ makViewSave(); if(makComp&&!$('#mak').classList.contains('hide')) renderMakWall(); };
-  $('#mkUngrouped').onchange=e=>{ makView.ungrouped=e.target.checked; refresh(); };
-  $('#mkTimeline').onchange=e=>{ makView.timeline=e.target.checked; refresh(); };
-  $('#mkArchive').onchange=e=>{ makView.archive=e.target.checked; refresh(); };
-  $('#mkY1').onchange=$('#mkY2').onchange=()=>{
-    makView.y1=$('#mkY1').value; makView.y2=$('#mkY2').value;
-    refresh();
-  };
-})();
 function flatGroups(){ const out=[]; (function w(l){ (l||[]).forEach(g=>{ out.push(g); w(g.subgroups); }); })(groups); return out; }
 
 async function ensureMedia(force){
   if(mediaCache && !force) return;
   mediaCache = await api('/api/media-cards') || [];
 }
-function yearOK(v){ return /^\d{4}$/.test(String(v||'').trim()); }
-async function renderMak(){
-  // The year fields are ALWAYS sane when the tab opens: anything that isn't
-  // a real 4-digit year (old junk like "-7") is replaced by this/next year.
-  const yNow=new Date().getFullYear();
-  if(!yearOK(makView.y1)) makView.y1=String(yNow);
-  if(!yearOK(makView.y2)||+makView.y2<+makView.y1) makView.y2=String(+makView.y1+1);
-  makViewSave();
-  $('#mkY1').value=makView.y1; $('#mkY2').value=makView.y2;
-  $('#mkUngrouped').checked=!!makView.ungrouped;
-  $('#mkTimeline').checked=!!makView.timeline;
-  $('#mkArchive').checked=!!makView.archive;
-  try{ await ensureBlog(); }catch(e){}
-  try{ await ensureMedia(); }catch(e){}
-  if(makComp) renderMakPick(); else await renderMakLib();
-}
+async function renderMak(){ await renderMakLib(); }
 
 // ── View A: the print library ───────────────────────────────────────
 // Every print as a real cover: the objects from card 1 laid out where they
@@ -2715,7 +2629,6 @@ const PAPERH={a0:1189,a1:841,a2:594,a3:420,a4:297,a5:210,a6:148,
 let PRINTS=[], PRBLOCKS=0, prQ='', prSort='new', prGroup='none';
 
 async function renderMakLib(){
-  $('#makPick').classList.add('hide');
   const host=$('#makLib'); host.classList.remove('hide');
   host.innerHTML='<div class="panel" style="padding:12px 14px;">Loading…</div>';
   try{
@@ -2953,203 +2866,6 @@ $('#jobCancel').onclick=closeJobDlg;
 $('#jobGo').onclick=generateJob;
 $('#jobModalBg').onmousedown=e=>{ if(e.target.id==='jobModalBg') closeJobDlg(); };
 
-async function makLoad(id){
-  const c=await api('/api/compositions/'+id);
-  makComp={id:c.id,name:c.name,items:c.items.map(i=>({ref_type:i.ref_type,ref_id:i.ref_id,overrides:i.overrides||{}}))};
-}
-function makHas(rt,rid){ return makComp&&makComp.items.some(i=>i.ref_type===rt&&i.ref_id===rid); }
-function makCountSel(){
-  const s=new Set(); (makComp?makComp.items:[]).forEach(i=>s.add(i.ref_type+':'+i.ref_id));
-  return s.size;
-}
-function makToggle(rt,rid){
-  if(!makComp) return;
-  if(makHas(rt,rid)) makComp.items=makComp.items.filter(i=>!(i.ref_type===rt&&i.ref_id===rid));  // every part goes
-  else makComp.items.push({ref_type:rt,ref_id:rid,overrides:{}});
-}
-
-// ── View B: the wall — people by group, timeline, archive ──
-function renderMakPick(){
-  $('#makLib').classList.add('hide');
-  $('#makPick').classList.remove('hide');
-  $('#makName').value=makComp.name||'';
-  renderMakWall();
-  makWireDrop();
-}
-// Year range only: empty fields mean open-ended (clear both = everything).
-function inPeriod(p){
-  const y1=+makView.y1||0, y2=+makView.y2||9999;
-  if(!makView.y1&&!makView.y2) return true;
-  const y=+String(p.post_date||'').slice(0,4);
-  if(!y) return false;
-  return y>=y1&&y<=y2;
-}
-function makCardHtml(rt,id,img,t,sub,extra){
-  const on=makHas(rt,id);
-  return '<div class="makCard'+(on?' on':'')+(rt==='media'?' logo':'')+'" draggable="true" data-rt="'+rt+'" data-id="'+id+'">'+
-    '<div class="im">'+(img?'<img src="'+esc(img)+'" loading="lazy">':'<span style="font-size:26px;">'+(rt==='contact'?'👤':rt==='media'?'◆':'📄')+'</span>')+'</div>'+
-    '<div class="ck">✓</div>'+(extra||'')+
-    '<div class="tt">'+esc(t)+'</div><div class="ss">'+esc(sub||'')+'</div></div>';
-}
-function renderMakWall(){
-  const q=($('#makSearch').value||'').toLowerCase();
-  const hit=s=>!q||String(s||'').toLowerCase().includes(q);
-  const byGroup={}, inSome=new Set(), cById={};
-  memberships.forEach(m=>{ (byGroup[m.group_id]=byGroup[m.group_id]||[]).push(m.contact_id); inSome.add(m.contact_id); });
-  contactsPool.forEach(c=>cById[c.id]=c);
-  let html='';
-  flatGroups().forEach(g=>{
-    if(makView.groups[g.id]===false) return;
-    const ppl=[...new Set(byGroup[g.id]||[])].map(i=>cById[i])
-      .filter(c=>c&&passesFilterC(c)&&hit((c.name||'')+' '+(c.company||'')+' '+(c.job_title||'')));
-    if(!ppl.length) return;
-    html+='<div class="makSec">'+esc(g.name)+' <span class="muted" style="font-weight:400;">('+ppl.length+')</span>'+
-      '<button class="btn sm gray makAllG" data-g="'+g.id+'">Select all</button></div>'+
-      '<div class="makGrid">'+ppl.map(c=>makCardHtml('contact',c.id,c.photo_url,c.name||'(unnamed)',
-        [c.job_title,c.company].filter(Boolean).join(' · '))).join('')+'</div>';
-  });
-  if(makView.ungrouped){
-    const loose=contactsPool.filter(c=>!inSome.has(c.id)&&passesFilterC(c)&&hit((c.name||'')+' '+(c.company||'')));
-    if(loose.length) html+='<div class="makSec">Ungrouped <span class="muted" style="font-weight:400;">('+loose.length+')</span></div>'+
-      '<div class="makGrid">'+loose.map(c=>makCardHtml('contact',c.id,c.photo_url,c.name||'(unnamed)',
-        [c.job_title,c.company].filter(Boolean).join(' · '))).join('')+'</div>';
-  }
-  let posts=[];
-  if(makView.timeline){
-    posts=(blogCache||[]).filter(p=>inPeriod(p)&&hit((p.title||'')+' '+(p.body||'')+' '+(p.tags||[]).join(' ')));
-    html+='<div class="makSec">Timeline <span class="muted" style="font-weight:400;">('+posts.length+')</span>'+
-      '<button class="btn sm gray" id="makAllP">Select all shown</button></div>'+
-      (posts.length?'<div class="makGrid">'+posts.map(p=>makCardHtml('post',p.id,(p.photos||[])[0],
-        p.title||(p.body||'').slice(0,40)||'(untitled)',
-        d10(p.post_date)+((p.photos||[]).length>1?' · '+(p.photos||[]).length+' photos':''))).join('')+'</div>'
-      :'<div class="empty">No posts in this period.</div>');
-  }
-  if(makView.archive){
-    const media=(mediaCache||[]).filter(m=>hit((m.title||'')+' '+(m.tags||[]).join(' ')));
-    html+='<div class="makSec">Archive — logos &amp; images <span class="muted" style="font-weight:400;">('+media.length+')</span>'+
-      '<span class="muted" style="font-weight:400;font-size:11.5px;">drop files or web pictures here</span></div>'+
-      (media.length?'<div class="makGrid">'+media.map(m=>makCardHtml('media',m.id,m.url,m.title||'(logo)',
-        (m.tags||[]).slice(0,3).join(', ')||(m.kind==='image'?'image':'SVG'),
-        '<button class="btn sm danger makDelM makDelBadge" data-id="'+m.id+'" title="Delete from the archive">✕</button>')).join('')+'</div>'
-      :'<div class="empty">Nothing in the archive yet — drop a file here or use ＋ Add.</div>');
-  }
-  $('#makWall').innerHTML=html;
-  $('#makCount').textContent=makCountSel()+' selected';
-  $('#makWall').querySelectorAll('.makCard').forEach(cd=>{
-    cd.onclick=e=>{
-      if(e.target.closest('button')) return;
-      makToggle(cd.dataset.rt,+cd.dataset.id);
-      cd.classList.toggle('on');
-      $('#makCount').textContent=makCountSel()+' selected';
-    };
-    // Drag a card straight into an open editor window (side by side).
-    cd.ondragstart=e=>{
-      e.dataTransfer.setData('text/ts-card',JSON.stringify({ref_type:cd.dataset.rt,ref_id:+cd.dataset.id}));
-      e.dataTransfer.effectAllowed='copy';
-    };
-  });
-  $('#makWall').querySelectorAll('.makAllG').forEach(b=>b.onclick=()=>{
-    [...new Set(byGroup[+b.dataset.g]||[])].forEach(cid=>{
-      const c=cById[cid];
-      if(c&&passesFilterC(c)&&!makHas('contact',cid)) makComp.items.push({ref_type:'contact',ref_id:cid,overrides:{}});
-    });
-    renderMakWall();
-  });
-  const ap=$('#makAllP');
-  if(ap) ap.onclick=()=>{
-    posts.forEach(p=>{ if(!makHas('post',p.id)) makComp.items.push({ref_type:'post',ref_id:p.id,overrides:{}}); });
-    renderMakWall();
-  };
-  $('#makWall').querySelectorAll('.makDelM').forEach(b=>b.onclick=async()=>{
-    const id=+b.dataset.id;
-    if(!confirm('Delete this logo? It will be removed from any prints using it.')) return;
-    try{ await api('/api/media-cards/'+id,{method:'DELETE'}); }catch(e){ alert('Delete failed: '+e.message); return; }
-    if(makComp) makComp.items=makComp.items.filter(i=>!(i.ref_type==='media'&&i.ref_id===id));
-    await ensureMedia(true); renderMakWall();
-  });
-}
-
-// Save. Already-placed items keep their layout untouched. NEW picks on a
-// print that already has a layout arrive PARKED in the grey space beside
-// page 1 (x > 100) — the editor shows them greyed, ready to drag in.
-async function makSave(){
-  if(!makComp) return null;
-  const name=($('#makName').value||'').trim()||makComp.name;
-  const placed=makComp.items.some(i=>i.overrides&&i.overrides.page!=null);
-  let k=0;
-  const items=makComp.items.map(i=>{
-    const ov=i.overrides||{};
-    if(placed&&ov.page==null&&ov.x==null)
-      return {ref_type:i.ref_type,ref_id:i.ref_id,overrides:{page:1,x:104,y:4+(k++%5)*19,w:22}};
-    return {ref_type:i.ref_type,ref_id:i.ref_id,overrides:ov};
-  });
-  await api('/api/compositions/'+makComp.id,{method:'PUT',body:JSON.stringify({name,items})});
-  makComp.name=name;
-  return makComp.id;
-}
-$('#makBack').onclick=async()=>{ await makSave(); makComp=null; renderMak(); };
-$('#makSaveBtn').onclick=async()=>{ await makSave(); showToast('Saved'); };
-$('#makGo').onclick=async()=>{ const id=await makSave(); if(id) window.open('/print/brochure?comp='+id,'_blank'); };
-$('#makSearch').oninput=debounce(renderMakWall,180);
-$('#makAddSvg').onclick=()=>$('#makSvgFile').click();
-
-// ── Archive uploads: file picker, dropped files, dropped web pictures ──
-async function makUploadFile(f,askMeta){
-  const isSvg=/svg/i.test(f.type||'')||/\.svg$/i.test(f.name||'');
-  if(!isSvg&&!/^image\//i.test(f.type||'')){ showToast('Skipped '+f.name+' — not an image'); return; }
-  let title=(f.name||'file').replace(/\.(svg|png|jpe?g|webp|gif|avif)$/i,''), tags=[];
-  if(askMeta){
-    title=(prompt('Name this logo/graphic:',title)||'').trim()||title;
-    const tr=(prompt('Tags (comma-separated, optional) — e.g. logo, jul, birthday:','')||'').trim();
-    tags=tr?tr.split(',').map(t=>t.trim()).filter(Boolean):[];
-  }
-  const fd=new FormData(); fd.append('file',f); fd.append('title',title); fd.append('tags',JSON.stringify(tags));
-  const r=await fetch('/api/media-cards',{method:'POST',body:fd});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(d.error||d.details||('HTTP '+r.status));
-}
-async function makUploadUrl(u){
-  const r=await fetch('/api/media-cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(d.error||d.details||('HTTP '+r.status));
-}
-$('#makSvgFile').onchange=async e=>{
-  const files=[...(e.target.files||[])]; e.target.value='';
-  if(!files.length) return;
-  try{
-    for(const f of files) await makUploadFile(f, files.length===1);
-    showToast('Added to the archive');
-    await ensureMedia(true); renderMakWall();
-  }catch(err){ alert('Upload failed: '+err.message); }
-};
-let makDropWired=false;
-function makWireDrop(){
-  if(makDropWired) return; makDropWired=true;
-  const wall=$('#makWall');
-  wall.addEventListener('dragover',e=>{
-    const ts=[...(e.dataTransfer.types||[])];
-    if(ts.includes('text/ts-card')) return;        // our own card dragging OUT
-    e.preventDefault(); wall.classList.add('dropping');
-  });
-  wall.addEventListener('dragleave',()=>wall.classList.remove('dropping'));
-  wall.addEventListener('drop',async e=>{
-    wall.classList.remove('dropping');
-    const ts=[...(e.dataTransfer.types||[])];
-    if(ts.includes('text/ts-card')) return;
-    e.preventDefault();
-    try{
-      const files=[...(e.dataTransfer.files||[])];
-      if(files.length){ for(const f of files) await makUploadFile(f,false); }
-      else{
-        const uri=(e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain')||'').split('\n')[0].trim();
-        if(!/^https?:\/\//.test(uri)) return;
-        await makUploadUrl(uri);
-      }
-      showToast('Added to the archive');
-      await ensureMedia(true); renderMakWall();
-    }catch(err){ alert('Upload failed: '+err.message); }
-  });
-}
 
 // ── Tabs ──
 const ids=['kon','kar','tid','tre','bok','exp','web','mak','dup'];
@@ -3158,7 +2874,6 @@ function showTab(t){
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.t===t));
   clearAnomaly();
   ids.forEach(i=>$('#'+i).classList.toggle('hide', i!==showId));
-  document.body.classList.toggle('makmode', showId==='mak');   // board controls in the sidebar
   if(showId==='kar') setTimeout(renderMap,80);
   if(showId==='kon') renderContactsTable();
   if(showId==='tid') renderTimeline();
