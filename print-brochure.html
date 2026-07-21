@@ -147,7 +147,8 @@
   .sprev .rszh,.sprev .crE{ display:none!important; }
   .sscale{ transform-origin:top left; position:absolute; top:0; left:0; }
   .snum{ text-align:center; font-size:10.5px; font-weight:800; color:#6f7865; margin-top:2px;
-         text-shadow:0 1px 0 rgba(255,255,255,.85); }
+         text-shadow:0 1px 0 rgba(255,255,255,.85);
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sthumb.cur .snum{ color:var(--green); }
   .sthumb.dragover .sprev{ border-color:var(--green); box-shadow:-3px 0 0 var(--green); }
   /* Hovering a card floats a real toolbar above it — the old corner buttons were
@@ -2925,9 +2926,11 @@ function renderStrip(){
   for(let n=1;n<=N;n++){
     const rl=ruleOf(n);
     const cp=chapterPos(n);
+    const pl=placementOf(n);
     html+='<div class="sthumb'+(n===curPage?' cur':'')+(cp?' chIn':'')+'" data-n="'+n+'" draggable="true" title="Page '+n+
       (cp?' — '+esc(cp.ch.name||'chapter')+' '+cp.i+'/'+cp.n+', moves with its chapter':' — click to edit, drag to move')+'">'+
-      (cp&&cp.i===1?'<span class="schap" data-chap="'+n+'" title="Chapter settings">'+esc(cp.ch.name||'chapter')+'</span>':'')+
+      (cp&&cp.i===1?'<span class="schap" data-chap="'+n+'" title="Chapter settings">'+esc(cp.ch.name||'chapter')+'</span>'
+        : (pl?'<span class="schap" data-chap="'+n+'" title="From your library — v'+(+pl.p.version||1)+'">⬒ '+esc(pl.p.name||'card')+'</span>':''))+
       (rl?'<span class="srule" data-rule="'+n+'" title="This card follows the group ‘'+esc(rl.name||'')+'’ — click for its settings">↻ '+esc(rl.name||'group')+'</span>':'')+
       '<div class="sprev" style="width:'+TW+'px;height:'+TH+'px;">'+
         '<div class="sscale" style="width:'+natW+'px;height:'+natH+'px;transform:scale('+k+');">'+pageHtml(n)+'</div>'+
@@ -2939,7 +2942,10 @@ function renderStrip(){
         (chapterOf(n)?'':'<button data-chnew="'+n+'" title="Start a chapter with this card">⊞</button>')+
         (N>1?'<button class="danger" data-del="'+n+'" title="Delete this card">✕</button>':'')+
       '</div></div>'+
-      '<div class="snum">'+(cp?esc(cp.ch.name?cp.ch.name.slice(0,1).toUpperCase():'C')+' '+cp.i+'/'+cp.n:n)+'</div></div>';
+      '<div class="snum" title="'+esc(cp?(cp.ch.name||'chapter')+' '+cp.i+'/'+cp.n:(pl?pl.p.name||'':'Page '+n))+'">'+
+        (cp ? esc(cp.ch.name||'chapter')+' '+cp.i+'/'+cp.n
+            : pl ? esc(pl.p.name||'card')
+            : n)+'</div></div>';
   }
   html+='<div id="stripEnd" title="Drop a saved card here to add it as a new page at the end"'+
         ' style="width:'+TW+'px;height:'+TH+'px;">+</div>';
@@ -3152,20 +3158,46 @@ function resItemHtml(kind,o){
 }
 // A saved card previews as a real mini page: the same renderers, positioned
 // exactly where the objects sit, scaled by each wrapper's font-size.
+// A saved card previews as a real mini page. It has to apply what absWrap()
+// applies — font, colour, background, rotation, stacking — or the preview lies:
+// the .block.ffo rules inherit their font from the WRAPPER, so a wrapper with no
+// font-family silently drops the chosen typeface.
+//
+// Scale: the thumbnail is its own little page, so pScale becomes W/794 and the
+// font-size formula is the same one fsOf() uses. No ad-hoc numbers.
 function cardThumbHtml(b, W){
-  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
+  const P=paperOf(b.paper||(COMP&&COMP.params&&COMP.params.paper)||'a4');
   const H=Math.round(W*(P.h/P.w));
-  const obs=(b.cover||[]).map(it=>{
-    const ov=it.overrides||{};
-    const w=+ov.w||24;
-    return '<div style="position:absolute;left:'+(+ov.x||0)+'%;top:'+(+ov.y||0)+'%;width:'+w+'%;'+
-      'font-size:'+Math.max(1.5,(W*w/100)/28*13.5/13.5*2.2).toFixed(2)+'px;'+
-      ((+ov.r)?'transform:rotate('+(+ov.r)+'deg);':'')+'overflow:hidden;">'+
-      cardInner({ ...it, _idx:-1 })+'</div>';
+  const tScale=W/794;
+  const obs=(b.cover||[]).slice()
+    .sort((a,c)=>(+((a.overrides||{}).z)||0)-(+((c.overrides||{}).z)||0))
+    .map(it=>{
+      const ov=it.overrides||{};
+      const w=+ov.w||28, ts=(ov.ts?+ov.ts:1);
+      const fs=Math.max(1.2, 13.5*(w/28)*ts*tScale);
+      const st='position:absolute;left:'+(+ov.x||0)+'%;top:'+(+ov.y||0)+'%;width:'+w+'%;'+
+        'font-size:'+fs.toFixed(2)+'px;z-index:'+(+ov.z||0)+';overflow:hidden;'+
+        'border-radius:'+(ov.sq?'0':Math.max(1,4.5*tScale).toFixed(1)+'px')+';'+
+        ((+ov.r)?'transform:rotate('+(+ov.r)+'deg);':'')+
+        (ov.ff?'font-family:'+esc(fontCss(ov.ff))+';':'')+
+        (ov.tc?'color:'+esc(ov.tc)+';':'')+
+        (ov.bg?'background:'+esc(ov.bg)+';padding:'+Math.max(0.5,5.4*tScale).toFixed(1)+'px;':'')+
+        (+ov.bw?'border:'+Math.max(0.5,(+ov.bw)*tScale).toFixed(1)+'px '+
+          (BORDER_STYLES.includes(ov.bs)?ov.bs:'solid')+' '+esc(ov.bc||'#23291d')+';':'');
+      return '<div class="'+(ov.sq?'sqo':'')+'" style="'+st+'">'+cardInner({ ...it, _idx:-1 })+'</div>';
+    }).join('');
+  const bars=(b.texts||[]).map(t=>{
+    const w=+t.w||30, ts=(t.ts?+t.ts:1);
+    const fs=Math.max(1.2, 13.5*(w/28)*ts*tScale);
+    const st='position:absolute;left:'+(+t.x||0)+'%;top:'+(+t.y||0)+'%;width:'+w+'%;'+
+      'font-size:'+fs.toFixed(2)+'px;z-index:'+(+t.z||0)+';overflow:hidden;'+
+      ((+t.r)?'transform:rotate('+(+t.r)+'deg);':'')+
+      (t.ff?'font-family:'+esc(fontCss(t.ff))+';':'')+
+      (t.tc?'color:'+esc(t.tc)+';':'');
+    // Free texts carry their words in the card itself, so show them.
+    return '<div style="'+st+'"><div class="block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'')+
+      '"><div class="bd">'+sanitizeHtml(t.text||'')+'</div></div></div>';
   }).join('');
-  const bars=(b.texts||[]).map(t=>
-    '<div style="position:absolute;left:'+(+t.x||0)+'%;top:'+(+t.y||0)+'%;width:'+(+t.w||30)+'%;'+
-    'height:4%;background:#e7e2d2;border-radius:2px;"></div>').join('');
   return '<div style="position:relative;width:'+W+'px;height:'+H+'px;background:#fff;'+
     'border:1px solid #e2dccb;border-radius:4px;overflow:hidden;">'+bars+obs+'</div>';
 }
