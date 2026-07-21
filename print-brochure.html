@@ -691,7 +691,8 @@ function absWrap(it){
     +decoCss(ov,bareText)
     +(ov.tc?'color:'+esc(ov.tc)+';':'')
     +(ov.fw?'font-weight:'+(+ov.fw)+';':'')
-    +(ov.lh?'line-height:'+(+ov.lh)+';':'');
+    +(ov.lh?'line-height:'+(+ov.lh)+';':'')
+    +(ov.ls?'letter-spacing:'+(+ov.ls)+'em;':'');
   return '<div class="abswrap'+(ov.sq?' sqo':'')+(+ov.pin?' pinned':'')+(ov.lh?' lh':'')+
     '" style="'+st+'" data-absidx="'+it._idx+'">'+cardInner(it)+'</div>';
 }
@@ -714,7 +715,8 @@ function txtFreeDiv(t,i){
     +decoCss(t,true)
     +(t.tc?'color:'+esc(t.tc)+';':'')
     +(t.fw?'font-weight:'+(+t.fw)+';':'')
-    +(t.lh?'line-height:'+(+t.lh)+';':'');
+    +(t.lh?'line-height:'+(+t.lh)+';':'')
+    +(t.ls?'letter-spacing:'+(+t.ls)+'em;':'');
   const cls='block txtobj'+(t.ff?' ffo':'')+(t.tc?' tco':'');
   const ffs=t.ff?' style="font-family:'+esc(fontCss(t.ff))+'"':'';
   return '<div class="abswrap txtfree'+(t.sq?' sqo':'')+(t.lh?' lh':'')+'" style="'+st+'" data-text="'+i+'">'+
@@ -1401,6 +1403,7 @@ function liveSelStyle(){
       el.style.boxShadow=(sh&&!bare)?shStr(SHB,sh):'';
       el.style.borderRadius=o.sq?'0':RADpx().toFixed(1)+'px';
       el.style.lineHeight=o.lh?(+o.lh):'';
+      el.style.letterSpacing=o.ls?((+o.ls)+'em'):'';
       el.classList.toggle('sqo',!!o.sq);
       el.classList.toggle('lh',!!o.lh);
     }else{
@@ -1633,7 +1636,10 @@ function showKnobs(){
       '<input type="number" id="knWn" step="0.5" min="1" max="200" value="'+(Math.round((+ov.w||28)*10)/10)+'" style="width:60px;"></div>'+
     (anyText?'<div class="krow"><span style="font-size:11px;color:var(--muted);">Line spacing</span>'+
       '<input type="range" id="knLh" min="0.8" max="2.4" step="0.05" value="'+(+ov.lh||1.45)+'" style="flex:1;width:auto;margin:0;">'+
-      '<span id="knLhV" style="font-size:11px;color:var(--muted);width:30px;text-align:right;">'+(+ov.lh||1.45).toFixed(2)+'</span></div>':'')+
+      '<span id="knLhV" style="font-size:11px;color:var(--muted);width:30px;text-align:right;">'+(+ov.lh||1.45).toFixed(2)+'</span></div>'+
+      '<div class="krow"><span style="font-size:11px;color:var(--muted);">Letter spacing</span>'+
+      '<input type="range" id="knLs" min="-0.1" max="0.6" step="0.01" value="'+(+ov.ls||0)+'" style="flex:1;width:auto;margin:0;">'+
+      '<span id="knLsV" style="font-size:11px;color:var(--muted);width:34px;text-align:right;">'+(+ov.ls||0).toFixed(2)+'</span></div>':'')+
     '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(+ov.bw||0)+'" title="Border width (0 = none)" style="width:56px;">'+
       '<select id="knBs" style="flex:1;margin-bottom:0;">'+
         BORDER_STYLES.map(s=>'<option value="'+s+'"'+((ov.bs||'solid')===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
@@ -1775,6 +1781,16 @@ function showKnobs(){
       SEL.forEach(key=>{ if(!isTextKey(key)) return; ovOf(key).lh=v; });
       liveSelStyle(); };
     lh.onchange=()=>{ if(pre!=null){ pushUndo(pre); pre=null; } };
+  }
+  const ls=q('knLs');
+  if(ls){
+    let pre=null;
+    ls.oninput=e=>{ if(pre==null) pre=snap();
+      const v=+e.target.value; q('knLsV').textContent=v.toFixed(2);
+      SEL.forEach(key=>{ if(!isTextKey(key)) return; const o=ovOf(key);
+        if(Math.abs(v)<0.005) delete o.ls; else o.ls=v; });
+      liveSelStyle(); };
+    ls.onchange=()=>{ if(pre!=null){ pushUndo(pre); pre=null; } };
   }
   const fw=q('knFW');
   if(fw) fw.onchange=e=>{ pushUndo();
