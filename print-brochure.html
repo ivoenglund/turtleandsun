@@ -268,6 +268,7 @@
   #teBody h3{ font-family:Georgia,serif; color:var(--green); font-size:1.56em; margin:0 0 .35em;
               font-weight:inherit; }
   #teBody p{ margin:0 0 .73em; }
+  #teBody b, #teBody strong{ font-weight:inherit; }
   #txtEdFoot{ padding:7px 12px; font-size:11.5px; color:var(--muted); border-top:1px solid #ece7d9; }
   @media print{ #res,#resTab,#resPrev,#updOverlay,#txtEd{ display:none!important; } }
   #knobs{ margin-top:8px; padding-top:8px; border-top:2px solid #efe9d8; }
@@ -1837,19 +1838,30 @@ function teSyncToolbar(){
 }
 // Quill remembers the range even after focus goes to a toolbar control, which is
 // the whole reason this works now.
-function teFormat(name,value){
+// Apply one or more formats in ONE go, against a single range.
+// focus() collapses the selection, so two teFormat calls in a row meant the
+// second one saw a bare caret and only styled future typing — which is why
+// Weight never took while italic and underline did.
+function teApply(pairs){
   if(!TE_Q) return;
-  const r=TE_Q.getSelection() || TE_RANGE;      // survives a trip to a toolbar control
-  if(r && r.length>0) TE_Q.formatText(r.index, r.length, name, value, 'user');
-  else if(r)          TE_Q.format(name, value, 'user');       // caret: affects typing
-  else{
-    // Nothing selected: all of it. Clear per-run values first, or the old ones win.
-    TE_Q.formatText(0, TE_Q.getLength(), name, false, 'silent');
-    TE_Q.formatText(0, TE_Q.getLength(), name, value, 'user');
-  }
+  const r=TE_Q.getSelection() || TE_RANGE;
+  const all=!r;
+  const idx=all?0:r.index, len=all?TE_Q.getLength():r.length;
+  Object.keys(pairs).forEach(name=>{
+    const value=pairs[name];
+    if(len>0){
+      // Clear first, or a per-run value already on the text keeps winning.
+      TE_Q.formatText(idx, len, name, false, 'silent');
+      TE_Q.formatText(idx, len, name, value, 'user');
+    }else{
+      TE_Q.format(name, value, 'user');          // caret: affects what you type next
+    }
+  });
   TE_Q.focus();
+  if(r) TE_Q.setSelection(r.index, r.length, 'silent');   // keep the words selected
   teSyncToolbar();
 }
+function teFormat(name,value){ teApply({[name]:value}); }
 function teSave(){
   if(!TE_KEY||!TE_Q) return;
   const ov=ovOf(TE_KEY);
@@ -1877,8 +1889,8 @@ document.getElementById('txtEd').onmousedown=e=>{ if(e.target.id==='txtEd') teCl
 function teCurFmt(){ if(!TE_Q) return {}; const r=TE_Q.getSelection()||TE_RANGE;
   return (r?TE_Q.getFormat(r):TE_Q.getFormat())||{}; }
 document.getElementById('teWeight').onchange=e=>{
-  teFormat('bold',false);                 // drop any <strong>, weight owns this now
-  teFormat('weight',e.target.value);
+  // One operation: drop any <strong> and set the weight against the same range.
+  teApply({ bold:false, weight:e.target.value });
 };
 document.getElementById('teI').onclick=()=>teFormat('italic',!teCurFmt().italic);
 document.getElementById('teU').onclick=()=>teFormat('underline',!teCurFmt().underline);
