@@ -291,6 +291,7 @@
     <div class="ph">Paper</div>
     <div class="hint" id="designPaper" style="margin:0 0 4px;">Designed for A4</div>
     <select id="outPaper" title="Print this design on a different paper — the whole page scales, nothing is re-laid out"></select>
+    <div class="hint" id="printPaperNote" style="display:none;margin:4px 0 0;"></div>
     <div class="ph">Zoom · <span id="zoomPct">100%</span></div>
     <div id="zoomWrap" class="prow">
       <button id="zoomOut" title="Zoom out ( - )">−</button>
@@ -499,7 +500,11 @@ function applyPaper(){
   // a different shape — A4 onto US Letter is 2.8% wider but 6% shorter, so the
   // bottom of the design would run off the page.
   const ratio=Math.min(O.w/D.w, O.h/D.h);
-  let css='@page{ size:'+O.w+'mm '+O.h+'mm; margin:0; }';
+  // Chrome matches a CSS *named* size to its paper dropdown more reliably than raw
+  // millimetres. Only a few names exist in the spec; everything else stays in mm.
+  const CSSNAME={ a5:'A5', a4:'A4', a3:'A3', letter:'letter', legal:'legal', tabloid:'ledger' };
+  const sz = CSSNAME[O.k] || (O.w+'mm '+O.h+'mm');
+  let css='@page{ size:'+sz+'; margin:0; }';
   if(D.canvas){
     css+=' .page{ width:'+D.w+'mm; height:'+D.h+'mm; min-height:0; padding:0;';
   }else{
@@ -510,6 +515,12 @@ function applyPaper(){
   st.textContent=css;
   const lbl=document.getElementById('designPaper');
   if(lbl) lbl.textContent='Designed for '+paperLabel(D)+(ratio!==1?' — printing at '+(ratio*100).toFixed(0)+'%':'');
+  // Chrome cannot be told which paper to preselect, so say it plainly instead.
+  const rem=document.getElementById('printPaperNote');
+  if(rem){
+    rem.textContent='In the print dialog: paper '+O.n+', margins None, scale 100%.';
+    rem.style.display='block';
+  }
 }
 function designPaperKey(){ return (COMP&&COMP.params&&COMP.params.paper)||'a4'; }
 function outPaperKey(){ return (COMP&&COMP.params&&(COMP.params.outPaper||COMP.params.paper))||'a4'; }
