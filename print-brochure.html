@@ -350,7 +350,13 @@
     <select id="teFont"></select>
     <input type="number" id="teSize" min="4" max="900" step="1" title="Size in points, as it will print">
     <span class="u">pt</span>
-    <button id="teB" title="Bold"><b>B</b></button>
+    <select id="teWeight" title="Weight">
+      <option value="300">Light</option>
+      <option value="400">Regular</option>
+      <option value="500">Medium</option>
+      <option value="700">Bold</option>
+      <option value="800">Extra bold</option>
+    </select>
     <button id="teI" title="Italic"><i>I</i></button>
     <button id="teU" title="Underline"><span style="text-decoration:underline">U</span></button>
     <input type="color" id="teColor" title="Colour of the selected text">
@@ -1735,6 +1741,12 @@ function teQuill(){
   // sanitiser already allows and what the page renderer already understands.
   const Size=Quill.import('attributors/style/size'); Size.whitelist=null; Quill.register(Size,true);
   const Font=Quill.import('attributors/style/font'); Font.whitelist=null; Quill.register(Font,true);
+  // Weight as an explicit style, not <strong>. A heading is bold by default, so a
+  // <strong> can only ever make it bolder — there was no way to get the regular
+  // cut of a font. An inline font-weight always wins over the heading's default.
+  const P=Quill.import('parchment');
+  const Weight=new P.StyleAttributor('weight','font-weight',{scope:P.Scope.INLINE});
+  Quill.register(Weight,true);
   TE_Q=new Quill('#teBody',{ theme:null, modules:{ toolbar:false } });
   TE_Q.on('selection-change',range=>{ if(range) TE_RANGE=range; teSyncToolbar(); });
   TE_Q.on('text-change',()=>{ const r=TE_Q.getSelection(); if(r) TE_RANGE=r; teSyncToolbar(); });
@@ -1774,8 +1786,15 @@ function teSyncToolbar(){
   const fmt=(r ? TE_Q.getFormat(r) : TE_Q.getFormat()) || {};
   const em = fmt.size ? parseFloat(fmt.size) : 1;   // no size set = 1em of the object
   sz.value=Math.max(1,Math.round(teEmToPt(isFinite(em)?em:1)));
-  const b=document.getElementById('teB'), i=document.getElementById('teI'), u=document.getElementById('teU');
-  if(b) b.classList.toggle('on',!!fmt.bold);
+  const wsel=document.getElementById('teWeight');
+  if(wsel && document.activeElement!==wsel){
+    // <strong> with no explicit weight reads as 700; a heading's own bold as 700 too.
+    const el=(TE_Q.getSelection()&&TE_Q.getLeaf(TE_Q.getSelection().index)[0])||null;
+    const dom=el&&el.domNode&&(el.domNode.parentElement||el.domNode);
+    const computed=dom?parseInt(getComputedStyle(dom).fontWeight,10):400;
+    wsel.value=String(fmt.weight || (fmt.bold?700:(isFinite(computed)?computed:400)));
+  }
+  const i=document.getElementById('teI'), u=document.getElementById('teU');
   if(i) i.classList.toggle('on',!!fmt.italic);
   if(u) u.classList.toggle('on',!!fmt.underline);
 }
@@ -1814,13 +1833,16 @@ document.getElementById('txtEd').addEventListener('keydown',e=>{
 document.getElementById('teCancel').onclick=teClose;
 document.getElementById('teDone').onclick=teSave;
 document.getElementById('txtEd').onmousedown=e=>{ if(e.target.id==='txtEd') teClose(); };
-['teB','teI','teU'].forEach(id=>{
+['teI','teU'].forEach(id=>{
   const b=document.getElementById(id);
   if(b) b.onmousedown=e=>e.preventDefault();     // keep the caret where it is
 });
 function teCurFmt(){ if(!TE_Q) return {}; const r=TE_Q.getSelection()||TE_RANGE;
   return (r?TE_Q.getFormat(r):TE_Q.getFormat())||{}; }
-document.getElementById('teB').onclick=()=>teFormat('bold',!teCurFmt().bold);
+document.getElementById('teWeight').onchange=e=>{
+  teFormat('bold',false);                 // drop any <strong>, weight owns this now
+  teFormat('weight',e.target.value);
+};
 document.getElementById('teI').onclick=()=>teFormat('italic',!teCurFmt().italic);
 document.getElementById('teU').onclick=()=>teFormat('underline',!teCurFmt().underline);
 document.getElementById('teColor').oninput=e=>teFormat('color',e.target.value);
