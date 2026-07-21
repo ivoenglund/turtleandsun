@@ -202,6 +202,8 @@
   .rcard:hover{ border-color:var(--gold); box-shadow:0 2px 10px rgba(0,0,0,.10); }
   .rcard:active{ cursor:grabbing; }
   .rcard .block{ margin:0; }
+  .rcard .clamp8 .bd{ display:-webkit-box; -webkit-line-clamp:8; -webkit-box-orient:vertical;
+                      overflow:hidden; }
   .rcard img{ pointer-events:none; }
   #resSplit{ position:absolute; top:0; right:-4px; width:9px; height:100%; cursor:col-resize; z-index:2; }
   #resSplit:hover{ background:rgba(201,162,75,.35); }
@@ -516,9 +518,15 @@ function normalizeItems(){
       const photos=(it.content&&it.content.photos)||[];
       const s=(ov.x==null)?seed():{x:+ov.x,y:+ov.y};
       const page=ov.page==null?1:+ov.page, w=+ov.w||28;
-      out.push({ ...it, overrides:Object.assign({},ov,{part:'txt',page,x:s.x,y:s.y,w}) });
+      // Pictures stacked, then the text UNDERNEATH them. They used to cascade
+      // diagonally, which put every photo on top of the words.
+      const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
+      const imgH=w*(P.w/P.h)*0.85, GAP=1.5;      // a photo runs ~0.85x its width
       photos.forEach((p,i)=> out.push({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content,
-        overrides:{ part:'img'+i, page, x:Math.min(88,s.x+3+i*4), y:Math.min(92,s.y+3+i*4), w } }));
+        overrides:{ part:'img'+i, page, x:s.x, y:Math.round((s.y+i*(imgH+GAP))*10)/10, w } }));
+      const ty=s.y+photos.length*(imgH+GAP);
+      out.push({ ...it, overrides:Object.assign({},ov,
+        {part:'txt', page, x:s.x, y:Math.round(ty*10)/10, w}) });
     } else {
       if(ov.page==null){ const s=seed(); ov.page=1; if(ov.x==null) ov.x=s.x; if(ov.y==null) ov.y=s.y; if(ov.w==null) ov.w=28; }
       out.push(it);
@@ -2101,19 +2109,25 @@ document.addEventListener('drop',async e=>{
   }
   e.preventDefault();
   let d; try{ d=JSON.parse(raw); }catch(err){ return; }
-  if(!d||!['post','contact','media'].includes(d.ref_type)||!+d.ref_id) return;
-  pushUndo();
-  const ov={ page:curPage, card:cardIdAt(curPage), w:24, x:104, y:8 };
+  let x0=null, y0=null;
   const page=document.querySelector('#out .page');
   if(page){
     const pr=page.getBoundingClientRect();
-    const x0=Math.round(Math.max(-30,Math.min(98,(e.clientX-pr.left)/pr.width*100-12))*10)/10;
-    const y0=Math.round(Math.max(-30,Math.min(98,(e.clientY-pr.top)/pr.height*100-4))*10)/10;
-    // Where you let go, unless something is already there — then the nearest clear spot.
-    const spot=freeSpot(24, estH(24), x0, y0);
-    ov.x=spot.x; ov.y=spot.y;
+    x0=Math.round(Math.max(-30,Math.min(98,(e.clientX-pr.left)/pr.width*100-12))*10)/10;
+    y0=Math.round(Math.max(-30,Math.min(98,(e.clientY-pr.top)/pr.height*100-4))*10)/10;
   }
-  COMP.items.push({ ref_type:d.ref_type, ref_id:+d.ref_id, overrides:ov });
+  await placeCardRef(d, x0, y0);
+});
+
+// Put one referenced card on the CURRENT page. Shared by the canvas drop and by
+// dropping onto a small page in the filmstrip.
+async function placeCardRef(d, x0, y0){
+  if(!d||!['post','contact','media'].includes(d.ref_type)||!+d.ref_id) return;
+  pushUndo();
+  // Where you let go, unless something is already there — then the nearest clear spot.
+  const spot=freeSpot(24, estH(24), x0==null?8:x0, y0==null?8:y0);
+  COMP.items.push({ ref_type:d.ref_type, ref_id:+d.ref_id,
+    overrides:{ page:curPage, card:cardIdAt(curPage), w:24, x:spot.x, y:spot.y } });
   await saveNow();
   const r=await fetch('/api/compositions/'+compId);
   if(r.ok){
@@ -2122,7 +2136,7 @@ document.addEventListener('drop',async e=>{
     normalizeItems();
     SEL=[]; renderCurrent(); showKnobs();
   }
-});
+}
 
 // Print = all pages in order; restore the single-page editor afterwards.
 window.addEventListener('beforeprint',()=>{ if(editing) commitEdit(false); renderAllPages(); });
@@ -2341,12 +2355,28 @@ function renderStrip(){
     el.onclick=e=>{ if(e.target.closest('.sact')) return; setPage(n); };
     el.ondragstart=e=>{ dragFrom=n; e.dataTransfer.effectAllowed='move';
       try{ e.dataTransfer.setData('text/plain','card'); }catch(err){} };
-    el.ondragover=e=>{ if(dragFrom==null) return; e.preventDefault();
-      e.dataTransfer.dropEffect='move'; el.classList.add('dragover'); };
+    // A small page accepts three things: another card (reorder), and content or a
+    // whole group dragged out of the Content panel — dropped straight onto THAT page.
+    el.ondragover=e=>{
+      const t=[...(e.dataTransfer.types||[])];
+      if(dragFrom==null && !t.includes('text/ts-card') && !t.includes('text/ts-group')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect=dragFrom==null?'copy':'move';
+      el.classList.add('dragover');
+    };
     el.ondragleave=()=>el.classList.remove('dragover');
-    el.ondrop=e=>{ e.preventDefault(); e.stopPropagation(); el.classList.remove('dragover');
-      if(dragFrom!=null&&dragFrom!==n) moveCard(dragFrom,n);
-      dragFrom=null; };
+    el.ondrop=async e=>{
+      e.preventDefault(); e.stopPropagation(); el.classList.remove('dragover');
+      if(dragFrom!=null){ if(dragFrom!==n) moveCard(dragFrom,n); dragFrom=null; return; }
+      const grp=e.dataTransfer.getData('text/ts-group');
+      const one=e.dataTransfer.getData('text/ts-card');
+      if(!grp&&!one) return;
+      if(n!==curPage) setPage(n);            // work on the page you dropped onto
+      if(grp){ let d; try{ d=JSON.parse(grp); }catch(err){ return; }
+               if(d&&d.section) await dropGroup(d); }
+      else   { let d; try{ d=JSON.parse(one); }catch(err){ return; }
+               await placeCardRef(d, null, null); }
+    };
     el.ondragend=()=>{ dragFrom=null; host.querySelectorAll('.dragover').forEach(x=>x.classList.remove('dragover')); };
   });
   host.querySelectorAll('[data-ins]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); insertCardAt(+b.dataset.ins); });
@@ -2491,8 +2521,11 @@ async function fetchContent(){
 function resItemHtml(kind,o){
   if(kind==='contact') return personCard({_idx:-1,ref_type:'contact',content:o,overrides:{}});
   if(kind==='media')   return mediaBlock({_idx:-1,ref_type:'media',content:o,overrides:{caption:1}});
-  return ((o.photos||[]).length?postBlock({_idx:-1,ref_type:'post',content:o,overrides:{part:'img0'}}):'')+
-         postBlock({_idx:-1,ref_type:'post',content:o,overrides:{}});
+  // Every picture in the item, then its words cut to eight rows — enough to know
+  // what it is without a long post filling the panel.
+  return (o.photos||[]).map((_,i)=>
+           postBlock({_idx:-1,ref_type:'post',content:o,overrides:{part:'img'+i}})).join('')+
+         '<div class="clamp8">'+postBlock({_idx:-1,ref_type:'post',content:o,overrides:{}})+'</div>';
 }
 function renderContent(){
   const body=document.getElementById('resBody');
