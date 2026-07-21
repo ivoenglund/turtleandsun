@@ -56,7 +56,9 @@ window.CardRender = (function(){
 
   const BORDER_STYLES=['solid','dashed','dotted','double'];
 
-  const FONTSTACK={ 'Futura Book': "'Futura Book','Jost','Century Gothic',sans-serif" };
+  // Century Gothic is wide and heavy — a poor stand-in. Jost at 300 is the closest
+  // open face to Futura Book, so go straight to it.
+  const FONTSTACK={ 'Futura Book': "'Futura Book','Jost',sans-serif" };
 
   function fontCss(name){
     if(!name) return '';

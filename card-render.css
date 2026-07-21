@@ -4,14 +4,20 @@
    uses the same typefaces as the editor — otherwise the text silently falls back
    to a default and only the SVG logos look right. */
 
+/* Only real BOOK cuts. local('Futura') was matching the family's default weight —
+   often Medium or Bold — which is why it came out fat and wrong. If no Book cut is
+   installed, fall through to Jost 300, which is close in weight and shape. */
 @font-face{
   font-family:'Futura Book';
   src: local('Futura Book'), local('Futura-Book'), local('FuturaBT-Book'),
        local('Futura BT Book'), local('Futura Std Book'), local('FuturaStd-Book'),
-       local('Futura PT Book'), local('FuturaPT-Book'), local('Futura'),
+       local('Futura PT Book'), local('FuturaPT-Book'), local('Futura Lt BT'),
        url('/fonts/futura-book.woff2') format('woff2');
   font-weight:400; font-style:normal; font-display:swap;
 }
+/* Never let the browser fake a bold or italic from a Book cut — synthesised
+   weights are what make a geometric sans look heavy and wrong. */
+.block, .ql-editor{ font-synthesis-weight:none; font-synthesis-style:none; }
 
 
 /* card-render.css — how a card's contents LOOK.

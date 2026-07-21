@@ -1723,7 +1723,7 @@ let styleSpan=null, holdSel=false;
 // Sizes are stored as em relative to the object, which is what keeps text
 // scaling with the paper. The dialog renders 1em as TE_DIALOG_EM px and shows
 // points on the page, so the number means something in print.
-let TE_KEY=null, TE_BASE=13.5, TE_Q=null;
+let TE_KEY=null, TE_BASE=13.5, TE_Q=null, TE_RANGE=null;
 const TE_DIALOG_EM=16;
 function tePtToEm(pt){ return pt/0.75/TE_BASE; }
 function teEmToPt(em){ return em*TE_BASE*0.75; }
@@ -1735,14 +1735,15 @@ function teQuill(){
   const Size=Quill.import('attributors/style/size'); Size.whitelist=null; Quill.register(Size,true);
   const Font=Quill.import('attributors/style/font'); Font.whitelist=null; Quill.register(Font,true);
   TE_Q=new Quill('#teBody',{ theme:null, modules:{ toolbar:false } });
-  TE_Q.on('selection-change',()=>teSyncToolbar());
-  TE_Q.on('text-change',()=>teSyncToolbar());
+  TE_Q.on('selection-change',range=>{ if(range) TE_RANGE=range; teSyncToolbar(); });
+  TE_Q.on('text-change',()=>{ const r=TE_Q.getSelection(); if(r) TE_RANGE=r; teSyncToolbar(); });
   return TE_Q;
 }
 function teOpen(key){
   const ov=ovOf(key); if(!ov) return;
   TE_KEY=key;
   TE_BASE=fsOf(ov)||13.5;
+  TE_RANGE=null;
   const q=teQuill();
   let html=ov.text;
   if(html==null){                       // never edited: start from what is on the page
@@ -1768,7 +1769,8 @@ function teSyncToolbar(){
   if(!TE_Q||!TE_KEY) return;
   const sz=document.getElementById('teSize');
   if(document.activeElement===sz) return;      // do not fight the user mid-type
-  const fmt=TE_Q.getFormat() || {};
+  const r=TE_Q.getSelection() || TE_RANGE;
+  const fmt=(r ? TE_Q.getFormat(r) : TE_Q.getFormat()) || {};
   const em = fmt.size ? parseFloat(fmt.size) : 1;   // no size set = 1em of the object
   sz.value=Math.max(1,Math.round(teEmToPt(isFinite(em)?em:1)));
   const b=document.getElementById('teB'), i=document.getElementById('teI'), u=document.getElementById('teU');
@@ -1780,7 +1782,7 @@ function teSyncToolbar(){
 // the whole reason this works now.
 function teFormat(name,value){
   if(!TE_Q) return;
-  const r=TE_Q.getSelection();
+  const r=TE_Q.getSelection() || TE_RANGE;      // survives a trip to a toolbar control
   if(r && r.length>0) TE_Q.formatText(r.index, r.length, name, value, 'user');
   else if(r)          TE_Q.format(name, value, 'user');       // caret: affects typing
   else                TE_Q.formatText(0, TE_Q.getLength(), name, value, 'user');  // nothing selected: all of it
@@ -1807,9 +1809,15 @@ document.getElementById('txtEd').addEventListener('keydown',e=>{
 document.getElementById('teCancel').onclick=teClose;
 document.getElementById('teDone').onclick=teSave;
 document.getElementById('txtEd').onmousedown=e=>{ if(e.target.id==='txtEd') teClose(); };
-document.getElementById('teB').onclick=()=>{ const f=TE_Q&&TE_Q.getFormat()||{}; teFormat('bold',!f.bold); };
-document.getElementById('teI').onclick=()=>{ const f=TE_Q&&TE_Q.getFormat()||{}; teFormat('italic',!f.italic); };
-document.getElementById('teU').onclick=()=>{ const f=TE_Q&&TE_Q.getFormat()||{}; teFormat('underline',!f.underline); };
+['teB','teI','teU'].forEach(id=>{
+  const b=document.getElementById(id);
+  if(b) b.onmousedown=e=>e.preventDefault();     // keep the caret where it is
+});
+function teCurFmt(){ if(!TE_Q) return {}; const r=TE_Q.getSelection()||TE_RANGE;
+  return (r?TE_Q.getFormat(r):TE_Q.getFormat())||{}; }
+document.getElementById('teB').onclick=()=>teFormat('bold',!teCurFmt().bold);
+document.getElementById('teI').onclick=()=>teFormat('italic',!teCurFmt().italic);
+document.getElementById('teU').onclick=()=>teFormat('underline',!teCurFmt().underline);
 document.getElementById('teColor').oninput=e=>teFormat('color',e.target.value);
 document.getElementById('teFont').onchange=e=>{
   const v=e.target.value;
