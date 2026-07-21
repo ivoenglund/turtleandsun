@@ -2468,15 +2468,13 @@ async function pushPlacement(pid){
         params:{ frames:fr.map(rebase), texts:tx.map(rebase) },
         items:onPage.map(it=>({ref_type:it.ref_type,ref_id:it.ref_id,overrides:rebase(it.overrides)})) })});
     if(!r.ok){ alert('Could not update the original.'); return; }
-    // Read the new version back so this print does not immediately offer itself an update.
-    try{
-      const v=await fetch('/api/print-blocks/versions');
-      if(v.ok){ const by=((await v.json()).blocks)||{};
-        if(by[p.block_id]) p.version=+by[p.block_id].version||p.version+1; }
-    }catch(e){ p.version=(+p.version||1)+1; }
+    const d=await r.json().catch(()=>({}));
+    p.version = +d.version || (+p.version||1)+1;      // the PUT returns the new one
     // The pushed copy is now identical to the original, so it is no longer "edited".
     (COMP.items||[]).forEach(it=>{ if(it.overrides&&it.overrides.plc===pid) delete it.overrides.pin; });
+    // Refresh the Content panel, or its badge would keep showing the old version.
     RES.cardsDirty=true;
+    if(document.getElementById('res').classList.contains('open')&&RES.cards) fetchContent();
     scheduleSave(); showKnobs(); scheduleStrip();
     groupBanner('“'+(p.name||'card')+'” is now v'+p.version+' — other prints will be offered it.');
   }catch(e){ alert('Could not update the original.'); }

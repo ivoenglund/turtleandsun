@@ -3010,16 +3010,19 @@ app.put('/api/print-blocks/:id(\\d+)', requireAuth, async (req, res) => {
       : null;
     // Any change to the content is a new version; a rename alone is not.
     const bump = (params || clean || pages) ? 1 : 0;
-    await pool.query(
+    const upd = await pool.query(
       `UPDATE print_blocks SET name = COALESCE($1, name), pages = COALESCE($2, pages),
               params = COALESCE($3, params), items = COALESCE($4, items),
               declares = COALESCE($5, declares), updated_at = NOW(),
               version = version + ${bump}
-        WHERE id = $6`,
+        WHERE id = $6
+        RETURNING version, pages, name`,
       [name ? String(name).trim() : null, pages ? Math.max(1, +pages) : null,
        params ? JSON.stringify(params) : null, clean ? JSON.stringify(clean) : null,
        declares ? JSON.stringify(declares) : null, req.params.id]);
-    res.json({ v: 1, ok: true });
+    // Hand the new version straight back — the caller needs it to stay in step,
+    // and a second round trip to read it was one more thing to go stale.
+    res.json({ v: 1, ok: true, ...(upd.rows[0] || {}) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
