@@ -136,11 +136,11 @@
   .sthumb.dragover .sprev{ border-color:var(--green); box-shadow:-3px 0 0 var(--green); }
   /* Hovering a card floats a real toolbar above it — the old corner buttons were
      10px and impossible to hit. */
-  .sact{ position:absolute; left:50%; bottom:calc(100% + 5px); transform:translateX(-50%);
-         display:none; gap:3px; background:#fff; border:1.5px solid var(--gold);
-         border-radius:9px; padding:3px; box-shadow:0 3px 12px rgba(0,0,0,.22); z-index:3;
-         white-space:nowrap; }
-  .sthumb:hover .sact{ display:flex; }
+  .sact{ position:absolute; left:50%; bottom:100%; transform:translateX(-50%);
+         display:none; padding-bottom:6px; z-index:3; white-space:nowrap; }
+  .sactin{ display:flex; gap:3px; background:#fff; border:1.5px solid var(--gold);
+           border-radius:9px; padding:3px; box-shadow:0 3px 12px rgba(0,0,0,.22); }
+  .sthumb:hover .sact, .sact:hover{ display:block; }
   .sact button{ font-family:inherit; font-size:14px; font-weight:700; line-height:1;
                 width:26px; height:26px; display:flex; align-items:center; justify-content:center;
                 border:1px solid #e2dccb; border-radius:7px; background:#fff;
@@ -149,6 +149,13 @@
   .sact button.danger{ color:#8c2f1b; border-color:#dcc0b5; }
   .sact button.danger:hover{ background:#f9ece7; }
   /* Drop a saved card here to append it as a new page. */
+  /* A card that follows a group says so, and the badge takes you to its rule. */
+  .srule{ position:absolute; left:3px; top:3px; z-index:2; max-width:calc(100% - 6px);
+          font-size:9.5px; font-weight:800; letter-spacing:.3px; padding:2px 6px;
+          border-radius:20px; background:var(--green); color:#f4efe4; cursor:pointer;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+          box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  .srule:hover{ background:#17403b; }
   #stripEnd{ flex:0 0 auto; align-self:flex-start; display:flex; align-items:center;
              justify-content:center; border:2px dashed #cfc9b8; border-radius:6px;
              color:var(--muted); font-size:18px; font-weight:700; cursor:default;
@@ -1479,6 +1486,10 @@ function showKnobs(){
   // ── MODE: nothing selected ────────────────────────────────────────
   if(!n){
     k.innerHTML=cardRuleHtml+
+      (cardRuleHtml?'':'<div class="kh">This card</div><div class="hint">It has no rule — the '+
+        'objects on it stay exactly as you put them.<br><br>To make a card that follows a group, '+
+        'open <b>Content</b>, tick a group, and drag its <b>heading</b> onto the page. That card '+
+        'then updates when people join or leave, and its settings appear here.</div>')+
       '<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
       'Shift-click or drag a rectangle on the page for several. Drag to move, gold dot to resize, '+
       'click a selected text again to edit it.</div>';
@@ -2497,16 +2508,18 @@ function renderStrip(){
   const N=pageCount();
   let html='';
   for(let n=1;n<=N;n++){
+    const rl=ruleOf(n);
     html+='<div class="sthumb'+(n===curPage?' cur':'')+'" data-n="'+n+'" draggable="true" title="Page '+n+' — click to edit, drag to move">'+
+      (rl?'<span class="srule" data-rule="'+n+'" title="This card follows the group ‘'+esc(rl.name||'')+'’ — click for its settings">↻ '+esc(rl.name||'group')+'</span>':'')+
       '<div class="sprev" style="width:'+TW+'px;height:'+TH+'px;">'+
         '<div class="sscale" style="width:'+natW+'px;height:'+natH+'px;transform:scale('+k+');">'+pageHtml(n)+'</div>'+
       '</div>'+
-      '<div class="sact">'+
+      '<div class="sact"><div class="sactin">'+
         '<button data-ins="'+n+'" title="Insert an empty card after this one">＋</button>'+
         '<button data-cpy="'+n+'" title="Duplicate this card">⧉</button>'+
         '<button data-savecard="'+n+'" title="Save this card to reuse in other prints">⬒</button>'+
         (N>1?'<button class="danger" data-del="'+n+'" title="Delete this card">✕</button>':'')+
-      '</div>'+
+      '</div></div>'+
       '<div class="snum">'+n+'</div></div>';
   }
   html+='<div id="stripEnd" title="Drop a saved card here to add it as a new page at the end"'+
@@ -2562,6 +2575,8 @@ function renderStrip(){
   host.querySelectorAll('[data-ins]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); insertCardAt(+b.dataset.ins); });
   host.querySelectorAll('[data-cpy]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); copyCardAt(+b.dataset.cpy); });
   host.querySelectorAll('[data-savecard]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); saveCardAsBlock(+b.dataset.savecard); });
+  host.querySelectorAll('[data-rule]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
+    setPage(+b.dataset.rule); showKnobs(); });
   host.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation();
     const n=+b.dataset.del; if(n!==curPage) setPage(n); deletePage(); });
   const cur=host.querySelector('.sthumb.cur');
