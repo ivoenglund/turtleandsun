@@ -314,6 +314,10 @@
     </div>
     <div class="ph">Paper</div>
     <select id="paper"></select>
+    <div class="prow" id="paperModeRow">
+      <button id="pmScale" class="on" title="The design scales with the paper — same layout, bigger or smaller">Scale design</button>
+      <button id="pmKeep" title="Everything keeps its physical size — a bigger sheet just gives more room">Keep size</button>
+    </div>
     <div class="ph">Zoom · <span id="zoomPct">100%</span></div>
     <div id="zoomWrap" class="prow">
       <button id="zoomOut" title="Zoom out ( - )">−</button>
@@ -2037,23 +2041,49 @@ function cropEdgeDrag(e,wrap,key,edge){
 // physical width, position and text size, and the larger sheet simply gives more
 // room around the design. The stored model stays percentage-based, so nothing
 // about the data contract changes.
+// Two honest behaviours, and both are wanted.
+//
+// SCALE (default): leave x/y/w alone. They are percentages of the page, and
+// fsOf() carries the paper scale, so everything grows or shrinks by exactly one
+// factor — the design is identical, just a different size. Nothing can drift.
+// This is the same reason the card thumbnails are faithful.
+//
+// KEEP SIZE: rescale x/y/w by the paper ratio so every object keeps its physical
+// width, position and type size, and the larger sheet simply gives more room.
+let paperMode = 'scale';
+try{ paperMode = localStorage.getItem('ts_paper_mode') || 'scale'; }catch(e){}
+function setPaperMode(m){
+  paperMode = m;
+  try{ localStorage.setItem('ts_paper_mode', m); }catch(e){}
+  const a=document.getElementById('pmScale'), b=document.getElementById('pmKeep');
+  if(a) a.classList.toggle('on', m==='scale');
+  if(b) b.classList.toggle('on', m==='keep');
+}
+document.getElementById('pmScale').onclick=()=>setPaperMode('scale');
+document.getElementById('pmKeep').onclick=()=>setPaperMode('keep');
+setPaperMode(paperMode);
+
 document.getElementById('paper').onchange=e=>{
   COMP.params=COMP.params||{};
   const from=paperOf(COMP.params.paper||'a4'), to=paperOf(e.target.value);
-  const rw=from.w/to.w, rh=from.h/to.h;
-  if(Math.abs(rw-1)>0.0001||Math.abs(rh-1)>0.0001){
-    pushUndo();
-    const fix=o=>{ if(!o) return;
-      if(o.x!=null) o.x=Math.round((+o.x)*rw*100)/100;
-      if(o.y!=null) o.y=Math.round((+o.y)*rh*100)/100;
-      if(o.w!=null) o.w=Math.round((+o.w)*rw*1000)/1000;
-      if(o.h!=null) o.h=Math.round((+o.h)*rh*1000)/1000;   // frames carry a height
-    };
-    (COMP.items||[]).forEach(it=>fix(it.overrides));
-    frames().forEach(fix); texts().forEach(fix);
+  if(paperMode==='keep'){
+    const rw=from.w/to.w, rh=from.h/to.h;
+    if(Math.abs(rw-1)>0.0001||Math.abs(rh-1)>0.0001){
+      pushUndo();
+      const fix=o=>{ if(!o) return;
+        if(o.x!=null) o.x=Math.round((+o.x)*rw*100)/100;
+        if(o.y!=null) o.y=Math.round((+o.y)*rh*100)/100;
+        if(o.w!=null) o.w=Math.round((+o.w)*rw*1000)/1000;
+        if(o.h!=null) o.h=Math.round((+o.h)*rh*1000)/1000;   // frames carry a height
+      };
+      (COMP.items||[]).forEach(it=>fix(it.overrides));
+      frames().forEach(fix); texts().forEach(fix);
+    }
+  }else{
+    pushUndo();     // nothing to move: the percentages already scale everything
   }
   COMP.params.paper=e.target.value;
-  applyPaper(e.target.value); render(); applyZoom(curScale*100); showKnobs(); markSel();
+  applyPaper(e.target.value); render(); applyZoom(curScale*100); showKnobs(); markSel(); scheduleStrip();
 };
 document.getElementById('zoom').oninput=e=>zoomToPct(+e.target.value);
 document.getElementById('zoomIn').onclick=()=>zoomStep(1.25);
