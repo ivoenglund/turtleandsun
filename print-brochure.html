@@ -998,6 +998,7 @@ function addPage(){
   cards().splice(curPage,0,{id:nid});
   // A chapter is a container: adding a page grows it instead of breaking it in two.
   if(f){ const list=f.ch.cards||[]; const at=list.indexOf(cardIdAt(curPage)); list.splice(at+1,0,nid); }
+  joinPlacement(cardIdAt(curPage), nid);
   enforceChapters();
   setPage(curPage+1);
 }
@@ -1421,6 +1422,23 @@ function liveSelStyle(){
 // editing text, cropping, a selection, or nothing.
 // The rule is a set of controls, not hidden state: every part of it is visible
 // and changeable on the card it belongs to.
+function placementSectionHtml(){
+  const f=placementOf(curPage); if(!f) return '';
+  const n=(f.p.cards||[]).length;
+  const edited=plcHasLocalEdits(f.pid);
+  return '<div class="kh">From your library — '+esc(f.p.name||'card')+'</div>'+
+    '<div class="hint">v'+(+f.p.version||1)+' · '+n+' page'+(n===1?'':'s')+'. '+
+      (edited?'You have changed this copy. ':'')+
+      'Changes here stay in this print until you send them back.</div>'+
+    '<div class="krow"><button id="plcPush" style="flex:1;" '+
+      'title="Save these pages back to the original as a new version">⬆ Update the original</button>'+
+      '<button id="plcUnlink" title="Stop following the original">⛓</button></div>';
+}
+function wirePlacementSection(){
+  const f=placementOf(curPage); if(!f) return;
+  const a=document.getElementById('plcPush');  if(a) a.onclick=()=>pushPlacement(f.pid);
+  const b=document.getElementById('plcUnlink'); if(b) b.onclick=()=>unlinkPlacement(f.pid);
+}
 function chapterSectionHtml(){
   const cp=chapterPos(curPage); if(!cp) return '';
   return '<div class="kh">Chapter — '+esc(cp.ch.name||'')+'</div>'+
@@ -1544,7 +1562,7 @@ function showKnobs(){
   }
 
   // ── The card's own rule, if it has one ────────────────────────────
-  const cardRuleHtml=chapterSectionHtml()+ruleSectionHtml();
+  const cardRuleHtml=placementSectionHtml()+chapterSectionHtml()+ruleSectionHtml();
 
   // ── MODE: nothing selected ────────────────────────────────────────
   if(!n){
@@ -1556,7 +1574,7 @@ function showKnobs(){
       '<div class="kh">Objects</div><div class="hint">Click an object to select it — '+
       'Shift-click or drag a rectangle on the page for several. Drag to move, gold dot to resize, '+
       'click a selected text again to edit it.</div>';
-    wireChapterSection(); wireRuleSection();
+    wirePlacementSection(); wireChapterSection(); wireRuleSection();
     return;
   }
 
@@ -1658,7 +1676,7 @@ function showKnobs(){
       render(); showKnobs(); markSel();
     };
   });
-  wireChapterSection(); wireRuleSection();
+  wirePlacementSection(); wireChapterSection(); wireRuleSection();
   liveSlider('knW', v=>SEL.forEach(key=>{
     const o=ovOf(key);
     if(isTextKey(key)){    // text reshapes: wider box = longer lines, same letters
@@ -2114,6 +2132,14 @@ function enforceChapters(){
       if(at!==want && at>=0){ const [m]=arr.splice(at,1); arr.splice(want,0,m); }
     });
   });
+  // Placements track pages too; drop any that no longer exist, and forget a
+  // placement whose pages have all gone.
+  const present=cards().map(c=>c.id);
+  const ps=(COMP.params&&COMP.params.placements)||{};
+  Object.keys(ps).forEach(k=>{
+    ps[k].cards=(ps[k].cards||[]).filter(id=>present.indexOf(id)>=0);
+    if(!ps[k].cards.length) delete ps[k];
+  });
   syncPages();
 }
 function createChapter(n){
@@ -2416,6 +2442,55 @@ document.addEventListener('dragover',e=>{
 // A saved card is a whole PAGE, so it does not land on top of the page you are
 // working on. By default it becomes a NEW card straight after the current one.
 // Drop it on a page in the filmstrip and it goes into that page instead.
+// Push this print's copy back up to the saved card, as a new version. This is
+// the ONLY way edits reach the original — never automatic, because one nudge for
+// one customer would otherwise land in every print that takes the update.
+async function pushPlacement(pid){
+  const p=placements()[pid]; if(!p) return;
+  if(editing) commitEdit(true);
+  const ids=(p.cards||[]).filter(id=>cards().some(c=>c.id===id));
+  if(!ids.length){ alert('Those pages are gone.'); return; }
+  const pageOf=id=>ids.indexOf(id)+1;
+  const onPage=(COMP.items||[]).filter(it=>it.overrides&&ids.indexOf(it.overrides.card)>=0);
+  const fr=frames().filter(f=>ids.indexOf(f.card)>=0);
+  const tx=texts().filter(t=>ids.indexOf(t.card)>=0);
+  if(!confirm('Update the original “'+(p.name||'card')+'” with what is on '+
+      (ids.length>1?'these '+ids.length+' pages':'this page')+'?\n\n'+
+      'Every other print will then be offered this version.')) return;
+  const rebase=o=>{ const c=JSON.parse(JSON.stringify(o||{}));
+    c.page=pageOf(c.card)||1;
+    delete c.card; delete c.blk; delete c.grp; delete c.gi; delete c.pin;
+    delete c.rule; delete c.ri; delete c.plc; return c; };
+  try{
+    const r=await fetch('/api/print-blocks/'+p.block_id,{method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ pages:ids.length,
+        params:{ frames:fr.map(rebase), texts:tx.map(rebase) },
+        items:onPage.map(it=>({ref_type:it.ref_type,ref_id:it.ref_id,overrides:rebase(it.overrides)})) })});
+    if(!r.ok){ alert('Could not update the original.'); return; }
+    // Read the new version back so this print does not immediately offer itself an update.
+    try{
+      const v=await fetch('/api/print-blocks/versions');
+      if(v.ok){ const by=((await v.json()).blocks)||{};
+        if(by[p.block_id]) p.version=+by[p.block_id].version||p.version+1; }
+    }catch(e){ p.version=(+p.version||1)+1; }
+    // The pushed copy is now identical to the original, so it is no longer "edited".
+    (COMP.items||[]).forEach(it=>{ if(it.overrides&&it.overrides.plc===pid) delete it.overrides.pin; });
+    RES.cardsDirty=true;
+    scheduleSave(); showKnobs(); scheduleStrip();
+    groupBanner('“'+(p.name||'card')+'” is now v'+p.version+' — other prints will be offered it.');
+  }catch(e){ alert('Could not update the original.'); }
+}
+function unlinkPlacement(pid){
+  const p=placements()[pid]; if(!p) return;
+  if(!confirm('Unlink from “'+(p.name||'card')+'”? These pages stay exactly as they are, '+
+              'but they stop following the original.')) return;
+  pushUndo();
+  (COMP.items||[]).forEach(it=>{ if(it.overrides&&it.overrides.plc===pid) delete it.overrides.plc; });
+  delete placements()[pid];
+  showKnobs(); scheduleStrip();
+}
+
 // ── Is anything in this print out of date? ──────────────────────────
 // Nothing changes without you ticking it, so an old print stays exactly as it
 // was printed. The page count is shown because updating changes the length.
@@ -2509,6 +2584,19 @@ async function updatePlacement(pid){
 // params.placements[pid] = { block_id, version, name, cards:[…] }
 // A print remembers which of its pages came from which saved card, and at which
 // version — that is what lets it be offered the newer one later.
+// A new page next to a linked page belongs to the same placement.
+function joinPlacement(afterId, newId){
+  const f=placementOfCard(afterId); if(!f) return;
+  const l=f.p.cards||[]; const at=l.indexOf(afterId);
+  l.splice(at<0?l.length:at+1, 0, newId);
+}
+function placementOfCard(id){
+  if(!id) return null;
+  const ps=placements();
+  for(const k in ps){ if((ps[k].cards||[]).indexOf(id)>=0) return { pid:k, p:ps[k] }; }
+  return null;
+}
+function placementOf(n){ return placementOfCard(cardIdAt(n)); }
 function placements(){ COMP.params=COMP.params||{}; return COMP.params.placements=COMP.params.placements||{}; }
 function newPlcId(){ return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
@@ -2722,6 +2810,7 @@ function copyCardAt(n){
   const nid=newCardId();
   cards().splice(n,0,{id:nid});                       // the copy sits right after
   { const f=chapterOfCard(id); if(f){ const l=f.ch.cards||[]; l.splice(l.indexOf(id)+1,0,nid); } }
+  joinPlacement(id, nid);
   const clone=o=>{ const c=JSON.parse(JSON.stringify(o)); c.card=nid; return c; };
   (COMP.items||[]).filter(it=>it.overrides&&it.overrides.card===id)
     .map(it=>({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content, overrides:clone(it.overrides) }))
@@ -2737,6 +2826,7 @@ function insertCardAt(n){            // new empty card AFTER page n
   const f=chapterOf(n);
   cards().splice(n,0,{id:nid});
   if(f){ const list=f.ch.cards||[]; const at=list.indexOf(cardIdAt(n)); list.splice(at+1,0,nid); }
+  joinPlacement(cardIdAt(n), nid);
   enforceChapters();
   setPage(n+1);
 }
