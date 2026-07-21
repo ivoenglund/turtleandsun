@@ -941,7 +941,7 @@ function startMarquee(e){
 }
 
 // ── Page navigation ─────────────────────────────────────────────────
-function setPage(n){ curPage=n; SEL=[]; renderCurrent(); syncZoom(); showKnobs(); stripMark(); }
+function setPage(n){ curPage=n; SEL=[]; renderCurrent(); showKnobs(); stripMark(); }
 // Insert a new card AFTER the current one — a yearbook is built by inserting,
 // not only by appending.
 function addPage(){
@@ -960,7 +960,7 @@ function deletePage(){
   cards().splice(curPage-1,1);
   syncPages();
   curPage=Math.min(curPage,pageCount());
-  SEL=[]; renderCurrent(); syncZoom(); showKnobs();
+  SEL=[]; renderCurrent(); showKnobs();
 }
 
 // ── Object operations ───────────────────────────────────────────────
@@ -1171,9 +1171,10 @@ document.addEventListener('cut',  e=>onCopy(e,true));
 // Put a freshly uploaded picture on the current card.
 function placeMedia(card){
   pushUndo();
+  const spot=freeSpot(34, estH(34), 18, 18);
   COMP.items.push({ ref_type:'media', ref_id:card.id,
     content:{ title:card.title, url:card.url, tags:card.tags, kind:card.kind },
-    overrides:{ page:curPage, card:cardIdAt(curPage), x:18, y:18, w:34 } });
+    overrides:{ page:curPage, card:cardIdAt(curPage), x:spot.x, y:spot.y, w:34 } });
   renderCurrent(); SEL=['i'+(COMP.items.length-1)]; showKnobs(); markSel();
 }
 async function addImageFromFile(f){
@@ -1857,7 +1858,7 @@ document.getElementById('paper').onchange=e=>{
     frames().forEach(fix); texts().forEach(fix);
   }
   COMP.params.paper=e.target.value;
-  applyPaper(e.target.value); render(); syncZoom(); showKnobs(); markSel();
+  applyPaper(e.target.value); render(); applyZoom(curScale*100); showKnobs(); markSel();
 };
 document.getElementById('zoom').oninput=e=>zoomToPct(+e.target.value);
 document.getElementById('zoomIn').onclick=()=>zoomStep(1.25);
@@ -1930,6 +1931,47 @@ updateUndoBtns();
 // No arbitrary cap. The drop FILLS the card with a grid of as many as physically
 // fit — a number that means something, because it depends on the paper and the
 // size — then reports what's left with one button to continue onto new cards.
+// ── Dropping without covering what's already there ──────────────────
+// Measured from the RENDERED card, so these are real boxes, not estimates.
+function occupiedRects(){
+  const page=document.querySelector('#out .page'); if(!page) return [];
+  const pr=page.getBoundingClientRect();
+  if(!pr.width||!pr.height) return [];
+  const out=[];
+  page.querySelectorAll('.abswrap,.txtfree,.frameobj').forEach(el=>{
+    const r=el.getBoundingClientRect();
+    out.push({ x:(r.left-pr.left)/pr.width*100,  y:(r.top-pr.top)/pr.height*100,
+               w:r.width/pr.width*100,           h:r.height/pr.height*100 });
+  });
+  return out;
+}
+const rectsHit=(a,b)=>!(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y);
+// Lowest point anything reaches on this card — where a new grid should start.
+function occupiedBottom(){
+  const occ=occupiedRects();
+  return occ.length ? Math.max(0, ...occ.map(o=>o.y+o.h)) : 0;
+}
+// Where you dropped, if it's clear. Otherwise the nearest clear place, searching
+// down and across. Falls back to the drop point if the card is genuinely full.
+function freeSpot(w,h,x0,y0){
+  const occ=occupiedRects();
+  const clear=c=>!occ.some(o=>rectsHit(c,o));
+  const want={ x:Math.max(1,Math.min(99-w,x0)), y:Math.max(1,y0), w, h };
+  if(clear(want)) return want;
+  const sx=Math.max(2.5,w*0.34), sy=Math.max(2.5,h*0.34);
+  for(let y=1; y<=140; y+=sy)
+    for(let x=1; x+w<=99; x+=sx){
+      const t={x:Math.round(x*10)/10, y:Math.round(y*10)/10, w, h};
+      if(clear(t)) return t;
+    }
+  return want;
+}
+// Rough height of an object at width w%, as a share of page height.
+function estH(w){
+  const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
+  return w*(P.w/P.h)*CARDASPECT;
+}
+
 const GRIDMARGIN=6, GRIDGAP=2.5, CARDASPECT=1.45;
 function planFor(cols){
   const P=paperOf((COMP&&COMP.params&&COMP.params.paper)||'a4');
@@ -1955,7 +1997,8 @@ function gridPlan(count){
 }
 // One plan for the whole drop, so the leftovers on later cards are laid out at
 // exactly the same size as the first card — not re-planned for a smaller count.
-function placeGrid(items, kind, groupKey, startPage, g, continuous){
+function placeGrid(items, kind, groupKey, startPage, g, continuous, topY){
+  const y0=(topY==null?GRIDMARGIN:topY);
   let page=startPage, i=0;
   while(i<items.length){
     ensureCards(page);
@@ -1966,7 +2009,7 @@ function placeGrid(items, kind, groupKey, startPage, g, continuous){
       COMP.items.push({ ref_type:kind, ref_id:o.id, content:o, overrides:{
         page, card:cardIdAt(page),
         x:Math.round((GRIDMARGIN+col*(g.w+GRIDGAP))*10)/10,
-        y:Math.round((GRIDMARGIN+row*(g.hPct+GRIDGAP))*10)/10,
+        y:Math.round((y0+row*(g.hPct+GRIDGAP))*10)/10,
         w:Math.round(g.w*10)/10,
         grp:groupKey,           // which group these came from — groundwork
         gi:(continuous?n:i+n)   // position in the group's grid, for exact re-flow
@@ -2007,8 +2050,11 @@ async function dropGroup(d){
     pushUndo();
     // Everything comes in as one continuous grid. What fits prints; the rest runs
     // on below the page edge, greyed and parked, ready to be moved or flowed.
-    placeGrid(sec.items, sec.kind, d.section, curPage, g, true);
-    syncPages(); renderCurrent(); syncZoom(); showKnobs(); markSel();
+    // Start under whatever is already on the card rather than across it.
+    const bot=occupiedBottom();
+    const y0=bot>0 ? Math.min(bot+GRIDGAP, 100) : GRIDMARGIN;
+    placeGrid(sec.items, sec.kind, d.section, curPage, g, true, y0);
+    syncPages(); renderCurrent(); showKnobs(); markSel();
     const over=sec.items.length-g.perCard;
     if(over>0){
       groupBanner(g.perCard+' of '+sec.items.length+' fit the page — '+over+' are parked below.',
@@ -2019,8 +2065,8 @@ async function dropGroup(d){
           // Remove exactly the parked ones — by grid index, not by guessing at y.
           COMP.items=COMP.items.filter(it=>!(it.overrides&&it.overrides.grp===d.section
                                             && +it.overrides.gi>=g.perCard));
-          placeGrid(rest, sec.kind, d.section, curPage+1, g, false);
-          syncPages(); renderCurrent(); syncZoom(); showKnobs();
+          placeGrid(rest, sec.kind, d.section, curPage+1, g, false, GRIDMARGIN);
+          syncPages(); renderCurrent(); showKnobs();
         });
     }else{
       groupBanner('Placed all '+sec.items.length+'.');
@@ -2061,8 +2107,11 @@ document.addEventListener('drop',async e=>{
   const page=document.querySelector('#out .page');
   if(page){
     const pr=page.getBoundingClientRect();
-    ov.x=Math.round(Math.max(-30,Math.min(98,(e.clientX-pr.left)/pr.width*100-12))*10)/10;
-    ov.y=Math.round(Math.max(-30,Math.min(98,(e.clientY-pr.top)/pr.height*100-4))*10)/10;
+    const x0=Math.round(Math.max(-30,Math.min(98,(e.clientX-pr.left)/pr.width*100-12))*10)/10;
+    const y0=Math.round(Math.max(-30,Math.min(98,(e.clientY-pr.top)/pr.height*100-4))*10)/10;
+    // Where you let go, unless something is already there — then the nearest clear spot.
+    const spot=freeSpot(24, estH(24), x0, y0);
+    ov.x=spot.x; ov.y=spot.y;
   }
   COMP.items.push({ ref_type:d.ref_type, ref_id:+d.ref_id, overrides:ov });
   await saveNow();
@@ -2176,7 +2225,7 @@ function stampBlock(b){
   (((b.params||{}).texts) ||[]).forEach(t=>{ texts().push(shift(t));  newSel.push('t'+(texts().length-1)); });
   syncPages();
   SEL = newSel.filter(k=>{ const ov=ovOf(k); return ov && (+ov.page||1)===curPage; });
-  renderCurrent(); syncZoom(); showKnobs(); markSel();
+  renderCurrent(); showKnobs(); markSel();
   if(b.dropped) alert('Placed — but '+b.dropped+' card'+(b.dropped>1?'s are':' is')+
     ' no longer in your library, so '+(b.dropped>1?'they were':'it was')+' left out.');
 }
@@ -2323,7 +2372,6 @@ function toggleStrip(){
   stripOpen=!stripOpen;
   document.getElementById('strip').classList.toggle('hid',!stripOpen);
   if(stripOpen) renderStrip();
-  syncZoom();          // Fit has more (or less) room now
 }
 // ── Content panel ───────────────────────────────────────────────────
 // Filters on top (the same tree geometry as the studio sidebar, via the shared
@@ -2366,7 +2414,6 @@ function syncResLayout(){
   const el=document.getElementById('res');
   const w=el.classList.contains('open')?(el.offsetWidth+32):0;
   const st=document.getElementById('strip'); if(st) st.style.left=w+'px';
-  syncZoom();
 }
 function toggleRes(){
   const el=document.getElementById('res');
