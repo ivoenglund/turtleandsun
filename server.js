@@ -25,6 +25,7 @@ const { google } = require('googleapis');
 const gelato = require('./gelato');
 const generation = require('./generation');
 const storyEngine = require('./story_engine');
+const layoutEngine = require('./layout_engine');
 const cron = require('node-cron');
 const crypto = require('crypto');
 const { lookup: geoLookup } = require('./geoip');
@@ -3130,6 +3131,18 @@ app.delete('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM compositions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// The Arrange button in the editor: the client sends what's on the page
+// (already reduced to plain kind/photoCount/excerpt/size facts, no DB
+// lookups needed here) and gets back a small validated structural plan —
+// see layout_engine.js for why it's shaped this way.
+app.post('/api/layout/suggest', requireAuth, async (req, res) => {
+  try {
+    const { paper, pieces, previousPlan } = req.body || {};
+    const out = await layoutEngine.suggestArrangement({ paper, pieces, previousPlan });
+    res.json({ ok: true, ...out });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

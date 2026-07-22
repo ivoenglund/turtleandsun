@@ -2665,16 +2665,25 @@ function placeGrid(items, kind, groupKey, startPage, g, continuous, topY){
 // it tries a different column count / order, so a second attempt actually
 // looks different rather than nudging things by a pixel.
 let ARRANGE_TRY=0;
-function stripLen(html){ return String(html||'').replace(/<[^>]*>/g,'').length; }
+function stripHtml(html){ return String(html||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim(); }
+// The plain text a piece actually carries, whatever form it's stored in —
+// shared by the weight heuristic and by the AI piece description, so the
+// two never disagree about how much text something has.
+function pieceTextPlain(p){
+  if(p.kind==='post'){
+    if(!p.text) return '';
+    const ov=p.text.it.overrides||{};
+    return ov.text ? stripHtml(ov.text) : String((p.text.it.content&&p.text.it.content.body)||'');
+  }
+  if(p.kind==='freeText') return stripHtml(p.solo.t.text||'');
+  return '';                                    // contact / media: name/title, not prose
+}
 function pieceWeight(p){
   if(p.kind==='post'){
     const photoN=(p.photos||[]).length;
-    let chars=0;
-    if(p.text){ const ov=p.text.it.overrides||{};
-      chars = ov.text ? stripLen(ov.text) : ((p.text.it.content&&p.text.it.content.body)||'').length; }
-    return Math.max(1, photoN*2.2 + chars/240);
+    return Math.max(1, photoN*2.2 + pieceTextPlain(p).length/240);
   }
-  if(p.kind==='freeText') return Math.max(1, stripLen(p.solo.t.text||'')/240);
+  if(p.kind==='freeText') return Math.max(1, pieceTextPlain(p).length/240);
   return 1.6;                                  // contact / media: compact, fairly fixed size
 }
 // Group everything on card N by what it belongs to: a post's photos + its
@@ -2687,15 +2696,17 @@ function arrangePieces(n){
     const ov=it.overrides||{};
     if(it.ref_type==='post'){
       const fkey='post:'+it.ref_id;
-      if(!fam.has(fkey)) fam.set(fkey,{ kind:'post', photos:[], text:null });
+      if(!fam.has(fkey)) fam.set(fkey,{ kind:'post', key:fkey, photos:[], text:null });
       const p=fam.get(fkey);
       if((ov.part||'txt').slice(0,3)==='img') p.photos.push({ it, key:'i'+it._idx });
       else p.text={ it, key:'i'+it._idx };
     }else{
-      fam.set(it.ref_type+':'+it.ref_id+':'+it._idx, { kind:it.ref_type, solo:{ it, key:'i'+it._idx } });
+      const fkey=it.ref_type+':'+it.ref_id+':'+it._idx;
+      fam.set(fkey, { kind:it.ref_type, key:fkey, solo:{ it, key:'i'+it._idx } });
     }
   });
-  texts().forEach((t,i)=>{ if((+t.page||1)===n) fam.set('freeText:'+i, { kind:'freeText', solo:{ t, key:'t'+i } }); });
+  texts().forEach((t,i)=>{ if((+t.page||1)===n){ const fkey='freeText:'+i;
+    fam.set(fkey, { kind:'freeText', key:fkey, solo:{ t, key:'t'+i } }); } });
   return [...fam.values()];
 }
 // How many columns to try this time — alternates on repeat presses so
@@ -2743,7 +2754,37 @@ function measurePieceHeight(p){
   else eat(p.solo.key);
   return (top!=null&&bottom!=null) ? Math.max(2, bottom-top) : 8;
 }
-function arrangePage(){
+// A small, honest fact-sheet for one piece, in real numbers computed by the
+// app's OWN formulas — the model doesn't have to derive scale itself, and
+// this is exactly the correction from the "you have to know the real sizes"
+// conversation: real paper mm, real computed point size and line count at a
+// few candidate widths, not raw character counts or a bare aspect ratio.
+function pieceSizeAtWidths(p, P){
+  const chars=pieceTextPlain(p).length; if(!chars) return null;
+  return [1,2,3].map(cols=>{
+    const wPct=(100-GRIDMARGIN*2-GRIDGAP*(cols-1))/cols;
+    const px=fsOf({ w:wPct, ts:1 });
+    const pt=Math.round(px*0.75*10)/10;
+    const boxPx=wPct/100*P.w*MMPX;
+    const charsPerLine=Math.max(6, boxPx/(px*0.52));
+    return { colSpan:1, wPct:Math.round(wPct*10)/10, pt, lines:Math.max(1, Math.ceil(chars/charsPerLine)) };
+  });
+}
+function describePieceForAI(p, P){
+  const text=pieceTextPlain(p);
+  return {
+    key: p.key,
+    kind: p.kind==='post' ? 'photo+text post' : p.kind==='contact' ? 'person card'
+        : p.kind==='media' ? 'photo/logo' : 'free text block',
+    photoCount: p.kind==='post' ? (p.photos||[]).length : (p.kind==='media'?1:0),
+    excerpt: text ? (text.length>140 ? text.slice(0,140)+'…' : text) : undefined,
+    sizeAtWidths: pieceSizeAtWidths(p, P) || undefined,
+  };
+}
+// One AI-suggested plan per card, kept only so a repeat press can tell the
+// model "that one wasn't it, try something different" — never persisted.
+const ARRANGE_PREV=new Map();
+async function arrangePage(){
   const n=curPage, cardId=cardIdAt(n); if(!cardId) return;
   if(rules()[cardId]){
     groupBanner('This card follows a group — change it from the rule panel, not Arrange.');
@@ -2754,12 +2795,37 @@ function arrangePage(){
   if(editing) commitEdit(false);
   pushUndo();
   const tryN=ARRANGE_TRY++;
-  const cols=pickCols(pieces.length, tryN);
+  const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
+  const btn=document.getElementById('arrangeBtn');
+  if(btn){ btn.disabled=true; btn.textContent='🧩 Thinking…'; }
+  let cols, order, heavy=null, usedAI=false;
+  try{
+    const payload={
+      paper:{ wMm:P.w, hMm:P.h },
+      pieces: pieces.map(p=>describePieceForAI(p,P)),
+      previousPlan: ARRANGE_PREV.get(cardId)||null,
+    };
+    const r=await fetch('/api/layout/suggest',{ method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const out=r.ok ? await r.json() : null;
+    if(out&&out.ok&&out.plan){
+      const byKey=new Map(pieces.map(p=>[p.key,p]));
+      cols=Math.max(1,Math.min(4,Math.round(+out.plan.cols)||1));
+      order=(out.plan.order||[]).map(k=>byKey.get(k)).filter(Boolean);
+      pieces.forEach(p=>{ if(!order.includes(p)) order.push(p); });   // never drop a piece, whatever it said
+      heavy=out.plan.heavyKey ? (byKey.get(out.plan.heavyKey)||null) : null;
+      ARRANGE_PREV.set(cardId, out.plan);
+      usedAI=true;
+    }
+  }catch(err){ /* network hiccup, bad JSON, whatever — heuristic below covers it */ }
+  if(btn){ btn.disabled=false; btn.textContent='🧩 Arrange'; }
+  if(!usedAI){
+    cols=pickCols(pieces.length, tryN);
+    order=[...pieces].sort((a,b)=>pieceWeight(b)-pieceWeight(a));
+    heavy=(tryN%2===0&&order.length>1)?order[0]:null;
+  }
   const margin=GRIDMARGIN, gap=GRIDGAP;
   const colW=(100-margin*2-gap*(cols-1))/cols;
-  const order=[...pieces].sort((a,b)=>pieceWeight(b)-pieceWeight(a));
-  const heavy=(tryN%2===0&&order.length>1)?order[0]:null;   // give the biggest piece room, most tries
-  const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
   // Pass 1: decide columns and widths only. Height is a rough stand-in from
   // each piece's weight — good enough to spread pieces across columns
   // sensibly; the real number comes from measuring after this renders.
@@ -2786,7 +2852,7 @@ function arrangePage(){
     applyPlacement(pl.p, pl.x, pl.y, pl.w, P);
   });
   renderCurrent(); showKnobs(); markSel();
-  groupBanner('Arranged — press again for a different layout.');
+  groupBanner(usedAI ? 'Arranged by AI — press again for another try.' : 'Arranged — press again for a different layout.');
 }
 function groupBanner(msg, btnLabel, fn){
   let b=document.getElementById('grpBanner');
