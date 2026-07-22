@@ -2899,6 +2899,22 @@ async function arrangePage(){
     return;
   }
   if(best.cols!==lastTried) layoutOnce(best.cols, order, best.heavy, P);   // leave the DOM showing the best candidate, not just the last one tried
+  // The masonry gives one piece more width for visual emphasis — but since
+  // type size is driven by box width, that piece's text then renders bigger
+  // too. Two long-form articles sitting at visibly different sizes reads as
+  // a mistake, not a design choice. Match them: scale every article DOWN (
+  // never up, so this can't reintroduce overflow) to whichever one's own
+  // width already gives the smallest size.
+  const articleOvs=order
+    .filter(p=>(p.kind==='post'||p.kind==='freeText')&&pieceTextPlain(p))
+    .map(p=>p.kind==='post'?(p.text&&ovOf(p.text.key)):ovOf(p.solo.key))
+    .filter(Boolean);
+  if(articleOvs.length>1){
+    const naturalPt=ov=>fsOf({ w:+ov.w||28, ts:1 })*0.75;
+    const targetPt=Math.min(...articleOvs.map(naturalPt));
+    articleOvs.forEach(ov=>{ ov.ts=Math.round((targetPt/naturalPt(ov))*100)/100; });
+    renderCurrent();
+  }
   showKnobs(); markSel();
   groupBanner(best.overflowAmt>2
     ? 'Arranged, but it\'s a tight fit for this much content — trim the text if it looks cramped.'
