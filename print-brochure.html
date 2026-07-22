@@ -270,6 +270,17 @@
   #txtEdHead button:hover{ background:#f4efe4; }
   #txtEdHead button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
   #txtEdHead button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  /* Alignment buttons: three bars standing in for lines of text, ragged the
+     way each alignment actually looks — clearer than a letter at this size. */
+  #txtEdHead button.alnbtn{ display:flex; flex-direction:column; justify-content:center;
+                            gap:2px; width:28px; height:26px; padding:0 5px; }
+  #txtEdHead button.alnbtn i{ display:block; height:2px; border-radius:1px; background:currentColor; }
+  #txtEdHead button.alnbtn i:nth-child(1){ width:100%; }
+  #txtEdHead button.alnbtn i:nth-child(2){ width:65%; }
+  #txtEdHead button.alnbtn i:nth-child(3){ width:80%; }
+  #teAlC.alnbtn i{ margin-left:auto; margin-right:auto; }
+  #teAlR.alnbtn i{ margin-left:auto; }
+  #teAlJ.alnbtn i{ width:100%; }
   /* quill.core.css sets Helvetica on .ql-container; the object's own font wins. */
   #teBody{ flex:1; overflow:auto; min-height:180px; font-size:16px; font-family:inherit; }
   #teBody .ql-editor{ padding:22px 26px; line-height:1.45; min-height:180px; }
@@ -370,6 +381,10 @@
     </select>
     <button id="teI" title="Italic"><i>I</i></button>
     <button id="teU" title="Underline"><span style="text-decoration:underline">U</span></button>
+    <button id="teAlL" class="alnbtn on" title="Align left"><i></i><i></i><i></i></button>
+    <button id="teAlC" class="alnbtn" title="Centre"><i></i><i></i><i></i></button>
+    <button id="teAlR" class="alnbtn" title="Align right"><i></i><i></i><i></i></button>
+    <button id="teAlJ" class="alnbtn" title="Justify — straight on both sides"><i></i><i></i><i></i></button>
     <input type="color" id="teColor" title="Colour of the selected text">
     <span class="sp"></span>
     <button id="teCancel">Cancel</button>
@@ -1859,6 +1874,11 @@ function teQuill(){
   const P=Quill.import('parchment');
   const Weight=new P.StyleAttributor('weight','font-weight',{scope:P.Scope.INLINE});
   Quill.register(Weight,true);
+  // Alignment as inline style (text-align on the paragraph), same reasoning as
+  // above — Quill's default is a class (ql-align-center), which the sanitiser
+  // would strip since it only keeps the style attribute.
+  const Align=Quill.import('attributors/style/align');
+  Quill.register(Align,true);
   TE_Q=new Quill('#teBody',{ theme:null, modules:{ toolbar:false } });
   TE_Q.on('selection-change',range=>{ if(range) TE_RANGE=range; teSyncToolbar(); });
   TE_Q.on('text-change',()=>{ const r=TE_Q.getSelection(); if(r) TE_RANGE=r; teSyncToolbar(); });
@@ -1909,6 +1929,12 @@ function teSyncToolbar(){
   const i=document.getElementById('teI'), u=document.getElementById('teU');
   if(i) i.classList.toggle('on',!!fmt.italic);
   if(u) u.classList.toggle('on',!!fmt.underline);
+  const align=fmt.align||'';                    // no align set = left, same as CSS default
+  const alIds={ '':'teAlL', center:'teAlC', right:'teAlR', justify:'teAlJ' };
+  const onId=alIds[align];
+  ['teAlL','teAlC','teAlR','teAlJ'].forEach(id=>{
+    const b=document.getElementById(id); if(b) b.classList.toggle('on', id===onId);
+  });
 }
 // Quill remembers the range even after focus goes to a toolbar control, which is
 // the whole reason this works now.
@@ -1936,6 +1962,19 @@ function teApply(pairs){
   teSyncToolbar();
 }
 function teFormat(name,value){ teApply({[name]:value}); }
+// Alignment is a whole-PARAGRAPH format, not a per-run one — formatText (what
+// teApply uses) is for character-level formats and won't reliably touch a
+// block attribute. formatLine is the correct call, and it takes the whole
+// line under the caret even with nothing selected, which is what you want:
+// clicking Center never means "just these three highlighted words".
+function teAlign(value){
+  if(!TE_Q) return;
+  const r=TE_Q.getSelection() || TE_RANGE; if(!r) return;
+  TE_Q.formatLine(r.index, r.length||1, 'align', value||false, 'user');
+  TE_Q.focus();
+  TE_Q.setSelection(r.index, r.length, 'silent');
+  teSyncToolbar();
+}
 function teSave(){
   if(!TE_KEY||!TE_Q) return;
   const ov=ovOf(TE_KEY);
@@ -1956,7 +1995,7 @@ document.getElementById('txtEd').addEventListener('keydown',e=>{
 document.getElementById('teCancel').onclick=teClose;
 document.getElementById('teDone').onclick=teSave;
 document.getElementById('txtEd').onmousedown=e=>{ if(e.target.id==='txtEd') teClose(); };
-['teI','teU'].forEach(id=>{
+['teI','teU','teAlL','teAlC','teAlR','teAlJ'].forEach(id=>{
   const b=document.getElementById(id);
   if(b) b.onmousedown=e=>e.preventDefault();     // keep the caret where it is
 });
@@ -1968,6 +2007,10 @@ document.getElementById('teWeight').onchange=e=>{
 };
 document.getElementById('teI').onclick=()=>teFormat('italic',!teCurFmt().italic);
 document.getElementById('teU').onclick=()=>teFormat('underline',!teCurFmt().underline);
+document.getElementById('teAlL').onclick=()=>teAlign(false);
+document.getElementById('teAlC').onclick=()=>teAlign('center');
+document.getElementById('teAlR').onclick=()=>teAlign('right');
+document.getElementById('teAlJ').onclick=()=>teAlign('justify');
 document.getElementById('teColor').oninput=e=>teFormat('color',e.target.value);
 document.getElementById('teFont').onchange=e=>{
   const v=e.target.value;

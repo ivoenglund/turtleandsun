@@ -22,7 +22,7 @@ window.CardRender = (function(){
 
   const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  const STYLE_OK=['font-family','font-size','color','font-weight','font-style','text-decoration'];
+  const STYLE_OK=['font-family','font-size','color','font-weight','font-style','text-decoration','text-align'];
 
   function cleanStyle(s){
     return String(s||'').split(';').map(d=>{
