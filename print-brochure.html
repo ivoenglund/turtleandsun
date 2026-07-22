@@ -2776,7 +2776,7 @@ function pieceSizeAtWidths(p, P){
 // narrow column can sit right above the hard floor and still look cramped
 // and wrong. This checks the SECOND, higher bar against the width a piece
 // would actually get in a specific candidate plan.
-const COMFORTABLE_PT=9;
+const COMFORTABLE_PT=12;
 function colsAreComfortable(cols, order, heavy, P){
   const margin=GRIDMARGIN, gap=GRIDGAP;
   const colW=(100-margin*2-gap*(cols-1))/cols;
