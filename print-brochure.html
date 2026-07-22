@@ -346,6 +346,7 @@
     </div>
     <!-- Page navigation and page operations live in the filmstrip now. -->
     <div class="prow"><button id="addTextBtn" title="Add a free text object to this page">＋ Text</button></div>
+    <div class="prow"><button id="arrangeBtn" title="Automatically arrange the pictures and text on this card — press again for a different layout">🧩 Arrange</button></div>
   </div>
   <div id="knobs"></div>
 </aside>
@@ -2302,6 +2303,7 @@ document.getElementById('zoomFit').onclick=()=>syncZoom();
 // Track the mouse so keyboard zoom anchors where you're looking.
 let lastMouse=null, lastNudge=0;
 document.getElementById('addTextBtn').onclick=()=>{ if(editing) commitEdit(false); addText(); };
+document.getElementById('arrangeBtn').onclick=arrangePage;
 document.addEventListener('mousemove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
 
 // The wheel zooms EVERYWHERE (anchored to the cursor, even off the page) —
@@ -2651,6 +2653,140 @@ function placeGrid(items, kind, groupKey, startPage, g, continuous, topY){
     if(i<items.length) page++;
   }
   return page;
+}
+
+// ── Arrange: a first-pass layout for whatever's loose on this card ─────────
+// Not an AI call — there's no model gateway wired up yet — but the same
+// "guess, render, measure, correct" two-pass principle the group-card rule
+// engine already uses (ruleLayout/ruleCorrect). A post's photos and its own
+// text share one ref_id, so they're grouped into one PIECE and travel
+// together; a person or media card is already one indivisible piece. Pieces
+// pack into a masonry grid, heaviest piece first. Press the button again and
+// it tries a different column count / order, so a second attempt actually
+// looks different rather than nudging things by a pixel.
+let ARRANGE_TRY=0;
+function stripLen(html){ return String(html||'').replace(/<[^>]*>/g,'').length; }
+function pieceWeight(p){
+  if(p.kind==='post'){
+    const photoN=(p.photos||[]).length;
+    let chars=0;
+    if(p.text){ const ov=p.text.it.overrides||{};
+      chars = ov.text ? stripLen(ov.text) : ((p.text.it.content&&p.text.it.content.body)||'').length; }
+    return Math.max(1, photoN*2.2 + chars/240);
+  }
+  if(p.kind==='freeText') return Math.max(1, stripLen(p.solo.t.text||'')/240);
+  return 1.6;                                  // contact / media: compact, fairly fixed size
+}
+// Group everything on card N by what it belongs to: a post's photos + its
+// text share ref_id, so they become ONE piece; contacts/media are already
+// one object each; free texts have no ref, so each is its own piece.
+function arrangePieces(n){
+  const its=itemsAll().filter(it=>it.overrides&&+it.overrides.page===n);
+  const fam=new Map();
+  its.forEach(it=>{
+    const ov=it.overrides||{};
+    if(it.ref_type==='post'){
+      const fkey='post:'+it.ref_id;
+      if(!fam.has(fkey)) fam.set(fkey,{ kind:'post', photos:[], text:null });
+      const p=fam.get(fkey);
+      if((ov.part||'txt').slice(0,3)==='img') p.photos.push({ it, key:'i'+it._idx });
+      else p.text={ it, key:'i'+it._idx };
+    }else{
+      fam.set(it.ref_type+':'+it.ref_id+':'+it._idx, { kind:it.ref_type, solo:{ it, key:'i'+it._idx } });
+    }
+  });
+  texts().forEach((t,i)=>{ if((+t.page||1)===n) fam.set('freeText:'+i, { kind:'freeText', solo:{ t, key:'t'+i } }); });
+  return [...fam.values()];
+}
+// How many columns to try this time — alternates on repeat presses so
+// "try again" is a genuinely different shape, not the same grid re-measured.
+function pickCols(count, tryN){
+  const alt=tryN%2===1;
+  if(count<=1) return 1;
+  if(count===2) return alt?1:2;
+  if(count===3) return alt?2:3;
+  if(count<=6) return alt?3:2;
+  return alt?4:3;
+}
+// Write x/y/w onto every object a piece owns. A post's photos stack first,
+// its text runs underneath — the same order normalizeItems() already uses
+// when a post first lands on a page, so this doesn't invent a new convention.
+function applyPlacement(p,x,y,w,P){
+  const r1=v=>Math.round(v*10)/10;
+  if(p.kind==='post'){
+    let yy=y;
+    (p.photos||[]).forEach(ph=>{
+      const ov=ovOf(ph.key);
+      ov.x=r1(x); ov.y=r1(yy); ov.w=r1(w);
+      yy+=w*(P.w/P.h)*0.85+1.5;
+    });
+    if(p.text){ const ov=ovOf(p.text.key); ov.x=r1(x); ov.y=r1(yy); ov.w=r1(w); }
+  }else{
+    const ov=ovOf(p.solo.key);
+    ov.x=r1(x); ov.y=r1(y); ov.w=r1(w);
+  }
+}
+// The real occupied height of a piece, read off the rendered page — the top
+// of its highest part to the bottom of its lowest, as % of page height.
+function measurePieceHeight(p){
+  const page=document.querySelector('#out .page'); if(!page) return 8;
+  const pr=page.getBoundingClientRect(); if(!pr.height) return 8;
+  let top=null, bottom=null;
+  const eat=key=>{
+    const el=elOf(key); if(!el) return;
+    const r=el.getBoundingClientRect();
+    const t=(r.top-pr.top)/pr.height*100, b=(r.bottom-pr.top)/pr.height*100;
+    if(top==null||t<top) top=t;
+    if(bottom==null||b>bottom) bottom=b;
+  };
+  if(p.kind==='post'){ (p.photos||[]).forEach(ph=>eat(ph.key)); if(p.text) eat(p.text.key); }
+  else eat(p.solo.key);
+  return (top!=null&&bottom!=null) ? Math.max(2, bottom-top) : 8;
+}
+function arrangePage(){
+  const n=curPage, cardId=cardIdAt(n); if(!cardId) return;
+  if(rules()[cardId]){
+    groupBanner('This card follows a group — change it from the rule panel, not Arrange.');
+    return;
+  }
+  const pieces=arrangePieces(n);
+  if(!pieces.length){ groupBanner('Nothing loose on this card to arrange — drop something on it first.'); return; }
+  if(editing) commitEdit(false);
+  pushUndo();
+  const tryN=ARRANGE_TRY++;
+  const cols=pickCols(pieces.length, tryN);
+  const margin=GRIDMARGIN, gap=GRIDGAP;
+  const colW=(100-margin*2-gap*(cols-1))/cols;
+  const order=[...pieces].sort((a,b)=>pieceWeight(b)-pieceWeight(a));
+  const heavy=(tryN%2===0&&order.length>1)?order[0]:null;   // give the biggest piece room, most tries
+  const P=paperOf((COMP.params&&COMP.params.paper)||'a4');
+  // Pass 1: decide columns and widths only. Height is a rough stand-in from
+  // each piece's weight — good enough to spread pieces across columns
+  // sensibly; the real number comes from measuring after this renders.
+  const colBottoms=new Array(cols).fill(margin);
+  const placements=order.map(p=>{
+    const span=(p===heavy&&cols>1)?Math.min(2,cols):1;
+    let bestCol=0, bestVal=Infinity;
+    for(let c=0;c<=cols-span;c++){ const v=Math.max(...colBottoms.slice(c,c+span)); if(v<bestVal){ bestVal=v; bestCol=c; } }
+    const x=margin+bestCol*(colW+gap), w=colW*span+gap*(span-1);
+    const guessH=Math.max(4, pieceWeight(p)*3.2);
+    for(let c=bestCol;c<bestCol+span;c++) colBottoms[c]=bestVal+guessH+gap;
+    return { p, x, y:bestVal, w, span, col:bestCol };
+  });
+  placements.forEach(pl=>applyPlacement(pl.p, pl.x, pl.y, pl.w, P));
+  renderCurrent();
+  // Pass 2: real heights are on the page now — redo Y with the same columns,
+  // order and spans, correct heights this time.
+  const colBottoms2=new Array(cols).fill(margin);
+  placements.forEach(pl=>{
+    const h=measurePieceHeight(pl.p);
+    const v=Math.max(...colBottoms2.slice(pl.col,pl.col+pl.span));
+    pl.y=v;
+    for(let c=pl.col;c<pl.col+pl.span;c++) colBottoms2[c]=v+h+gap;
+    applyPlacement(pl.p, pl.x, pl.y, pl.w, P);
+  });
+  renderCurrent(); showKnobs(); markSel();
+  groupBanner('Arranged — press again for a different layout.');
 }
 function groupBanner(msg, btnLabel, fn){
   let b=document.getElementById('grpBanner');
