@@ -175,7 +175,8 @@ window.CardRender = (function(){
 
   function fsOf(ov){
     const w=(ov&&ov.w!=null)?+ov.w:28, ts=(ov&&ov.ts)?+ov.ts:1;
-    return Math.max(2, 13.5*(w/28)*ts*pScale());   // no ceiling — big papers want BIG type
+    const MIN_PX=6/0.75;   // 6pt hard floor, real print points — not an arbitrary pixel like the old 2
+    return Math.max(MIN_PX, 13.5*(w/28)*ts*pScale());   // no ceiling — big papers want BIG type
   }
 
   const PAPERS=[
