@@ -2872,38 +2872,33 @@ async function arrangePage(){
     order=[...pieces].sort((a,b)=>pieceWeight(b)-pieceWeight(a));
     heavy=(tryN%2===0&&order.length>1)?order[0]:null;
   }
-  // Whoever proposed this plan (AI or heuristic) doesn't get trusted blindly:
-  // check what type size its own column count would actually produce, and if
-  // that's cramped rather than just legible, back off to fewer, wider columns
-  // — same content, more room each — until it's comfortable or there's only
-  // one column left to give.
-  while(cols>1 && !colsAreComfortable(cols, order, heavy, P)) cols--;
-  if(cols===1) heavy=null;   // no "wide slot" exists at one column anyway
-  // Fewer columns fixes cramped type but stacks more in series — which can
-  // run taller than the page. Rendering is the only way to know for sure, so
-  // actually try it: if the comfort-picked column count overflows, trade some
-  // of that comfort back for more columns (shorter stack) and re-measure,
-  // rather than trusting the width math alone. Every step here is a local
-  // re-render, not another AI call.
-  let best=null, lastTried=cols;
-  for(let tryCols=cols; tryCols<=4; tryCols++){
+  // Neither the AI's column count nor the heuristic's gets trusted blindly.
+  // Code owns this decision: search every column count from 1 to 4 and keep
+  // ONLY the ones that pass the comfort check — a column count that merely
+  // avoids overflow but crams the type doesn't qualify, full stop. Among the
+  // comfortable ones, prefer whichever fits the page best. This is a few
+  // local re-renders, never another AI call.
+  let best=null, lastTried=null;
+  for(let tryCols=1; tryCols<=4; tryCols++){
     const tryHeavy=(tryCols===1)?null:heavy;
+    if(!colsAreComfortable(tryCols, order, tryHeavy, P)) continue;   // cramped type disqualifies a column count outright, however well it fits
     const res=layoutOnce(tryCols, order, tryHeavy, P);
     lastTried=tryCols;
     if(!best||res.overflowAmt<best.overflowAmt) best={ cols:tryCols, heavy:tryHeavy, overflowAmt:res.overflowAmt };
-    if(res.overflowAmt<=2) break;   // fits — no need to try more columns
+    if(res.overflowAmt<=2) break;   // comfortable AND fits — nothing better to look for
   }
-  if(best.cols!==lastTried) layoutOnce(best.cols, order, best.heavy, P);   // leave the DOM showing the best candidate, not just the last one tried
-  if(best.overflowAmt>15){
-    // Nothing between 1 and 4 columns avoids a real overflow — this is not a
-    // column-count problem, it's more content than this page can hold at a
-    // readable size. Leaving a page that runs 2-3x too tall is worse than not
+  if(!best||best.overflowAmt>15){
+    // Either no column count keeps the type comfortable at all, or the one
+    // that comes closest still overflows badly. Either way this isn't a
+    // column-count problem — it's more content than this page can hold at a
+    // readable size. Leaving a broken or illegible page is worse than not
     // touching it, so undo back to how it looked before Arrange ran.
     doUndo();
     if(btn){ btn.disabled=false; btn.textContent='🧩 Arrange'; }
-    groupBanner('This card has more content than fits on one page at a readable size, even in one column — split it across two cards or trim the text, then try Arrange again.');
+    groupBanner('This card has more content than fits on one page at a comfortable reading size — split it across two cards or trim the text, then try Arrange again.');
     return;
   }
+  if(best.cols!==lastTried) layoutOnce(best.cols, order, best.heavy, P);   // leave the DOM showing the best candidate, not just the last one tried
   showKnobs(); markSel();
   groupBanner(best.overflowAmt>2
     ? 'Arranged, but it\'s a tight fit for this much content — trim the text if it looks cramped.'
