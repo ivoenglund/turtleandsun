@@ -2770,6 +2770,24 @@ function pieceSizeAtWidths(p, P){
     return { colSpan:1, wPct:Math.round(wPct*10)/10, pt, lines:Math.max(1, Math.ceil(chars/charsPerLine)) };
   });
 }
+// Comfortable, not just legible. fsOf() already has a hard 6pt floor so
+// nothing ever renders as an unreadable smudge — but "not a smudge" and
+// "pleasant to read" are different bars. A long article squeezed into a
+// narrow column can sit right above the hard floor and still look cramped
+// and wrong. This checks the SECOND, higher bar against the width a piece
+// would actually get in a specific candidate plan.
+const COMFORTABLE_PT=9;
+function colsAreComfortable(cols, order, heavy, P){
+  const margin=GRIDMARGIN, gap=GRIDGAP;
+  const colW=(100-margin*2-gap*(cols-1))/cols;
+  return order.every(p=>{
+    if(!pieceTextPlain(p)) return true;   // photos/contacts: nothing to cram
+    const span=(p===heavy&&cols>1)?Math.min(2,cols):1;
+    const w=colW*span+gap*(span-1);
+    const pt=fsOf({ w, ts:1 })*0.75;
+    return pt>=COMFORTABLE_PT;
+  });
+}
 function describePieceForAI(p, P){
   const text=pieceTextPlain(p);
   return {
@@ -2824,6 +2842,13 @@ async function arrangePage(){
     order=[...pieces].sort((a,b)=>pieceWeight(b)-pieceWeight(a));
     heavy=(tryN%2===0&&order.length>1)?order[0]:null;
   }
+  // Whoever proposed this plan (AI or heuristic) doesn't get trusted blindly:
+  // check what type size its own column count would actually produce, and if
+  // that's cramped rather than just legible, back off to fewer, wider columns
+  // — same content, more room each — until it's comfortable or there's only
+  // one column left to give.
+  while(cols>1 && !colsAreComfortable(cols, order, heavy, P)) cols--;
+  if(cols===1) heavy=null;   // no "wide slot" exists at one column anyway
   const margin=GRIDMARGIN, gap=GRIDGAP;
   const colW=(100-margin*2-gap*(cols-1))/cols;
   // Pass 1: decide columns and widths only. Height is a rough stand-in from
