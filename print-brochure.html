@@ -2877,7 +2877,15 @@ async function arrangePage(){
     applyPlacement(pl.p, pl.x, pl.y, pl.w, P);
   });
   renderCurrent(); showKnobs(); markSel();
-  groupBanner(usedAI ? 'Arranged by AI — press again for another try.' : 'Arranged — press again for a different layout.');
+  // The comfort check above trades columns for width — but fewer columns
+  // means more gets stacked in series, which can push the total taller than
+  // the page itself. That's not a bug to silently paper over: it means this
+  // card genuinely has more content than fits at a readable size. Say so
+  // plainly instead of leaving a page that quietly overflows off the bottom.
+  const overflow=Math.max(...colBottoms2)>(100-margin+2);
+  groupBanner(overflow
+    ? 'This card has more content than fits comfortably on one page at a readable size — try splitting it across two cards or trimming the text, then Arrange again.'
+    : (usedAI ? 'Arranged by AI — press again for another try.' : 'Arranged — press again for a different layout.'));
 }
 function groupBanner(msg, btnLabel, fn){
   let b=document.getElementById('grpBanner');
