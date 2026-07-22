@@ -2788,6 +2788,36 @@ function colsAreComfortable(cols, order, heavy, P){
     return pt>=COMFORTABLE_PT;
   });
 }
+// Places every piece at a given column count and returns how tall the
+// tallest column actually rendered — the same two-pass guess-then-measure
+// as before, just reusable so arrangePage can try more than one column
+// count before committing to one.
+function layoutOnce(cols, order, heavy, P){
+  const margin=GRIDMARGIN, gap=GRIDGAP;
+  const colW=(100-margin*2-gap*(cols-1))/cols;
+  const colBottoms=new Array(cols).fill(margin);
+  const placements=order.map(p=>{
+    const span=(p===heavy&&cols>1)?Math.min(2,cols):1;
+    let bestCol=0, bestVal=Infinity;
+    for(let c=0;c<=cols-span;c++){ const v=Math.max(...colBottoms.slice(c,c+span)); if(v<bestVal){ bestVal=v; bestCol=c; } }
+    const x=margin+bestCol*(colW+gap), w=colW*span+gap*(span-1);
+    const guessH=Math.max(4, pieceWeight(p)*3.2);
+    for(let c=bestCol;c<bestCol+span;c++) colBottoms[c]=bestVal+guessH+gap;
+    return { p, x, y:bestVal, w, span, col:bestCol };
+  });
+  placements.forEach(pl=>applyPlacement(pl.p, pl.x, pl.y, pl.w, P));
+  renderCurrent();
+  const colBottoms2=new Array(cols).fill(margin);
+  placements.forEach(pl=>{
+    const h=measurePieceHeight(pl.p);
+    const v=Math.max(...colBottoms2.slice(pl.col,pl.col+pl.span));
+    pl.y=v;
+    for(let c=pl.col;c<pl.col+pl.span;c++) colBottoms2[c]=v+h+gap;
+    applyPlacement(pl.p, pl.x, pl.y, pl.w, P);
+  });
+  renderCurrent();
+  return { overflowAmt: Math.max(0, Math.max(...colBottoms2)-(100-margin)) };
+}
 function describePieceForAI(p, P){
   const text=pieceTextPlain(p);
   return {
@@ -2849,42 +2879,34 @@ async function arrangePage(){
   // one column left to give.
   while(cols>1 && !colsAreComfortable(cols, order, heavy, P)) cols--;
   if(cols===1) heavy=null;   // no "wide slot" exists at one column anyway
-  const margin=GRIDMARGIN, gap=GRIDGAP;
-  const colW=(100-margin*2-gap*(cols-1))/cols;
-  // Pass 1: decide columns and widths only. Height is a rough stand-in from
-  // each piece's weight — good enough to spread pieces across columns
-  // sensibly; the real number comes from measuring after this renders.
-  const colBottoms=new Array(cols).fill(margin);
-  const placements=order.map(p=>{
-    const span=(p===heavy&&cols>1)?Math.min(2,cols):1;
-    let bestCol=0, bestVal=Infinity;
-    for(let c=0;c<=cols-span;c++){ const v=Math.max(...colBottoms.slice(c,c+span)); if(v<bestVal){ bestVal=v; bestCol=c; } }
-    const x=margin+bestCol*(colW+gap), w=colW*span+gap*(span-1);
-    const guessH=Math.max(4, pieceWeight(p)*3.2);
-    for(let c=bestCol;c<bestCol+span;c++) colBottoms[c]=bestVal+guessH+gap;
-    return { p, x, y:bestVal, w, span, col:bestCol };
-  });
-  placements.forEach(pl=>applyPlacement(pl.p, pl.x, pl.y, pl.w, P));
-  renderCurrent();
-  // Pass 2: real heights are on the page now — redo Y with the same columns,
-  // order and spans, correct heights this time.
-  const colBottoms2=new Array(cols).fill(margin);
-  placements.forEach(pl=>{
-    const h=measurePieceHeight(pl.p);
-    const v=Math.max(...colBottoms2.slice(pl.col,pl.col+pl.span));
-    pl.y=v;
-    for(let c=pl.col;c<pl.col+pl.span;c++) colBottoms2[c]=v+h+gap;
-    applyPlacement(pl.p, pl.x, pl.y, pl.w, P);
-  });
-  renderCurrent(); showKnobs(); markSel();
-  // The comfort check above trades columns for width — but fewer columns
-  // means more gets stacked in series, which can push the total taller than
-  // the page itself. That's not a bug to silently paper over: it means this
-  // card genuinely has more content than fits at a readable size. Say so
-  // plainly instead of leaving a page that quietly overflows off the bottom.
-  const overflow=Math.max(...colBottoms2)>(100-margin+2);
-  groupBanner(overflow
-    ? 'This card has more content than fits comfortably on one page at a readable size — try splitting it across two cards or trimming the text, then Arrange again.'
+  // Fewer columns fixes cramped type but stacks more in series — which can
+  // run taller than the page. Rendering is the only way to know for sure, so
+  // actually try it: if the comfort-picked column count overflows, trade some
+  // of that comfort back for more columns (shorter stack) and re-measure,
+  // rather than trusting the width math alone. Every step here is a local
+  // re-render, not another AI call.
+  let best=null, lastTried=cols;
+  for(let tryCols=cols; tryCols<=4; tryCols++){
+    const tryHeavy=(tryCols===1)?null:heavy;
+    const res=layoutOnce(tryCols, order, tryHeavy, P);
+    lastTried=tryCols;
+    if(!best||res.overflowAmt<best.overflowAmt) best={ cols:tryCols, heavy:tryHeavy, overflowAmt:res.overflowAmt };
+    if(res.overflowAmt<=2) break;   // fits — no need to try more columns
+  }
+  if(best.cols!==lastTried) layoutOnce(best.cols, order, best.heavy, P);   // leave the DOM showing the best candidate, not just the last one tried
+  if(best.overflowAmt>15){
+    // Nothing between 1 and 4 columns avoids a real overflow — this is not a
+    // column-count problem, it's more content than this page can hold at a
+    // readable size. Leaving a page that runs 2-3x too tall is worse than not
+    // touching it, so undo back to how it looked before Arrange ran.
+    doUndo();
+    if(btn){ btn.disabled=false; btn.textContent='🧩 Arrange'; }
+    groupBanner('This card has more content than fits on one page at a readable size, even in one column — split it across two cards or trim the text, then try Arrange again.');
+    return;
+  }
+  showKnobs(); markSel();
+  groupBanner(best.overflowAmt>2
+    ? 'Arranged, but it\'s a tight fit for this much content — trim the text if it looks cramped.'
     : (usedAI ? 'Arranged by AI — press again for another try.' : 'Arranged — press again for a different layout.'));
 }
 function groupBanner(msg, btnLabel, fn){
