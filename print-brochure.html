@@ -169,8 +169,9 @@
                border:1px solid #d9d4c4; border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
   #res button:hover{ background:#f4efe4; }
   #res button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #resMain{ flex:1; display:flex; min-height:0; background:var(--cream); }
-  #resFilters{ width:212px; flex:0 0 auto; margin:9px 0 9px 9px; padding:10px 12px; overflow-y:auto;
+  #resMain{ flex:1; display:flex; align-items:flex-start; min-height:0; background:var(--cream); }
+  #resFilters{ width:212px; flex:0 0 auto; margin:9px 0 9px 9px; padding:10px 12px;
+               max-height:calc(100% - 18px); overflow-y:auto;
                background:#fff; border:2px solid var(--gold); border-radius:14px;
                box-shadow:0 4px 18px rgba(0,0,0,.2); }
   #resSearch{ width:100%; font-family:inherit; font-size:13px; padding:5px 8px; margin-bottom:8px;
@@ -178,10 +179,12 @@
   #resBody{ flex:1; min-width:0; overflow-y:auto; padding:10px 12px; }
   /* Archive accepts drops: pictures dragged in from the page or the desktop. */
   #resBody .dropz.over{ outline:2px dashed var(--gold); outline-offset:3px; border-radius:9px; }
-  .rcard .rdel{ position:absolute; top:3px; right:3px; font-size:10px; font-weight:700;
-                line-height:1; padding:2px 5px; border:1px solid #dcc0b5; border-radius:6px;
-                background:rgba(255,255,255,.92); color:#8c2f1b; cursor:pointer; display:none; }
-  .rcard:hover .rdel{ display:block; }
+  .rcard .rdel{ position:absolute; top:3px; right:3px; font-size:11px; font-weight:700;
+                line-height:1; width:20px; height:20px; display:none; align-items:center;
+                justify-content:center; padding:0; border:1px solid #dcc0b5; border-radius:6px;
+                background:rgba(255,255,255,.92); color:#8c2f1b; cursor:pointer; }
+  .rcard .rdel:hover{ background:#f9ece7; border-color:#c98a76; }
+  .rcard:hover .rdel{ display:flex; }
   #resBody .sechd{ display:flex; align-items:baseline; gap:9px; margin:16px 0 8px;
                    position:sticky; top:-10px; z-index:2; background:#fff;
                    padding:6px 0 5px; border-bottom:1px solid #ece7d9; cursor:grab; }
@@ -3401,7 +3404,7 @@ function renderContent(){
             '" draggable="true" data-blk="'+b.id+'" style="width:'+W+'px;" '+
             'title="'+esc(b.name)+' · '+esc((b.paper||'a4').toUpperCase())+
             ((b.paper&&b.paper!==curPaper)?' — built for a different paper':'')+' — drag it onto the page">'+
-            '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">✕</button>'+
+            '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">🗑</button>'+
             cardThumbHtml(b,W-18)+
             '<div class="rname" data-rn="'+b.id+'" title="Double-click to rename" '+
             'style="font-size:11px;font-weight:700;margin-top:5px;white-space:nowrap;'+
@@ -3426,7 +3429,7 @@ function renderContent(){
       sec.items.map(o=>
         '<div class="rcard" draggable="true" data-rt="'+sec.kind+'" data-ri="'+o.id+'" data-sec="'+esc(sec.key)+'"'+
         ' style="width:'+W+'px;font-size:'+RES.size+'px;">'+
-        (arch?'<button class="rdel" data-del="'+o.id+'" title="Delete from the archive">✕</button>':'')+
+        (arch?'<button class="rdel" data-del="'+o.id+'" title="Delete from the archive">🗑</button>':'')+
         resItemHtml(sec.kind,o)+'</div>').join('')+
       (shown?'':'<div class="empty">'+(arch?'Archive is empty — drop a picture here.'
                                             :'Nothing here with these filters.')+'</div>')+
