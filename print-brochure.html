@@ -169,8 +169,8 @@
                border:1px solid #d9d4c4; border-radius:7px; background:#fff; cursor:pointer; color:var(--ink); }
   #res button:hover{ background:#f4efe4; }
   #res button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
-  #resMain{ flex:1; display:flex; align-items:flex-start; min-height:0; background:var(--cream); }
-  #resFilters{ width:212px; flex:0 0 auto; margin:9px 0 9px 9px; padding:10px 12px;
+  #resMain{ flex:1; display:flex; min-height:0; background:var(--cream); }
+  #resFilters{ width:212px; flex:0 0 auto; align-self:flex-start; margin:9px 0 9px 9px; padding:10px 12px;
                max-height:calc(100% - 18px); overflow-y:auto;
                background:#fff; border:2px solid var(--gold); border-radius:14px;
                box-shadow:0 4px 18px rgba(0,0,0,.2); }
@@ -179,11 +179,12 @@
   #resBody{ flex:1; min-width:0; overflow-y:auto; padding:10px 12px; }
   /* Archive accepts drops: pictures dragged in from the page or the desktop. */
   #resBody .dropz.over{ outline:2px dashed var(--gold); outline-offset:3px; border-radius:9px; }
-  .rcard .rdel{ position:absolute; top:3px; right:3px; font-size:11px; font-weight:700;
-                line-height:1; width:20px; height:20px; display:none; align-items:center;
-                justify-content:center; padding:0; border:1px solid #dcc0b5; border-radius:6px;
-                background:rgba(255,255,255,.92); color:#8c2f1b; cursor:pointer; }
-  .rcard .rdel:hover{ background:#f9ece7; border-color:#c98a76; }
+  .rcard .rdel{ position:absolute; top:5px; right:5px; z-index:2; font-size:14px; font-weight:400;
+                line-height:1; width:22px; height:22px; display:none; align-items:center;
+                justify-content:center; padding:0; border:none; border-radius:50%;
+                background:rgba(255,255,255,.92); box-shadow:0 1px 4px rgba(0,0,0,.18);
+                color:#6b7268; cursor:pointer; }
+  .rcard .rdel:hover{ background:#fff; color:#23291d; box-shadow:0 2px 7px rgba(0,0,0,.28); }
   .rcard:hover .rdel{ display:flex; }
   #resBody .sechd{ display:flex; align-items:baseline; gap:9px; margin:16px 0 8px;
                    position:sticky; top:-10px; z-index:2; background:#fff;
@@ -3404,7 +3405,7 @@ function renderContent(){
             '" draggable="true" data-blk="'+b.id+'" style="width:'+W+'px;" '+
             'title="'+esc(b.name)+' · '+esc((b.paper||'a4').toUpperCase())+
             ((b.paper&&b.paper!==curPaper)?' — built for a different paper':'')+' — drag it onto the page">'+
-            '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">🗑</button>'+
+            '<button class="rdel" data-blkdel="'+b.id+'" title="Delete this card">×</button>'+
             cardThumbHtml(b,W-18)+
             '<div class="rname" data-rn="'+b.id+'" title="Double-click to rename" '+
             'style="font-size:11px;font-weight:700;margin-top:5px;white-space:nowrap;'+
@@ -3429,7 +3430,8 @@ function renderContent(){
       sec.items.map(o=>
         '<div class="rcard" draggable="true" data-rt="'+sec.kind+'" data-ri="'+o.id+'" data-sec="'+esc(sec.key)+'"'+
         ' style="width:'+W+'px;font-size:'+RES.size+'px;">'+
-        (arch?'<button class="rdel" data-del="'+o.id+'" title="Delete from the archive">🗑</button>':'')+
+        (sec.kind==='media'?'<button class="rdel" data-del="'+o.id+'" title="Delete from the archive">×</button>':
+         sec.kind==='post'?'<button class="rdel" data-postdel="'+o.id+'" title="Delete this post">×</button>':'')+
         resItemHtml(sec.kind,o)+'</div>').join('')+
       (shown?'':'<div class="empty">'+(arch?'Archive is empty — drop a picture here.'
                                             :'Nothing here with these filters.')+'</div>')+
@@ -3518,6 +3520,16 @@ function renderContent(){
       if(!d.ok){ alert('Could not delete that picture.'); return; }
       fetchContent();
     }catch(err){ alert('Could not delete that picture.'); }
+  });
+  body.querySelectorAll('[data-postdel]').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const id=b.dataset.postdel;
+    if(!confirm('Delete this post from your timeline? It disappears from any print that used it, too.')) return;
+    try{
+      const d=await fetch('/api/blog-posts/'+id,{method:'DELETE'});
+      if(!d.ok){ alert('Could not delete that post.'); return; }
+      fetchContent();
+    }catch(err){ alert('Could not delete that post.'); }
   });
 
   // Drop pictures straight into the archive: files from the desktop, or an image
