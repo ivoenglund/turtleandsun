@@ -270,6 +270,11 @@
   #txtEdHead button:hover{ background:#f4efe4; }
   #txtEdHead button.on{ background:var(--green); color:#f4efe4; border-color:var(--green); }
   #txtEdHead button.primary{ background:var(--green); color:#f4efe4; border-color:var(--green); }
+  /* Selection spans both on and off for this format (e.g. some but not all
+     of it is bold) — dashed instead of solid so it reads as "part of it",
+     never confusable with the solid .on state. */
+  #txtEdHead button.mixed{ border-style:dashed; background:#f4efe4; }
+  #txtEdHead input[type=number]::placeholder{ color:var(--muted); font-style:italic; }
   /* Alignment buttons: three bars standing in for lines of text, ragged the
      way each alignment actually looks — clearer than a letter at this size. */
   #txtEdHead button.alnbtn{ display:flex; flex-direction:column; justify-content:center;
@@ -1923,26 +1928,92 @@ function teOpen(key){
 }
 function teClose(){ document.getElementById('txtEd').classList.remove('open'); TE_KEY=null; }
 
-// Show what the caret is actually sitting in.
+// quill.getFormat() collapses two different situations into the exact same
+// "absent" result: (a) NOTHING in the range has this attribute, and (b)
+// EVERY run has it but with different values, except when literally every
+// run has a truthy value — only then does it return an array of the
+// distinct values. In practice most mixed selections are "one run has an
+// explicit size/weight/font, another doesn't" (the default/inherited run),
+// which hits case (a) — getFormat just drops the key, and the toolbar used
+// to fall back to "no size set = 1em of the object", showing a single
+// confident-looking value for a selection that was actually mixed. This
+// walks the real per-run attributes so mixed can be told apart from unset.
+function teRangeValues(name,r){
+  if(!TE_Q||!r) return [];
+  const vals=new Set();
+  TE_Q.getContents(r.index, Math.max(r.length,1)).ops.forEach(op=>{
+    if(typeof op.insert!=='string') return;      // skip embeds
+    vals.add(op.attributes ? op.attributes[name] : undefined);
+  });
+  return Array.from(vals);
+}
+
+// Show what the caret/selection is actually sitting in. A selection that
+// spans more than one size/weight/font — or is partly bold/italic/underline
+// — is shown as blank/"Mixed" rather than picking one of the values, which
+// was the actual bug (not a Quill limitation, a display-logic one).
 function teSyncToolbar(){
   if(!TE_Q||!TE_KEY) return;
   const sz=document.getElementById('teSize');
   if(document.activeElement===sz) return;      // do not fight the user mid-type
   const r=TE_Q.getSelection() || TE_RANGE;
   const fmt=(r ? TE_Q.getFormat(r) : TE_Q.getFormat()) || {};
-  const em = fmt.size ? parseFloat(fmt.size) : 1;   // no size set = 1em of the object
-  sz.value=Math.max(1,Math.round(teEmToPt(isFinite(em)?em:1)));
+  const selected=!!(r && r.length>0);          // only a real selection can be "mixed"
+
+  if(selected && teRangeValues('size',r).length>1){
+    sz.value=''; sz.placeholder='Mixed';
+  }else{
+    sz.placeholder='';
+    const em = fmt.size ? parseFloat(fmt.size) : 1;   // no size set = 1em of the object
+    sz.value=Math.max(1,Math.round(teEmToPt(isFinite(em)?em:1)));
+  }
+
+  const fEl=document.getElementById('teFont');
+  if(fEl && document.activeElement!==fEl){
+    let mixedOpt=fEl.querySelector('option[data-mixed]');
+    if(selected && teRangeValues('font',r).length>1){
+      if(!mixedOpt){ mixedOpt=document.createElement('option'); mixedOpt.dataset.mixed='1'; fEl.insertBefore(mixedOpt,fEl.firstChild); }
+      mixedOpt.value=''; mixedOpt.textContent='Multiple fonts';
+      fEl.value='';
+    }else{
+      if(mixedOpt) mixedOpt.remove();
+      // Same normalisation updateTb() already uses for the other editor:
+      // Quill stores the full CSS font-family value, not our short name.
+      const fam=(fmt.font||'').split(',')[0].replace(/["']/g,'').trim();
+      const m=FONTS.find(([v])=>v.toLowerCase()===fam.toLowerCase());
+      fEl.value=m?m[0]:'';
+    }
+  }
+
   const wsel=document.getElementById('teWeight');
   if(wsel && document.activeElement!==wsel){
-    // <strong> with no explicit weight reads as 700; a heading's own bold as 700 too.
-    const el=(TE_Q.getSelection()&&TE_Q.getLeaf(TE_Q.getSelection().index)[0])||null;
-    const dom=el&&el.domNode&&(el.domNode.parentElement||el.domNode);
-    const computed=dom?parseInt(getComputedStyle(dom).fontWeight,10):400;
-    wsel.value=String(fmt.weight || (fmt.bold?700:(isFinite(computed)?computed:400)));
+    let mixedOpt=wsel.querySelector('option[data-mixed]');
+    if(selected && teRangeValues('weight',r).length>1){
+      if(!mixedOpt){ mixedOpt=document.createElement('option'); mixedOpt.dataset.mixed='1'; mixedOpt.textContent='Mixed'; wsel.insertBefore(mixedOpt,wsel.firstChild); }
+      mixedOpt.value='';
+      wsel.value='';
+    }else{
+      if(mixedOpt) mixedOpt.remove();
+      // <strong> with no explicit weight reads as 700; a heading's own bold as 700 too.
+      const el=(TE_Q.getSelection()&&TE_Q.getLeaf(TE_Q.getSelection().index)[0])||null;
+      const dom=el&&el.domNode&&(el.domNode.parentElement||el.domNode);
+      const computed=dom?parseInt(getComputedStyle(dom).fontWeight,10):400;
+      wsel.value=String(fmt.weight || (fmt.bold?700:(isFinite(computed)?computed:400)));
+    }
   }
+
   const i=document.getElementById('teI'), u=document.getElementById('teU');
-  if(i) i.classList.toggle('on',!!fmt.italic);
-  if(u) u.classList.toggle('on',!!fmt.underline);
+  if(i){
+    const mixed=selected && teRangeValues('italic',r).length>1;
+    i.classList.toggle('mixed',mixed);
+    i.classList.toggle('on', !mixed && !!fmt.italic);
+  }
+  if(u){
+    const mixed=selected && teRangeValues('underline',r).length>1;
+    u.classList.toggle('mixed',mixed);
+    u.classList.toggle('on', !mixed && !!fmt.underline);
+  }
+
   const align=fmt.align||'';                    // no align set = left, same as CSS default
   const alIds={ '':'teAlL', center:'teAlC', right:'teAlR', justify:'teAlJ' };
   const onId=alIds[align];
