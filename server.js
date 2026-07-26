@@ -1783,6 +1783,10 @@ app.get('/print/labels', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'print-labels.html'));
 });
 
+app.get('/print/merge', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'print-merge.html'));
+});
+
 app.get('/print/calendar', async (req, res) => {
   const user = await getSessionUser(req).catch(() => null);
   if (!user) return res.redirect('/login?redirect=' + encodeURIComponent('/print/calendar' + (req.url.replace(/^\/print\/calendar/, '') || '')));
@@ -3131,6 +3135,272 @@ app.delete('/api/compositions/:id(\\d+)', requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM compositions WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Custom groups — a group of anything that isn't a contact (2026-07-26) ──
+// Deliberately a SEPARATE table from `groups`: `groups` already carries a lot
+// of contact-only weight (Family hierarchy, share links, group sites,
+// calendars) that a list of products has no business inheriting. See db.js
+// for the full note. Each member is a free-form bag of fields — no schema.
+
+app.get('/api/custom-groups', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT g.id, g.name, g.created_at,
+              (SELECT COUNT(*) FROM custom_group_members m WHERE m.group_id = g.id) AS member_count
+         FROM custom_groups g WHERE g.user_id = $1 ORDER BY g.name`, [req.user.id]);
+    res.json({ v: 1, groups: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/custom-groups', requireAuth, async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
+  try {
+    const r = await pool.query(
+      `INSERT INTO custom_groups (user_id, name) VALUES ($1,$2) RETURNING id, name, created_at`,
+      [req.user.id, String(name).trim()]);
+    res.json({ v: 1, ok: true, group: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/custom-groups/:id(\\d+)', requireAuth, async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
+  try {
+    const r = await pool.query(
+      `UPDATE custom_groups SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING id, name`,
+      [String(name).trim(), req.params.id, req.user.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ v: 1, ok: true, group: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/custom-groups/:id(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM custom_groups WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ v: 1, ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/custom-groups/:id(\\d+)/members', requireAuth, async (req, res) => {
+  try {
+    const own = await pool.query(`SELECT id FROM custom_groups WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Not found' });
+    const r = await pool.query(
+      `SELECT id, fields, position FROM custom_group_members
+        WHERE group_id = $1 AND user_id = $2 ORDER BY position, id`,
+      [req.params.id, req.user.id]);
+    res.json({ v: 1, members: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/custom-groups/:id(\\d+)/members', requireAuth, async (req, res) => {
+  const fields = (req.body && req.body.fields && typeof req.body.fields === 'object') ? req.body.fields : {};
+  try {
+    const own = await pool.query(`SELECT id FROM custom_groups WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Not found' });
+    const pos = await pool.query(
+      `SELECT COALESCE(MAX(position), -1) + 1 AS next FROM custom_group_members WHERE group_id = $1`,
+      [req.params.id]);
+    const r = await pool.query(
+      `INSERT INTO custom_group_members (user_id, group_id, fields, position)
+       VALUES ($1,$2,$3,$4) RETURNING id, fields, position`,
+      [req.user.id, req.params.id, JSON.stringify(fields), pos.rows[0].next]);
+    res.json({ v: 1, ok: true, member: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/custom-groups/:id(\\d+)/members/:mid(\\d+)', requireAuth, async (req, res) => {
+  const fields = (req.body && req.body.fields && typeof req.body.fields === 'object') ? req.body.fields : null;
+  if (!fields) return res.status(400).json({ error: 'fields object required' });
+  try {
+    const r = await pool.query(
+      `UPDATE custom_group_members SET fields = $1
+        WHERE id = $2 AND group_id = $3 AND user_id = $4 RETURNING id, fields, position`,
+      [JSON.stringify(fields), req.params.mid, req.params.id, req.user.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ v: 1, ok: true, member: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/custom-groups/:id(\\d+)/members/:mid(\\d+)', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM custom_group_members WHERE id = $1 AND group_id = $2 AND user_id = $3`,
+      [req.params.mid, req.params.id, req.user.id]);
+    res.json({ v: 1, ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Merge fields: one interface, two kinds of group ────────────────────────
+// A contacts group (`groups` + contact_group_memberships) and a custom group
+// both answer the same two questions — "what fields does this group have"
+// and "what's each member's value for a field" — through the same shape, so
+// everything downstream (the picker, the batch-stamp loop) never needs to
+// know which kind of group it's looking at.
+
+// Bookkeeping columns (id/google_id/is_placeholder/is_pet/is_me/lat/long) are
+// deliberately left out — nothing you'd ever put in a letter.
+const CONTACT_FIELD_KEYS = ['name', 'email', 'phone', 'street', 'street_2', 'city', 'region',
+  'postal_code', 'country', 'company', 'job_title', 'about', 'birthday', 'photo_url'];
+
+// Returns { group:{id,name}, members:[{ref_type, ref_id, fields:{...}}] }, or
+// null if the group doesn't exist / isn't this user's.
+async function resolveGroupMembers(kind, groupId, userId) {
+  if (kind === 'custom') {
+    const g = await pool.query(`SELECT id, name FROM custom_groups WHERE id = $1 AND user_id = $2`,
+      [groupId, userId]);
+    if (!g.rows.length) return null;
+    const m = await pool.query(
+      `SELECT id, fields FROM custom_group_members WHERE group_id = $1 AND user_id = $2 ORDER BY position, id`,
+      [groupId, userId]);
+    return { group: g.rows[0], members: m.rows.map(r => ({ ref_type: 'custom', ref_id: r.id, fields: r.fields || {} })) };
+  }
+  // Default 'contact': a `groups` row, resolved via the existing
+  // contact_group_memberships join. No relation to custom_groups.
+  const g = await pool.query(`SELECT id, name FROM groups WHERE id = $1 AND user_id = $2`, [groupId, userId]);
+  if (!g.rows.length) return null;
+  const c = await pool.query(
+    `SELECT c.id, ${CONTACT_FIELD_KEYS.join(', ')} FROM contacts c
+       JOIN contact_group_memberships m ON m.contact_id = c.id
+      WHERE m.group_id = $1 AND m.user_id = $2 ORDER BY c.name`,
+    [groupId, userId]);
+  return {
+    group: g.rows[0],
+    members: c.rows.map(r => {
+      const fields = {}; CONTACT_FIELD_KEYS.forEach(k => { fields[k] = r[k]; });
+      return { ref_type: 'contact', ref_id: r.id, fields };
+    })
+  };
+}
+
+// Field names available for a group, for the editor's "insert field" picker —
+// a fixed list for contacts, discovered LIVE (the union of keys actually in
+// use) for a custom group, since it has no fixed schema to read instead.
+app.get('/api/group-fields', requireAuth, async (req, res) => {
+  const kind = req.query.kind === 'custom' ? 'custom' : 'contact';
+  const groupId = +req.query.group_id;
+  if (!groupId) return res.status(400).json({ error: 'group_id required' });
+  try {
+    if (kind === 'custom') {
+      const own = await pool.query(`SELECT id FROM custom_groups WHERE id = $1 AND user_id = $2`,
+        [groupId, req.user.id]);
+      if (!own.rows.length) return res.status(404).json({ error: 'Not found' });
+      const r = await pool.query(
+        `SELECT DISTINCT jsonb_object_keys(fields) AS k FROM custom_group_members
+          WHERE group_id = $1 AND user_id = $2 ORDER BY k`, [groupId, req.user.id]);
+      return res.json({ v: 1, fields: r.rows.map(x => x.k) });
+    }
+    const own = await pool.query(`SELECT id FROM groups WHERE id = $1 AND user_id = $2`, [groupId, req.user.id]);
+    if (!own.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ v: 1, fields: CONTACT_FIELD_KEYS });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Replace every {{field}} token with that member's value. A token with no
+// matching field is left exactly as typed, never silently blanked — same
+// "never silently swallowed" rule resolveBlockItems follows for dropped
+// refs — so a typo in a merge field is visible on the page, not just missing.
+function applyMergeFields(str, fields) {
+  if (typeof str !== 'string' || !str) return { text: str, missing: [] };
+  const missing = [];
+  const text = str.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (m, key) => {
+    const v = fields[key];
+    if (v === undefined || v === null) { missing.push(key); return m; }
+    return String(v);
+  });
+  return { text, missing };
+}
+
+// Stamp ONE block once per member of a group, substituting {{field}} tokens
+// from that member's fields, and append every member's pages into a single
+// document in order. The mail-merge case: one letter per contact, one page
+// per product, whatever the group holds — the block doesn't know or care
+// which. Same "stamp = expand to ordinary objects" rule as from-blocks
+// above; this differs only in looping the SAME block once per member instead
+// of stamping a list of different blocks once each.
+app.post('/api/compositions/from-group-merge', requireAuth, async (req, res) => {
+  const { name, block_id, group_kind, group_id, paper } = req.body || {};
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
+  if (!block_id) return res.status(400).json({ error: 'block_id required' });
+  if (!group_id) return res.status(400).json({ error: 'group_id required' });
+  const kind = group_kind === 'custom' ? 'custom' : 'contact';
+  try {
+    const br = await pool.query(
+      `SELECT id, name, kind, pages, paper, params, items FROM print_blocks WHERE id = $1 AND user_id = $2`,
+      [block_id, req.user.id]);
+    if (!br.rows.length) return res.status(400).json({ error: 'Block not found' });
+    const block = br.rows[0];
+
+    const resolved = await resolveGroupMembers(kind, group_id, req.user.id);
+    if (!resolved) return res.status(400).json({ error: 'Group not found' });
+    if (!resolved.members.length) return res.status(400).json({ error: 'That group has no members' });
+
+    // Resolved once — the static refs in the block (a logo, a signature
+    // photo) don't change per member, only the merge text does.
+    const { items: ok, dropped } = await resolveBlockItems(block.items, req.user.id);
+
+    const cardList = [];
+    const newCardId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const cardIdAt = n => (cardList[n - 1] || {}).id || null;
+    const ensureCards = n => { while (cardList.length < n) cardList.push({ id: newCardId() }); };
+
+    const items = [], frames = [], texts = [], madeFrom = [];
+    const bp = block.params || {};
+    const pages = Math.max(1, +block.pages || 1);
+    let offset = 0, totalMissing = 0;
+
+    for (const member of resolved.members) {
+      ensureCards(offset + pages);
+      const shift = (o, mergeText) => {
+        const c = JSON.parse(JSON.stringify(o || {}));
+        const p = (+c.page || 1) + offset;
+        c.page = p; c.card = cardIdAt(p);
+        if (mergeText && typeof c.text === 'string') {
+          const { text, missing } = applyMergeFields(c.text, member.fields);
+          c.text = text; totalMissing += missing.length;
+        }
+        return c;
+      };
+      for (const it of ok) {
+        const ov = shift(it.overrides, true);
+        ov.blk = block.id;
+        ov.merge = { group_kind: kind, group_id: +group_id, member_ref: member.ref_id };
+        items.push({ ref_type: it.ref_type, ref_id: it.ref_id, overrides: ov });
+      }
+      for (const f of (bp.frames || [])) { const c = shift(f, false); c.blk = block.id; frames.push(c); }
+      for (const t of (bp.texts  || [])) { const c = shift(t, true);  c.blk = block.id; texts.push(c); }
+      madeFrom.push({ block_id: block.id, name: block.name, member_ref: member.ref_id, pages });
+      offset += pages;
+    }
+
+    const params = {
+      paper: paper || block.paper || 'a4',
+      cards: cardList,
+      pages: Math.max(1, cardList.length),
+      frames, texts,
+      made_from: madeFrom,
+      merge: { block_id: block.id, group_kind: kind, group_id: +group_id },
+      roles: {}
+    };
+
+    const comp = await pool.query(
+      `INSERT INTO compositions (user_id, name, template, params)
+       VALUES ($1,$2,$3,$4) RETURNING id, name`,
+      [req.user.id, String(name).trim(), 'brochure', JSON.stringify(params)]);
+    const compId = comp.rows[0].id;
+    let pos = 0;
+    for (const it of items) {
+      await pool.query(
+        `INSERT INTO composition_items (user_id, composition_id, ref_type, ref_id, position, overrides)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [req.user.id, compId, it.ref_type, it.ref_id, pos++, JSON.stringify(it.overrides)]);
+    }
+    res.json({ v: 1, ok: true, composition: comp.rows[0], pages: params.pages,
+               members: resolved.members.length, dropped, missing_fields: totalMissing });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

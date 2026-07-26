@@ -481,6 +481,36 @@ async function initDb() {
     ALTER TABLE print_blocks ADD COLUMN IF NOT EXISTS paper   TEXT;
     ALTER TABLE print_blocks ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 
+    -- 2026-07-26: CUSTOM GROUPS — a group of anything that isn't a contact
+    -- (products, a price list, whatever). Deliberately a SEPARATE table from
+    -- groups: the groups table already carries a lot of contact-only weight
+    -- (the Family hierarchy, share links, group sites, calendars) that makes
+    -- no sense for a list of products. Keeping this table small and separate
+    -- means a "Products" group can never accidentally grow a public site or
+    -- a share link.
+    --
+    -- Each member is just a bag of fields the user names themselves — there is
+    -- no fixed schema, unlike contacts. Field names are discovered live from
+    -- whatever keys are actually on the members (see GET /api/group-fields),
+    -- not declared up front, so adding a field is just filling it in on a row.
+    CREATE TABLE IF NOT EXISTS custom_groups (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      name       TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_custom_groups_user ON custom_groups(user_id, name);
+
+    CREATE TABLE IF NOT EXISTS custom_group_members (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      group_id   INTEGER NOT NULL REFERENCES custom_groups(id) ON DELETE CASCADE,
+      fields     JSONB NOT NULL DEFAULT '{}'::jsonb,
+      position   INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_custom_group_members_group ON custom_group_members(group_id, position);
+
     -- 2026-05-30: triplets — a triplet = (before image, after picture, after video)
     -- attached to a concept. The widget cycles through in_rolling_demo=TRUE triplets
     -- as customers stay on the page, so different subjects (dogs, people, etc.) cycle

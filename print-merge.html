@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Merge Print — Turtle and Sun</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@300;400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:#FFF9E6;color:#1C0A00;}
+
+.nav-bar{background:#FFF9E6;border-bottom:1px solid rgba(28,10,0,0.08);padding:14px 32px;display:flex;align-items:center;gap:20px;}
+.nav-bar a{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:500;color:rgba(28,10,0,0.6);text-decoration:none;}
+.nav-bar a:hover{color:#1C0A00;}
+.nav-bar h1{font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:800;color:#1C0A00;flex:1;}
+
+.wrap{max-width:900px;margin:0 auto;padding:28px 24px 80px;}
+.step{background:#fff;border:1.5px solid #e0dcd4;border-radius:12px;padding:18px 20px;margin-bottom:18px;}
+.step h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;margin-bottom:4px;}
+.step .sub{font-size:12px;color:rgba(28,10,0,0.5);margin-bottom:14px;}
+
+.cols{display:flex;gap:18px;flex-wrap:wrap;}
+.col{flex:1;min-width:260px;}
+.col-h{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(28,10,0,0.4);margin-bottom:8px;}
+
+.gitem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1.5px solid #e0dcd4;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;}
+.gitem:hover{border-color:#3A6B20;}
+.gitem.sel{border-color:#3A6B20;background:#f3f8ee;}
+.gitem .n{font-size:11px;color:rgba(28,10,0,0.4);}
+.gitem.indent{margin-left:16px;}
+
+.btn{padding:8px 14px;background:#3A6B20;color:#fff;border:none;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.btn:hover{background:#1C0A00;}
+.btn:disabled{background:#ccc;cursor:not-allowed;}
+.btn.ghost{background:#fff;color:#3A6B20;border:1.5px solid #3A6B20;}
+.btn.ghost:hover{background:#f3f8ee;}
+.btn.sm{padding:5px 10px;font-size:11.5px;}
+.btn.danger{background:#fff;color:#a33;border:1.5px solid #e0b0b0;}
+.btn.danger:hover{background:#fdf0f0;}
+
+input[type=text]{padding:7px 10px;border:1.5px solid #e0dcd4;border-radius:7px;font-size:12.5px;font-family:'DM Sans',sans-serif;color:#1C0A00;outline:none;}
+input[type=text]:focus{border-color:#3A6B20;}
+
+.newgrp{display:flex;gap:8px;margin-top:10px;}
+.newgrp input{flex:1;}
+
+.mtable{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;}
+.mtable th{text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:rgba(28,10,0,0.4);padding:4px 6px;border-bottom:1.5px solid #e0dcd4;}
+.mtable td{padding:3px 6px;border-bottom:1px solid rgba(28,10,0,0.06);}
+.mtable input[type=text]{width:100%;border:1px solid transparent;border-radius:5px;padding:5px 6px;background:transparent;}
+.mtable input[type=text]:hover{border-color:#e0dcd4;}
+.mtable input[type=text]:focus{border-color:#3A6B20;background:#fff;}
+.mtable .rm{color:#a33;cursor:pointer;font-size:14px;padding:0 4px;}
+
+.field-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.chip{font-family:'DM Sans',monospace;font-size:12px;background:#f3f8ee;border:1px solid #cfe3c0;color:#28531a;padding:4px 9px;border-radius:20px;cursor:pointer;}
+.chip:hover{background:#e3f0d8;}
+.chip.copied{background:#3A6B20;color:#fff;border-color:#3A6B20;}
+.empty{font-size:12px;color:rgba(28,10,0,0.4);font-style:italic;}
+
+.blist{max-height:260px;overflow-y:auto;}
+.gen-row{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+.gen-row input[type=text]{flex:1;min-width:200px;}
+
+.result{margin-top:14px;padding:12px 14px;border-radius:9px;font-size:13px;}
+.result.ok{background:#f3f8ee;border:1.5px solid #cfe3c0;color:#1f3a12;}
+.result.err{background:#fdf0f0;border:1.5px solid #e0b0b0;color:#7a2020;}
+.result a{color:#3A6B20;font-weight:700;}
+</style>
+</head>
+<body>
+
+<div class="nav-bar">
+  <a href="/account">← Account</a>
+  <h1>Merge Print — one page per group member</h1>
+</div>
+
+<div class="wrap">
+
+  <div class="step">
+    <h2>1. Pick a group</h2>
+    <div class="sub">Any group — people or custom. One output page (or spread) gets stamped per member.</div>
+    <div class="cols">
+      <div class="col">
+        <div class="col-h">People groups</div>
+        <div id="peopleGroups"><span class="empty">Loading…</span></div>
+      </div>
+      <div class="col">
+        <div class="col-h">Custom groups</div>
+        <div id="customGroups"><span class="empty">Loading…</span></div>
+        <div class="newgrp">
+          <input type="text" id="newGrpName" placeholder="New custom group name (e.g. Products)">
+          <button class="btn ghost sm" id="newGrpBtn">+ Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" id="membersStep" style="display:none;">
+    <h2>Members of <span id="mgName"></span></h2>
+    <div class="sub" id="mgSub"></div>
+    <div id="memberEditor"></div>
+  </div>
+
+  <div class="step" id="fieldsStep" style="display:none;">
+    <h2>2. Fields you can use</h2>
+    <div class="sub">Click to copy — paste the token into the block's text while editing it, e.g. "Dear {{name}},"</div>
+    <div class="field-chips" id="fieldChips"></div>
+  </div>
+
+  <div class="step">
+    <h2>3. Pick a saved block</h2>
+    <div class="sub">A page or spread you already saved (⬒ Save page, in the editor).</div>
+    <div class="blist" id="blockList"><span class="empty">Loading…</span></div>
+  </div>
+
+  <div class="step">
+    <h2>4. Generate</h2>
+    <div class="gen-row">
+      <input type="text" id="genName" placeholder="Name this document (e.g. Family Christmas Letters 2026)">
+      <button class="btn" id="genBtn" disabled>Generate</button>
+    </div>
+    <div id="genResult"></div>
+  </div>
+
+</div>
+
+<script>
+const S = { groups:[], customGroups:[], selKind:null, selId:null, selName:'', members:[], blocks:[], selBlockId:null };
+
+async function jget(url){ const r=await fetch(url); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
+async function jpost(url,body,method){ const r=await fetch(url,{method:method||'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
+
+function flattenTree(nodes,depth){
+  depth=depth||0; let out=[];
+  (nodes||[]).forEach(n=>{
+    out.push({id:n.id,name:n.name,depth});
+    out=out.concat(flattenTree(n.subgroups,depth+1));
+  });
+  return out;
+}
+
+function renderPeopleGroups(){
+  const box=document.getElementById('peopleGroups');
+  const flat=flattenTree(S.groups);
+  if(!flat.length){ box.innerHTML='<span class="empty">No groups yet.</span>'; return; }
+  box.innerHTML=flat.map(g=>
+    '<div class="gitem'+(g.depth>0?' indent':'')+(S.selKind==='contact'&&S.selId===g.id?' sel':'')+'" data-kind="contact" data-id="'+g.id+'" data-name="'+esc(g.name)+'">'+
+      '<span>'+esc(g.name)+'</span></div>').join('');
+  wireGroupClicks(box);
+}
+function renderCustomGroups(){
+  const box=document.getElementById('customGroups');
+  if(!S.customGroups.length){ box.innerHTML='<span class="empty">None yet — create one below.</span>'; return; }
+  box.innerHTML=S.customGroups.map(g=>
+    '<div class="gitem'+(S.selKind==='custom'&&S.selId===g.id?' sel':'')+'" data-kind="custom" data-id="'+g.id+'" data-name="'+esc(g.name)+'">'+
+      '<span>'+esc(g.name)+'</span><span class="n">'+g.member_count+'</span></div>').join('');
+  wireGroupClicks(box);
+}
+function wireGroupClicks(box){
+  box.querySelectorAll('.gitem').forEach(el=>{
+    el.onclick=()=>selectGroup(el.dataset.kind, +el.dataset.id, el.dataset.name);
+  });
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function loadGroups(){
+  try{ S.groups = await jget('/api/groups'); }catch(e){ S.groups=[]; }
+  renderPeopleGroups();
+  try{ const r = await jget('/api/custom-groups'); S.customGroups = r.groups||[]; }catch(e){ S.customGroups=[]; }
+  renderCustomGroups();
+}
+
+async function selectGroup(kind,id,name){
+  S.selKind=kind; S.selId=id; S.selName=name;
+  renderPeopleGroups(); renderCustomGroups();
+  document.getElementById('membersStep').style.display = kind==='custom' ? '' : 'none';
+  document.getElementById('mgName').textContent=name;
+  checkGenReady();
+  if(kind==='custom'){
+    document.getElementById('mgSub').textContent='Add rows for each product / item, and fields for whatever you need to print.';
+    await loadCustomMembers();
+  }
+  await loadFields();
+}
+
+// ── Custom group member editor ──────────────────────────────────────────
+async function loadCustomMembers(){
+  const r = await jget('/api/custom-groups/'+S.selId+'/members');
+  S.members = r.members||[];
+  renderMemberEditor();
+}
+function memberFieldKeys(){
+  const keys=[];
+  S.members.forEach(m=>Object.keys(m.fields||{}).forEach(k=>{ if(!keys.includes(k)) keys.push(k); }));
+  return keys;
+}
+function renderMemberEditor(){
+  const keys=memberFieldKeys();
+  const box=document.getElementById('memberEditor');
+  let h='<table class="mtable"><thead><tr>'+
+    keys.map(k=>'<th>'+esc(k)+'</th>').join('')+
+    '<th></th></tr></thead><tbody>';
+  S.members.forEach(m=>{
+    h+='<tr data-mid="'+m.id+'">'+
+      keys.map(k=>'<td><input type="text" data-k="'+esc(k)+'" value="'+esc((m.fields||{})[k]||'')+'"></td>').join('')+
+      '<td><span class="rm" data-del="'+m.id+'" title="Remove">✕</span></td></tr>';
+  });
+  h+='</tbody></table>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;">'+
+      '<button class="btn ghost sm" id="addMemberBtn">+ Row</button>'+
+      '<div class="newgrp" style="margin:0;"><input type="text" id="newFieldName" placeholder="New field name (e.g. price)" style="width:180px;">'+
+      '<button class="btn ghost sm" id="addFieldBtn">+ Field</button></div>'+
+    '</div>';
+  box.innerHTML=h;
+
+  box.querySelectorAll('input[type=text][data-k]').forEach(inp=>{
+    inp.onchange=async e=>{
+      const tr=e.target.closest('tr'); const mid=+tr.dataset.mid;
+      const member=S.members.find(x=>x.id===mid); if(!member) return;
+      member.fields=member.fields||{};
+      member.fields[e.target.dataset.k]=e.target.value;
+      try{ await jpost('/api/custom-groups/'+S.selId+'/members/'+mid,{fields:member.fields},'PUT'); }catch(err){ alert('Save failed: '+err.message); }
+      await loadFields();
+    };
+  });
+  box.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick=async()=>{
+      const mid=+b.dataset.del;
+      if(!confirm('Remove this row?')) return;
+      try{ await jpost('/api/custom-groups/'+S.selId+'/members/'+mid,{}, 'DELETE'); }catch(e){}
+      await loadCustomMembers(); await loadFields();
+    };
+  });
+  const addBtn=document.getElementById('addMemberBtn');
+  if(addBtn) addBtn.onclick=async()=>{
+    const fields={}; keys.forEach(k=>fields[k]='');
+    try{ await jpost('/api/custom-groups/'+S.selId+'/members',{fields}); await loadCustomMembers(); }
+    catch(e){ alert('Could not add row: '+e.message); }
+  };
+  const addFieldBtn=document.getElementById('addFieldBtn');
+  if(addFieldBtn) addFieldBtn.onclick=async()=>{
+    const name=(document.getElementById('newFieldName').value||'').trim().replace(/[^a-zA-Z0-9_]/g,'_');
+    if(!name) return;
+    if(!S.members.length){
+      try{ await jpost('/api/custom-groups/'+S.selId+'/members',{fields:{[name]:''}}); await loadCustomMembers(); await loadFields(); }
+      catch(e){ alert(e.message); }
+      return;
+    }
+    // Stamp the new (empty) field onto every existing row so the column shows up everywhere.
+    for(const m of S.members){
+      m.fields=m.fields||{};
+      if(!(name in m.fields)){
+        m.fields[name]='';
+        try{ await jpost('/api/custom-groups/'+S.selId+'/members/'+m.id,{fields:m.fields},'PUT'); }catch(e){}
+      }
+    }
+    renderMemberEditor(); await loadFields();
+  };
+}
+
+// ── Field discovery (for the picker chips) ──────────────────────────────
+async function loadFields(){
+  const step=document.getElementById('fieldsStep'), box=document.getElementById('fieldChips');
+  if(!S.selKind){ step.style.display='none'; return; }
+  step.style.display='';
+  try{
+    const r=await jget('/api/group-fields?kind='+S.selKind+'&group_id='+S.selId);
+    const fields=r.fields||[];
+    box.innerHTML = fields.length
+      ? fields.map(f=>'<span class="chip" data-f="'+esc(f)+'">{{'+esc(f)+'}}</span>').join('')
+      : '<span class="empty">No fields yet — add a row and a field above.</span>';
+    box.querySelectorAll('.chip').forEach(c=>{
+      c.onclick=()=>{
+        const token='{{'+c.dataset.f+'}}';
+        navigator.clipboard&&navigator.clipboard.writeText(token).catch(()=>{});
+        c.classList.add('copied'); c.textContent='Copied!';
+        setTimeout(()=>{ c.classList.remove('copied'); c.textContent=token; },900);
+      };
+    });
+  }catch(e){ box.innerHTML='<span class="empty">'+esc(e.message)+'</span>'; }
+}
+
+// ── New custom group ─────────────────────────────────────────────────────
+document.getElementById('newGrpBtn').onclick=async()=>{
+  const inp=document.getElementById('newGrpName');
+  const name=(inp.value||'').trim(); if(!name) return;
+  try{
+    const r=await jpost('/api/custom-groups',{name});
+    inp.value='';
+    const rl=await jget('/api/custom-groups'); S.customGroups=rl.groups||[];
+    renderCustomGroups();
+    selectGroup('custom', r.group.id, r.group.name);
+  }catch(e){ alert('Could not create group: '+e.message); }
+};
+
+// ── Blocks ────────────────────────────────────────────────────────────────
+async function loadBlocks(){
+  const box=document.getElementById('blockList');
+  try{
+    const r=await jget('/api/print-blocks');
+    S.blocks=r.blocks||[];
+    if(!S.blocks.length){ box.innerHTML='<span class="empty">No saved blocks yet — use ⬒ Save page in the editor first.</span>'; return; }
+    box.innerHTML=S.blocks.map(b=>
+      '<div class="gitem" data-id="'+b.id+'">'+
+        '<span>'+esc(b.name)+' <span class="n">('+b.pages+' page'+(b.pages>1?'s':'')+')</span></span>'+
+        '<span class="n">'+b.item_count+' item'+(b.item_count===1?'':'s')+'</span></div>').join('');
+    box.querySelectorAll('.gitem').forEach(el=>{
+      el.onclick=()=>{
+        S.selBlockId=+el.dataset.id;
+        box.querySelectorAll('.gitem').forEach(x=>x.classList.remove('sel'));
+        el.classList.add('sel');
+        checkGenReady();
+      };
+    });
+  }catch(e){ box.innerHTML='<span class="empty">'+esc(e.message)+'</span>'; }
+}
+
+function checkGenReady(){
+  document.getElementById('genBtn').disabled = !(S.selKind && S.selId && S.selBlockId);
+}
+document.getElementById('genName').oninput=checkGenReady;
+
+document.getElementById('genBtn').onclick=async()=>{
+  const box=document.getElementById('genResult');
+  const name=(document.getElementById('genName').value||'').trim() || (S.selName+' — merged');
+  box.innerHTML='';
+  try{
+    const r=await jpost('/api/compositions/from-group-merge',{
+      name, block_id:S.selBlockId, group_kind:S.selKind, group_id:S.selId, paper:'a4'
+    });
+    let msg='Generated <b>'+r.pages+'</b> page'+(r.pages===1?'':'s')+' for <b>'+r.members+'</b> member'+(r.members===1?'':'s')+'.';
+    if(r.dropped) msg+=' '+r.dropped+' item'+(r.dropped===1?'':'s')+' in the block could not be resolved.';
+    if(r.missing_fields) msg+=' '+r.missing_fields+' merge token'+(r.missing_fields===1?'':'s')+' had no matching field — check the text for a typo.';
+    msg+=' <a href="/print/brochure?comp='+r.composition.id+'">Open it in the editor →</a>';
+    box.innerHTML='<div class="result ok">'+msg+'</div>';
+  }catch(e){
+    box.innerHTML='<div class="result err">'+esc(e.message)+'</div>';
+  }
+};
+
+loadGroups();
+loadBlocks();
+</script>
+</body>
+</html>

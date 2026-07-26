@@ -75,6 +75,7 @@
         '<a class="ts-nav-dd-link ts-nav-auth" href="/print/labels">Print address labels</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth" href="/account/occasions">Print occasion list</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth" href="/print/calendar">Print calendar</a>' +
+        '<a class="ts-nav-dd-link ts-nav-auth" href="/print/merge">Merge print (one per group member)</a>' +
         '<div class="ts-nav-dd-sep ts-nav-auth"></div>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-pg-account" href="/account">My Archive</a>' +
         '<a class="ts-nav-dd-link ts-nav-auth ts-nav-dd-logout" href="/auth/logout">Log out</a>' +
@@ -152,6 +153,7 @@
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/print/labels">Print address labels</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/account/occasions">Print occasion list</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth" href="/print/calendar">Print calendar</a>' +
+        '<a class="ts-nav-drawer-link ts-nav-auth" href="/print/merge">Merge print (one per group member)</a>' +
         '<div class="ts-nav-drawer-sep ts-nav-auth"></div>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-pg-account" href="/account">My Archive</a>' +
         '<a class="ts-nav-drawer-link ts-nav-auth ts-nav-drawer-logout" href="/auth/logout">Log out</a>' +
