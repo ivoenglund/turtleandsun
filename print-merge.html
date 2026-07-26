@@ -103,20 +103,32 @@ input[type=text]:focus{border-color:#3A6B20;}
     <div id="memberEditor"></div>
   </div>
 
+  <div class="step" id="whoStep" style="display:none;">
+    <h2>2. Who to include</h2>
+    <div class="sub">Unchecked members stay in the group — this only skips them for this print.</div>
+    <div style="margin-bottom:8px;">
+      <button class="btn ghost sm" id="allBtn">Select all</button>
+      <button class="btn ghost sm" id="noneBtn">Select none</button>
+      <span class="n" id="whoCount" style="font-size:11.5px;color:rgba(28,10,0,0.5);margin-left:6px;"></span>
+    </div>
+    <div id="whoList"></div>
+  </div>
+
   <div class="step" id="fieldsStep" style="display:none;">
-    <h2>2. Fields you can use</h2>
-    <div class="sub">Click to copy — paste the token into the block's text while editing it, e.g. "Dear {{name}},"</div>
+    <h2>3. Fields you can use</h2>
+    <div class="sub">Click to copy. Paste a token into any text box while editing the block — each token can be
+      its own text box, positioned wherever you want, e.g. put {{name}} top-left and {{phone}} bottom-right.</div>
     <div class="field-chips" id="fieldChips"></div>
   </div>
 
   <div class="step">
-    <h2>3. Pick a saved block</h2>
+    <h2>4. Pick a saved block</h2>
     <div class="sub">A page or spread you already saved (⬒ Save page, in the editor).</div>
     <div class="blist" id="blockList"><span class="empty">Loading…</span></div>
   </div>
 
   <div class="step">
-    <h2>4. Generate</h2>
+    <h2>5. Generate</h2>
     <div class="gen-row">
       <input type="text" id="genName" placeholder="Name this document (e.g. Family Christmas Letters 2026)">
       <button class="btn" id="genBtn" disabled>Generate</button>
@@ -127,7 +139,7 @@ input[type=text]:focus{border-color:#3A6B20;}
 </div>
 
 <script>
-const S = { groups:[], customGroups:[], selKind:null, selId:null, selName:'', members:[], blocks:[], selBlockId:null };
+const S = { groups:[], customGroups:[], selKind:null, selId:null, selName:'', members:[], blocks:[], selBlockId:null, whoAll:[], excluded:new Set() };
 
 async function jget(url){ const r=await fetch(url); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
 async function jpost(url,body,method){ const r=await fetch(url,{method:method||'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
@@ -173,7 +185,7 @@ async function loadGroups(){
 }
 
 async function selectGroup(kind,id,name){
-  S.selKind=kind; S.selId=id; S.selName=name;
+  S.selKind=kind; S.selId=id; S.selName=name; S.excluded=new Set();
   renderPeopleGroups(); renderCustomGroups();
   document.getElementById('membersStep').style.display = kind==='custom' ? '' : 'none';
   document.getElementById('mgName').textContent=name;
@@ -183,7 +195,43 @@ async function selectGroup(kind,id,name){
     await loadCustomMembers();
   }
   await loadFields();
+  await loadWho();
 }
+
+// ── Who to include (checkboxes) ──────────────────────────────────────────
+async function loadWho(){
+  const step=document.getElementById('whoStep');
+  step.style.display='';
+  const list=document.getElementById('whoList');
+  list.innerHTML='<span class="empty">Loading…</span>';
+  try{
+    const r=await jget('/api/group-members?kind='+S.selKind+'&group_id='+S.selId);
+    S.whoAll=r.members||[];
+    renderWho();
+  }catch(e){ list.innerHTML='<span class="empty">'+esc(e.message)+'</span>'; }
+}
+function renderWho(){
+  const list=document.getElementById('whoList');
+  if(!S.whoAll.length){ list.innerHTML='<span class="empty">No members yet.</span>'; updateWhoCount(); return; }
+  list.innerHTML=S.whoAll.map(m=>
+    '<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:13px;cursor:pointer;">'+
+      '<input type="checkbox" data-ref="'+m.ref_id+'"'+(S.excluded.has(m.ref_id)?'':' checked')+'>'+
+      '<span>'+esc(m.label)+'</span></label>').join('');
+  list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.onchange=()=>{
+      const ref=+cb.dataset.ref;
+      if(cb.checked) S.excluded.delete(ref); else S.excluded.add(ref);
+      updateWhoCount();
+    };
+  });
+  updateWhoCount();
+}
+function updateWhoCount(){
+  const total=S.whoAll.length, included=total-S.excluded.size;
+  document.getElementById('whoCount').textContent = included+' of '+total+' will be printed';
+}
+document.getElementById('allBtn').onclick=()=>{ S.excluded=new Set(); renderWho(); };
+document.getElementById('noneBtn').onclick=()=>{ S.excluded=new Set(S.whoAll.map(m=>m.ref_id)); renderWho(); };
 
 // ── Custom group member editor ──────────────────────────────────────────
 async function loadCustomMembers(){
@@ -222,7 +270,7 @@ function renderMemberEditor(){
       member.fields=member.fields||{};
       member.fields[e.target.dataset.k]=e.target.value;
       try{ await jpost('/api/custom-groups/'+S.selId+'/members/'+mid,{fields:member.fields},'PUT'); }catch(err){ alert('Save failed: '+err.message); }
-      await loadFields();
+      await loadFields(); await loadWho();
     };
   });
   box.querySelectorAll('[data-del]').forEach(b=>{
@@ -230,13 +278,13 @@ function renderMemberEditor(){
       const mid=+b.dataset.del;
       if(!confirm('Remove this row?')) return;
       try{ await jpost('/api/custom-groups/'+S.selId+'/members/'+mid,{}, 'DELETE'); }catch(e){}
-      await loadCustomMembers(); await loadFields();
+      await loadCustomMembers(); await loadFields(); await loadWho();
     };
   });
   const addBtn=document.getElementById('addMemberBtn');
   if(addBtn) addBtn.onclick=async()=>{
     const fields={}; keys.forEach(k=>fields[k]='');
-    try{ await jpost('/api/custom-groups/'+S.selId+'/members',{fields}); await loadCustomMembers(); }
+    try{ await jpost('/api/custom-groups/'+S.selId+'/members',{fields}); await loadCustomMembers(); await loadWho(); }
     catch(e){ alert('Could not add row: '+e.message); }
   };
   const addFieldBtn=document.getElementById('addFieldBtn');
@@ -328,7 +376,8 @@ document.getElementById('genBtn').onclick=async()=>{
   box.innerHTML='';
   try{
     const r=await jpost('/api/compositions/from-group-merge',{
-      name, block_id:S.selBlockId, group_kind:S.selKind, group_id:S.selId, paper:'a4'
+      name, block_id:S.selBlockId, group_kind:S.selKind, group_id:S.selId, paper:'a4',
+      exclude:[...S.excluded]
     });
     let msg='Generated <b>'+r.pages+'</b> page'+(r.pages===1?'':'s')+' for <b>'+r.members+'</b> member'+(r.members===1?'':'s')+'.';
     if(r.dropped) msg+=' '+r.dropped+' item'+(r.dropped===1?'':'s')+' in the block could not be resolved.';

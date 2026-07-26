@@ -3322,12 +3322,38 @@ function applyMergeFields(str, fields) {
 // which. Same "stamp = expand to ordinary objects" rule as from-blocks
 // above; this differs only in looping the SAME block once per member instead
 // of stamping a list of different blocks once each.
+// Members of a group, formatted for a checkbox picker — exactly the same
+// set resolveGroupMembers() would stamp, so what's shown can never drift
+// from what actually gets used (the richer /api/groups/:id/members endpoint
+// also pulls in subgroups, which would make the checkbox list disagree with
+// the merge itself).
+app.get('/api/group-members', requireAuth, async (req, res) => {
+  const kind = req.query.kind === 'custom' ? 'custom' : 'contact';
+  const groupId = +req.query.group_id;
+  if (!groupId) return res.status(400).json({ error: 'group_id required' });
+  try {
+    const resolved = await resolveGroupMembers(kind, groupId, req.user.id);
+    if (!resolved) return res.status(404).json({ error: 'Not found' });
+    const members = resolved.members.map(m => ({
+      ref_id: m.ref_id,
+      label: m.fields.name || m.fields.title || m.fields.sku ||
+             Object.values(m.fields).find(v => v) || ('Member ' + m.ref_id)
+    }));
+    res.json({ v: 1, members });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Excludes a member from the group WITHOUT removing them from the group —
+// "everyone in Family except these two this time", same shape as the
+// group-block's declares.query.exclude planned in the print-blocks spec, so
+// this doesn't invent a second convention for the same idea.
 app.post('/api/compositions/from-group-merge', requireAuth, async (req, res) => {
-  const { name, block_id, group_kind, group_id, paper } = req.body || {};
+  const { name, block_id, group_kind, group_id, paper, exclude } = req.body || {};
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name required' });
   if (!block_id) return res.status(400).json({ error: 'block_id required' });
   if (!group_id) return res.status(400).json({ error: 'group_id required' });
   const kind = group_kind === 'custom' ? 'custom' : 'contact';
+  const excludeSet = new Set((Array.isArray(exclude) ? exclude : []).map(n => +n));
   try {
     const br = await pool.query(
       `SELECT id, name, kind, pages, paper, params, items FROM print_blocks WHERE id = $1 AND user_id = $2`,
@@ -3335,9 +3361,11 @@ app.post('/api/compositions/from-group-merge', requireAuth, async (req, res) => 
     if (!br.rows.length) return res.status(400).json({ error: 'Block not found' });
     const block = br.rows[0];
 
-    const resolved = await resolveGroupMembers(kind, group_id, req.user.id);
-    if (!resolved) return res.status(400).json({ error: 'Group not found' });
-    if (!resolved.members.length) return res.status(400).json({ error: 'That group has no members' });
+    const resolvedFull = await resolveGroupMembers(kind, group_id, req.user.id);
+    if (!resolvedFull) return res.status(400).json({ error: 'Group not found' });
+    const resolved = { group: resolvedFull.group,
+      members: resolvedFull.members.filter(m => !excludeSet.has(+m.ref_id)) };
+    if (!resolved.members.length) return res.status(400).json({ error: 'No members left to stamp — everything in the group was excluded' });
 
     // Resolved once — the static refs in the block (a logo, a signature
     // photo) don't change per member, only the merge text does.
