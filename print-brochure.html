@@ -1676,7 +1676,7 @@ function showKnobs(){
       '<span id="knLsV" style="font-size:11px;color:var(--muted);width:34px;text-align:right;">'+(+ov.ls||0).toFixed(2)+'</span></div>'+
       '<div class="krow"><span style="font-size:11px;color:var(--muted);">Columns</span>'+
       '<select id="knCn" style="flex:1;margin-bottom:0;" title="Split this text into side-by-side columns">'+
-        [1,2,3,4].map(n=>'<option value="'+n+'"'+((+ov.cn||1)===n?' selected':'')+'>'+n+(n===1?' column':' columns')+'</option>').join('')+
+        [1,2,3,4,5].map(n=>'<option value="'+n+'"'+((+ov.cn||1)===n?' selected':'')+'>'+n+(n===1?' column':' columns')+'</option>').join('')+
       '</select></div>':'')+
     '<div class="krow"><input type="number" id="knBw" min="0" max="30" step="1" value="'+(+ov.bw||0)+'" title="Border width (0 = none)" style="width:56px;">'+
       '<select id="knBs" style="flex:1;margin-bottom:0;">'+
