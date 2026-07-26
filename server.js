@@ -3300,6 +3300,19 @@ app.get('/api/group-fields', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Every member with their FULL fields (not just a display label) — what the
+// in-editor merge-stamp action needs to substitute {{tokens}} client-side.
+app.get('/api/group-members-full', requireAuth, async (req, res) => {
+  const kind = req.query.kind === 'custom' ? 'custom' : 'contact';
+  const groupId = +req.query.group_id;
+  if (!groupId) return res.status(400).json({ error: 'group_id required' });
+  try {
+    const resolved = await resolveGroupMembers(kind, groupId, req.user.id);
+    if (!resolved) return res.status(404).json({ error: 'Not found' });
+    res.json({ v: 1, members: resolved.members.map(m => ({ ref_id: m.ref_id, fields: m.fields })) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Replace every {{field}} token with that member's value. A token with no
 // matching field is left exactly as typed, never silently blanked — same
 // "never silently swallowed" rule resolveBlockItems follows for dropped

@@ -186,14 +186,34 @@
                 color:#6b7268; cursor:pointer; }
   .rcard .rdel:hover{ background:#fff; color:#23291d; box-shadow:0 2px 7px rgba(0,0,0,.28); }
   .rcard:hover .rdel{ display:flex; }
+  /* Member-select checkbox for merge mode — top-left, mirrors .rdel's corner
+     on the right. Only rendered on cards inside a merge-enabled group. */
+  .rcard .mrgChk{ position:absolute; top:5px; left:5px; z-index:2;
+                  width:18px; height:18px; accent-color:var(--green); cursor:pointer; }
+  .mrgBar{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; width:100%;
+           margin:2px 0 2px; font-size:12px; }
+  .mrgBar select{ font-family:inherit; font-size:12px; padding:3px 6px; border:1px solid #d9d4c4;
+                  border-radius:7px; background:#fff; max-width:170px; }
+  .mrgBar button{ font-family:inherit; font-weight:700; font-size:11.5px; padding:4px 9px;
+                  border:1px solid var(--green); border-radius:7px; background:var(--green);
+                  color:#f4efe4; cursor:pointer; }
+  .mrgBar button:disabled{ background:#ccc; border-color:#ccc; cursor:not-allowed; }
+  .mrgBar .cnt{ font-size:11px; color:var(--muted); }
   #resBody .sechd{ display:flex; align-items:baseline; gap:9px; margin:16px 0 8px;
                    position:sticky; top:-10px; z-index:2; background:#fff;
-                   padding:6px 0 5px; border-bottom:1px solid #ece7d9; cursor:grab; }
+                   padding:6px 0 5px; border-bottom:1px solid #ece7d9; }
   #resBody .sechd:first-child{ margin-top:0; }
-  #resBody .sechd:active{ cursor:grabbing; }
   #resBody .sechd b{ font-size:17px; font-weight:800; letter-spacing:.2px; color:var(--green); }
   #resBody .sechd .n{ font-size:12px; color:var(--muted); }
   #resBody .sechd .more{ margin-left:auto; font-size:11px; }
+  /* The ONLY draggable part of a group heading now — was the whole sticky bar,
+     which sat directly above the member photos and, because it's sticky, can
+     visually overlap the first row while scrolling. Grabbing a person by
+     mistake instead dragged the entire group onto a brand-new page. A small
+     dedicated handle means an accidental grab there just does nothing. */
+  #resBody .sechd .drag-handle{ cursor:grab; color:var(--muted); font-size:15px;
+                                 padding:0 2px; user-select:none; }
+  #resBody .sechd .drag-handle:active{ cursor:grabbing; }
   #resBody .empty{ color:var(--muted); padding:10px 2px; line-height:1.5; }
   .rgrid{ display:flex; flex-wrap:wrap; gap:8px; }
   /* Everything in the card renderers is em, so the container's font-size scales a
@@ -3437,6 +3457,126 @@ function stampBlock(b, cardIds, plc){
     ' no longer in your library, so '+(b.dropped>1?'they were':'it was')+' left out.');
 }
 
+// ── Merge: stamp one saved card per group member, right where you are ──────
+// Wires the "🔀 Merge" checkbox, the per-member checkboxes, the saved-card
+// picker and the Stamp button that the Content panel now renders on a group
+// heading. Deliberately separate from the group-heading DRAG (dropGroup) —
+// that puts everyone on ONE page as a grid; this puts each person on their
+// OWN page(s), starting right after the page you're on, which is the whole
+// point of a merge (a letter per person, not a team photo).
+function wireMergeControls(body){
+  body.querySelectorAll('.mrgToggle').forEach(cb=>{
+    cb.onmousedown=e=>e.stopPropagation();      // don't let the header's own click logic fight this
+    cb.onchange=()=>{
+      const sec=cb.dataset.sec;
+      RES.mergeOn[sec]=cb.checked;
+      if(cb.checked && RES.mergeBlocks==null){
+        RES.mergeBlocks=[];                     // placeholder so a second click doesn't double-fetch
+        fetch('/api/print-blocks').then(r=>r.json()).then(j=>{ RES.mergeBlocks=j.blocks||[]; renderContent(); })
+          .catch(()=>{ RES.mergeBlocks=[]; });
+      }
+      renderContent();
+    };
+  });
+  body.querySelectorAll('.mrgChk').forEach(cb=>{
+    cb.onmousedown=e=>e.stopPropagation();
+    cb.onclick=e=>e.stopPropagation();          // don't also trigger the card's own click/drag
+    cb.onchange=()=>{
+      const sec=cb.dataset.sec, ref=+cb.dataset.ref;
+      RES.mergeExclude[sec]=RES.mergeExclude[sec]||{};
+      if(cb.checked) delete RES.mergeExclude[sec][ref]; else RES.mergeExclude[sec][ref]=true;
+      updateMergeCount(sec);
+    };
+  });
+  body.querySelectorAll('.mrgBlockSel').forEach(sel=>{
+    sel.onclick=e=>e.stopPropagation();
+    sel.onchange=()=>{ RES.mergeBlock[sel.dataset.sec]=sel.value?+sel.value:''; updateMergeCount(sel.dataset.sec); };
+  });
+  body.querySelectorAll('.mrgStampBtn').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); mergeGroupStamp(btn.dataset.sec); };
+  });
+  Object.keys(RES.mergeOn).forEach(sec=>{ if(RES.mergeOn[sec]) updateMergeCount(sec); });
+}
+function updateMergeCount(sec){
+  const bar=document.querySelector('.mrgBar[data-sec="'+sec+'"]'); if(!bar) return;
+  const total=document.querySelectorAll('.rcard[data-sec="'+sec+'"]').length;
+  const included=total-Object.keys(RES.mergeExclude[sec]||{}).length;
+  const cnt=bar.querySelector('[data-mrgcnt]');
+  if(cnt) cnt.textContent=included+' of '+total+' will be printed';
+  const btn=bar.querySelector('.mrgStampBtn');
+  if(btn) btn.disabled = !(included>0 && RES.mergeBlock[sec]);
+}
+// Same shape as stampBlock(), but every text override gets {{field}} tokens
+// substituted from ONE member's fields first. Returns how many tokens had no
+// matching field, so the caller can tell the user rather than print blanks.
+function stampBlockMerged(b, cardIds, plc, fields){
+  if(!COMP) return 0;
+  COMP.params = COMP.params || {};
+  const ids = cardIds || [];
+  let missing=0;
+  const place = (o, mergeText) => { const c=JSON.parse(JSON.stringify(o||{}));
+    const p=Math.max(1,+c.page||1);
+    const target = ids[p-1] || cardIdAt(curPage);
+    c.card=target; c.blk=b.id; if(plc) c.plc=plc;
+    if(mergeText && typeof c.text==='string'){
+      c.text=c.text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,(m,key)=>{
+        const v=fields[key];
+        if(v===undefined||v===null){ missing++; return m; }
+        return String(v);
+      });
+    }
+    delete c.page; return c; };
+  (b.items||[]).forEach(it=>{
+    COMP.items.push({ ref_type:it.ref_type, ref_id:it.ref_id, content:it.content,
+                      overrides:place(it.overrides,true) });
+  });
+  (((b.params||{}).frames)||[]).forEach(f=>frames().push(place(f,false)));
+  (((b.params||{}).texts) ||[]).forEach(t=>texts().push(place(t,true)));
+  return missing;
+}
+// The Stamp button: one copy of the chosen card per checked member, inserted
+// right after the page you're on — never a new, separate document, and never
+// wherever dropGroup happens to feel like putting it.
+async function mergeGroupStamp(sec){
+  const blockId=RES.mergeBlock[sec];
+  if(!blockId) return;
+  const gid=+String(sec).slice(2);
+  if(!gid) return;
+  const excl=RES.mergeExclude[sec]||{};
+  const btn=document.querySelector('.mrgStampBtn[data-sec="'+sec+'"]');
+  if(btn){ btn.disabled=true; btn.textContent='Stamping…'; }
+  try{
+    const [mr,b]=await Promise.all([
+      fetch('/api/group-members-full?kind=contact&group_id='+gid).then(r=>r.json()),
+      fetch('/api/print-blocks/'+blockId).then(r=>r.json())
+    ]);
+    const members=(mr.members||[]).filter(m=>!excl[m.ref_id]);
+    if(!members.length){ alert('Everyone in this group is unchecked — nothing to stamp.'); return; }
+    const pages=Math.max(1,+b.pages||1);
+    pushUndo();
+    const startAt=curPage;                      // right after the page you're on, not wherever
+    let offset=0, missing=0;
+    members.forEach(member=>{
+      const made=[];
+      for(let i=0;i<pages;i++){ const nid=newCardId(); cards().splice(startAt+offset+i,0,{id:nid}); made.push(nid); }
+      offset+=pages;
+      const pid=newPlcId();
+      missing+=stampBlockMerged(b, made, pid, member.fields);
+      placements()[pid]={ block_id:+blockId, version:+b.version||1, name:b.name||'', cards:made.slice() };
+      if(pages>1) chapters()[newChId()]={ name:(b.name||'Card')+' — '+(member.fields.name||('#'+member.ref_id)), cards:made.slice() };
+    });
+    syncPages();
+    curPage=startAt+1; SEL=[];
+    enforceChapters();
+    renderCurrent(); showKnobs(); markSel(); scheduleStrip();
+    groupBanner('Stamped '+members.length+' member'+(members.length>1?'s':'')+
+      ' ('+(pages*members.length)+' page'+(pages*members.length>1?'s':'')+'), starting right after where you were.'+
+      (missing?(' '+missing+' merge token'+(missing>1?'s':'')+' had no matching field.'):'')+
+      (b.dropped?(' '+b.dropped+' item'+(b.dropped>1?'s':'')+' in the card were no longer available.'):''));
+  }catch(e){ alert('Could not stamp the merge: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='▤ Stamp merge'; updateMergeCount(sec); } }
+}
+
 
 
 
@@ -3622,7 +3762,9 @@ const RES={
   cardList:[], cardsDirty:true,
   living:true, deceased:true, people:true, pets:true,
   y1:String(new Date().getFullYear()), y2:String(new Date().getFullYear()+1),
-  q:'', size:13.5, busy:false, seq:0
+  q:'', size:13.5, busy:false, seq:0,
+  // Merge: 'g:5' -> true/false, and per-group excluded member ids / chosen block.
+  mergeOn:{}, mergeExclude:{}, mergeBlock:{}, mergeBlocks:null
 };
 const RSIZES={S:9.5, M:13.5, L:19};
 
@@ -3816,15 +3958,34 @@ function renderContent(){
   body.innerHTML=cardsHtml+RES.sections.map(sec=>{
     const shown=sec.items.length, more=sec.total-shown;
     const arch=sec.key==='archive';
-    // Grab the heading to drag the WHOLE section onto a card.
-    return '<div class="sechd" draggable="true" data-sec="'+esc(sec.key)+'" data-title="'+esc(sec.title)+'"'+
-      ' title="Drag this heading to put the whole group on the card">'+
+    const isGroup=String(sec.key).slice(0,2)==='g:';   // Timeline/Archive have no merge — no members to substitute
+    const mergeOn=isGroup&&!!RES.mergeOn[sec.key];
+    const excl=RES.mergeExclude[sec.key]||{};
+    // Only the small handle is draggable now — see the .drag-handle CSS note:
+    // the whole bar used to be the drag target, which sat right above the
+    // member photos and was too easy to grab by accident.
+    return '<div class="sechd" data-sec="'+esc(sec.key)+'" data-title="'+esc(sec.title)+'">'+
+      '<span class="drag-handle" draggable="true" data-sec="'+esc(sec.key)+'" data-title="'+esc(sec.title)+'"'+
+        ' title="Drag this handle to put everyone in this section on a new page">⠿</span>'+
       '<b>'+esc(sec.title)+'</b><span class="n">'+sec.total+'</span>'+
-      (more>0?'<button class="more" data-more="'+esc(sec.key)+'">Show all '+sec.total+'</button>':'')+'</div>'+
+      (more>0?'<button class="more" data-more="'+esc(sec.key)+'">Show all '+sec.total+'</button>':'')+
+      (isGroup?'<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;margin-left:auto;cursor:pointer;" title="Stamp a saved card once per member, fields substituted">'+
+        '<input type="checkbox" class="mrgToggle" data-sec="'+esc(sec.key)+'"'+(mergeOn?' checked':'')+'> 🔀 Merge</label>':'')+
+      '</div>'+
+      (mergeOn?'<div class="mrgBar" data-sec="'+esc(sec.key)+'">'+
+        '<select class="mrgBlockSel" data-sec="'+esc(sec.key)+'"><option value="">Pick a saved card…</option>'+
+          (RES.mergeBlocks||[]).map(b=>'<option value="'+b.id+'"'+(RES.mergeBlock[sec.key]===b.id?' selected':'')+'>'+
+            esc(b.name)+' ('+b.pages+(b.pages>1?' pages)':' page)')+'</option>').join('')+
+        '</select>'+
+        '<button class="mrgStampBtn" data-sec="'+esc(sec.key)+'" disabled>▤ Stamp merge</button>'+
+        '<span class="cnt" data-mrgcnt="'+esc(sec.key)+'"></span>'+
+        '</div>':'')+
       '<div class="'+(arch?'rgrid dropz':'rgrid')+'"'+(arch?' data-drop="1"':'')+'>'+
       sec.items.map(o=>
         '<div class="rcard" draggable="true" data-rt="'+sec.kind+'" data-ri="'+o.id+'" data-sec="'+esc(sec.key)+'"'+
         ' style="width:'+W+'px;font-size:'+RES.size+'px;">'+
+        (mergeOn?'<input type="checkbox" class="mrgChk" data-ref="'+o.id+'" data-sec="'+esc(sec.key)+'"'+
+          (excl[o.id]?'':' checked')+' title="Include this member in the merge">':'')+
         (sec.kind==='media'?'<button class="rdel" data-del="'+o.id+'" title="Delete from the archive">×</button>':
          sec.kind==='post'?'<button class="rdel" data-postdel="'+o.id+'" title="Delete this post">×</button>':'')+
         resItemHtml(sec.kind,o)+'</div>').join('')+
@@ -3886,13 +4047,15 @@ function renderContent(){
     try{ await fetch('/api/print-blocks/'+b.dataset.blkdel,{method:'DELETE'});
          RES.cardsDirty=true; fetchContent(); }catch(err){}
   });
-  body.querySelectorAll('.sechd[data-sec]').forEach(h=>{
+  body.querySelectorAll('.sechd .drag-handle[data-sec]').forEach(h=>{
     h.ondragstart=e=>{
+      e.stopPropagation();
       try{ e.dataTransfer.setData('text/ts-group',
         JSON.stringify({section:h.dataset.sec, title:h.dataset.title, q:resQuery({})})); }catch(err){}
       e.dataTransfer.effectAllowed='copy';
     };
   });
+  wireMergeControls(body);
   body.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
     e.stopPropagation();
     const id=b.dataset.del;
